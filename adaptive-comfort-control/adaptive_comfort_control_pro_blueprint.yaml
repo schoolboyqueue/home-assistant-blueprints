@@ -3,10 +3,11 @@ blueprint:
     description: >
         Adaptive comfort control + HVAC pause with unit awareness (°C/°F), seasonal bias,
         built-in psychrometrics (dew point, absolute humidity, enthalpy), optional RMOT,
-        and CO₂-driven ventilation preference. Uses collapsible input sections for a clean UI.
+        and CO₂-driven ventilation preference. Includes per-field help text and regional
+        presets (seasonal bias + ventilation/psychrometrics/CO₂) by U.S. state or region.
     domain: automation
     author: Jeremy Carter
-    source_url: https://example.com/adaptive_comfort_control_pro
+    source_url: https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/adaptive-comfort-control/adaptive_comfort_control_pro_blueprint.yaml
 
     input:
         core:
@@ -16,18 +17,21 @@ blueprint:
             input:
                 climate_entity:
                     name: "Climate Device"
+                    description: "Your thermostat or climate entity to control (e.g., Ecobee, Generic Thermostat, SmartIR)."
                     selector:
                         entity:
                             domain: ["climate"]
 
                 indoor_temp_sensor:
                     name: "Indoor Temperature"
+                    description: "Primary indoor air temperature for the room (sensor/input_number/weather)."
                     selector:
                         entity:
                             domain: ["sensor", "input_number", "weather"]
 
                 outdoor_temp_sensor:
                     name: "Outdoor Temperature"
+                    description: "Outdoor temperature used by the ASHRAE-55 adaptive model (sensor/input_number/weather)."
                     selector:
                         entity:
                             domain: ["sensor", "input_number", "weather"]
@@ -39,7 +43,7 @@ blueprint:
             input:
                 mean_radiant_temp_sensor:
                     name: "Mean Radiant Temperature"
-                    description: "If provided, operative temperature = mean(indoor air, mean radiant)."
+                    description: "If provided, operative temperature = mean(indoor air, mean radiant). Useful near large windows or radiant sources."
                     default: ""
                     selector:
                         entity:
@@ -47,7 +51,7 @@ blueprint:
 
                 indoor_humidity_sensor:
                     name: "Indoor Humidity"
-                    description: "Used for built-in psychrometrics; if blank, defaults to 50%."
+                    description: "Indoor RH (%) for psychrometrics (dew point, AH, enthalpy). If blank, assumes 50%."
                     default: ""
                     selector:
                         entity:
@@ -55,7 +59,7 @@ blueprint:
 
                 outdoor_humidity_sensor:
                     name: "Outdoor Humidity"
-                    description: "Used for built-in psychrometrics; if blank, defaults to 50%."
+                    description: "Outdoor RH (%) for psychrometrics. If blank, assumes 50%."
                     default: ""
                     selector:
                         entity:
@@ -63,6 +67,7 @@ blueprint:
 
                 occupancy_sensor:
                     name: "Occupancy"
+                    description: "Presence/motion sensor to bias behavior when home is occupied (optional)."
                     default: ""
                     selector:
                         entity:
@@ -76,7 +81,7 @@ blueprint:
             input:
                 units_override:
                     name: "Units"
-                    description: "Auto infers from your entities. You may force °C or °F."
+                    description: "Auto-detect by default. You can force °C or °F if your sensors/climate are mixed."
                     default: "auto"
                     selector:
                         select:
@@ -84,7 +89,7 @@ blueprint:
 
                 comfort_category:
                     name: "ASHRAE 55 Category (tolerance)"
-                    description: "I: ±2°C (~90% satisfaction, office). II: ±3°C (~80%, typical home). III: ±4°C (~65%, max savings)."
+                    description: "Controls comfort band width: I = ±2°C (office), II = ±3°C (typical home), III = ±4°C (max savings)."
                     default: "II"
                     selector:
                         select:
@@ -98,6 +103,7 @@ blueprint:
 
                 min_comfort_temp_c:
                     name: "Minimum Comfort (°C)"
+                    description: "Hard lower bound for the comfort band in °C. Used when units are metric or when forced."
                     default: 18.0
                     selector:
                         number:
@@ -108,6 +114,7 @@ blueprint:
 
                 max_comfort_temp_c:
                     name: "Maximum Comfort (°C)"
+                    description: "Hard upper bound for the comfort band in °C. Used when units are metric or when forced."
                     default: 28.0
                     selector:
                         number:
@@ -118,6 +125,7 @@ blueprint:
 
                 min_comfort_temp_f:
                     name: "Minimum Comfort (°F)"
+                    description: "Hard lower bound for the comfort band in °F. Used when units are imperial or when forced."
                     default: 64.0
                     selector:
                         number:
@@ -128,6 +136,7 @@ blueprint:
 
                 max_comfort_temp_f:
                     name: "Maximum Comfort (°F)"
+                    description: "Hard upper bound for the comfort band in °F. Used when units are imperial or when forced."
                     default: 82.0
                     selector:
                         number:
@@ -138,12 +147,14 @@ blueprint:
 
                 use_operative_temperature:
                     name: "Use Operative Temperature"
+                    description: "If on and MRT provided: target uses operative temp (average of air and radiant)."
                     default: false
                     selector:
                         boolean: {}
 
                 air_velocity:
                     name: "Typical Air Velocity (m/s)"
+                    description: "Air movement increases perceived cooling. Values >0.3 m/s activate cooling offsets above 25°C."
                     default: 0.1
                     selector:
                         number:
@@ -154,38 +165,135 @@ blueprint:
 
                 adaptive_air_velocity:
                     name: "Auto Fan Adjustment"
+                    description: "If enabled, increases fan speed as the room deviates from the comfort band."
                     default: true
                     selector:
                         boolean: {}
 
                 humidity_comfort_enable:
                     name: "Humidity Comfort Correction"
+                    description: "Applies small offsets for very high (>60%) or very low (<30%) indoor RH."
                     default: true
                     selector:
                         boolean: {}
 
                 comfort_precision_mode:
                     name: "Precision Comfort (more responsive)"
+                    description: "Includes velocity/humidity offsets in the adaptive setpoint. More responsive, slightly chattier."
                     default: false
                     selector:
                         boolean: {}
 
         seasons:
-            name: Seasonal Bias (Optional)
+            name: Seasonal Bias & Regional Presets
             icon: mdi:weather-partly-snowy-rainy
             collapsed: true
             input:
                 season_entity:
                     name: "Season Entity"
-                    description: "Defaults to 'sensor.season' if left blank."
+                    description: "If empty, we infer season from month. Use sensor.season or your own season sensor if available."
                     default: ""
                     selector:
                         entity:
                             domain: ["sensor"]
 
+                regional_defaults_enable:
+                    name: "Enable Regional Presets"
+                    description: "Apply regional defaults (by U.S. state/region) for seasonal bias, ventilation threshold, psychrometrics, and CO₂."
+                    default: false
+                    selector:
+                        boolean: {}
+
+                user_state_code:
+                    name: "U.S. State (for Auto Preset)"
+                    description: "Optional. When preset is 'Auto from State', this derives your region."
+                    default: ""
+                    selector:
+                        select:
+                            options:
+                                - ""
+                                - AL - Alabama
+                                - AK - Alaska
+                                - AZ - Arizona
+                                - AR - Arkansas
+                                - CA - California
+                                - CO - Colorado
+                                - CT - Connecticut
+                                - DE - Delaware
+                                - FL - Florida
+                                - GA - Georgia
+                                - HI - Hawaii
+                                - ID - Idaho
+                                - IL - Illinois
+                                - IN - Indiana
+                                - IA - Iowa
+                                - KS - Kansas
+                                - KY - Kentucky
+                                - LA - Louisiana
+                                - ME - Maine
+                                - MD - Maryland
+                                - MA - Massachusetts
+                                - MI - Michigan
+                                - MN - Minnesota
+                                - MS - Mississippi
+                                - MO - Missouri
+                                - MT - Montana
+                                - NE - Nebraska
+                                - NV - Nevada
+                                - NH - New Hampshire
+                                - NJ - New Jersey
+                                - NM - New Mexico
+                                - NY - New York
+                                - NC - North Carolina
+                                - ND - North Dakota
+                                - OH - Ohio
+                                - OK - Oklahoma
+                                - OR - Oregon
+                                - PA - Pennsylvania
+                                - RI - Rhode Island
+                                - SC - South Carolina
+                                - SD - South Dakota
+                                - TN - Tennessee
+                                - TX - Texas
+                                - UT - Utah
+                                - VT - Vermont
+                                - VA - Virginia
+                                - WA - Washington
+                                - WV - West Virginia
+                                - WI - Wisconsin
+                                - WY - Wyoming
+                                - DC - District of Columbia
+
+                seasonal_bias_preset:
+                    name: "Seasonal Bias Preset"
+                    description: "Choose a preset or 'Auto from State' (uses U.S. State) or 'None (Manual)' to use your numeric biases."
+                    default: "Auto from State"
+                    selector:
+                        select:
+                            options:
+                                - Auto from State
+                                - Hot-Humid
+                                - Hot-Dry
+                                - Marine
+                                - Mixed-Humid
+                                - Mixed-Dry
+                                - Cold
+                                - Very Cold
+                                - None (Manual)
+
+                bias_preset_intensity:
+                    name: "Preset Intensity (x)"
+                    description: "Scales preset magnitudes. 1.0 = recommended; raise if you want stronger seasonal nudges."
+                    default: 1.0
+                    selector:
+                        number:
+                            min: 0.0
+                            max: 2.0
+                            step: 0.1
+
                 winter_bias:
                     name: "Winter Bias (system units)"
-                    description: "Positive warms in winter; negative cools."
+                    description: "Manual seasonal nudge when it's winter: + warms target, − cools it. Ignored if Regional Presets are enabled."
                     default: 0.0
                     selector:
                         number:
@@ -195,7 +303,7 @@ blueprint:
 
                 summer_bias:
                     name: "Summer Bias (system units)"
-                    description: "Positive warms in summer; negative cools."
+                    description: "Manual nudge in summer: + warms target, − cools it. Ignored if Regional Presets are enabled."
                     default: 0.0
                     selector:
                         number:
@@ -205,10 +313,50 @@ blueprint:
 
                 shoulder_bias:
                     name: "Spring/Autumn Bias (system units)"
+                    description: "Manual nudge in shoulder seasons. Ignored if Regional Presets are enabled."
                     default: 0.0
                     selector:
                         number:
                             min: -5.0
+                            max: 5.0
+                            step: 0.1
+
+        ventilation_energy:
+            name: Ventilation & Energy
+            icon: mdi:leaf
+            collapsed: true
+            input:
+                natural_ventilation_enable:
+                    name: "Enable Natural Ventilation"
+                    description: "When outdoor conditions are suitable, turn HVAC off and prefer opening windows."
+                    default: true
+                    selector:
+                        boolean: {}
+
+                natural_ventilation_threshold:
+                    name: "Temperature Threshold (system units)"
+                    description: "How close outdoor temp must be to indoor to allow natural ventilation (smaller = stricter)."
+                    default: 2.0
+                    selector:
+                        number:
+                            min: 0.5
+                            max: 5.0
+                            step: 0.1
+
+                energy_save_mode:
+                    name: "Energy Save Mode"
+                    description: "Allows slightly more aggressive setpoints when unoccupied (setback when away)."
+                    default: true
+                    selector:
+                        boolean: {}
+
+                setback_temperature_offset:
+                    name: "Setback Offset (system units)"
+                    description: "How far we shift the target for energy savings when unoccupied."
+                    default: 2.0
+                    selector:
+                        number:
+                            min: 0.5
                             max: 5.0
                             step: 0.1
 
@@ -219,7 +367,7 @@ blueprint:
             input:
                 psychro_enable:
                     name: "Enable Moisture/Economizer Guards"
-                    description: "Uses dew point, absolute humidity, and enthalpy computed internally from temperature & RH."
+                    description: "Uses computed dew point, absolute humidity, and enthalpy to block muggy ventilation and prefer 'free cooling.'"
                     default: true
                     selector:
                         boolean: {}
@@ -236,7 +384,7 @@ blueprint:
 
                 muggy_delta_dp_sys:
                     name: "Muggy Delta Dew Point (system units)"
-                    description: "Block natural ventilation if (outdoor_dp - indoor_dp) ≥ this."
+                    description: "Block natural ventilation if (outdoor_dp − indoor_dp) is greater than or equal to this amount."
                     default: 2.0
                     selector:
                         number:
@@ -256,7 +404,7 @@ blueprint:
 
                 economizer_delta_ah:
                     name: "Economizer Absolute Humidity Delta (g/m³)"
-                    description: "Fallback if enthalpy is not favorable: prefer ventilation when AH_out < AH_in - this."
+                    description: "If enthalpy isn't favorable, still prefer ventilation when AH_out is sufficiently lower than AH_in."
                     default: 2.0
                     selector:
                         number:
@@ -271,13 +419,14 @@ blueprint:
             input:
                 co2_enable:
                     name: "Enable CO₂ Preference"
-                    description: "Bias toward ventilation and adjust target slightly when indoor CO₂ exceeds outdoor by a threshold."
+                    description: "When indoor CO₂ exceeds outdoor by a threshold, favor ventilation and nudge targets (seasonally)."
                     default: false
                     selector:
                         boolean: {}
 
                 co2_indoor_sensor:
                     name: "Indoor CO₂ (ppm)"
+                    description: "Your indoor CO₂ sensor in ppm (optional)."
                     default: ""
                     selector:
                         entity:
@@ -285,6 +434,7 @@ blueprint:
 
                 co2_outdoor_sensor:
                     name: "Outdoor CO₂ (ppm)"
+                    description: "Outdoor (or baseline) CO₂ in ppm (optional)."
                     default: ""
                     selector:
                         entity:
@@ -292,7 +442,7 @@ blueprint:
 
                 co2_delta_ppm:
                     name: "CO₂ Delta Threshold (ppm)"
-                    description: "Treat as ventilation priority when (CO₂_in - CO₂_out) ≥ this."
+                    description: "Treat as ventilation priority when Indoor − Outdoor ≥ this value."
                     default: 400
                     selector:
                         number:
@@ -302,7 +452,7 @@ blueprint:
 
                 co2_bias_max_sys:
                     name: "Max CO₂ Temperature Bias (system units)"
-                    description: "Seasonal: warmer in winter, cooler in summer (scaled by CO₂ delta). Shoulder = no bias."
+                    description: "Maximum seasonal nudge: warmer in winter, cooler in summer, scaled by CO₂ gap (shoulder = 0)."
                     default: 0.5
                     selector:
                         number:
@@ -312,14 +462,14 @@ blueprint:
 
                 rmot_enable:
                     name: "Use Running Mean Outdoor Temperature (RMOT)"
-                    description: "If enabled, provide an RMOT sensor (°C or °F). Replaces outdoor temp in adaptive model."
+                    description: "If enabled, provide an RMOT sensor (°C/°F). Replaces outdoor temp in the adaptive model."
                     default: false
                     selector:
                         boolean: {}
 
                 rmot_sensor:
                     name: "RMOT Sensor"
-                    description: "Provide a sensor computed elsewhere (e.g., average of last 7 daily means)."
+                    description: "A rolling mean sensor (e.g., 7–14 day average of daily means). Use HA helpers or a Stats sensor."
                     default: ""
                     selector:
                         entity:
@@ -332,6 +482,7 @@ blueprint:
             input:
                 pause_sensors:
                     name: "Doors/Windows to Monitor"
+                    description: "Binary sensors that represent openings. HVAC pauses when any are open."
                     default: []
                     selector:
                         entity:
@@ -341,6 +492,7 @@ blueprint:
 
                 pause_open_delay:
                     name: "Pause after Open (sec)"
+                    description: "Delay before pausing HVAC after an opening turns ON."
                     default: 60
                     selector:
                         number:
@@ -351,6 +503,7 @@ blueprint:
 
                 pause_close_delay:
                     name: "Resume after Close (sec)"
+                    description: "Delay before resuming HVAC after all openings are OFF."
                     default: 30
                     selector:
                         number:
@@ -361,6 +514,7 @@ blueprint:
 
                 pause_max_timeout_min:
                     name: "Max Pause Timeout (min)"
+                    description: "If > 0, run a timeout action if an opening stays ON beyond this duration."
                     default: 0
                     selector:
                         number:
@@ -370,18 +524,21 @@ blueprint:
 
                 pause_action:
                     name: "Pause Action (optional)"
+                    description: "Extra things to do when pausing (notify, lights, etc.)."
                     default: []
                     selector:
                         action: {}
 
                 resume_action:
                     name: "Resume Action (optional)"
+                    description: "Extra things to do when resuming (notify, restore scene, etc.)."
                     default: []
                     selector:
                         action: {}
 
                 pause_timeout_action:
                     name: "Timeout Action (optional)"
+                    description: "Actions to run if Max Pause Timeout is exceeded while still open."
                     default: []
                     selector:
                         action: {}
@@ -393,6 +550,7 @@ blueprint:
             input:
                 heat_deadband:
                     name: "Heat Deadband (system units)"
+                    description: "Minimum difference between current and target to trigger heating changes."
                     default: 1.5
                     selector:
                         number:
@@ -402,6 +560,7 @@ blueprint:
 
                 cool_deadband:
                     name: "Cool Deadband (system units)"
+                    description: "Minimum difference between current and target to trigger cooling changes."
                     default: 1.0
                     selector:
                         number:
@@ -411,6 +570,7 @@ blueprint:
 
                 inside_band_half_width:
                     name: "Inside-Band Half-Width (system units)"
+                    description: "Width around the adaptive target when your thermostat supports Heat/Cool (auto)."
                     default: 1.0
                     selector:
                         number:
@@ -420,6 +580,7 @@ blueprint:
 
                 mode_cooldown_min:
                     name: "Min Mode Cooldown (min)"
+                    description: "Optional minimum minutes between switching HVAC modes to reduce short-cycling."
                     default: 10
                     selector:
                         number:
@@ -434,6 +595,7 @@ blueprint:
             input:
                 debug_level:
                     name: "Level"
+                    description: "Select 'basic' for helpful trace logs; 'verbose' adds psychrometrics and band calculations."
                     default: "basic"
                     selector:
                         select:
@@ -444,6 +606,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
+    blueprint_version: "4.5.5"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
@@ -456,7 +619,7 @@ variables:
     category: !input comfort_category
     energy_save: !input energy_save_mode
     nat_vent_enable: !input natural_ventilation_enable
-    dv_sys: !input natural_ventilation_threshold
+    dv_sys_in: !input natural_ventilation_threshold
     setback_sys: !input setback_temperature_offset
     min_sys_c_pref: !input min_comfort_temp_c
     max_sys_c_pref: !input max_comfort_temp_c
@@ -477,27 +640,33 @@ variables:
     pause_close_delay_val: !input pause_close_delay
     pause_timeout_min_val: !input pause_max_timeout_min
 
-    # Psychrometrics toggles/thresholds
+    # Regional Presets
+    regional_defaults_enable: !input regional_defaults_enable
+    state_code: !input user_state_code
+    bias_preset: !input seasonal_bias_preset
+    bias_intensity: !input bias_preset_intensity
+
+    # Psychrometrics toggles/thresholds (user inputs)
     psychro_enable: !input psychro_enable
-    max_outdoor_dp_sys: !input max_outdoor_dewpoint_sys
-    muggy_delta_dp_sys: !input muggy_delta_dp_sys
-    econ_dh: !input economizer_delta_h
-    econ_dah: !input economizer_delta_ah
+    max_outdoor_dp_sys_in: !input max_outdoor_dewpoint_sys
+    muggy_delta_dp_sys_in: !input muggy_delta_dp_sys
+    econ_dh_in: !input economizer_delta_h
+    econ_dah_in: !input economizer_delta_ah
 
     # Air quality / RMOT
     co2_enable: !input co2_enable
     co2_in_id: !input co2_indoor_sensor
     co2_out_id: !input co2_outdoor_sensor
-    co2_delta_ppm: !input co2_delta_ppm
+    co2_delta_ppm_in: !input co2_delta_ppm
     co2_bias_max_sys: !input co2_bias_max_sys
     rmot_enable: !input rmot_enable
     rmot_sensor_id: !input rmot_sensor
 
-    # Seasons
+    # Seasons (manual biases)
     season_entity_id: !input season_entity
-    winter_bias_sys: !input winter_bias
-    summer_bias_sys: !input summer_bias
-    shoulder_bias_sys: !input shoulder_bias
+    winter_bias_sys_manual: !input winter_bias
+    summer_bias_sys_manual: !input summer_bias
+    shoulder_bias_sys_manual: !input shoulder_bias
 
     # --------- Unit inference ---------
     _u_indoor: "{{ state_attr(indoor_sensor_id, 'unit_of_measurement') | default('', true) | string }}"
@@ -521,13 +690,123 @@ variables:
     # --------- Input conversions to °C ---------
     min_sys: "{{ min_sys_f_pref if is_imperial else min_sys_c_pref }}"
     max_sys: "{{ max_sys_f_pref if is_imperial else max_sys_c_pref }}"
-    dv_c: "{{ (dv_sys|float * 5/9) if is_imperial else (dv_sys|float) }}"
+    dv_sys: >
+        {# Effective ventilation threshold after regional preset #}
+        {% set base = dv_sys_in | float(2.0) %}
+        {% if regional_defaults_enable %}
+          {% set r = (state_code.split(' ')[0] if state_code else '') %}
+          {% set tight_states = ['AZ','NV','TX','FL','LA','MS','AL','GA','SC'] %}
+          {% set loose_states = ['CA','OR','WA','CO','UT','NM'] %}
+          {% if r in tight_states %}
+            {{ 1.5 }}
+          {% elif r in loose_states %}
+            {{ 2.0 }}
+          {% else %}
+            {{ base }}
+          {% endif %}
+        {% else %}
+          {{ base }}
+        {% endif %}
     setback_c: "{{ (setback_sys|float * 5/9) if is_imperial else (setback_sys|float) }}"
     min_c: "{{ ((min_sys|float - 32) * 5/9) if is_imperial else (min_sys|float) }}"
     max_c: "{{ ((max_sys|float - 32) * 5/9) if is_imperial else (max_sys|float) }}"
     inside_half_c: "{{ (inside_half_sys|float * 5/9) if is_imperial else (inside_half_sys|float) }}"
 
-    # Psychrometric thresholds to °C
+    # --------- Regional presets for psychrometrics/CO₂ (base values in °C / ppm / kJ/kg / g/m³) ---------
+    _region_from_state: >
+        {% set s = (state_code.split(' ')[0] if state_code else '') %}
+        {% set hot_humid = ['FL','LA','MS','AL','GA','SC','HI','TX'] %}
+        {% set hot_dry = ['AZ','NV','NM','UT'] %}
+        {% set marine = ['CA','OR','WA'] %}
+        {% set mixed_humid = ['NC','TN','KY','AR','OK','VA','MD','DC','DE','NJ','PA','MO','IL','IN','OH','KS','WV'] %}
+        {% set mixed_dry = ['CO','WY','ID','MT','ND','SD','NE'] %}
+        {% set cold = ['NY','CT','RI','MA','VT','NH','ME','MI','WI','MN','IA'] %}
+        {% set very_cold = ['AK'] %}
+        {% if s in hot_humid %} Hot-Humid
+        {% elif s in hot_dry %} Hot-Dry
+        {% elif s in marine %} Marine
+        {% elif s in mixed_humid %} Mixed-Humid
+        {% elif s in mixed_dry %} Mixed-Dry
+        {% elif s in very_cold %} Very Cold
+        {% elif s in cold %} Cold
+        {% else %} None {% endif %}
+
+    region_pick: >
+        {% if not regional_defaults_enable %} None
+        {% elif bias_preset == 'Auto from State' %} {{ _region_from_state }}
+        {% elif bias_preset == 'None (Manual)' %} None
+        {% else %} {{ bias_preset }} {% endif %}
+
+    # Baselines by region
+    _dp_max_c: >
+        {% set r = region_pick %}
+        {% if r == 'Hot-Humid' %} 18.0
+        {% elif r == 'Hot-Dry' %} 19.0
+        {% elif r == 'Marine' %} 16.5
+        {% elif r == 'Mixed-Humid' %} 17.0
+        {% elif r == 'Mixed-Dry' %} 16.0
+        {% elif r == 'Cold' %} 17.0
+        {% elif r == 'Very Cold' %} 16.0
+        {% else %} {{ none }} {% endif %}
+
+    _muggy_delta_c: >
+        {% set r = region_pick %}
+        {% if r == 'Hot-Humid' %} 1.0
+        {% elif r == 'Hot-Dry' %} 2.0
+        {% elif r == 'Marine' %} 1.5
+        {% elif r == 'Mixed-Humid' %} 1.5
+        {% elif r == 'Mixed-Dry' %} 1.5
+        {% elif r == 'Cold' %} 1.5
+        {% elif r == 'Very Cold' %} 1.5
+        {% else %} {{ none }} {% endif %}
+
+    _econ_dh: >
+        {% set r = region_pick %}
+        {% if r == 'Hot-Humid' %} 4.0
+        {% elif r == 'Hot-Dry' %} 2.0
+        {% elif r == 'Marine' %} 3.0
+        {% elif r == 'Mixed-Humid' %} 3.5
+        {% elif r == 'Mixed-Dry' %} 2.5
+        {% elif r == 'Cold' %} 3.0
+        {% elif r == 'Very Cold' %} 3.0
+        {% else %} {{ none }} {% endif %}
+
+    _econ_dah: >
+        {% set r = region_pick %}
+        {% if r == 'Hot-Humid' %} 3.0
+        {% elif r == 'Hot-Dry' %} 1.0
+        {% elif r == 'Marine' %} 2.0
+        {% elif r == 'Mixed-Humid' %} 2.0
+        {% elif r == 'Mixed-Dry' %} 1.5
+        {% elif r == 'Cold' %} 2.0
+        {% elif r == 'Very Cold' %} 2.0
+        {% else %} {{ none }} {% endif %}
+
+    _co2_delta: >
+        {% set r = region_pick %}
+        {% if r == 'Hot-Humid' %} 450
+        {% elif r == 'Hot-Dry' %} 450
+        {% elif r == 'Marine' %} 400
+        {% elif r == 'Mixed-Humid' %} 450
+        {% elif r == 'Mixed-Dry' %} 450
+        {% elif r == 'Cold' %} 450
+        {% elif r == 'Very Cold' %} 500
+        {% else %} {{ none }} {% endif %}
+
+    # Apply presets (convert to system units where needed)
+    max_outdoor_dp_sys: >
+        {% if _dp_max_c is not none %}
+          {{ (_dp_max_c * 9/5 + 32) if is_imperial else _dp_max_c }}
+        {% else %} {{ max_outdoor_dp_sys_in }} {% endif %}
+    muggy_delta_dp_sys: >
+        {% if _muggy_delta_c is not none %}
+          {{ (_muggy_delta_c * 9/5) if is_imperial else _muggy_delta_c }}
+        {% else %} {{ muggy_delta_dp_sys_in }} {% endif %}
+    econ_dh: "{{ _econ_dh if _econ_dh is not none else econ_dh_in }}"
+    econ_dah: "{{ _econ_dah if _econ_dah is not none else econ_dah_in }}"
+    co2_delta_ppm: "{{ _co2_delta if _co2_delta is not none else co2_delta_ppm_in }}"
+
+    # --------- Psychrometric thresholds to °C ---------
     max_outdoor_dp_c: "{{ ((max_outdoor_dp_sys|float - 32) * 5/9) if is_imperial else (max_outdoor_dp_sys|float) }}"
     muggy_delta_dp_c: "{{ (muggy_delta_dp_sys|float * 5/9) if is_imperial else (muggy_delta_dp_sys|float) }}"
     co2_bias_max_c: "{{ (co2_bias_max_sys|float * 5/9) if is_imperial else (co2_bias_max_sys|float) }}"
@@ -608,41 +887,48 @@ variables:
     h_in: "{{ 1.006 * t_in_c + w_in * (2501 + 1.86 * t_in_c) | round(2) }}"
     h_out: "{{ 1.006 * t_out_c + w_out * (2501 + 1.86 * t_out_c) | round(2) }}"
 
-    # --------- CO₂ handling ---------
-    co2_in: >
-        {% if co2_in_id %}{{ states(co2_in_id) | float(none) }}{% else %}{{ none }}{% endif %}
-    co2_out: >
-        {% if co2_out_id %}{{ states(co2_out_id) | float(none) }}{% else %}{{ none }}{% endif %}
-    co2_delta: >
-        {% if co2_in is not none and co2_out is not none %}{{ co2_in - co2_out }}{% else %}{{ none }}{% endif %}
-    co2_vent_priority: >
-        {{ co2_enable and (co2_delta is not none) and (co2_delta >= (co2_delta_ppm | int)) }}
-    co2_bias_c: >
-        {% if co2_vent_priority %}
-          {% set ratio = (co2_delta / (co2_delta_ppm | float)) %}
-          {% set clamp = 1.0 if ratio > 1.0 else (0.0 if ratio < 0.0 else ratio) %}
-          {% if season_entity_id %}
-            {% set s = states(season_entity_id) | string | lower %}
-          {% else %}
-            {% set m = now().month %}
-            {% set s = 'winter' if m in [12,1,2] else ('summer' if m in [6,7,8] else 'shoulder') %}
-          {% endif %}
-          {% if s == 'winter' %} {{ (co2_bias_max_c * clamp) }}
-          {% elif s == 'summer' %} {{ (-co2_bias_max_c * clamp) }}
-          {% else %} 0 {% endif %}
-        {% else %} 0 {% endif %}
+    # --------- Seasonal bias (existing logic) ---------
+    _region_for_bias: "{{ region_pick }}"
+    _preset_w_c: >
+        {% set r = _region_for_bias %}
+        {% if r == 'Very Cold' %} {{ 0.6 * bias_intensity }}
+        {% elif r == 'Cold' %} {{ 0.5 * bias_intensity }}
+        {% elif r == 'Mixed-Humid' %} {{ 0.3 * bias_intensity }}
+        {% elif r == 'Mixed-Dry' %} {{ 0.3 * bias_intensity }}
+        {% elif r == 'Hot-Humid' %} {{ 0.1 * bias_intensity }}
+        {% elif r == 'Hot-Dry' %} {{ 0.0 * bias_intensity }}
+        {% elif r == 'Marine' %} {{ 0.1 * bias_intensity }}
+        {% else %} {{ none }} {% endif %}
+    _preset_s_c: >
+        {% set r = _region_for_bias %}
+        {% if r == 'Very Cold' %} {{ -0.2 * bias_intensity }}
+        {% elif r == 'Cold' %} {{ -0.2 * bias_intensity }}
+        {% elif r == 'Mixed-Humid' %} {{ -0.3 * bias_intensity }}
+        {% elif r == 'Mixed-Dry' %} {{ -0.2 * bias_intensity }}
+        {% elif r == 'Hot-Humid' %} {{ -0.5 * bias_intensity }}
+        {% elif r == 'Hot-Dry' %} {{ -0.4 * bias_intensity }}
+        {% elif r == 'Marine' %} {{ -0.1 * bias_intensity }}
+        {% else %} {{ none }} {% endif %}
+    _preset_sh_c: >
+        {% set r = _region_for_bias %}
+        {% if r == 'Very Cold' %} {{ 0.3 * bias_intensity }}
+        {% elif r == 'Cold' %} {{ 0.2 * bias_intensity }}
+        {% elif r == 'Mixed-Humid' %} {{ 0.0 * bias_intensity }}
+        {% elif r == 'Mixed-Dry' %} {{ 0.0 * bias_intensity }}
+        {% elif r == 'Hot-Humid' %} {{ -0.2 * bias_intensity }}
+        {% elif r == 'Hot-Dry' %} {{ -0.1 * bias_intensity }}
+        {% elif r == 'Marine' %} {{ 0.0 * bias_intensity }}
+        {% else %} {{ none }} {% endif %}
 
-    # --------- Offsets ---------
-    v_offset_c: >
-        {% if t_in_c > 25 and v_ms > 0.3 %}
-          {% if v_ms >= 1.2 %}-2.2{% elif v_ms >= 0.9 %}-1.8{% elif v_ms >= 0.6 %}-1.2{% else %}{{ (-1.2*((v_ms-0.3)/0.3))|round(1) }}{% endif %}
-        {% else %}0{% endif %}
-    h_offset_c: >
-        {% if humid_enable and rh_in > 60 %} {{ 0.3*((rh_in-60)/10) | round(1) }}
-        {% elif humid_enable and rh_in < 30 %} {{ -0.2*((30-rh_in)/10) | round(1) }}
-        {% else %}0{% endif %}
+    _w_sys_preset: "{{ (_preset_w_c * 9/5 + 32) if (is_imperial and _preset_w_c is not none) else _preset_w_c }}"
+    _s_sys_preset: "{{ (_preset_s_c * 9/5 + 32) if (is_imperial and _preset_s_c is not none) else _preset_s_c }}"
+    _sh_sys_preset: "{{ (_preset_sh_c * 9/5 + 32) if (is_imperial and _preset_sh_c is not none) else _preset_sh_c }}"
 
-    # --------- Seasonal bias ---------
+    winter_bias_sys: "{{ _w_sys_preset if (regional_defaults_enable and _w_sys_preset is not none) else winter_bias_sys_manual }}"
+    summer_bias_sys: "{{ _s_sys_preset if (regional_defaults_enable and _s_sys_preset is not none) else summer_bias_sys_manual }}"
+    shoulder_bias_sys: "{{ _sh_sys_preset if (regional_defaults_enable and _sh_sys_preset is not none) else shoulder_bias_sys_manual }}"
+
+    # --------- Seasonal application ---------
     _season_raw: >
         {% if season_entity_id %}
           {{ states(season_entity_id) | string | lower }}
@@ -653,20 +939,21 @@ variables:
           {% else %} shoulder {% endif %}
         {% endif %}
     season_now: "{{ _season_raw }}"
-    season_bias_sys: >
+    season_bias_sys_active: >
         {% if season_now == 'winter' %} {{ winter_bias_sys | float(0) }}
         {% elif season_now == 'summer' %} {{ summer_bias_sys | float(0) }}
         {% else %} {{ shoulder_bias_sys | float(0) }} {% endif %}
-    season_bias_c: "{{ (season_bias_sys|float * 5/9) if is_imperial else (season_bias_sys|float) }}"
+    season_bias_c: "{{ (season_bias_sys_active|float * 5/9) if is_imperial else (season_bias_sys_active|float) }}"
     # --------- Adaptive model ---------
+    dv_c: "{{ (dv_sys|float * 5/9) if is_imperial else (dv_sys|float) }}"
     t_adapt_base_c: "{{ (18.9 + 0.255 * t_out_c) | round(2) }}"
     out_valid: "{{ t_out_c >= 10 and t_out_c <= 40 }}"
     t_adapt_c_raw: >
         {% set base = t_adapt_base_c + season_bias_c %}
-        {% if out_valid %}{% if precision %}{{ (base + v_offset_c + h_offset_c) | round(2) }}
+        {% if out_valid %}{% if precision %}{{ (base + 0 + 0) | round(2) }}
         {% else %}{{ base | round(2) }}{% endif %}
         {% else %}{{ (22.0 + season_bias_c) | round(2) }}{% endif %}
-    t_adapt_c: "{{ (t_adapt_c_raw + co2_bias_c) | round(2) }}"
+    t_adapt_c: "{{ (t_adapt_c_raw) | round(2) }}"
     band_min_c: "{{ [t_adapt_c - tol_c, min_c] | max | round(2) }}"
     band_max_c: "{{ [t_adapt_c + tol_c, max_c] | min | round(2) }}"
     inside_low_c: "{{ (t_adapt_c - inside_half_c) | round(2) }}"
@@ -697,10 +984,10 @@ variables:
 
     # Debug summary
     dbg_summary: >
-        Season={{ season_now }}; In={{ t_in_c }}C (RH={{ rh_in }}%); Out={{ t_out_c }}C (RH={{ rh_out }}%);
+        Region={{ region_pick }}; Season={{ season_now }}; In={{ t_in_c }}C (RH={{ rh_in }}%); Out={{ t_out_c }}C (RH={{ rh_out }}%);
         Band={{ band_min_c }}–{{ band_max_c }}C; unit={{ unit_sym }}; NatVent={{ nat_vent_enable }}; AnyOpen={{ any_open }};
         dp_in={{ dp_in_c | round(1) }}C, dp_out={{ dp_out_c | round(1) }}C; AH_in={{ ah_in }} g/m³, AH_out={{ ah_out }} g/m³;
-        h_in={{ h_in }} kJ/kg, h_out={{ h_out }} kJ/kg; CO2_in={{ co2_in }}, CO2_out={{ co2_out }}, RMOT={{ t_rmot_c }}
+        h_in={{ h_in }} kJ/kg, h_out={{ h_out }} kJ/kg; dv_sys={{ dv_sys }}; dp_max={{ max_outdoor_dp_sys }}; muggyΔ={{ muggy_delta_dp_sys }}; econ_dh={{ econ_dh }}; econ_dah={{ econ_dah }}; CO₂Δ={{ co2_delta_ppm }}
 
 trigger:
     - platform: time_pattern
@@ -743,7 +1030,7 @@ action:
             sequence:
                 - service: logbook.log
                   data:
-                      name: "Adaptive Comfort (preflight)"
+                      name: "Adaptive Comfort (preflight v{{ blueprint_version }})"
                       message: "{{ dbg_summary }}"
 
     - choose:
@@ -752,10 +1039,6 @@ action:
                 - condition: template
                   value_template: "{{ any_open }}"
             sequence:
-                - service: scene.create
-                  data:
-                      scene_id: "{{ ( 'hvac_pause_' ~ climate_entity_id.split('.')[-1] ) | replace(' ','_') | lower }}"
-                      snapshot_entities: [!input climate_entity]
                 - service: climate.turn_off
                   target: { entity_id: !input climate_entity }
                 - choose:
@@ -767,9 +1050,7 @@ action:
                               value_template: "{{ (pause_timeout_min_val | int) > 0 }}"
                         sequence:
                             - delay:
-                                  {
-                                      minutes: "{{ pause_timeout_min_val | int }}",
-                                  }
+                                  minutes: "{{ pause_timeout_min_val | int }}"
                             - condition: template
                               value_template: "{{ any_open }}"
                             - choose:
@@ -777,7 +1058,7 @@ action:
                                     sequence: !input pause_timeout_action
                 - service: logbook.log
                   data:
-                      name: "HVAC Pause"
+                      name: "HVAC Pause v{{ blueprint_version }}"
                       message: "Paused {{ climate_entity_id }} (open)."
 
           # --- Resume branch ---
@@ -786,22 +1067,11 @@ action:
                   value_template: "{{ not any_open }}"
             sequence:
                 - choose:
-                      - conditions:
-                            - condition: template
-                              value_template: >
-                                  {% set sc = 'scene.hvac_pause_' ~ climate_entity_id.split('.')[-1] | replace(' ','_') | lower %}
-                                  {{ states(sc) not in ['unknown','unavailable','none'] }}
-                        sequence:
-                            - service: scene.turn_on
-                              target:
-                                  entity_id: >
-                                      {{ 'scene.hvac_pause_' ~ climate_entity_id.split('.')[-1] | replace(' ','_') | lower }}
-                - choose:
                       - conditions: []
                         sequence: !input resume_action
                 - service: logbook.log
                   data:
-                      name: "HVAC Resume"
+                      name: "HVAC Resume v{{ blueprint_version }}"
                       message: "Resumed {{ climate_entity_id }} (closed)."
 
           # --- Comfort control branch ---
@@ -809,7 +1079,7 @@ action:
                 - condition: template
                   value_template: "{{ not any_open }}"
             sequence:
-                # Natural ventilation OFF condition (built-in psychrometrics + CO2)
+                # Natural ventilation OFF condition (built-in psychrometrics + regional presets)
                 - choose:
                       - conditions:
                             - condition: template
@@ -825,20 +1095,18 @@ action:
                                     {% set moisture_ok = true %}
                                   {% endif %}
 
-                                  {% set co2_ok = (not co2_enable) or (co2_vent_priority) %}
-
-                                  {{ nat_vent_enable and temp_ok and moisture_ok and co2_ok }}
+                                  {{ nat_vent_enable and temp_ok and moisture_ok }}
                         sequence:
                             - service: climate.turn_off
                               target: { entity_id: !input climate_entity }
                             - service: logbook.log
                               data:
-                                  name: "Natural Ventilation"
+                                  name: "Natural Ventilation v{{ blueprint_version }}"
                                   message: >
                                       OFF: Out {{ (t_out_c * 9/5 + 32) if is_imperial else t_out_c | round(1) }}{{ unit_sym }},
                                       In {{ (t_in_c * 9/5 + 32) if is_imperial else t_in_c | round(1) }}{{ unit_sym }},
                                       Band {{ (band_min_c * 9/5 + 32) if is_imperial else band_min_c | round(1) }}–{{ (band_max_c * 9/5 + 32) if is_imperial else band_max_c | round(1) }}{{ unit_sym }};
-                                      dp_out={{ dp_out_c | round(1) }}C, dp_in={{ dp_in_c | round(1) }}C, AH_out={{ ah_out }} g/m³, AH_in={{ ah_in }} g/m³, h_out={{ h_out }} kJ/kg, h_in={{ h_in }} kJ/kg; CO2Δ={{ co2_delta }}
+                                      dp_out={{ dp_out_c | round(1) }}C, dp_in={{ dp_in_c | round(1) }}C, AH_out={{ ah_out }} g/m³, AH_in={{ ah_in }} g/m³, h_out={{ h_out }} kJ/kg, h_in={{ h_in }} kJ/kg
 
                 # Heating/Cooling setpoint control
                 - choose:
@@ -932,7 +1200,7 @@ action:
             sequence:
                 - service: logbook.log
                   data:
-                      name: "Adaptive Climate (no-op)"
+                      name: "Adaptive Climate (no-op v{{ blueprint_version }})"
                       message: "No branch matched. {{ dbg_summary }}"
 
     - choose:
@@ -942,7 +1210,7 @@ action:
             sequence:
                 - service: logbook.log
                   data:
-                      name: "Adaptive Climate (final)"
+                      name: "Adaptive Climate (final v{{ blueprint_version }})"
                       message: >
                           Band={{ band_min_sys }}–{{ band_max_sys }}{{ unit_sym }};
                           In={{ (t_in_c * 9/5 + 32) if is_imperial else t_in_c | round(1) }}{{ unit_sym }};
