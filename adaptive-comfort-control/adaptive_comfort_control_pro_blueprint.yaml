@@ -1160,148 +1160,131 @@ action:
                   data:
                       name: "HVAC Pause v{{ blueprint_version }}"
                       message: "Paused {{ climate_entity_id }} (open)."
+      default:
+          # --- Resume branch (no openings active) ---
+          - choose:
+                - conditions: []
+                  sequence: !input resume_action
+          - service: logbook.log
+            data:
+                name: "HVAC Resume v{{ blueprint_version }}"
+                message: "Resumed {{ climate_entity_id }} (closed)."
 
-          # --- Resume branch ---
-          - conditions:
-                - condition: template
-                  value_template: "{{ not any_open }}"
-            sequence:
-                - choose:
-                      - conditions: []
-                        sequence: !input resume_action
-                - service: logbook.log
-                  data:
-                      name: "HVAC Resume v{{ blueprint_version }}"
-                      message: "Resumed {{ climate_entity_id }} (closed)."
+          # --- Natural ventilation OFF condition ---
+          - choose:
+                - conditions:
+                      - condition: template
+                        value_template: >
+                          {% set temp_ok = (t_out_c >= (t_in_c - dv_c)) and (t_out_c <= (t_in_c + dv_c)) and (t_out_c >= band_min_c) and (t_out_c <= band_max_c) %}
 
-          # --- Comfort control branch ---
-          - conditions:
-                - condition: template
-                  value_template: "{{ not any_open }}"
-            sequence:
-                # Natural ventilation OFF condition (built-in psychrometrics + regional presets)
-                - choose:
-                      - conditions:
-                            - condition: template
-                              value_template: >
-                                  {% set temp_ok = (t_out_c >= (t_in_c - dv_c)) and (t_out_c <= (t_in_c + dv_c)) and (t_out_c >= band_min_c) and (t_out_c <= band_max_c) %}
+                          {% if psychro_enable %}
+                            {% set dp_max_ok = (dp_out_c <= max_outdoor_dp_c) %}
+                            {% set dp_delta_ok = ( (dp_out_c - dp_in_c) < muggy_delta_dp_c ) %}
+                            {% set econ_ok = ( (h_out < (h_in - econ_dh|float)) or (ah_out < (ah_in - econ_dah|float)) ) %}
+                            {% set moisture_ok = dp_max_ok and dp_delta_ok and econ_ok %}
+                          {% else %}
+                            {% set moisture_ok = true %}
+                          {% endif %}
 
-                                  {% if psychro_enable %}
-                                    {% set dp_max_ok = (dp_out_c <= max_outdoor_dp_c) %}
-                                    {% set dp_delta_ok = ( (dp_out_c - dp_in_c) < muggy_delta_dp_c ) %}
-                                    {% set econ_ok = ( (h_out < (h_in - econ_dh|float)) or (ah_out < (ah_in - econ_dah|float)) ) %}
-                                    {% set moisture_ok = dp_max_ok and dp_delta_ok and econ_ok %}
-                                  {% else %}
-                                    {% set moisture_ok = true %}
-                                  {% endif %}
+                          {{ nat_vent_enable and temp_ok and moisture_ok }}
+                  sequence:
+                      - service: climate.turn_off
+                        target: { entity_id: !input climate_entity }
+                      - service: logbook.log
+                        data:
+                            name: "Natural Ventilation v{{ blueprint_version }}"
+                            message: >
+                                OFF: Out {{ (t_out_c * 9/5 + 32) if is_imperial else t_out_c | round(1) }}{{ unit_sym }},
+                                In {{ (t_in_c * 9/5 + 32) if is_imperial else t_in_c | round(1) }}{{ unit_sym }},
+                                Band {{ (band_min_c * 9/5 + 32) if is_imperial else band_min_c | round(1) }}-{{ (band_max_c * 9/5 + 32) if is_imperial else band_max_c | round(1) }}{{ unit_sym }};
+                                dp_out={{ dp_out_c | round(1) }}C, dp_in={{ dp_in_c | round(1) }}C, AH_out={{ ah_out }} g/m³, AH_in={{ ah_in }} g/m³, h_out={{ h_out }} kJ/kg, h_in={{ h_in }} kJ/kg
 
-                                  {{ nat_vent_enable and temp_ok and moisture_ok }}
-                        sequence:
-                            - service: climate.turn_off
-                              target: { entity_id: !input climate_entity }
-                            - service: logbook.log
-                              data:
-                                  name: "Natural Ventilation v{{ blueprint_version }}"
-                                  message: >
-                                      OFF: Out {{ (t_out_c * 9/5 + 32) if is_imperial else t_out_c | round(1) }}{{ unit_sym }},
-                                      In {{ (t_in_c * 9/5 + 32) if is_imperial else t_in_c | round(1) }}{{ unit_sym }},
-                                      Band {{ (band_min_c * 9/5 + 32) if is_imperial else band_min_c | round(1) }}-{{ (band_max_c * 9/5 + 32) if is_imperial else band_max_c | round(1) }}{{ unit_sym }};
-                                      dp_out={{ dp_out_c | round(1) }}C, dp_in={{ dp_in_c | round(1) }}C, AH_out={{ ah_out }} g/m³, AH_in={{ ah_in }} g/m³, h_out={{ h_out }} kJ/kg, h_in={{ h_in }} kJ/kg
-
-                # Heating/Cooling setpoint control
-                - choose:
-                      - conditions:
-                            - condition: template
-                              value_template: "{{ t_in_c < band_min_c or t_in_c > band_max_c }}"
-                        sequence:
-                            - choose:
-                                  - conditions:
-                                        - condition: template
-                                          value_template: "{{ t_in_c < band_min_c }}"
-                                    sequence:
-                                        - service: climate.set_hvac_mode
-                                          target:
-                                              {
-                                                  entity_id: !input climate_entity,
-                                              }
-                                          data: { hvac_mode: heat }
-                                  - conditions:
-                                        - condition: template
-                                          value_template: "{{ t_in_c > band_max_c }}"
-                                    sequence:
-                                        - service: climate.set_hvac_mode
-                                          target:
-                                              {
-                                                  entity_id: !input climate_entity,
-                                              }
-                                          data: { hvac_mode: cool }
-                            - service: climate.set_temperature
-                              target: { entity_id: !input climate_entity }
-                              data:
-                                  temperature: "{{ (band_min_sys if t_in_c < band_min_c else band_max_sys) | float }}"
-                            - choose:
-                                  - conditions:
-                                        - condition: template
-                                          value_template: >
-                                              {% set dev = (t_in_c - band_max_c) if t_in_c > band_max_c else (band_min_c - t_in_c) %}
-                                              {{ adaptive_fan and (fan_modes|length > 0) and (dev > 0.5) }}
-                                    sequence:
-                                        - service: climate.set_fan_mode
-                                          target:
-                                              {
-                                                  entity_id: !input climate_entity,
-                                              }
-                                          data:
-                                              fan_mode: >
-                                                  {% set dev = (t_in_c - band_max_c) if t_in_c > band_max_c else (band_min_c - t_in_c) %}
-                                                  {% if dev > 3 %} high
-                                                  {% elif dev > 1.5 %} medium
-                                                  {% elif dev > 0.5 %} low
-                                                  {% else %} auto{% endif %}
-
-                # Heat_Cool / Auto inside band
-                - choose:
-                      - conditions:
-                            - condition: template
-                              value_template: "{{ t_in_c >= band_min_c and t_in_c <= band_max_c }}"
-                        sequence:
-                            - choose:
-                                  - conditions:
-                                        - condition: template
-                                          value_template: "{{ supports_heat_cool }}"
-                                    sequence:
-                                        - service: climate.set_hvac_mode
-                                          target:
-                                              {
-                                                  entity_id: !input climate_entity,
-                                              }
-                                          data: { hvac_mode: heat_cool }
-                                        - service: climate.set_temperature
-                                          target:
-                                              {
-                                                  entity_id: !input climate_entity,
-                                              }
-                                          data:
-                                              target_temp_low: "{{ inside_low_sys | float }}"
-                                              target_temp_high: "{{ inside_high_sys | float }}"
-                              default:
+          # --- Heating / Cooling setpoint control ---
+          - choose:
+                - conditions:
+                      - condition: template
+                        value_template: "{{ t_in_c < band_min_c or t_in_c > band_max_c }}"
+                  sequence:
+                      - choose:
+                            - conditions:
+                                  - condition: template
+                                    value_template: "{{ t_in_c < band_min_c }}"
+                              sequence:
                                   - service: climate.set_hvac_mode
-                                    target: { entity_id: !input climate_entity }
-                                    data: { hvac_mode: auto }
-                                  - service: climate.set_temperature
-                                    target: { entity_id: !input climate_entity }
-                                    data:
+                                    target:
                                         {
-                                            temperature: "{{ t_adapt_sys | float }}",
+                                            entity_id: !input climate_entity,
                                         }
+                                    data: { hvac_mode: heat }
+                            - conditions:
+                                  - condition: template
+                                    value_template: "{{ t_in_c > band_max_c }}"
+                              sequence:
+                                  - service: climate.set_hvac_mode
+                                    target:
+                                        {
+                                            entity_id: !input climate_entity,
+                                        }
+                                    data: { hvac_mode: cool }
+                      - service: climate.set_temperature
+                        target: { entity_id: !input climate_entity }
+                        data:
+                            temperature: "{{ (band_min_sys if t_in_c < band_min_c else band_max_sys) | float }}"
+                      - choose:
+                            - conditions:
+                                  - condition: template
+                                    value_template: >
+                                      {% set dev = (t_in_c - band_max_c) if t_in_c > band_max_c else (band_min_c - t_in_c) %}
+                                      {{ adaptive_fan and (fan_modes|length > 0) and (dev > 0.5) }}
+                              sequence:
+                                  - service: climate.set_fan_mode
+                                    target:
+                                        {
+                                            entity_id: !input climate_entity,
+                                        }
+                                    data:
+                                        fan_mode: >
+                                            {% set dev = (t_in_c - band_max_c) if t_in_c > band_max_c else (band_min_c - t_in_c) %}
+                                            {% if dev > 3 %} high
+                                            {% elif dev > 1.5 %} medium
+                                            {% elif dev > 0.5 %} low
+                                            {% else %} auto{% endif %}
 
-          # No-op log for trace visibility
-          - conditions: []
-            sequence:
-                - service: logbook.log
+          # --- Heat_Cool / Auto inside band ---
+          - choose:
+              - conditions:
+                    - condition: template
+                      value_template: "{{ t_in_c >= band_min_c and t_in_c <= band_max_c }}"
+                sequence:
+                    - choose:
+                          - conditions:
+                                - condition: template
+                                  value_template: "{{ supports_heat_cool }}"
+                            sequence:
+                                - service: climate.set_hvac_mode
+                                  target:
+                                      {
+                                          entity_id: !input climate_entity,
+                                      }
+                                  data: { hvac_mode: heat_cool }
+                                - service: climate.set_temperature
+                                  target:
+                                      {
+                                          entity_id: !input climate_entity,
+                                      }
+                                  data:
+                                      target_temp_low: "{{ inside_low_sys | float }}"
+                                      target_temp_high: "{{ inside_high_sys | float }}"
+            default:
+                - service: climate.set_hvac_mode
+                  target: { entity_id: !input climate_entity }
+                  data: { hvac_mode: auto }
+                - service: climate.set_temperature
+                  target: { entity_id: !input climate_entity }
                   data:
-                      name: "Adaptive Climate (no-op v{{ blueprint_version }})"
-                      message: "No branch matched. {{ dbg_summary }}"
+                      {
+                          temperature: "{{ t_adapt_sys | float }}",
+                      }
 
     - choose:
           - conditions:
