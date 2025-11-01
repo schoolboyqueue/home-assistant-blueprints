@@ -293,7 +293,7 @@ blueprint:
 
                 winter_bias:
                     name: "Winter Bias (system units)"
-                    description: "Manual seasonal nudge when it's winter: + warms target, − cools it. Ignored if Regional Presets are enabled."
+                    description: "Manual seasonal nudge when it's winter: + warms target, - cools it. Ignored if Regional Presets are enabled."
                     default: 0.0
                     selector:
                         number:
@@ -303,7 +303,7 @@ blueprint:
 
                 summer_bias:
                     name: "Summer Bias (system units)"
-                    description: "Manual nudge in summer: + warms target, − cools it. Ignored if Regional Presets are enabled."
+                    description: "Manual nudge in summer: + warms target, - cools it. Ignored if Regional Presets are enabled."
                     default: 0.0
                     selector:
                         number:
@@ -384,7 +384,7 @@ blueprint:
 
                 muggy_delta_dp_sys:
                     name: "Muggy Delta Dew Point (system units)"
-                    description: "Block natural ventilation if (outdoor_dp − indoor_dp) is greater than or equal to this amount."
+                    description: "Block natural ventilation if (outdoor_dp - indoor_dp) is greater than or equal to this amount."
                     default: 2.0
                     selector:
                         number:
@@ -442,7 +442,7 @@ blueprint:
 
                 co2_delta_ppm:
                     name: "CO₂ Delta Threshold (ppm)"
-                    description: "Treat as ventilation priority when Indoor − Outdoor ≥ this value."
+                    description: "Treat as ventilation priority when Indoor - Outdoor ≥ this value."
                     default: 400
                     selector:
                         number:
@@ -469,7 +469,7 @@ blueprint:
 
                 rmot_sensor:
                     name: "RMOT Sensor"
-                    description: "A rolling mean sensor (e.g., 7-14 day average of daily means). Use HA helpers or a Stats sensor."
+                    description: "A rolling mean sensor (e.g., 7–14 day average of daily means). Use HA helpers or a Stats sensor."
                     default: sensor.none
                     selector:
                         entity:
@@ -611,14 +611,14 @@ variables:
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
     outdoor_sensor_id: !input outdoor_temp_sensor
-    _raw_mrt_sensor_id: !input mean_radiant_temp_sensor
-    _raw_rh_in_id: !input indoor_humidity_sensor
-    _raw_rh_out_id: !input outdoor_humidity_sensor
-    _raw_occupancy_sensor_id: !input occupancy_sensor
-    _raw_co2_in_id: !input co2_indoor_sensor
-    _raw_co2_out_id: !input co2_outdoor_sensor
-    _raw_rmot_sensor_id: !input rmot_sensor
-    _raw_season_entity_id: !input season_entity
+    _raw_mrt_sensor_values: !input mean_radiant_temp_sensor
+    _raw_rh_in_values: !input indoor_humidity_sensor
+    _raw_rh_out_values: !input outdoor_humidity_sensor
+    _raw_occupancy_values: !input occupancy_sensor
+    _raw_co2_in_values: !input co2_indoor_sensor
+    _raw_co2_out_values: !input co2_outdoor_sensor
+    _raw_rmot_values: !input rmot_sensor
+    _raw_season_entity_values: !input season_entity
     units_override_val: !input units_override
     category: !input comfort_category
     energy_save: !input energy_save_mode
@@ -645,27 +645,59 @@ variables:
     pause_timeout_min_val: !input pause_max_timeout_min
 
     mrt_sensor_id: >
-        {% set e = _raw_mrt_sensor_id | default('', true) %}
-        {% set v = e | lower %}
+        {% set raw = _raw_mrt_sensor_values %}
+        {% if raw is string %}
+          {% set e = raw %}
+        {% elif raw is iterable %}
+          {% set e = (raw[0] if raw|length > 0 else '') %}
+        {% else %}
+          {% set e = '' %}
+        {% endif %}
+        {% set e = e | default('', true) %}
+        {% set v = e | string | lower %}
         {% if v not in ['', 'none', 'sensor.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
     rh_in_id: >
-        {% set e = _raw_rh_in_id | default('', true) %}
-        {% set v = e | lower %}
+        {% set raw = _raw_rh_in_values %}
+        {% if raw is string %}
+          {% set e = raw %}
+        {% elif raw is iterable %}
+          {% set e = (raw[0] if raw|length > 0 else '') %}
+        {% else %}
+          {% set e = '' %}
+        {% endif %}
+        {% set e = e | default('', true) %}
+        {% set v = e | string | lower %}
         {% if v not in ['', 'none', 'sensor.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
     rh_out_id: >
-        {% set e = _raw_rh_out_id | default('', true) %}
-        {% set v = e | lower %}
+        {% set raw = _raw_rh_out_values %}
+        {% if raw is string %}
+          {% set e = raw %}
+        {% elif raw is iterable %}
+          {% set e = (raw[0] if raw|length > 0 else '') %}
+        {% else %}
+          {% set e = '' %}
+        {% endif %}
+        {% set e = e | default('', true) %}
+        {% set v = e | string | lower %}
         {% if v not in ['', 'none', 'sensor.none', 'weather.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
     occupancy_sensor_id: >
-        {% set e = _raw_occupancy_sensor_id | default('', true) %}
-        {% set v = e | lower %}
+        {% set raw = _raw_occupancy_values %}
+        {% if raw is string %}
+          {% set e = raw %}
+        {% elif raw is iterable %}
+          {% set e = (raw[0] if raw|length > 0 else '') %}
+        {% else %}
+          {% set e = '' %}
+        {% endif %}
+        {% set e = e | default('', true) %}
+        {% set v = e | string | lower %}
         {% if v not in ['', 'none', 'binary_sensor.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
 
     # Regional Presets
     regional_defaults_enable: !input regional_defaults_enable
     state_code: !input user_state_code
     bias_preset: !input seasonal_bias_preset
-    bias_intensity: !input bias_preset_intensity
+    bias_intensity_raw: !input bias_preset_intensity
 
     # Psychrometrics toggles/thresholds (user inputs)
     psychro_enable: !input psychro_enable
@@ -680,26 +712,61 @@ variables:
     co2_bias_max_sys: !input co2_bias_max_sys
     rmot_enable: !input rmot_enable
     co2_in_id: >
-        {% set e = _raw_co2_in_id | default('', true) %}
-        {% set v = e | lower %}
+        {% set raw = _raw_co2_in_values %}
+        {% if raw is string %}
+          {% set e = raw %}
+        {% elif raw is iterable %}
+          {% set e = (raw[0] if raw|length > 0 else '') %}
+        {% else %}
+          {% set e = '' %}
+        {% endif %}
+        {% set e = e | default('', true) %}
+        {% set v = e | string | lower %}
         {% if v not in ['', 'none', 'sensor.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
     co2_out_id: >
-        {% set e = _raw_co2_out_id | default('', true) %}
-        {% set v = e | lower %}
+        {% set raw = _raw_co2_out_values %}
+        {% if raw is string %}
+          {% set e = raw %}
+        {% elif raw is iterable %}
+          {% set e = (raw[0] if raw|length > 0 else '') %}
+        {% else %}
+          {% set e = '' %}
+        {% endif %}
+        {% set e = e | default('', true) %}
+        {% set v = e | string | lower %}
         {% if v not in ['', 'none', 'sensor.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
     rmot_sensor_id: >
-        {% set e = _raw_rmot_sensor_id | default('', true) %}
-        {% set v = e | lower %}
+        {% set raw = _raw_rmot_values %}
+        {% if raw is string %}
+          {% set e = raw %}
+        {% elif raw is iterable %}
+          {% set e = (raw[0] if raw|length > 0 else '') %}
+        {% else %}
+          {% set e = '' %}
+        {% endif %}
+        {% set e = e | default('', true) %}
+        {% set v = e | string | lower %}
         {% if v not in ['', 'none', 'sensor.none', 'input_number.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
 
     # Seasons (manual biases)
     season_entity_id: >
-        {% set e = _raw_season_entity_id | default('', true) %}
-        {% set v = e | lower %}
+        {% set raw = _raw_season_entity_values %}
+        {% if raw is string %}
+          {% set e = raw %}
+        {% elif raw is iterable %}
+          {% set e = (raw[0] if raw|length > 0 else '') %}
+        {% else %}
+          {% set e = '' %}
+        {% endif %}
+        {% set e = e | default('', true) %}
+        {% set v = e | string | lower %}
         {% if v not in ['', 'none', 'sensor.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
     winter_bias_sys_manual: !input winter_bias
     summer_bias_sys_manual: !input summer_bias
     shoulder_bias_sys_manual: !input shoulder_bias
+
+    # Numeric normalization
+    bias_intensity: "{{ bias_intensity_raw | float(1.0) }}"
 
     # --------- Unit inference ---------
     _u_indoor: "{{ state_attr(indoor_sensor_id, 'unit_of_measurement') | default('', true) | string }}"
