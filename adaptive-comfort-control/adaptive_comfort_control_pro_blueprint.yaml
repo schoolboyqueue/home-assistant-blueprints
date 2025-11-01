@@ -606,6 +606,60 @@ blueprint:
                             max: 60
                             step: 1
 
+        sleep:
+            name: Sleep / Circadian Preferences
+            icon: mdi:sleep
+            collapsed: true
+            input:
+                sleep_enable:
+                    name: "Enable Sleep Cooling"
+                    description: "Apply a nighttime cooling bias and optional tighter band."
+                    default: true
+                    selector:
+                        boolean: {}
+
+                sleep_mode_entity:
+                    name: "Sleep Mode (optional)"
+                    description: "Binary sensor or helper that is ON during sleep (e.g., Bedtime, Sleep Mode). Overrides schedule when ON."
+                    default: binary_sensor.none
+                    selector:
+                        entity:
+                            domain: ["binary_sensor", "input_boolean"]
+
+                sleep_start_time:
+                    name: "Sleep Start"
+                    description: "Time of day sleep usually begins (local)."
+                    default: "22:00:00"
+                    selector:
+                        time: {}
+
+                sleep_end_time:
+                    name: "Sleep End"
+                    description: "Time of day sleep usually ends (local)."
+                    default: "07:00:00"
+                    selector:
+                        time: {}
+
+                sleep_bias_sys:
+                    name: "Sleep Bias (system units)"
+                    description: "Shift the adaptive target by this amount during sleep (negative = cooler)."
+                    default: -1.0
+                    selector:
+                        number:
+                            min: -5.0
+                            max: 5.0
+                            step: 0.1
+
+                sleep_tighten_sys:
+                    name: "Tighten Band (system units)"
+                    description: "Reduce the inside-band half-width during sleep for steadier temps (0 = no change)."
+                    default: 0.0
+                    selector:
+                        number:
+                            min: 0.0
+                            max: 3.0
+                            step: 0.1
+
         debug:
             name: Debug
             icon: mdi:bug-outline
@@ -624,7 +678,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.7.1"
+    blueprint_version: "4.8.0"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
@@ -661,6 +715,14 @@ variables:
     pause_open_delay_val: !input pause_open_delay
     pause_close_delay_val: !input pause_close_delay
     pause_timeout_min_val: !input pause_max_timeout_min
+
+    # Sleep inputs
+    sleep_enable: !input sleep_enable
+    _raw_sleep_entity_values: !input sleep_mode_entity
+    sleep_start_str: !input sleep_start_time
+    sleep_end_str: !input sleep_end_time
+    sleep_bias_sys_in: !input sleep_bias_sys
+    sleep_tighten_sys_in: !input sleep_tighten_sys
 
     mrt_sensor_id: >
         {% set raw = _raw_mrt_sensor_values %}
@@ -710,6 +772,19 @@ variables:
         {% set e = e | default('', true) %}
         {% set v = e | string | lower %}
         {% if v not in ['', 'none', 'binary_sensor.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
+
+    sleep_entity_id: >
+        {% set raw = _raw_sleep_entity_values %}
+        {% if raw is string %}
+          {% set e = raw %}
+        {% elif raw is iterable %}
+          {% set e = (raw[0] if raw|length > 0 else '') %}
+        {% else %}
+          {% set e = '' %}
+        {% endif %}
+        {% set e = e | default('', true) %}
+        {% set v = e | string | lower %}
+        {% if v not in ['', 'none', 'binary_sensor.none', 'input_boolean.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
 
     # Regional Presets
     regional_defaults_enable: !input regional_defaults_enable
@@ -1085,6 +1160,38 @@ variables:
     h_in: "{{ 1.006 * t_in_c + w_in * (2501 + 1.86 * t_in_c) | round(2) }}"
     h_out: "{{ 1.006 * t_out_c + w_out * (2501 + 1.86 * t_out_c) | round(2) }}"
 
+    # --------- Sleep / Circadian logic ---------
+    sleep_bias_c: "{{ (sleep_bias_sys_in|float * 5/9) if is_imperial else (sleep_bias_sys_in|float) }}"
+    sleep_tighten_c: "{{ (sleep_tighten_sys_in|float * 5/9) if is_imperial else (sleep_tighten_sys_in|float) }}"
+
+    # Time-window evaluation with wrap-around support (e.g., 22:00 → 07:00)
+    _now_m: "{{ now().hour*60 + now().minute }}"
+    _st_parts: "{{ sleep_start_str.split(':') if sleep_start_str else ['22','0','0'] }}"
+    _en_parts: "{{ sleep_end_str.split(':') if sleep_end_str else ['7','0','0'] }}"
+    _st_m: >
+        {% set h = (_st_parts[0]|int(22)) %}{% set m = (_st_parts[1]|int(0)) %}{{ h*60 + m }}
+    _en_m: >
+        {% set h = (_en_parts[0]|int(7)) %}{% set m = (_en_parts[1]|int(0)) %}{{ h*60 + m }}
+    _time_active: >
+        {% set nowm = _now_m|int %}
+        {% set s = _st_m|int %}
+        {% set e = _en_m|int %}
+        {% if s <= e %}{{ (nowm >= s) and (nowm < e) }}
+        {% else %}{{ (nowm >= s) or  (nowm < e) }}{% endif %}
+
+    _sleep_switch: >
+        {% if sleep_entity_id %}{{ is_state(sleep_entity_id, 'on') }}{% else %}false{% endif %}
+
+    sleep_active: >
+        {{ sleep_enable and ( (_sleep_switch|bool) or (_time_active|bool) ) and (occ_now|bool) }}
+
+    sleep_bias_c_eff: "{{ sleep_bias_c if sleep_active else 0 }}"
+    inside_half_c_eff: >
+        {% if sleep_active %}
+          {% set narrowed = (inside_half_c - sleep_tighten_c) %}
+          {{ [narrowed, 0.4] | max }}
+        {% else %}{{ inside_half_c }}{% endif %}
+
     # --------- Seasonal bias (existing logic) ---------
     _region_for_bias: "{{ region_pick }}"
     _preset_w_c: >
@@ -1177,16 +1284,16 @@ variables:
     t_adapt_base_c: "{{ (18.9 + 0.255 * t_out_c) | round(2) }}"
     out_valid: "{{ t_out_c >= 10 and t_out_c <= 40 }}"
     t_adapt_c_raw: >
-        {% set base = t_adapt_base_c + season_bias_c + co2_bias_c_eff %}
+        {% set base = t_adapt_base_c + season_bias_c + co2_bias_c_eff + sleep_bias_c_eff %}
         {% if out_valid %}
           {% if precision %}{{ (base + 0 + 0) | round(2) }}
           {% else %}{{ base | round(2) }}{% endif %}
-        {% else %}{{ (22.0 + season_bias_c + co2_bias_c_eff) | round(2) }}{% endif %}
+        {% else %}{{ (22.0 + season_bias_c + co2_bias_c_eff + sleep_bias_c_eff) | round(2) }}{% endif %}
     t_adapt_c: "{{ (t_adapt_c_raw) | round(2) }}"
     band_min_c: "{{ [t_adapt_c - tol_c - setback_apply_c, min_c] | max | round(2) }}"
     band_max_c: "{{ [t_adapt_c + tol_c + setback_apply_c, max_c] | min | round(2) }}"
-    inside_low_c: "{{ (t_adapt_c - inside_half_c - (setback_apply_c/2)) | round(2) }}"
-    inside_high_c: "{{ (t_adapt_c + inside_half_c + (setback_apply_c/2)) | round(2) }}"
+    inside_low_c: "{{ (t_adapt_c - inside_half_c_eff - (setback_apply_c/2)) | round(2) }}"
+    inside_high_c: "{{ (t_adapt_c + inside_half_c_eff + (setback_apply_c/2)) | round(2) }}"
 
     # --------- System units conversion ---------
     t_adapt_sys: "{{ (t_adapt_c * 9 / 5 + 32) if is_imperial else t_adapt_c }}"
@@ -1244,6 +1351,7 @@ variables:
         Band={{ band_min_c }}-{{ band_max_c }}C; unit={{ unit_sym }}; NatVent={{ nat_vent_enable }}; AnyOpen={{ any_open }};
         dp_in={{ dp_in_c | round(1) }}C, dp_out={{ dp_out_c | round(1) }}C; AH_in={{ ah_in }} g/m³, AH_out={{ ah_out }} g/m³;
         h_in={{ h_in }} kJ/kg, h_out={{ h_out }} kJ/kg; P={{ pressure_kpa | round(2) }} kPa; dv_sys={{ dv_sys }}; dp_max={{ max_outdoor_dp_sys }}; muggyΔ={{ muggy_delta_dp_sys }}; econ_dh={{ econ_dh }}; econ_dah={{ econ_dah }}; CO₂Δ={{ co2_delta_ppm }}
+        ; Sleep={{ sleep_active }} (bias={{ sleep_bias_c_eff }}, tighten={{ (inside_half_c - inside_half_c_eff) | round(2) }})
 
 
 trigger:

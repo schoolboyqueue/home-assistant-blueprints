@@ -1,3 +1,21 @@
+## [4.8.0] - 2025-10-31
+### Added
+- **Sleep / Circadian Preferences:** optional nighttime cooling and comfort bias.
+  - Configurable enable flag, start/end time, or external sleep mode sensor.
+  - Negative (cooler) bias applied to the adaptive comfort target during sleep.
+  - Optional “band tightening” for steadier overnight temperatures.
+  - Full unit awareness (°C/°F) and integrated with setback, occupancy, and seasonal logic.
+- Debug summary now reports `Sleep=<bool>` with effective bias and tightening delta.
+
+### Improved
+- Adaptive model incorporates circadian context for more realistic comfort behavior.
+- Seamless interaction with occupancy and energy-saving logic—sleep bias automatically disables if unoccupied.
+- Fully compatible with CO₂ and RMOT bias layers, including cumulative effects.
+
+### Notes
+- The sleep mode can be activated via time window or an entity (e.g., `input_boolean.bedtime`).
+- No manual configuration changes are required for existing users; defaults preserve prior behavior.
+
 ## [4.7.1] - 2025-10-31
 ### Fixed
 - Variable order dependency for occupancy-aware setback (`occ_now` / `setback_apply_c`) that could cause undefined or stale values at runtime.
