@@ -1,3 +1,17 @@
+## [4.8.5] - 2025-10-31
+### Fixed
+- Replaced `wait_for_trigger` in HVAC Pause and Resume branches with simple **delay and recheck** logic to prevent deadlocks when already in the target state (e.g., door already closed when resume runs).
+- Removed strict numeric sanity check from global conditions that blocked pause/resume execution; replaced with a non-blocking **sanity probe log** at the start of `action:`.
+- Pause/Resume delays now reliably respect user-configured **Pause after open** and **Resume after close** timings across all integrations (`on/off`, `open/closed`, etc.).
+
+### Improved
+- Enhanced log visibility: preflight trigger ID, open-sensor lists in pause logs, and a `t_in_c` / `t_out_c` / `band_min_c` / `band_max_c` sanity snapshot when debug is basic or verbose.
+- Increased blueprint resilience to mixed door/window entity reporting conventions.
+
+### Notes
+- No change to adaptive comfort, sleep bias, or ventilation behavior.
+- Recommended update for anyone using door/window-based HVAC pause.
+
 ## [4.8.4] - 2025-10-31
 ### Fixed
 - Eliminated boundary errors (e.g., `33.333333333333336 > 33.3`) by adding

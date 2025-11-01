@@ -688,7 +688,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.8.4"
+    blueprint_version: "4.8.5"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
@@ -1413,8 +1413,12 @@ variables:
     # Pause helpers
     any_open: >
         {% set ids = pause_entities if pause_entities else [] %}
-        {% if ids|length == 0 %} false
-        {% else %} {{ expand(ids) | selectattr('state','eq','on') | list | length > 0 }} {% endif %}
+        {% if ids|length == 0 %}
+          false
+        {% else %}
+          {% set states_list = expand(ids) | map(attribute='state') | list %}
+          {{ 'on' in states_list or 'open' in states_list or 'true' in states_list or 'True' in states_list }}
+        {% endif %}
 
     # Debug summary
     dbg_summary: >
@@ -1474,28 +1478,54 @@ trigger:
     platform: state
     entity_id: !input rmot_sensor
 
-  # Pause sensors
-  - id: pause_open
+  # Pause sensors (support both binary: on/off and text: open/closed)
+  - id: pause_open_on
     platform: state
     entity_id: !input pause_sensors
     to: "on"
     for:
       seconds: !input pause_open_delay
-  - id: pause_close
+  - id: pause_open_text
+    platform: state
+    entity_id: !input pause_sensors
+    to: "open"
+    for:
+      seconds: !input pause_open_delay
+
+  - id: pause_close_off
     platform: state
     entity_id: !input pause_sensors
     to: "off"
     for:
       seconds: !input pause_close_delay
+  - id: pause_close_text
+    platform: state
+    entity_id: !input pause_sensors
+    to: "closed"
+    for:
+      seconds: !input pause_close_delay
+  # Catch-all: resume on any pause sensor state change (to handle integrations with unusual states)
+  - id: pause_any_change
+    platform: state
+    entity_id: !input pause_sensors
 
 condition:
-    - condition: template
-      value_template: "{{ states(climate_entity_id) not in ['unavailable','unknown'] }}"
-    - condition: template
-      value_template: >
-        {{ t_in_c is number and t_out_c is number and band_min_c is number and band_max_c is number and (band_min_c < band_max_c) }}
+  - condition: template
+    value_template: "{{ states(climate_entity_id) not in ['unavailable','unknown'] }}"
 
 action:
+    # Sanity probe (non-blocking): dump key temps/bands if they look invalid
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ dbg in ['basic','verbose'] }}"
+          sequence:
+            - service: logbook.log
+              data:
+                name: "Adaptive Comfort (sanity v{{ blueprint_version }})"
+                message: >
+                  t_in_c={{ t_in_c }}, t_out_c={{ t_out_c }}, band_min_c={{ band_min_c }}, band_max_c={{ band_max_c }};
+                  valid_band={{ band_min_c < band_max_c }}
     # Preflight log
     - choose:
         - conditions:
@@ -1513,6 +1543,13 @@ action:
             - condition: template
               value_template: "{{ any_open }}"
           sequence:
+            # Honor Pause-after-Open using a simple delay, then re-check
+            - delay:
+                seconds: !input pause_open_delay
+
+            # Still open after the wait? If so, pause HVAC
+            - condition: template
+              value_template: "{{ any_open }}"
             - service: climate.turn_off
               target: { entity_id: !input climate_entity }
             - choose:
@@ -1533,9 +1570,18 @@ action:
             - service: logbook.log
               data:
                 name: "HVAC Pause v{{ blueprint_version }}"
-                message: "Paused {{ climate_entity_id }} (open)."
+                message: >
+                  Paused {{ climate_entity_id }} (opening detected). Open sensors: {{ expand(pause_entities) | selectattr('state','in',['on','open']) | map(attribute='entity_id') | list if pause_entities else [] }}
       default:
         # --- Resume branch (no openings active) ---
+        # Honor Resume-after-Close using a simple delay, then re-check
+        - delay:
+            seconds: !input pause_close_delay
+
+        # Re-validate that everything is closed before we resume
+        - condition: template
+          value_template: "{{ not any_open }}"
+
         - choose:
             - conditions: []
               sequence: !input resume_action
@@ -1544,10 +1590,28 @@ action:
             name: "HVAC Resume v{{ blueprint_version }}"
             message: "Resumed {{ climate_entity_id }} (closed)."
 
+        # If climate is OFF at resume, prime it back to an active mode before normal logic
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ states(climate_entity_id) | lower == 'off' }}"
+              sequence:
+                - service: climate.set_hvac_mode
+                  target: { entity_id: !input climate_entity }
+                  data:
+                    hvac_mode: >
+                      {% if supports_heat_cool %}heat_cool
+                      {% elif supports_auto %}auto
+                      {% else %}
+                        {% if t_in_c < t_adapt_c %}heat{% else %}cool{% endif %}
+                      {% endif %}
+
         # --- Natural ventilation OFF condition ---
         - if:
             - condition: template
               value_template: >
+                {% set close_ids = ['pause_close_off','pause_close_text'] %}
+                {% set is_close_run = (trigger.id | default('') in close_ids) %}
                 {% set temp_ok = (t_out_c >= (t_in_c - dv_c)) and (t_out_c <= (t_in_c + dv_c)) and (t_out_c >= band_min_c) and (t_out_c <= band_max_c) %}
 
                 {% if psychro_enable %}
@@ -1559,7 +1623,7 @@ action:
                   {% set moisture_ok = true %}
                 {% endif %}
 
-                {{ nat_vent_enable and temp_ok and moisture_ok }}
+                {{ (not is_close_run) and nat_vent_enable and temp_ok and moisture_ok }}
           then:
             - service: climate.turn_off
               target: { entity_id: !input climate_entity }
