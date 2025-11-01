@@ -688,7 +688,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.8.5"
+    blueprint_version: "4.8.6"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
@@ -1403,12 +1403,22 @@ variables:
         {% endif %}
         {% if low_band >= high_band %}{{ low_band + (cli_step | float(0.5)) }}{% else %}{{ high_band }}{% endif %}
 
-    # --------- Step rounding to device resolution + final clamp ---------
-    band_min_cli_final: "{{ [ [ ((band_min_cli_capped / cli_step) | round(0) * cli_step), max_allowed_cli ] | min , min_allowed_cli ] | max }}"
-    band_max_cli_final: "{{ [ [ ((band_max_cli_capped / cli_step) | round(0) * cli_step), max_allowed_cli ] | min , min_allowed_cli ] | max }}"
-    t_adapt_cli_final:  "{{ [ [ ((t_adapt_cli_capped  / cli_step) | round(0) * cli_step),  max_allowed_cli ] | min , min_allowed_cli ] | max }}"
-    inside_low_cli_final:  "{{ [ [ ((inside_low_cli_capped  / cli_step) | round(0) * cli_step),  max_allowed_cli ] | min , min_allowed_cli ] | max }}"
-    inside_high_cli_final: "{{ [ [ ((inside_high_cli_capped / cli_step) | round(0) * cli_step),  max_allowed_cli ] | min , min_allowed_cli ] | max }}"
+    # --------- CLI epsilon and safe maximum (avoid floating spillover) ---------
+    cli_eps: 0.001
+    cli_max_safe: "{{ (max_allowed_cli | float) - (cli_eps | float) }}"
+
+    # Quantize to device step using floor (never round up over max) then clamp to safe limits
+    band_min_cli_q: "{{ ((band_min_cli_capped  / cli_step) | round(0,'floor') * cli_step) }}"
+    band_max_cli_q: "{{ ((band_max_cli_capped  / cli_step) | round(0,'floor') * cli_step) }}"
+    t_adapt_cli_q:  "{{ ((t_adapt_cli_capped   / cli_step) | round(0,'floor') * cli_step) }}"
+    inside_low_cli_q:  "{{ ((inside_low_cli_capped  / cli_step) | round(0,'floor') * cli_step) }}"
+    inside_high_cli_q: "{{ ((inside_high_cli_capped / cli_step) | round(0,'floor') * cli_step) }}"
+
+    band_min_cli_final: "{{ [ [ band_min_cli_q,  cli_max_safe ] | min , min_allowed_cli ] | max }}"
+    band_max_cli_final: "{{ [ [ band_max_cli_q,  cli_max_safe ] | min , min_allowed_cli ] | max }}"
+    t_adapt_cli_final:  "{{ [ [ t_adapt_cli_q,   cli_max_safe ] | min , min_allowed_cli ] | max }}"
+    inside_low_cli_final:  "{{ [ [ inside_low_cli_q,  cli_max_safe ] | min , min_allowed_cli ] | max }}"
+    inside_high_cli_final: "{{ [ [ inside_high_cli_q, cli_max_safe ] | min , min_allowed_cli ] | max }}"
 
     # Pause helpers
     any_open: >
@@ -1683,15 +1693,14 @@ action:
                     - service: climate.set_temperature
                       target: { entity_id: !input climate_entity }
                       data:
-                        target_temp_low: "{{ [ inside_low_cli_final | float, max_allowed_cli | float ] | min | round(2) }}"
-                        target_temp_high: "{{ [ inside_high_cli_final | float, max_allowed_cli | float ] | min | round(2) }}"
+                        target_temp_low: "{{ [ inside_low_cli_final | float, cli_max_safe | float ] | min | round(1) }}"
+                        target_temp_high: "{{ [ inside_high_cli_final | float, cli_max_safe | float ] | min | round(1) }}"
               default:
                 - service: climate.set_temperature
                   target: { entity_id: !input climate_entity }
                   data:
                     temperature: >
-                      {{ [ (band_min_cli_final if t_in_c < band_min_c else band_max_cli_final) | float,
-                           max_allowed_cli | float ] | min | round(2) }}
+                      {{ [ (band_min_cli_final if t_in_c < band_min_c else band_max_cli_final) | float, cli_max_safe | float ] | min | round(1) }}
             - if:
                 - condition: template
                   value_template: >
@@ -1740,8 +1749,8 @@ action:
                         entity_id: !input climate_entity,
                     }
                   data:
-                    target_temp_low: "{{ [ inside_low_cli_final | float, max_allowed_cli | float ] | min | round(2) }}"
-                    target_temp_high: "{{ [ inside_high_cli_final | float, max_allowed_cli | float ] | min | round(2) }}"
+                    target_temp_low: "{{ [ inside_low_cli_final | float, cli_max_safe | float ] | min | round(1) }}"
+                    target_temp_high: "{{ [ inside_high_cli_final | float, cli_max_safe | float ] | min | round(1) }}"
               else:
                 - choose:
                     - conditions:
@@ -1754,12 +1763,12 @@ action:
                         - service: climate.set_temperature
                           target: { entity_id: !input climate_entity }
                           data:
-                            temperature: "{{ [ t_adapt_cli_final | float, max_allowed_cli | float ] | min | round(2) }}"
+                            temperature: "{{ [ t_adapt_cli_final | float, cli_max_safe | float ] | min | round(1) }}"
                   default:
                     - service: climate.set_temperature
                       target: { entity_id: !input climate_entity }
                       data:
-                        temperature: "{{ [ t_adapt_cli_final | float, max_allowed_cli | float ] | min | round(2) }}"
+                        temperature: "{{ [ t_adapt_cli_final | float, cli_max_safe | float ] | min | round(1) }}"
           else:
             - choose:
                 - conditions:

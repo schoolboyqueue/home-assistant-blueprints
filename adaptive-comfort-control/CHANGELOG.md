@@ -1,3 +1,19 @@
+## [4.8.6] - 2025-11-01
+### Fixed
+- Eliminated floating-point spillover that produced invalid setpoints like `33.333333…` against devices capped at `33.3°C`.
+- Quantized all computed setpoints using **floor** rounding (never rounding up past device max) and clamped to a **safe maximum** (`max_allowed_cli − 0.001`).
+- Applied safe-max clamp to all `climate.set_temperature` calls (single and low/high) and standardized rounding to **one decimal place**.
+
+### Changed
+- Added `cli_eps` and `cli_max_safe` helper variables for precision control.
+- Reworked the “step rounding to device resolution + final clamp” block to use floor quantization and safe-limit clamping.
+- Unified rounding behavior across temperature writes for consistent °C/°F device support.
+
+### Notes
+- Backward compatible with previous versions.
+- Behavior near the upper temperature limit may shift downward by ≤ one device step, which is intentional to prevent HA range errors.
+- Resolves recurring “Provided temperature … not valid. Accepted range is 7.2 to 33.3” log errors.
+
 ## [4.8.5] - 2025-10-31
 ### Fixed
 - Replaced `wait_for_trigger` in HVAC Pause and Resume branches with simple **delay and recheck** logic to prevent deadlocks when already in the target state (e.g., door already closed when resume runs).
