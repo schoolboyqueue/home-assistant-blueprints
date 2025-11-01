@@ -923,13 +923,21 @@ variables:
 
     # Optional RMOT source
     t_rmot_c: >
+        {# Robust RMOT parsing: skip if unknown/unavailable, handle units #}
         {% if rmot_enable and rmot_sensor_id %}
-          {% set v = states(rmot_sensor_id) | float(none) %}
-          {% if v is none %} {{ none }}
-          {% else %}
+          {% set raw = states(rmot_sensor_id) %}
+          {% set v = (raw if raw not in ['unknown','unavailable',''] else none) %}
+          {% if v is not none %}
+            {% set vf = v | float(none) %}
             {% set u = state_attr(rmot_sensor_id, 'unit_of_measurement') | default('', true) | string %}
-            {% if u|lower in ['°f','f','fahrenheit'] or (u == '' and is_imperial) %} {{ ((v - 32) * 5 / 9) }}
-            {% else %} {{ v }} {% endif %}
+            {% if vf is number %}
+              {% if u|lower in ['°f','f','fahrenheit'] or (u == '' and is_imperial) %} {{ ((vf - 32) * 5 / 9) }}
+              {% else %} {{ vf }} {% endif %}
+            {% else %}
+              {{ none }}
+            {% endif %}
+          {% else %}
+            {{ none }}
           {% endif %}
         {% else %} {{ none }} {% endif %}
 
@@ -1057,15 +1065,16 @@ variables:
     t_adapt_base_c: "{{ (18.9 + 0.255 * t_out_c) | round(2) }}"
     out_valid: "{{ t_out_c >= 10 and t_out_c <= 40 }}"
     t_adapt_c_raw: >
-        {% set base = t_adapt_base_c + season_bias_c %}
-        {% if out_valid %}{% if precision %}{{ (base + 0 + 0) | round(2) }}
-        {% else %}{{ base | round(2) }}{% endif %}
-        {% else %}{{ (22.0 + season_bias_c) | round(2) }}{% endif %}
+        {% set base = t_adapt_base_c + season_bias_c + co2_bias_c_eff %}
+        {% if out_valid %}
+          {% if precision %}{{ (base + 0 + 0) | round(2) }}
+          {% else %}{{ base | round(2) }}{% endif %}
+        {% else %}{{ (22.0 + season_bias_c + co2_bias_c_eff) | round(2) }}{% endif %}
     t_adapt_c: "{{ (t_adapt_c_raw) | round(2) }}"
-    band_min_c: "{{ [t_adapt_c - tol_c, min_c] | max | round(2) }}"
-    band_max_c: "{{ [t_adapt_c + tol_c, max_c] | min | round(2) }}"
-    inside_low_c: "{{ (t_adapt_c - inside_half_c) | round(2) }}"
-    inside_high_c: "{{ (t_adapt_c + inside_half_c) | round(2) }}"
+    band_min_c: "{{ [t_adapt_c - tol_c - setback_apply_c, min_c] | max | round(2) }}"
+    band_max_c: "{{ [t_adapt_c + tol_c + setback_apply_c, max_c] | min | round(2) }}"
+    inside_low_c: "{{ (t_adapt_c - inside_half_c - (setback_apply_c/2)) | round(2) }}"
+    inside_high_c: "{{ (t_adapt_c + inside_half_c + (setback_apply_c/2)) | round(2) }}"
 
     # --------- System units conversion ---------
     t_adapt_sys: "{{ (t_adapt_c * 9 / 5 + 32) if is_imperial else t_adapt_c }}"
@@ -1076,6 +1085,7 @@ variables:
 
     # HVAC capabilities
     hvac_modes: "{{ state_attr(climate_entity_id, 'hvac_modes') | default([], true) }}"
+    supports_auto: "{{ 'auto' in hvac_modes }}"
     supports_heat_cool: "{{ 'heat_cool' in hvac_modes }}"
     fan_modes: "{{ state_attr(climate_entity_id, 'fan_modes') | default([], true) }}"
     hvac_mode_now: "{{ state_attr(climate_entity_id, 'hvac_mode') | string | lower }}"
@@ -1090,6 +1100,31 @@ variables:
         {% if ids|length == 0 %} false
         {% else %} {{ expand(ids) | selectattr('state','eq','on') | list | length > 0 }} {% endif %}
 
+    occ_now: >
+        {# Occupancy-aware: fallback to true if no sensor #}
+        {% if occupancy_sensor_id %} {{ is_state(occupancy_sensor_id, 'on') }}
+        {% else %} true {% endif %}
+
+    setback_apply_c: "{{ setback_c if (energy_save and (not occ_now)) else 0 }}"
+    co2_gap: >
+        {% if co2_enable and co2_in_id and co2_out_id %}
+          {{ (states(co2_in_id) | float(0)) - (states(co2_out_id) | float(0)) }}
+        {% else %} 0 {% endif %}
+
+    co2_dir: >
+        {# CO₂-driven seasonal bias: nudge comfort targets if CO₂ gap exceeded #}
+        {% if co2_enable and (co2_gap | float(0)) >= (co2_delta_ppm | float(0)) %}
+          {% if season_now == 'winter' %} 1
+          {% elif season_now == 'summer' %} -1
+          {% else %} 0 {% endif %}
+        {% else %} 0 {% endif %}
+
+    co2_bias_c_eff: >
+        {% set mag = co2_bias_max_c | float(0) %}
+        {% if co2_dir != 0 %}
+          {{ co2_dir * mag }}
+        {% else %} 0 {% endif %}
+
     # Debug summary
     dbg_summary: >
         Region={{ region_pick }}; Season={{ season_now }}; In={{ t_in_c }}C (RH={{ rh_in }}%); Out={{ t_out_c }}C (RH={{ rh_out }}%);
@@ -1097,49 +1132,88 @@ variables:
         dp_in={{ dp_in_c | round(1) }}C, dp_out={{ dp_out_c | round(1) }}C; AH_in={{ ah_in }} g/m³, AH_out={{ ah_out }} g/m³;
         h_in={{ h_in }} kJ/kg, h_out={{ h_out }} kJ/kg; dv_sys={{ dv_sys }}; dp_max={{ max_outdoor_dp_sys }}; muggyΔ={{ muggy_delta_dp_sys }}; econ_dh={{ econ_dh }}; econ_dah={{ econ_dah }}; CO₂Δ={{ co2_delta_ppm }}
 
+
 trigger:
-    - platform: time_pattern
-      minutes: "/10"
-    - platform: state
-      entity_id: !input indoor_temp_sensor
-    - platform: state
-      entity_id: !input outdoor_temp_sensor
-    - platform: state
-      entity_id: !input indoor_humidity_sensor
-    - platform: state
-      entity_id: !input outdoor_humidity_sensor
-    - platform: state
-      entity_id: !input co2_indoor_sensor
-    - platform: state
-      entity_id: !input co2_outdoor_sensor
-    - platform: state
-      entity_id: !input rmot_sensor
-    - platform: state
-      entity_id: !input pause_sensors
-      to: "on"
-      for:
-          seconds: !input pause_open_delay
-    - platform: state
-      entity_id: !input pause_sensors
-      to: "off"
-      for:
-          seconds: !input pause_close_delay
+  # Periodic safety net
+  - id: tick_10m
+    platform: time_pattern
+    minutes: "/10"
+
+  # Indoor temp
+  - id: indoor_temp_state
+    platform: state
+    entity_id: !input indoor_temp_sensor
+
+  # Outdoor temp (entity state)
+  - id: outdoor_temp_state
+    platform: state
+    entity_id: !input outdoor_temp_sensor
+  # Outdoor temp (attribute change when entity is weather.*)
+  - id: outdoor_temp_attr
+    platform: state
+    entity_id: !input outdoor_temp_sensor
+    attribute: temperature
+
+  # Indoor humidity
+  - id: indoor_rh_state
+    platform: state
+    entity_id: !input indoor_humidity_sensor
+
+  # Outdoor humidity (entity state)
+  - id: outdoor_rh_state
+    platform: state
+    entity_id: !input outdoor_humidity_sensor
+  # Outdoor humidity (attribute change when entity is weather.*)
+  - id: outdoor_rh_attr
+    platform: state
+    entity_id: !input outdoor_humidity_sensor
+    attribute: humidity
+
+  # CO₂
+  - id: co2_in_state
+    platform: state
+    entity_id: !input co2_indoor_sensor
+  - id: co2_out_state
+    platform: state
+    entity_id: !input co2_outdoor_sensor
+
+  # RMOT
+  - id: rmot_state
+    platform: state
+    entity_id: !input rmot_sensor
+
+  # Pause sensors
+  - id: pause_open
+    platform: state
+    entity_id: !input pause_sensors
+    to: "on"
+    for:
+      seconds: !input pause_open_delay
+  - id: pause_close
+    platform: state
+    entity_id: !input pause_sensors
+    to: "off"
+    for:
+      seconds: !input pause_close_delay
 
 condition:
     - condition: template
       value_template: "{{ states(climate_entity_id) not in ['unavailable','unknown'] }}"
+    - condition: template
+      value_template: >
+        {{ t_in_c is number and t_out_c is number and band_min_c is number and band_max_c is number and (band_min_c < band_max_c) }}
 
 action:
     # Preflight log
     - choose:
-          - conditions:
-                - condition: template
-                  value_template: "{{ dbg in ['basic','verbose'] }}"
-            sequence:
-                - service: logbook.log
-                  data:
-                      name: "Adaptive Comfort (preflight v{{ blueprint_version }})"
-                      message: "{{ dbg_summary }}"
+        - conditions:
+            - condition: template
+              value_template: "{{ dbg in ['basic','verbose'] }}"
+          sequence:
+            - service: logbook.log
+              data:
+                name: "Adaptive Comfort (trigger v{{ blueprint_version }})"
+                message: "Triggered by: {{ trigger.id | default('unknown') }}"
 
     - choose:
         # --- HVAC Pause branch ---
@@ -1211,27 +1285,37 @@ action:
             - condition: template
               value_template: "{{ t_in_c < band_min_c or t_in_c > band_max_c }}"
           then:
+            - variables:
+                minutes_since_state_change: >
+                  {% set lc = states[climate_entity_id].last_changed if climate_entity_id in states else none %}
+                  {% if lc is not none %}{{ ((as_timestamp(now()) - as_timestamp(lc)) / 60) | float(1e9) }}{% else %}{{ 1e9 }}{% endif %}
+                can_switch_mode: "{{ minutes_since_state_change > (cooldown_min | float(0)) }}"
             - choose:
                 - conditions:
                     - condition: template
-                      value_template: "{{ t_in_c < band_min_c }}"
+                      value_template: "{{ can_switch_mode }}"
                   sequence:
-                    - service: climate.set_hvac_mode
-                      target:
-                        {
-                            entity_id: !input climate_entity,
-                        }
-                      data: { hvac_mode: heat }
-                - conditions:
-                    - condition: template
-                      value_template: "{{ t_in_c > band_max_c }}"
+                    - choose:
+                        - conditions:
+                            - condition: template
+                              value_template: "{{ t_in_c < band_min_c }}"
+                          sequence:
+                            - service: climate.set_hvac_mode
+                              target: { entity_id: !input climate_entity }
+                              data: { hvac_mode: heat }
+                        - conditions:
+                            - condition: template
+                              value_template: "{{ t_in_c > band_max_c }}"
+                          sequence:
+                            - service: climate.set_hvac_mode
+                              target: { entity_id: !input climate_entity }
+                              data: { hvac_mode: cool }
+                - conditions: []
                   sequence:
-                    - service: climate.set_hvac_mode
-                      target:
-                        {
-                            entity_id: !input climate_entity,
-                        }
-                      data: { hvac_mode: cool }
+                    - service: logbook.log
+                      data:
+                        name: "HVAC Cooldown v{{ blueprint_version }}"
+                        message: "Skipped mode switch (cooldown {{ cooldown_min }} min)"
             - service: climate.set_temperature
               target: { entity_id: !input climate_entity }
               data:
@@ -1279,25 +1363,36 @@ action:
                     target_temp_low: "{{ inside_low_sys | float }}"
                     target_temp_high: "{{ inside_high_sys | float }}"
               else:
-                - service: climate.set_hvac_mode
-                  target: { entity_id: !input climate_entity }
-                  data: { hvac_mode: auto }
-                - service: climate.set_temperature
-                  target: { entity_id: !input climate_entity }
-                  data:
-                    {
-                        temperature: "{{ t_adapt_sys | float }}",
-                    }
+                - choose:
+                    - conditions:
+                        - condition: template
+                          value_template: "{{ supports_auto }}"
+                      sequence:
+                        - service: climate.set_hvac_mode
+                          target: { entity_id: !input climate_entity }
+                          data: { hvac_mode: auto }
+                        - service: climate.set_temperature
+                          target: { entity_id: !input climate_entity }
+                          data:
+                            temperature: "{{ t_adapt_sys | float }}"
+                  default:
+                    - service: climate.set_temperature
+                      target: { entity_id: !input climate_entity }
+                      data:
+                        temperature: "{{ t_adapt_sys | float }}"
           else:
-            - service: climate.set_hvac_mode
-              target: { entity_id: !input climate_entity }
-              data: { hvac_mode: auto }
+            - choose:
+                - conditions:
+                    - condition: template
+                      value_template: "{{ supports_auto }}"
+                  sequence:
+                    - service: climate.set_hvac_mode
+                      target: { entity_id: !input climate_entity }
+                      data: { hvac_mode: auto }
             - service: climate.set_temperature
               target: { entity_id: !input climate_entity }
               data:
-                {
-                    temperature: "{{ t_adapt_sys | float }}",
-                }
+                temperature: "{{ t_adapt_sys | float }}"
 
     - choose:
           - conditions:
@@ -1309,8 +1404,10 @@ action:
                       name: "Adaptive Climate (final v{{ blueprint_version }})"
                       message: >
                           Band={{ band_min_sys }}-{{ band_max_sys }}{{ unit_sym }};
+                          Set={{ (band_min_sys if t_in_c < band_min_c else (band_max_sys if t_in_c > band_max_c else t_adapt_sys)) | round(1) }}{{ unit_sym }};
                           In={{ (t_in_c * 9/5 + 32) if is_imperial else t_in_c | round(1) }}{{ unit_sym }};
                           Out={{ (t_out_c * 9/5 + 32) if is_imperial else t_out_c | round(1) }}{{ unit_sym }};
-                          dp_out={{ dp_out_c | round(1) }}C, dp_in={{ dp_in_c | round(1) }}C, AH_out={{ ah_out }} g/m³, AH_in={{ ah_in }} g/m³, h_out={{ h_out }} kJ/kg, h_in={{ h_in }} kJ/kg
+                          dp_out={{ dp_out_c | round(1) }}C, dp_in={{ dp_in_c | round(1) }}C, AH_out={{ ah_out }} g/m³, AH_in={{ ah_in }} g/m³, h_out={{ h_out }} kJ/kg, h_in={{ h_in }} kJ/kg;
+                          Trigger={{ trigger.id | default('unknown') }}
 mode: single
 max_exceeded: silent
