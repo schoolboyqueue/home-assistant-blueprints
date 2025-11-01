@@ -1,3 +1,11 @@
+## [4.7.1] - 2025-10-31
+### Fixed
+- Variable order dependency for occupancy-aware setback (`occ_now` / `setback_apply_c`) that could cause undefined or stale values at runtime.
+- Hardened setpoint output path to use climate-unit conversion and thermostat min/max clamping to prevent out-of-range errors.
+
+### Notes
+- No behavior change to the adaptive model itself; fix ensures reliable evaluation order and safer setpoint writes across thermostats.
+
 ## [4.7.0] - 2025-10-31
 ### Added
 - Optional barometric pressure sensor input with automatic unit conversion (kPa, hPa/mbar, Pa, inHg, mmHg).

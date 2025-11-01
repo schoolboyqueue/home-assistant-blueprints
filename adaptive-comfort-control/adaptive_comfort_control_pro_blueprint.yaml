@@ -624,7 +624,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.7.0"
+    blueprint_version: "4.7.1"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
@@ -1145,6 +1145,33 @@ variables:
         {% elif season_now == 'summer' %} {{ summer_bias_sys | float(0) }}
         {% else %} {{ shoulder_bias_sys | float(0) }} {% endif %}
     season_bias_c: "{{ (season_bias_sys_active|float * 5/9) if is_imperial else (season_bias_sys_active|float) }}"
+
+    occ_now: >
+        {# Occupancy-aware: fallback to true if no sensor #}
+        {% if occupancy_sensor_id %} {{ is_state(occupancy_sensor_id, 'on') }}
+        {% else %} true {% endif %}
+
+    setback_apply_c: "{{ setback_c if (energy_save and (not occ_now)) else 0 }}"
+
+    co2_gap: >
+        {% if co2_enable and co2_in_id and co2_out_id %}
+          {{ (states(co2_in_id) | float(0)) - (states(co2_out_id) | float(0)) }}
+        {% else %} 0 {% endif %}
+
+    co2_dir: >
+        {# CO₂-driven seasonal bias: nudge comfort targets if CO₂ gap exceeded #}
+        {% if co2_enable and (co2_gap | float(0)) >= (co2_delta_ppm | float(0)) %}
+          {% if season_now == 'winter' %} 1
+          {% elif season_now == 'summer' %} -1
+          {% else %} 0 {% endif %}
+        {% else %} 0 {% endif %}
+
+    co2_bias_c_eff: >
+        {% set mag = co2_bias_max_c | float(0) %}
+        {% if co2_dir != 0 %}
+          {{ co2_dir * mag }}
+        {% else %} 0 {% endif %}
+
     # --------- Adaptive model ---------
     dv_c: "{{ (dv_sys|float * 5/9) if is_imperial else (dv_sys|float) }}"
     t_adapt_base_c: "{{ (18.9 + 0.255 * t_out_c) | round(2) }}"
@@ -1168,6 +1195,32 @@ variables:
     inside_low_sys: "{{ (inside_low_c * 9 / 5 + 32) if is_imperial else inside_low_c }}"
     inside_high_sys: "{{ (inside_high_c * 9 / 5 + 32) if is_imperial else inside_high_c }}"
 
+    # --------- Climate unit outputs (convert from °C regardless of system heuristic) ---------
+    climate_is_imperial: "{{ (_u_climate | lower) is string and ('f' in _u_climate | lower) }}"
+
+    t_adapt_cli: "{{ (t_adapt_c * 9/5 + 32) if climate_is_imperial else t_adapt_c }}"
+    band_min_cli: "{{ (band_min_c * 9/5 + 32) if climate_is_imperial else band_min_c }}"
+    band_max_cli: "{{ (band_max_c * 9/5 + 32) if climate_is_imperial else band_max_c }}"
+    inside_low_cli: "{{ (inside_low_c * 9/5 + 32) if climate_is_imperial else inside_low_c }}"
+    inside_high_cli: "{{ (inside_high_c * 9/5 + 32) if climate_is_imperial else inside_high_c }}"
+
+    min_allowed_cli: "{{ state_attr(climate_entity_id, 'min_temp') | float(7.0) }}"
+    max_allowed_cli: "{{ state_attr(climate_entity_id, 'max_temp') | float(33.0) }}"
+
+    # Clamp helper patterns (max(min(x, max), min))
+    t_adapt_cli_capped: "{{ [ [ t_adapt_cli, max_allowed_cli ] | min , min_allowed_cli ] | max }}"
+    band_min_cli_capped: "{{ [ [ band_min_cli, max_allowed_cli ] | min , min_allowed_cli ] | max }}"
+    band_max_cli_capped: "{{ [ [ band_max_cli, max_allowed_cli ] | min , min_allowed_cli ] | max }}"
+
+    inside_low_cli_capped: >
+        {% set low =  [ [ inside_low_cli,  max_allowed_cli ] | min , min_allowed_cli ] | max %}
+        {% set high = [ [ inside_high_cli, max_allowed_cli ] | min , min_allowed_cli ] | max %}
+        {% if low >= high %}{{ high - 0.5 }}{% else %}{{ low }}{% endif %}
+    inside_high_cli_capped: >
+        {% set high = [ [ inside_high_cli, max_allowed_cli ] | min , min_allowed_cli ] | max %}
+        {% set low  = [ [ inside_low_cli,  max_allowed_cli ] | min , min_allowed_cli ] | max %}
+        {% if low >= high %}{{ low + 0.5 }}{% else %}{{ high }}{% endif %}
+
     # HVAC capabilities
     hvac_modes: "{{ state_attr(climate_entity_id, 'hvac_modes') | default([], true) }}"
     supports_auto: "{{ 'auto' in hvac_modes }}"
@@ -1184,31 +1237,6 @@ variables:
         {% set ids = pause_entities if pause_entities else [] %}
         {% if ids|length == 0 %} false
         {% else %} {{ expand(ids) | selectattr('state','eq','on') | list | length > 0 }} {% endif %}
-
-    occ_now: >
-        {# Occupancy-aware: fallback to true if no sensor #}
-        {% if occupancy_sensor_id %} {{ is_state(occupancy_sensor_id, 'on') }}
-        {% else %} true {% endif %}
-
-    setback_apply_c: "{{ setback_c if (energy_save and (not occ_now)) else 0 }}"
-    co2_gap: >
-        {% if co2_enable and co2_in_id and co2_out_id %}
-          {{ (states(co2_in_id) | float(0)) - (states(co2_out_id) | float(0)) }}
-        {% else %} 0 {% endif %}
-
-    co2_dir: >
-        {# CO₂-driven seasonal bias: nudge comfort targets if CO₂ gap exceeded #}
-        {% if co2_enable and (co2_gap | float(0)) >= (co2_delta_ppm | float(0)) %}
-          {% if season_now == 'winter' %} 1
-          {% elif season_now == 'summer' %} -1
-          {% else %} 0 {% endif %}
-        {% else %} 0 {% endif %}
-
-    co2_bias_c_eff: >
-        {% set mag = co2_bias_max_c | float(0) %}
-        {% if co2_dir != 0 %}
-          {{ co2_dir * mag }}
-        {% else %} 0 {% endif %}
 
     # Debug summary
     dbg_summary: >
@@ -1404,7 +1432,7 @@ action:
             - service: climate.set_temperature
               target: { entity_id: !input climate_entity }
               data:
-                temperature: "{{ (band_min_sys if t_in_c < band_min_c else band_max_sys) | float }}"
+                temperature: "{{ (band_min_cli_capped if t_in_c < band_min_c else band_max_cli_capped) | float }}"
             - if:
                 - condition: template
                   value_template: >
@@ -1445,8 +1473,8 @@ action:
                         entity_id: !input climate_entity,
                     }
                   data:
-                    target_temp_low: "{{ inside_low_sys | float }}"
-                    target_temp_high: "{{ inside_high_sys | float }}"
+                    target_temp_low: "{{ inside_low_cli_capped | float }}"
+                    target_temp_high: "{{ inside_high_cli_capped | float }}"
               else:
                 - choose:
                     - conditions:
@@ -1459,12 +1487,12 @@ action:
                         - service: climate.set_temperature
                           target: { entity_id: !input climate_entity }
                           data:
-                            temperature: "{{ t_adapt_sys | float }}"
+                            temperature: "{{ t_adapt_cli_capped | float }}"
                   default:
                     - service: climate.set_temperature
                       target: { entity_id: !input climate_entity }
                       data:
-                        temperature: "{{ t_adapt_sys | float }}"
+                        temperature: "{{ t_adapt_cli_capped | float }}"
           else:
             - choose:
                 - conditions:
@@ -1477,7 +1505,7 @@ action:
             - service: climate.set_temperature
               target: { entity_id: !input climate_entity }
               data:
-                temperature: "{{ t_adapt_sys | float }}"
+                temperature: "{{ t_adapt_cli_capped | float }}"
 
     - choose:
           - conditions:
@@ -1489,7 +1517,7 @@ action:
                       name: "Adaptive Climate (final v{{ blueprint_version }})"
                       message: >
                           Band={{ band_min_sys }}-{{ band_max_sys }}{{ unit_sym }};
-                          Set={{ (band_min_sys if t_in_c < band_min_c else (band_max_sys if t_in_c > band_max_c else t_adapt_sys)) | round(1) }}{{ unit_sym }};
+                          Set={{ (band_min_cli_capped if t_in_c < band_min_c else (band_max_cli_capped if t_in_c > band_max_c else t_adapt_cli_capped)) | round(1) }}{{ unit_sym }};
                           In={{ (t_in_c * 9/5 + 32) if is_imperial else t_in_c | round(1) }}{{ unit_sym }};
                           Out={{ (t_out_c * 9/5 + 32) if is_imperial else t_out_c | round(1) }}{{ unit_sym }};
                           dp_out={{ dp_out_c | round(1) }}C, dp_in={{ dp_in_c | round(1) }}C, AH_out={{ ah_out }} g/m³, AH_in={{ ah_in }} g/m³, h_out={{ h_out }} kJ/kg, h_in={{ h_in }} kJ/kg;
