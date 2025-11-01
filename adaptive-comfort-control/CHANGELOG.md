@@ -1,3 +1,23 @@
+## [4.9.0] - 2025-11-01
+### Fixed
+- Corrected seasonal bias preset conversion from °C→°F (removed +32 offset on delta values).
+- Eliminated extreme target values (e.g., 91°F) caused by unguarded adaptive target exceeding comfort bounds.
+- Added two-sided clamping to `band_min_c` / `band_max_c` to prevent inversion and ensure stable adaptive band formation.
+- Guarded adaptive target (`t_adapt_c_guard`) introduced to maintain band integrity within user comfort range.
+
+### Changed
+- Overhauled HVAC pause/resume logic:
+  - Added trigger-based debounce (no pause on short door opens).
+  - Removed redundant action delays to align with trigger `for:` timing.
+  - Always resumes HVAC to a valid mode when doors are closed.
+- Aligned all temperature outputs to use the guarded adaptive target for consistent reporting.
+- Expanded diagnostic logs to include all bias terms, tolerance, and adaptive intermediates.
+
+### Notes
+- Normal daytime operation now stabilizes around 70–72°F with outdoor ≈ 29°F.
+- Comfort band: ~65–76°F (configurable via inputs).
+- Backward compatible; strongly recommended for all v4.8.x users to eliminate 91°F runaway conditions.
+
 ## [4.8.6] - 2025-11-01
 ### Fixed
 - Eliminated floating-point spillover that produced invalid setpoints like `33.333333…` against devices capped at `33.3°C`.

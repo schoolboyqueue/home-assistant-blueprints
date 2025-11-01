@@ -688,7 +688,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.8.6"
+    blueprint_version: "4.9.0"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
@@ -1249,9 +1249,9 @@ variables:
         {% elif r == 'Marine' %} {{ 0.0 * intensity }}
         {% else %} {{ none }} {% endif %}
 
-    _w_sys_preset: "{{ (_preset_w_c * 9/5 + 32) if (is_imperial and _preset_w_c is not none) else _preset_w_c }}"
-    _s_sys_preset: "{{ (_preset_s_c * 9/5 + 32) if (is_imperial and _preset_s_c is not none) else _preset_s_c }}"
-    _sh_sys_preset: "{{ (_preset_sh_c * 9/5 + 32) if (is_imperial and _preset_sh_c is not none) else _preset_sh_c }}"
+    _w_sys_preset: "{{ (_preset_w_c * 9/5) if (is_imperial and _preset_w_c is not none) else _preset_w_c }}"
+    _s_sys_preset: "{{ (_preset_s_c * 9/5) if (is_imperial and _preset_s_c is not none) else _preset_s_c }}"
+    _sh_sys_preset: "{{ (_preset_sh_c * 9/5) if (is_imperial and _preset_sh_c is not none) else _preset_sh_c }}"
 
     winter_bias_sys: "{{ _w_sys_preset if (regional_defaults_enable and _w_sys_preset is not none) else winter_bias_sys_manual }}"
     summer_bias_sys: "{{ _s_sys_preset if (regional_defaults_enable and _s_sys_preset is not none) else summer_bias_sys_manual }}"
@@ -1304,15 +1304,23 @@ variables:
           {% else %}{{ base | round(2) }}{% endif %}
         {% else %}{{ (22.0 + season_bias_c + co2_bias_c_eff + sleep_bias_c_eff) | round(2) }}{% endif %}
     t_adapt_c: "{{ (t_adapt_c_raw) | round(2) }}"
-    band_min_c: "{{ [t_adapt_c - tol_c - setback_apply_c, min_c] | max | round(2) }}"
-    band_max_c: "{{ [t_adapt_c + tol_c + setback_apply_c, max_c] | min | round(2) }}"
+    # Guard: keep adaptive target within [min_c+tol+setback, max_c-tol-setback] so band doesn't collapse to the edges
+    t_adapt_c_guard: "{{ [ [ t_adapt_c, (max_c - tol_c - setback_apply_c) ] | min , (min_c + tol_c + setback_apply_c) ] | max | round(2) }}"
+    band_min_c: "{{ [ [ t_adapt_c_guard - tol_c - setback_apply_c, min_c ] | max, max_c ] | min | round(2) }}"
+    band_max_c: "{{ [ [ t_adapt_c_guard + tol_c + setback_apply_c, max_c ] | min, min_c ] | max | round(2) }}"
+    # --- Safety: ensure band_min <= band_max even if an upstream calc misbehaves ---
+    band_min_c_sane: "{{ [ band_min_c, band_max_c ] | min | round(2) }}"
+    band_max_c_sane: "{{ [ band_min_c, band_max_c ] | max | round(2) }}"
+    # --- Final clamp: keep comfort band within user bounds (handles inversion cases cleanly) ---
+    band_min_c_final: "{{ [ [ band_min_c_sane,  max_c ] | min , min_c ] | max }}"
+    band_max_c_final: "{{ [ [ band_max_c_sane, max_c ] | min , min_c ] | max }}"
     inside_low_c: "{{ (t_adapt_c - inside_half_c_eff - (setback_apply_c/2)) | round(2) }}"
     inside_high_c: "{{ (t_adapt_c + inside_half_c_eff + (setback_apply_c/2)) | round(2) }}"
 
     # --------- System units conversion ---------
     t_adapt_sys: "{{ (t_adapt_c * 9 / 5 + 32) if is_imperial else t_adapt_c }}"
-    band_min_sys: "{{ (band_min_c * 9 / 5 + 32) if is_imperial else band_min_c }}"
-    band_max_sys: "{{ (band_max_c * 9 / 5 + 32) if is_imperial else band_max_c }}"
+    band_min_sys: "{{ (band_min_c_final * 9 / 5 + 32) if is_imperial else band_min_c_final }}"
+    band_max_sys: "{{ (band_max_c_final * 9 / 5 + 32) if is_imperial else band_max_c_final }}"
     inside_low_sys: "{{ (inside_low_c * 9 / 5 + 32) if is_imperial else inside_low_c }}"
     inside_high_sys: "{{ (inside_high_c * 9 / 5 + 32) if is_imperial else inside_high_c }}"
 
@@ -1327,9 +1335,9 @@ variables:
         {% elif (max_allowed_raw | float(0)) >= 60 or (min_allowed_raw | float(0)) >= 30 %} true
         {% else %} false {% endif %}
 
-    t_adapt_cli: "{{ (t_adapt_c * 9/5 + 32) if climate_is_imperial else t_adapt_c }}"
-    band_min_cli: "{{ (band_min_c * 9/5 + 32) if climate_is_imperial else band_min_c }}"
-    band_max_cli: "{{ (band_max_c * 9/5 + 32) if climate_is_imperial else band_max_c }}"
+    t_adapt_cli: "{{ (t_adapt_c_guard * 9/5 + 32) if climate_is_imperial else t_adapt_c_guard }}"
+    band_min_cli: "{{ (band_min_c_final * 9/5 + 32) if climate_is_imperial else band_min_c_final }}"
+    band_max_cli: "{{ (band_max_c_final * 9/5 + 32) if climate_is_imperial else band_max_c_final }}"
     inside_low_cli: "{{ (inside_low_c * 9/5 + 32) if climate_is_imperial else inside_low_c }}"
     inside_high_cli: "{{ (inside_high_c * 9/5 + 32) if climate_is_imperial else inside_high_c }}"
 
@@ -1407,6 +1415,13 @@ variables:
     cli_eps: 0.001
     cli_max_safe: "{{ (max_allowed_cli | float) - (cli_eps | float) }}"
 
+    # Rounding-safe cap aligned to device step (avoids 33.333... vs 33.3 edge case)
+    # Step down a hair from the device max, then quantize to the device step.
+    cli_max_safe_r1: >
+        {% set headroom = 0.05 %}
+        {% set raw_cap = (max_allowed_cli | float) - headroom %}
+        {{ ((raw_cap / (cli_step | float(0.5))) | round(0,'floor') * (cli_step | float(0.5))) }}
+
     # Quantize to device step using floor (never round up over max) then clamp to safe limits
     band_min_cli_q: "{{ ((band_min_cli_capped  / cli_step) | round(0,'floor') * cli_step) }}"
     band_max_cli_q: "{{ ((band_max_cli_capped  / cli_step) | round(0,'floor') * cli_step) }}"
@@ -1414,11 +1429,11 @@ variables:
     inside_low_cli_q:  "{{ ((inside_low_cli_capped  / cli_step) | round(0,'floor') * cli_step) }}"
     inside_high_cli_q: "{{ ((inside_high_cli_capped / cli_step) | round(0,'floor') * cli_step) }}"
 
-    band_min_cli_final: "{{ [ [ band_min_cli_q,  cli_max_safe ] | min , min_allowed_cli ] | max }}"
-    band_max_cli_final: "{{ [ [ band_max_cli_q,  cli_max_safe ] | min , min_allowed_cli ] | max }}"
-    t_adapt_cli_final:  "{{ [ [ t_adapt_cli_q,   cli_max_safe ] | min , min_allowed_cli ] | max }}"
-    inside_low_cli_final:  "{{ [ [ inside_low_cli_q,  cli_max_safe ] | min , min_allowed_cli ] | max }}"
-    inside_high_cli_final: "{{ [ [ inside_high_cli_q, cli_max_safe ] | min , min_allowed_cli ] | max }}"
+    band_min_cli_final: "{{ [ [ band_min_cli_q,  cli_max_safe_r1 ] | min , min_allowed_cli ] | max }}"
+    band_max_cli_final: "{{ [ [ band_max_cli_q,  cli_max_safe_r1 ] | min , min_allowed_cli ] | max }}"
+    t_adapt_cli_final:  "{{ [ [ t_adapt_cli_q,   cli_max_safe_r1 ] | min , min_allowed_cli ] | max }}"
+    inside_low_cli_final:  "{{ [ [ inside_low_cli_q,  cli_max_safe_r1 ] | min , min_allowed_cli ] | max }}"
+    inside_high_cli_final: "{{ [ [ inside_high_cli_q, cli_max_safe_r1 ] | min , min_allowed_cli ] | max }}"
 
     # Pause helpers
     any_open: >
@@ -1433,7 +1448,7 @@ variables:
     # Debug summary
     dbg_summary: >
         Region={{ region_pick }}; Season={{ season_now }}; In={{ t_in_c }}C (RH={{ rh_in }}%); Out={{ t_out_c }}C (RH={{ rh_out }}%);
-        Band={{ band_min_c }}-{{ band_max_c }}C; unit={{ unit_sym }}; NatVent={{ nat_vent_enable }}; AnyOpen={{ any_open }};
+        Band={{ band_min_c_final }}-{{ band_max_c_final }}C; unit={{ unit_sym }}; NatVent={{ nat_vent_enable }}; AnyOpen={{ any_open }};
         dp_in={{ dp_in_c | round(1) }}C, dp_out={{ dp_out_c | round(1) }}C; AH_in={{ ah_in }} g/m³, AH_out={{ ah_out }} g/m³;
         h_in={{ h_in }} kJ/kg, h_out={{ h_out }} kJ/kg; P={{ pressure_kpa | round(2) }} kPa; dv_sys={{ dv_sys }}; dp_max={{ max_outdoor_dp_sys }}; muggyΔ={{ muggy_delta_dp_sys }}; econ_dh={{ econ_dh }}; econ_dah={{ econ_dah }}; CO₂Δ={{ co2_delta_ppm }}
         ; Sleep={{ sleep_active }} (bias={{ sleep_bias_c_eff }}, tighten={{ (inside_half_c - inside_half_c_eff) | round(2) }})
@@ -1534,8 +1549,21 @@ action:
               data:
                 name: "Adaptive Comfort (sanity v{{ blueprint_version }})"
                 message: >
-                  t_in_c={{ t_in_c }}, t_out_c={{ t_out_c }}, band_min_c={{ band_min_c }}, band_max_c={{ band_max_c }};
-                  valid_band={{ band_min_c < band_max_c }}
+                  t_in_c={{ t_in_c }}, t_out_c={{ t_out_c }}, out_valid={{ out_valid }}, 
+                  t_adapt_base_c={{ t_adapt_base_c }}, season_bias_c={{ season_bias_c }}, co2_bias_c_eff={{ co2_bias_c_eff }}, sleep_bias_c_eff={{ sleep_bias_c_eff }},
+                  tol_c={{ tol_c }}, setback_apply_c={{ setback_apply_c }}, 
+                  t_adapt_c={{ t_adapt_c }}, t_adapt_c_guard={{ t_adapt_c_guard }},
+                  band_min_c={{ band_min_c }}, band_max_c={{ band_max_c }}; valid_band={{ band_min_c < band_max_c }}
+    # Diagnostic: log if band_min_c > band_max_c, indicating a swap occurred
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ dbg in ['basic','verbose'] and (band_min_c > band_max_c) }}"
+          sequence:
+            - service: logbook.log
+              data:
+                name: "Adaptive Comfort (band guard v{{ blueprint_version }})"
+                message: "Band inverted (min {{ band_min_c }}C > max {{ band_max_c }}C). Using sane range {{ band_min_c_sane }}–{{ band_max_c_sane }}C."
     # Preflight log
     - choose:
         - conditions:
@@ -1551,15 +1579,8 @@ action:
         # --- HVAC Pause branch ---
         - conditions:
             - condition: template
-              value_template: "{{ any_open }}"
+              value_template: "{{ any_open and (trigger.id in ['pause_open_on','pause_open_text']) }}"
           sequence:
-            # Honor Pause-after-Open using a simple delay, then re-check
-            - delay:
-                seconds: !input pause_open_delay
-
-            # Still open after the wait? If so, pause HVAC
-            - condition: template
-              value_template: "{{ any_open }}"
             - service: climate.turn_off
               target: { entity_id: !input climate_entity }
             - choose:
@@ -1581,13 +1602,9 @@ action:
               data:
                 name: "HVAC Pause v{{ blueprint_version }}"
                 message: >
-                  Paused {{ climate_entity_id }} (opening detected). Open sensors: {{ expand(pause_entities) | selectattr('state','in',['on','open']) | map(attribute='entity_id') | list if pause_entities else [] }}
+                  Paused {{ climate_entity_id }} (trigger={{ trigger.id | default('unknown') }}). Open sensors: {{ expand(pause_entities) | selectattr('state','in',['on','open']) | map(attribute='entity_id') | list if pause_entities else [] }}
       default:
         # --- Resume branch (no openings active) ---
-        # Honor Resume-after-Close using a simple delay, then re-check
-        - delay:
-            seconds: !input pause_close_delay
-
         # Re-validate that everything is closed before we resume
         - condition: template
           value_template: "{{ not any_open }}"
@@ -1600,21 +1617,16 @@ action:
             name: "HVAC Resume v{{ blueprint_version }}"
             message: "Resumed {{ climate_entity_id }} (closed)."
 
-        # If climate is OFF at resume, prime it back to an active mode before normal logic
-        - choose:
-            - conditions:
-                - condition: template
-                  value_template: "{{ states(climate_entity_id) | lower == 'off' }}"
-              sequence:
-                - service: climate.set_hvac_mode
-                  target: { entity_id: !input climate_entity }
-                  data:
-                    hvac_mode: >
-                      {% if supports_heat_cool %}heat_cool
-                      {% elif supports_auto %}auto
-                      {% else %}
-                        {% if t_in_c < t_adapt_c %}heat{% else %}cool{% endif %}
-                      {% endif %}
+        # Always restore a valid HVAC mode after pause
+        - service: climate.set_hvac_mode
+          target: { entity_id: !input climate_entity }
+          data:
+            hvac_mode: >
+              {% if supports_heat_cool %}heat_cool
+              {% elif supports_auto %}auto
+              {% else %}
+                {% if t_in_c < t_adapt_c %}heat{% else %}cool{% endif %}
+              {% endif %}
 
         # --- Natural ventilation OFF condition ---
         - if:
@@ -1622,7 +1634,7 @@ action:
               value_template: >
                 {% set close_ids = ['pause_close_off','pause_close_text'] %}
                 {% set is_close_run = (trigger.id | default('') in close_ids) %}
-                {% set temp_ok = (t_out_c >= (t_in_c - dv_c)) and (t_out_c <= (t_in_c + dv_c)) and (t_out_c >= band_min_c) and (t_out_c <= band_max_c) %}
+                {% set temp_ok = (t_out_c >= (t_in_c - dv_c)) and (t_out_c <= (t_in_c + dv_c)) and (t_out_c >= band_min_c_final) and (t_out_c <= band_max_c_final) %}
 
                 {% if psychro_enable %}
                   {% set dp_max_ok = (dp_out_c <= max_outdoor_dp_c) %}
@@ -1643,13 +1655,13 @@ action:
                 message: >
                     OFF: Out {{ (t_out_c * 9/5 + 32) if is_imperial else t_out_c | round(1) }}{{ unit_sym }},
                     In {{ (t_in_c * 9/5 + 32) if is_imperial else t_in_c | round(1) }}{{ unit_sym }},
-                    Band {{ (band_min_c * 9/5 + 32) if is_imperial else band_min_c | round(1) }}-{{ (band_max_c * 9/5 + 32) if is_imperial else band_max_c | round(1) }}{{ unit_sym }};
+                    Band {{ (band_min_c_final * 9/5 + 32) if is_imperial else band_min_c_final | round(1) }}-{{ (band_max_c_final * 9/5 + 32) if is_imperial else band_max_c_final | round(1) }}{{ unit_sym }};
                     dp_out={{ dp_out_c | round(1) }}C, dp_in={{ dp_in_c | round(1) }}C, AH_out={{ ah_out }} g/m³, AH_in={{ ah_in }} g/m³, h_out={{ h_out }} kJ/kg, h_in={{ h_in }} kJ/kg
 
         # --- Heating / Cooling setpoint control ---
         - if:
             - condition: template
-              value_template: "{{ t_in_c < band_min_c or t_in_c > band_max_c }}"
+              value_template: "{{ t_in_c < band_min_c_final or t_in_c > band_max_c_final }}"
           then:
             - variables:
                 minutes_since_state_change: >
@@ -1664,14 +1676,14 @@ action:
                     - choose:
                         - conditions:
                             - condition: template
-                              value_template: "{{ t_in_c < band_min_c }}"
+                              value_template: "{{ t_in_c < band_min_c_final }}"
                           sequence:
                             - service: climate.set_hvac_mode
                               target: { entity_id: !input climate_entity }
                               data: { hvac_mode: heat }
                         - conditions:
                             - condition: template
-                              value_template: "{{ t_in_c > band_max_c }}"
+                              value_template: "{{ t_in_c > band_max_c_final }}"
                           sequence:
                             - service: climate.set_hvac_mode
                               target: { entity_id: !input climate_entity }
@@ -1693,18 +1705,18 @@ action:
                     - service: climate.set_temperature
                       target: { entity_id: !input climate_entity }
                       data:
-                        target_temp_low: "{{ [ inside_low_cli_final | float, cli_max_safe | float ] | min | round(1) }}"
-                        target_temp_high: "{{ [ inside_high_cli_final | float, cli_max_safe | float ] | min | round(1) }}"
+                        target_temp_low: "{{ [ inside_low_cli_final | float, cli_max_safe_r1 | float ] | min | round(1) }}"
+                        target_temp_high: "{{ [ inside_high_cli_final | float, cli_max_safe_r1 | float ] | min | round(1) }}"
               default:
                 - service: climate.set_temperature
                   target: { entity_id: !input climate_entity }
                   data:
                     temperature: >
-                      {{ [ (band_min_cli_final if t_in_c < band_min_c else band_max_cli_final) | float, cli_max_safe | float ] | min | round(1) }}
+                      {{ [ (band_min_cli_final if t_in_c < band_min_c_final else band_max_cli_final) | float, cli_max_safe_r1 | float ] | min | round(1) }}
             - if:
                 - condition: template
                   value_template: >
-                    {% set dev = (t_in_c - band_max_c) if t_in_c > band_max_c else (band_min_c - t_in_c) %}
+                    {% set dev = (t_in_c - band_max_c_final) if t_in_c > band_max_c_final else (band_min_c_final - t_in_c) %}
                     {{ adaptive_fan and (fan_modes|length > 0) and (dev > 0.5) }}
               then:
                 - service: climate.set_fan_mode
@@ -1714,7 +1726,7 @@ action:
                     }
                   data:
                     fan_mode: >
-                        {% set dev = (t_in_c - band_max_c) if t_in_c > band_max_c else (band_min_c - t_in_c) %}
+                        {% set dev = (t_in_c - band_max_c_final) if t_in_c > band_max_c_final else (band_min_c_final - t_in_c) %}
                         {% set modes = fan_modes | default([], true) %}
                         {% set has_steps = ('high' in modes) or ('medium' in modes) or ('low' in modes) %}
                         {% if has_steps %}
@@ -1731,7 +1743,7 @@ action:
         # --- Heat_Cool / Auto inside band ---
         - if:
             - condition: template
-              value_template: "{{ t_in_c >= band_min_c and t_in_c <= band_max_c }}"
+              value_template: "{{ t_in_c >= band_min_c_final and t_in_c <= band_max_c_final }}"
           then:
             - if:
                 - condition: template
@@ -1749,8 +1761,8 @@ action:
                         entity_id: !input climate_entity,
                     }
                   data:
-                    target_temp_low: "{{ [ inside_low_cli_final | float, cli_max_safe | float ] | min | round(1) }}"
-                    target_temp_high: "{{ [ inside_high_cli_final | float, cli_max_safe | float ] | min | round(1) }}"
+                    target_temp_low: "{{ [ inside_low_cli_final | float, cli_max_safe_r1 | float ] | min | round(1) }}"
+                    target_temp_high: "{{ [ inside_high_cli_final | float, cli_max_safe_r1 | float ] | min | round(1) }}"
               else:
                 - choose:
                     - conditions:
@@ -1763,12 +1775,12 @@ action:
                         - service: climate.set_temperature
                           target: { entity_id: !input climate_entity }
                           data:
-                            temperature: "{{ [ t_adapt_cli_final | float, cli_max_safe | float ] | min | round(1) }}"
+                            temperature: "{{ [ t_adapt_cli_final | float, cli_max_safe_r1 | float ] | min | round(1) }}"
                   default:
                     - service: climate.set_temperature
                       target: { entity_id: !input climate_entity }
                       data:
-                        temperature: "{{ [ t_adapt_cli_final | float, cli_max_safe | float ] | min | round(1) }}"
+                        temperature: "{{ [ t_adapt_cli_final | float, cli_max_safe_r1 | float ] | min | round(1) }}"
           else:
             - choose:
                 - conditions:
