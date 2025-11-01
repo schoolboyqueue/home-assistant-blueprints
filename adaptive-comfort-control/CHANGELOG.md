@@ -1,3 +1,19 @@
+## [4.8.4] - 2025-10-31
+### Fixed
+- Eliminated boundary errors (e.g., `33.333333333333336 > 33.3`) by adding
+  step-rounded **final** setpoints and **service-level clamps** on every
+  `climate.set_temperature` write.
+- Resolved `supports_heat_cool` undefined warnings by moving HVAC capability
+  variables earlier in the variables block (before any references).
+- Ensured inside-band Heat/Cool writes use `inside_low/high` (final, clamped)
+  for stable sleep-bias behavior and predictable Auto mode operation.
+- Final debug log now surfaces device step and bounds for quick validation.
+
+### Notes
+- No behavioral change if your device already enforced limits; this update
+  simply guarantees payloads are always within the device’s accepted range.
+- Blueprint field `blueprint_version` should be bumped to `4.8.4`.
+
 ## [4.8.2] - 2025-10-31
 ### Fixed
 - Resolved issue where the low Auto-mode setpoint could not drop below ~69°F when no minimum separation is required.
