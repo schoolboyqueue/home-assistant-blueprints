@@ -412,6 +412,24 @@ blueprint:
                             max: 10.0
                             step: 0.5
 
+                baro_pressure_sensor:
+                    name: "Barometric Pressure (optional)"
+                    description: "If provided, overrides sea-level assumption for psychrometrics. Supports kPa, hPa/mbar, Pa, inHg, mmHg."
+                    default: sensor.none
+                    selector:
+                        entity:
+                            domain: ["sensor"]
+                site_elevation_m:
+                    name: "Site Elevation (m, optional)"
+                    description: "If no pressure sensor, estimate pressure from elevation. Sensor > manual > LUT by state > sea level."
+                    default: 0
+                    selector:
+                        number:
+                            min: -200
+                            max: 5000
+                            step: 1
+                            unit_of_measurement: "m"
+
         air_quality_rmot:
             name: Air Quality & RMOT (Optional)
             icon: mdi:molecule-co2
@@ -606,7 +624,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.5.5"
+    blueprint_version: "4.7.0"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
@@ -747,6 +765,20 @@ variables:
         {% set e = e | default('', true) %}
         {% set v = e | string | lower %}
         {% if v not in ['', 'none', 'sensor.none', 'input_number.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
+
+    _raw_baro_values: !input baro_pressure_sensor
+    baro_sensor_id: >
+        {% set raw = _raw_baro_values %}
+        {% if raw is string %}
+          {% set e = raw %}
+        {% elif raw is iterable %}
+          {% set e = (raw[0] if raw|length > 0 else '') %}
+        {% else %}
+          {% set e = '' %}
+        {% endif %}
+        {% set e = e | default('', true) %}
+        {% set v = e | string | lower %}
+        {% if v not in ['', 'none', 'sensor.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
 
     # Seasons (manual biases)
     season_entity_id: >
@@ -976,6 +1008,59 @@ variables:
           {% endif %}
         {% else %}50{% endif %}
 
+    # --------- Pressure model (sensor > manual elevation > LUT by state > sea level) ---------
+    # Approximate average elevations by state (meters). Values are coarse; prefer sensor/manual when available.
+    _state_elev_lut: >
+        {{ {
+          'AL':150,'AK':580,'AZ':1250,'AR':200,'CA':880,'CO':2000,'CT':150,'DC':20,'DE':20,'FL':30,
+          'GA':180,'HI':920,'ID':1520,'IL':180,'IN':210,'IA':335,'KS':610,'KY':230,'LA':30,'ME':180,
+          'MD':110,'MA':150,'MI':270,'MN':370,'MS':90,'MO':240,'MT':1035,'NE':790,'NV':1675,'NH':300,
+          'NJ':80,'NM':1735,'NY':300,'NC':220,'ND':580,'OH':260,'OK':400,'OR':1000,'PA':340,'RI':60,
+          'SC':110,'SD':670,'TN':260,'TX':520,'UT':1890,'VT':300,'VA':290,'WA':520,'WV':460,'WI':320,'WY':2040
+        } }}
+    _state_code: "{{ (state_code.split(' ')[0] if state_code else '') }}"
+    lut_elev_m: >
+        {% set d = _state_elev_lut %}
+        {% if d is mapping and _state_code in d %}{{ d[_state_code] }}{% else %}0{% endif %}
+
+    site_elevation_m_in: !input site_elevation_m
+    site_elevation_eff_m: >
+        {# prefer manual elevation if not zero/non-default, else LUT when regional presets enabled, else 0 #}
+        {% set man = site_elevation_m_in | float(0) %}
+        {% if man != 0 %}{{ man }}
+        {% elif regional_defaults_enable %}{{ lut_elev_m | float(0) }}
+        {% else %}0{% endif %}
+
+    # Convert a barometer reading to kPa (supports several common units)
+    _baro_unit: "{{ state_attr(baro_sensor_id, 'unit_of_measurement') | default('', true) | string }}"
+    _baro_val_raw: "{{ states(baro_sensor_id) if baro_sensor_id else '' }}"
+    _baro_val_num: >
+        {% if baro_sensor_id and _baro_val_raw not in ['unknown','unavailable',''] %}
+          {{ _baro_val_raw | float(0) }}
+        {% else %}{{ none }}{% endif %}
+    baro_kpa_from_sensor: >
+        {% set v = _baro_val_num %}
+        {% if v is not none %}
+          {% set u = _baro_unit | lower %}
+          {% if 'kpa' in u %}{{ v }}
+          {% elif 'hpa' in u or 'mbar' in u %}{{ v / 10.0 }}
+          {% elif u == 'pa' %}{{ v / 1000.0 }}
+          {% elif 'inhg' in u %}{{ v * 3.38639 }}
+          {% elif 'mmhg' in u %}{{ v * 0.133322 }}
+          {% else %}{{ none }}{% endif %}
+        {% else %}{{ none }}{% endif %}
+
+    # Standard atmosphere adjusted by elevation when no sensor is present
+    baro_kpa_from_elev: >
+        {% set h = site_elevation_eff_m | float(0) %}
+        {% if h > -200 %}
+          {{ 101.325 * (1 - 2.25577e-5 * h) ** 5.25588 }}
+        {% else %}{{ 101.325 }}{% endif %}
+
+    pressure_kpa: >
+        {% if baro_kpa_from_sensor is not none %}{{ baro_kpa_from_sensor }}
+        {% else %}{{ baro_kpa_from_elev }}{% endif %}
+
     # --------- Built-in psychrometrics (T in °C, RH in %) ---------
     psat_in_kpa: "{{ 0.61078 * (2.718281828 ** ((17.2694 * t_in_c) / (t_in_c + 237.3))) }}"
     psat_out_kpa: "{{ 0.61078 * (2.718281828 ** ((17.2694 * t_out_c) / (t_out_c + 237.3))) }}"
@@ -995,8 +1080,8 @@ variables:
     ah_out: >
         {% set Tk = t_out_c + 273.15 %}
         {{ (2.1674 * pv_out_kpa / Tk) * 1000.0 | round(2) }}
-    w_in: "{{ 0.62198 * pv_in_kpa / (101.325 - pv_in_kpa) }}"
-    w_out: "{{ 0.62198 * pv_out_kpa / (101.325 - pv_out_kpa) }}"
+    w_in: "{{ 0.62198 * pv_in_kpa / (pressure_kpa - pv_in_kpa) }}"
+    w_out: "{{ 0.62198 * pv_out_kpa / (pressure_kpa - pv_out_kpa) }}"
     h_in: "{{ 1.006 * t_in_c + w_in * (2501 + 1.86 * t_in_c) | round(2) }}"
     h_out: "{{ 1.006 * t_out_c + w_out * (2501 + 1.86 * t_out_c) | round(2) }}"
 
@@ -1130,7 +1215,7 @@ variables:
         Region={{ region_pick }}; Season={{ season_now }}; In={{ t_in_c }}C (RH={{ rh_in }}%); Out={{ t_out_c }}C (RH={{ rh_out }}%);
         Band={{ band_min_c }}-{{ band_max_c }}C; unit={{ unit_sym }}; NatVent={{ nat_vent_enable }}; AnyOpen={{ any_open }};
         dp_in={{ dp_in_c | round(1) }}C, dp_out={{ dp_out_c | round(1) }}C; AH_in={{ ah_in }} g/m³, AH_out={{ ah_out }} g/m³;
-        h_in={{ h_in }} kJ/kg, h_out={{ h_out }} kJ/kg; dv_sys={{ dv_sys }}; dp_max={{ max_outdoor_dp_sys }}; muggyΔ={{ muggy_delta_dp_sys }}; econ_dh={{ econ_dh }}; econ_dah={{ econ_dah }}; CO₂Δ={{ co2_delta_ppm }}
+        h_in={{ h_in }} kJ/kg, h_out={{ h_out }} kJ/kg; P={{ pressure_kpa | round(2) }} kPa; dv_sys={{ dv_sys }}; dp_max={{ max_outdoor_dp_sys }}; muggyΔ={{ muggy_delta_dp_sys }}; econ_dh={{ econ_dh }}; econ_dah={{ econ_dah }}; CO₂Δ={{ co2_delta_ppm }}
 
 
 trigger:
