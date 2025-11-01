@@ -1306,7 +1306,15 @@ variables:
     inside_high_sys: "{{ (inside_high_c * 9 / 5 + 32) if is_imperial else inside_high_c }}"
 
     # --------- Climate unit outputs (convert from °C regardless of system heuristic) ---------
-    climate_is_imperial: "{{ (_u_climate | lower) is string and ('f' in _u_climate | lower) }}"
+    min_allowed_raw: "{{ state_attr(climate_entity_id, 'min_temp') | float(7.2) }}"
+    max_allowed_raw: "{{ state_attr(climate_entity_id, 'max_temp') | float(33.3) }}"
+
+    # Detect climate unit: prefer explicit attribute; fallback to range heuristic
+    climate_is_imperial: >
+        {% set u = _u_climate | lower %}
+        {% if 'f' in u %} true
+        {% elif (max_allowed_raw | float(0)) >= 60 or (min_allowed_raw | float(0)) >= 30 %} true
+        {% else %} false {% endif %}
 
     t_adapt_cli: "{{ (t_adapt_c * 9/5 + 32) if climate_is_imperial else t_adapt_c }}"
     band_min_cli: "{{ (band_min_c * 9/5 + 32) if climate_is_imperial else band_min_c }}"
@@ -1314,8 +1322,9 @@ variables:
     inside_low_cli: "{{ (inside_low_c * 9/5 + 32) if climate_is_imperial else inside_low_c }}"
     inside_high_cli: "{{ (inside_high_c * 9/5 + 32) if climate_is_imperial else inside_high_c }}"
 
-    min_allowed_cli: "{{ state_attr(climate_entity_id, 'min_temp') | float(7.0) }}"
-    max_allowed_cli: "{{ state_attr(climate_entity_id, 'max_temp') | float(33.0) }}"
+    # Limits remain in the climate's native units
+    min_allowed_cli: "{{ min_allowed_raw }}"
+    max_allowed_cli: "{{ max_allowed_raw }}"
 
     # Clamp helper patterns (max(min(x, max), min))
     t_adapt_cli_capped: "{{ [ [ t_adapt_cli, max_allowed_cli ] | min , min_allowed_cli ] | max }}"
@@ -1438,7 +1447,7 @@ action:
             - service: logbook.log
               data:
                 name: "Adaptive Comfort (trigger v{{ blueprint_version }})"
-                message: "Triggered by: {{ trigger.id | default('unknown') }}"
+                message: "Triggered by: {{ trigger.id | default('unknown') }} | climate_units={{ '°F' if climate_is_imperial else '°C' }} | min={{ min_allowed_cli }} max={{ max_allowed_cli }}"
 
     - choose:
         # --- HVAC Pause branch ---
@@ -1541,10 +1550,24 @@ action:
                       data:
                         name: "HVAC Cooldown v{{ blueprint_version }}"
                         message: "Skipped mode switch (cooldown {{ cooldown_min }} min)"
-            - service: climate.set_temperature
-              target: { entity_id: !input climate_entity }
-              data:
-                temperature: "{{ (band_min_cli_capped if t_in_c < band_min_c else band_max_cli_capped) | float }}"
+            - choose:
+                - conditions:
+                    - condition: template
+                      value_template: "{{ supports_heat_cool }}"
+                  sequence:
+                    - service: climate.set_hvac_mode
+                      target: { entity_id: !input climate_entity }
+                      data: { hvac_mode: heat_cool }
+                    - service: climate.set_temperature
+                      target: { entity_id: !input climate_entity }
+                      data:
+                        target_temp_low: "{{ band_min_cli_capped | float }}"
+                        target_temp_high: "{{ band_max_cli_capped | float }}"
+              default:
+                - service: climate.set_temperature
+                  target: { entity_id: !input climate_entity }
+                  data:
+                    temperature: "{{ (band_min_cli_capped if t_in_c < band_min_c else band_max_cli_capped) | float }}"
             - if:
                 - condition: template
                   value_template: >
