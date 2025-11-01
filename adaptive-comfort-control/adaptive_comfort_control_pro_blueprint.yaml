@@ -596,6 +596,16 @@ blueprint:
                             max: 3.0
                             step: 0.1
 
+                auto_min_separation:
+                    name: "Auto Mode Min Separation (system units)"
+                    description: "If your thermostat requires a minimum gap between low/high in Heat/Cool (Auto), set it here. Leave 0 if not enforced."
+                    default: 0.0
+                    selector:
+                        number:
+                            min: 0.0
+                            max: 5.0
+                            step: 0.1
+
                 mode_cooldown_min:
                     name: "Min Mode Cooldown (min)"
                     description: "Optional minimum minutes between switching HVAC modes to reduce short-cycling."
@@ -678,7 +688,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.8.1"
+    blueprint_version: "4.8.2"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
@@ -709,6 +719,7 @@ variables:
     heat_db_sys: !input heat_deadband
     cool_db_sys: !input cool_deadband
     inside_half_sys: !input inside_band_half_width
+    auto_sep_sys: !input auto_min_separation
     cooldown_min: !input mode_cooldown_min
     dbg: !input debug_level
     pause_entities: !input pause_sensors
@@ -1326,20 +1337,60 @@ variables:
     min_allowed_cli: "{{ min_allowed_raw }}"
     max_allowed_cli: "{{ max_allowed_raw }}"
 
+    # Minimum separation handling (only enforce if device or user requires it)
+    cli_step: "{{ state_attr(climate_entity_id, 'target_temp_step') | float(1.0 if climate_is_imperial else 0.5) }}"
+    # Attempt to read a device-advertised minimum separation (varies by integration)
+    device_min_sep_cli: >
+        {% set d1 = state_attr(climate_entity_id, 'min_temp_diff') %}
+        {% set d2 = state_attr(climate_entity_id, 'temperature_difference') %}
+        {% set v = d1 if d1 is not none else d2 %}
+        {% set f = (v | float(0)) %}
+        {{ f if f > 0 else 0 }}
+    auto_sep_cli_from_user: >
+        {% set sys = auto_sep_sys | float(0) %}
+        {% if sys <= 0 %}0
+        {% else %}
+          {{ (sys if climate_is_imperial else (sys * 5/9)) }}
+        {% endif %}
+    sep_cli_min: "{{ [auto_sep_cli_from_user | float(0), device_min_sep_cli | float(0)] | max }}"
+    sep_enforce: "{{ (sep_cli_min | float(0)) > 0 }}"
+
     # Clamp helper patterns (max(min(x, max), min))
     t_adapt_cli_capped: "{{ [ [ t_adapt_cli, max_allowed_cli ] | min , min_allowed_cli ] | max }}"
     band_min_cli_capped: "{{ [ [ band_min_cli, max_allowed_cli ] | min , min_allowed_cli ] | max }}"
     band_max_cli_capped: "{{ [ [ band_max_cli, max_allowed_cli ] | min , min_allowed_cli ] | max }}"
 
     inside_low_cli_capped: >
-        {% set low_dev =  [ [ inside_low_cli,  max_allowed_cli ] | min , min_allowed_cli ] | max %}
-        {% set low = [ low_dev, band_min_cli_capped ] | max %}
-        {% set high = [ [ inside_high_cli, max_allowed_cli ] | min , min_allowed_cli ] | max %}
-        {% if low >= high %}{{ high - 0.5 }}{% else %}{{ low }}{% endif %}
+        {# Start with device bounds #}
+        {% set low_dev  = [ [ inside_low_cli,  max_allowed_cli ] | min , min_allowed_cli ] | max %}
+        {% set high_dev = [ [ inside_high_cli, max_allowed_cli ] | min , min_allowed_cli ] | max %}
+        {# Enforce adaptive band limits #}
+        {% set low_band  = [ low_dev,  band_min_cli_capped ] | max %}
+        {% set high_band = [ high_dev, band_max_cli_capped ] | min %}
+        {# Enforce minimum separation in Auto only if required #}
+        {% if supports_heat_cool and sep_enforce %}
+          {% set sep = sep_cli_min | float(0) %}
+          {% if (high_band - low_band) < sep %}
+            {% set low_band = high_band - sep %}
+          {% endif %}
+        {% endif %}
+        {% if low_band >= high_band %}{{ high_band - (cli_step | float(0.5)) }}{% else %}{{ low_band }}{% endif %}
+
     inside_high_cli_capped: >
-        {% set high = [ [ inside_high_cli, max_allowed_cli ] | min , min_allowed_cli ] | max %}
-        {% set low  = [ [ inside_low_cli,  max_allowed_cli ] | min , min_allowed_cli ] | max %}
-        {% if low >= high %}{{ low + 0.5 }}{% else %}{{ high }}{% endif %}
+        {# Start with device bounds #}
+        {% set high_dev = [ [ inside_high_cli, max_allowed_cli ] | min , min_allowed_cli ] | max %}
+        {% set low_dev  = [ [ inside_low_cli,  max_allowed_cli ] | min , min_allowed_cli ] | max %}
+        {# Enforce adaptive band limits #}
+        {% set high_band = [ high_dev, band_max_cli_capped ] | min %}
+        {% set low_band  = [ low_dev,  band_min_cli_capped ] | max %}
+        {# Enforce minimum separation in Auto only if required #}
+        {% if supports_heat_cool and sep_enforce %}
+          {% set sep = sep_cli_min | float(0) %}
+          {% if (high_band - low_band) < sep %}
+            {% set high_band = low_band + sep %}
+          {% endif %}
+        {% endif %}
+        {% if low_band >= high_band %}{{ low_band + (cli_step | float(0.5)) }}{% else %}{{ high_band }}{% endif %}
 
     # HVAC capabilities
     hvac_modes: "{{ state_attr(climate_entity_id, 'hvac_modes') | default([], true) }}"
@@ -1561,8 +1612,8 @@ action:
                     - service: climate.set_temperature
                       target: { entity_id: !input climate_entity }
                       data:
-                        target_temp_low: "{{ band_min_cli_capped | float }}"
-                        target_temp_high: "{{ band_max_cli_capped | float }}"
+                        target_temp_low: "{{ inside_low_cli_capped | float }}"
+                        target_temp_high: "{{ inside_high_cli_capped | float }}"
               default:
                 - service: climate.set_temperature
                   target: { entity_id: !input climate_entity }
@@ -1665,5 +1716,6 @@ action:
                           Out={{ (t_out_c * 9/5 + 32) if is_imperial else t_out_c | round(1) }}{{ unit_sym }};
                           dp_out={{ dp_out_c | round(1) }}C, dp_in={{ dp_in_c | round(1) }}C, AH_out={{ ah_out }} g/m³, AH_in={{ ah_in }} g/m³, h_out={{ h_out }} kJ/kg, h_in={{ h_in }} kJ/kg;
                           Trigger={{ trigger.id | default('unknown') }}
+                          ; sep_enforce={{ sep_enforce }} sep_min={{ sep_cli_min | round(2) }}
 mode: single
 max_exceeded: silent

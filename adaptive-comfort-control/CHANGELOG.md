@@ -1,3 +1,19 @@
+## [4.8.2] - 2025-10-31
+### Fixed
+- Resolved issue where the low Auto-mode setpoint could not drop below ~69°F when no minimum separation is required.
+- Corrected separation enforcement to be **optional and device-aware** rather than hard-coded.
+- Adjusted inside-band and off-band control logic to write the **inside_low/high** targets instead of band edges for more accurate sleep bias handling.
+
+### Added
+- New input: **Auto Mode Min Separation (system units)**, default 0.0.
+  - Allows users to explicitly set or disable separation in Heat/Cool (Auto) mode.
+  - Automatically detects device-advertised minimums (`min_temp_diff`, `temperature_difference`) when present.
+- Extended debug output to include `sep_enforce` and `sep_min` for verification.
+
+### Notes
+- When `Auto Mode Min Separation` = 0.0 and the device does not report a required gap, the comfort band is free to fully contract—allowing lower nighttime bias.
+- Existing behavior for devices that require a gap remains unchanged.
+
 ## [4.8.1] - 2025-10-31
 ### Fixed
 - Map adaptive fan control to actual supported modes. When a thermostat only exposes `on`/`auto`, the blueprint now chooses between those and never attempts `high`/`medium`/`low`.
