@@ -678,7 +678,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.8.0"
+    blueprint_version: "4.8.1"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
@@ -1160,6 +1160,16 @@ variables:
     h_in: "{{ 1.006 * t_in_c + w_in * (2501 + 1.86 * t_in_c) | round(2) }}"
     h_out: "{{ 1.006 * t_out_c + w_out * (2501 + 1.86 * t_out_c) | round(2) }}"
 
+    # --------- Occupancy / Energy Save (must be defined before sleep logic) ---------
+    occ_now: >
+        {% if occupancy_sensor_id %}
+          {{ is_state(occupancy_sensor_id, 'on') }}
+        {% else %}
+          true
+        {% endif %}
+
+    setback_apply_c: "{{ setback_c if (energy_save and (not (occ_now | default(false) | bool))) else 0 }}"
+
     # --------- Sleep / Circadian logic ---------
     sleep_bias_c: "{{ (sleep_bias_sys_in|float * 5/9) if is_imperial else (sleep_bias_sys_in|float) }}"
     sleep_tighten_c: "{{ (sleep_tighten_sys_in|float * 5/9) if is_imperial else (sleep_tighten_sys_in|float) }}"
@@ -1253,13 +1263,6 @@ variables:
         {% else %} {{ shoulder_bias_sys | float(0) }} {% endif %}
     season_bias_c: "{{ (season_bias_sys_active|float * 5/9) if is_imperial else (season_bias_sys_active|float) }}"
 
-    occ_now: >
-        {# Occupancy-aware: fallback to true if no sensor #}
-        {% if occupancy_sensor_id %} {{ is_state(occupancy_sensor_id, 'on') }}
-        {% else %} true {% endif %}
-
-    setback_apply_c: "{{ setback_c if (energy_save and (not occ_now)) else 0 }}"
-
     co2_gap: >
         {% if co2_enable and co2_in_id and co2_out_id %}
           {{ (states(co2_in_id) | float(0)) - (states(co2_out_id) | float(0)) }}
@@ -1320,7 +1323,8 @@ variables:
     band_max_cli_capped: "{{ [ [ band_max_cli, max_allowed_cli ] | min , min_allowed_cli ] | max }}"
 
     inside_low_cli_capped: >
-        {% set low =  [ [ inside_low_cli,  max_allowed_cli ] | min , min_allowed_cli ] | max %}
+        {% set low_dev =  [ [ inside_low_cli,  max_allowed_cli ] | min , min_allowed_cli ] | max %}
+        {% set low = [ low_dev, band_min_cli_capped ] | max %}
         {% set high = [ [ inside_high_cli, max_allowed_cli ] | min , min_allowed_cli ] | max %}
         {% if low >= high %}{{ high - 0.5 }}{% else %}{{ low }}{% endif %}
     inside_high_cli_capped: >
@@ -1555,10 +1559,18 @@ action:
                   data:
                     fan_mode: >
                         {% set dev = (t_in_c - band_max_c) if t_in_c > band_max_c else (band_min_c - t_in_c) %}
-                        {% if dev > 3 %} high
-                        {% elif dev > 1.5 %} medium
-                        {% elif dev > 0.5 %} low
-                        {% else %} auto{% endif %}
+                        {% set modes = fan_modes | default([], true) %}
+                        {% set has_steps = ('high' in modes) or ('medium' in modes) or ('low' in modes) %}
+                        {% if has_steps %}
+                          {% if dev > 3 %} high
+                          {% elif dev > 1.5 %} medium
+                          {% elif dev > 0.5 %} low
+                          {% else %} auto{% endif %}
+                        {% elif 'on' in modes and 'auto' in modes %}
+                          {% if dev > 0.5 %} on {% else %} auto {% endif %}
+                        {% else %}
+                          {{ fan_now }}
+                        {% endif %}
 
         # --- Heat_Cool / Auto inside band ---
         - if:

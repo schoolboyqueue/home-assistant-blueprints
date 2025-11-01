@@ -1,3 +1,12 @@
+## [4.8.1] - 2025-10-31
+### Fixed
+- Map adaptive fan control to actual supported modes. When a thermostat only exposes `on`/`auto`, the blueprint now chooses between those and never attempts `high`/`medium`/`low`.
+- Prevent the inside-band **low** setpoint from collapsing to the device minimum by clamping it to the adaptive band floor (addresses night/sleep cases).
+- Define occupancy/setback (`occ_now` / `setback_apply_c`) before sleep logic to eliminate transient undefined/boolean-cast errors.
+
+### Notes
+- No behavior intent change; these fixes improve robustness across diverse climate entities and avoid invalid-service errors.
+
 ## [4.8.0] - 2025-10-31
 ### Added
 - **Sleep / Circadian Preferences:** optional nighttime cooling and comfort bias.
