@@ -487,7 +487,7 @@ blueprint:
 
                 rmot_sensor:
                     name: "RMOT Sensor"
-                    description: "A rolling mean sensor (e.g., 7–14 day average of daily means). Use HA helpers or a Stats sensor."
+                    description: "A rolling mean sensor (e.g., 7-14 day average of daily means). Use HA helpers or a Stats sensor."
                     default: sensor.none
                     selector:
                         entity:
@@ -606,6 +606,47 @@ blueprint:
                             max: 5.0
                             step: 0.1
 
+                thermostat_profile:
+                    name: "Thermostat Profile"
+                    description: "Optional vendor profile to enforce a safe minimum separation in Auto/Heat-Cool when the device doesn't report one. 'Auto (detect/device)' prefers the device-advertised minimum if available."
+                    default: "Auto (detect/device)"
+                    selector:
+                        select:
+                            options:
+                                - "Auto (detect/device)"
+                                - "Ecobee"
+                                - "Google Nest"
+                                - "Honeywell T-series (T5/T6/T9)"
+                                - "Honeywell Home/Resideo (Lyric/Prestige/VisionPRO)"
+                                - "Honeywell T6 Pro Z-Wave"
+                                - "Emerson Sensi"
+                                - "Carrier Infinity/Edge"
+                                - "Bryant Evolution"
+                                - "Trane/American Standard"
+                                - "Lennox iComfort"
+                                - "Bosch Connected Control"
+                                - "Amazon Smart Thermostat"
+                                - "Tado"
+                                - "Netatmo"
+                                - "Hive"
+                                - "Heatmiser Neo"
+                                - "Mysa (Electric Heat)"
+                                - "Wyze"
+                                - "Tuya Zigbee (Generic)"
+                                - "Zigbee (ZHA Generic)"
+                                - "Z-Wave (ZWAVE_JS Generic)"
+                                - "Generic (no minimum)"
+
+                vendor_min_override_sys:
+                    name: "Override Vendor Min Separation (system units, optional)"
+                    description: "If set (>0), this value overrides the selected profile’s built-in minimum. Use your thermostat’s documented minimum or installer setting. Leave 0 to keep the profile default."
+                    default: 0.0
+                    selector:
+                        number:
+                            min: 0.0
+                            max: 5.0
+                            step: 0.1
+
                 mode_cooldown_min:
                     name: "Min Mode Cooldown (min)"
                     description: "Optional minimum minutes between switching HVAC modes to reduce short-cycling."
@@ -688,7 +729,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.9.0"
+    blueprint_version: "4.11"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
@@ -896,14 +937,15 @@ variables:
         {% endif %}
     _u_climate: >
         {{ state_attr(climate_entity_id, 'temperature_unit') | default(state_attr(climate_entity_id, 'unit_of_measurement'), true) | default('', true) | string }}
-    _u_guess_raw: >
-        {% set u = _u_indoor or _u_outdoor or _u_climate %}{{ u }}
-    _is_imp_guess: >
-        {% set u = _u_guess_raw | lower %}{{ 'f' in u }}
     is_imperial: >
         {% if units_override_val == 'c' %} false
         {% elif units_override_val == 'f' %} true
-        {% else %} {{ _is_imp_guess }} {% endif %}
+        {% else %}
+          {% set u = (_u_indoor or _u_outdoor or _u_climate) | lower %}
+          {{ 'f' in u }}
+        {% endif %}
+    _is_weather_in:  "{{ indoor_sensor_id  is string and indoor_sensor_id.startswith('weather.') }}"
+    _is_weather_out: "{{ outdoor_sensor_id is string and outdoor_sensor_id.startswith('weather.') }}"
     unit_sym: "{{ '°F' if is_imperial else '°C' }}"
     # --------- Input conversions to °C ---------
     min_sys: "{{ min_sys_f_pref if is_imperial else min_sys_c_pref }}"
@@ -1033,9 +1075,8 @@ variables:
 
     # --------- Normalize temps to °C ---------
     t_out_c_raw: >
-        {% set is_weather = outdoor_sensor_id|string and outdoor_sensor_id.startswith('weather.') %}
-        {% set v = (state_attr(outdoor_sensor_id,'temperature') if is_weather else states(outdoor_sensor_id)) | float(20) %}
-        {% set u = (state_attr(outdoor_sensor_id,'temperature_unit') if is_weather else state_attr(outdoor_sensor_id,'unit_of_measurement')) | default('', true) | string %}
+        {% set v = (state_attr(outdoor_sensor_id,'temperature') if _is_weather_out else states(outdoor_sensor_id)) | float(20) %}
+        {% set u = (state_attr(outdoor_sensor_id,'temperature_unit') if _is_weather_out else state_attr(outdoor_sensor_id,'unit_of_measurement')) | default('', true) | string %}
         {% if u|lower in ['°f','f','fahrenheit'] or (u == '' and is_imperial) %} {{ ((v - 32) * 5 / 9) }}
         {% else %} {{ v }} {% endif %}
 
@@ -1062,17 +1103,15 @@ variables:
     t_out_c: "{{ t_rmot_c if t_rmot_c is not none else t_out_c_raw }}"
 
     t_in_air_c: >
-        {% set is_weather = indoor_sensor_id|string and indoor_sensor_id.startswith('weather.') %}
-        {% set v = (state_attr(indoor_sensor_id,'temperature') if is_weather else states(indoor_sensor_id)) | float(20) %}
-        {% set u = (state_attr(indoor_sensor_id,'temperature_unit') if is_weather else state_attr(indoor_sensor_id,'unit_of_measurement')) | default('', true) | string %}
+        {% set v = (state_attr(indoor_sensor_id,'temperature') if _is_weather_in else states(indoor_sensor_id)) | float(20) %}
+        {% set u = (state_attr(indoor_sensor_id,'temperature_unit') if _is_weather_in else state_attr(indoor_sensor_id,'unit_of_measurement')) | default('', true) | string %}
         {% if u|lower in ['°f','f','fahrenheit'] or (u == '' and is_imperial) %} {{ ((v - 32) * 5 / 9) }}
         {% else %} {{ v }} {% endif %}
 
     t_mrt_c: >
         {% if mrt_sensor_id %}
-          {% set is_weather = mrt_sensor_id|string and mrt_sensor_id.startswith('weather.') %}
-          {% set v = (state_attr(mrt_sensor_id,'temperature') if is_weather else states(mrt_sensor_id)) | float(t_in_air_c) %}
-          {% set u = (state_attr(mrt_sensor_id,'temperature_unit') if is_weather else state_attr(mrt_sensor_id,'unit_of_measurement')) | default('', true) | string %}
+          {% set v = (state_attr(mrt_sensor_id,'temperature') if _is_weather_in else states(mrt_sensor_id)) | float(t_in_air_c) %}
+          {% set u = (state_attr(mrt_sensor_id,'temperature_unit') if _is_weather_in else state_attr(mrt_sensor_id,'unit_of_measurement')) | default('', true) | string %}
           {% if u|lower in ['°f','f','fahrenheit'] or (u == '' and is_imperial) %} {{ ((v - 32) * 5 / 9) }}
           {% else %} {{ v }} {% endif %}
         {% else %} {{ t_in_air_c }} {% endif %}
@@ -1085,7 +1124,7 @@ variables:
     rh_in: "{% if rh_in_id %}{{ states(rh_in_id) | float(50) }}{% else %}50{% endif %}"
     rh_out: >
         {% if rh_out_id %}
-          {% if rh_out_id.startswith('weather.') %}
+          {% if _is_weather_out %}
             {{ state_attr(rh_out_id, 'humidity') | float(50) }}
           {% elif state_attr(rh_out_id, 'humidity') is not none %}
             {{ state_attr(rh_out_id, 'humidity') | float(50) }}
@@ -1148,33 +1187,58 @@ variables:
         {% else %}{{ baro_kpa_from_elev }}{% endif %}
 
     # --------- Built-in psychrometrics (T in °C, RH in %) ---------
-    psat_in_kpa: "{{ 0.61078 * (2.718281828 ** ((17.2694 * t_in_c) / (t_in_c + 237.3))) }}"
-    psat_out_kpa: "{{ 0.61078 * (2.718281828 ** ((17.2694 * t_out_c) / (t_out_c + 237.3))) }}"
-    pv_in_kpa: "{{ (rh_in | float(50) / 100.0) * psat_in_kpa }}"
-    pv_out_kpa: "{{ (rh_out | float(50) / 100.0) * psat_out_kpa }}"
+    _psychro_on: "{{ psychro_enable or dbg == 'verbose' }}"
+    psat_in_kpa: >
+        {% if _psychro_on %}{{ 0.61078 * (2.718281828 ** ((17.2694 * t_in_c) / (t_in_c + 237.3))) }}{% else %}{{ none }}{% endif %}
+    psat_out_kpa: >
+        {% if _psychro_on %}{{ 0.61078 * (2.718281828 ** ((17.2694 * t_out_c) / (t_out_c + 237.3))) }}{% else %}{{ none }}{% endif %}
+    pv_in_kpa:  "{{ ( (rh_in  | float(50) / 100.0) * psat_in_kpa )  if _psychro_on else none }}"
+    pv_out_kpa: "{{ ( (rh_out | float(50) / 100.0) * psat_out_kpa ) if _psychro_on else none }}"
     dp_in_c: >
-        {% set x = pv_in_kpa / 0.61078 %}
-        {% set ln = log(x) %}
-        {{ (237.3 * ln) / (17.2694 - ln) }}
+        {% if _psychro_on %}
+          {% set x = pv_in_kpa / 0.61078 %}{% set ln = log(x) %}
+          {{ (237.3 * ln) / (17.2694 - ln) }}
+        {% else %}{{ none }}{% endif %}
     dp_out_c: >
-        {% set x = pv_out_kpa / 0.61078 %}
-        {% set ln = log(x) %}
-        {{ (237.3 * ln) / (17.2694 - ln) }}
+        {% if _psychro_on %}
+          {% set x = pv_out_kpa / 0.61078 %}{% set ln = log(x) %}
+          {{ (237.3 * ln) / (17.2694 - ln) }}
+        {% else %}{{ none }}{% endif %}
     ah_in: >
-        {% set Tk = t_in_c + 273.15 %}
-        {{ (2.1674 * pv_in_kpa / Tk) * 1000.0 | round(2) }}
+        {% if _psychro_on %}{% set Tk = t_in_c + 273.15 %}{{ (2.1674 * pv_in_kpa / Tk) * 1000.0 | round(2) }}{% else %}{{ none }}{% endif %}
     ah_out: >
-        {% set Tk = t_out_c + 273.15 %}
-        {{ (2.1674 * pv_out_kpa / Tk) * 1000.0 | round(2) }}
-    w_in: "{{ 0.62198 * pv_in_kpa / (pressure_kpa - pv_in_kpa) }}"
-    w_out: "{{ 0.62198 * pv_out_kpa / (pressure_kpa - pv_out_kpa) }}"
-    h_in: "{{ 1.006 * t_in_c + w_in * (2501 + 1.86 * t_in_c) | round(2) }}"
-    h_out: "{{ 1.006 * t_out_c + w_out * (2501 + 1.86 * t_out_c) | round(2) }}"
+        {% if _psychro_on %}{% set Tk = t_out_c + 273.15 %}{{ (2.1674 * pv_out_kpa / Tk) * 1000.0 | round(2) }}{% else %}{{ none }}{% endif %}
+    w_in:  "{{ (0.62198 * pv_in_kpa  / (pressure_kpa - pv_in_kpa))  if _psychro_on else none }}"
+    w_out: "{{ (0.62198 * pv_out_kpa / (pressure_kpa - pv_out_kpa)) if _psychro_on else none }}"
+    h_in:  "{{ (1.006 * t_in_c  + w_in  * (2501 + 1.86 * t_in_c))  | round(2) if _psychro_on else none }}"
+    h_out: "{{ (1.006 * t_out_c + w_out * (2501 + 1.86 * t_out_c)) | round(2) if _psychro_on else none }}"
 
     # --------- Occupancy / Energy Save (must be defined before sleep logic) ---------
     occ_now: >
         {% if occupancy_sensor_id %}
-          {{ is_state(occupancy_sensor_id, 'on') }}
+          {% set raw = states(occupancy_sensor_id) | default('', true) | string %}
+          {% set s = raw | lower %}
+          {% set dc = state_attr(occupancy_sensor_id, 'device_class') | default('', true) | string | lower %}
+          {# Normalize common truthy/falsey and presence states #}
+          {% set on_states  = ['on','home','present','occupied','true','detected','motion'] %}
+          {% set off_states = ['off','not_home','away','clear','false','standby','none','closed'] %}
+          {% if s in on_states %}
+            true
+          {% elif s in off_states %}
+            false
+          {% else %}
+            {# Fallbacks by device class: presence/occupancy/motion default false unless explicitly on; person/device_tracker: home=on, not_home=off #}
+            {% if dc in ['presence','occupancy','motion'] %}
+              {{ s in on_states }}
+            {% else %}
+              {# Numeric or unknown states: treat >0 as on, else keep previous truthy if possible #}
+              {% if s|float(none) is not none %}
+                {{ (s | float(0)) > 0 }}
+              {% else %}
+                {{ s not in ['unknown','unavailable',''] }}
+              {% endif %}
+            {% endif %}
+          {% endif %}
         {% else %}
           true
         {% endif %}
@@ -1308,12 +1372,11 @@ variables:
     t_adapt_c_guard: "{{ [ [ t_adapt_c, (max_c - tol_c - setback_apply_c) ] | min , (min_c + tol_c + setback_apply_c) ] | max | round(2) }}"
     band_min_c: "{{ [ [ t_adapt_c_guard - tol_c - setback_apply_c, min_c ] | max, max_c ] | min | round(2) }}"
     band_max_c: "{{ [ [ t_adapt_c_guard + tol_c + setback_apply_c, max_c ] | min, min_c ] | max | round(2) }}"
-    # --- Safety: ensure band_min <= band_max even if an upstream calc misbehaves ---
-    band_min_c_sane: "{{ [ band_min_c, band_max_c ] | min | round(2) }}"
-    band_max_c_sane: "{{ [ band_min_c, band_max_c ] | max | round(2) }}"
-    # --- Final clamp: keep comfort band within user bounds (handles inversion cases cleanly) ---
-    band_min_c_final: "{{ [ [ band_min_c_sane,  max_c ] | min , min_c ] | max }}"
-    band_max_c_final: "{{ [ [ band_max_c_sane, max_c ] | min , min_c ] | max }}"
+    # --- Final clamp with built-in ordering (no separate “sane” step needed) ---
+    _band_min_ordered: "{{ [ band_min_c, band_max_c ] | min | round(2) }}"
+    _band_max_ordered: "{{ [ band_min_c, band_max_c ] | max | round(2) }}"
+    band_min_c_final: "{{ [ [ _band_min_ordered,  max_c ] | min , min_c ] | max }}"
+    band_max_c_final: "{{ [ [ _band_max_ordered, max_c ] | min , min_c ] | max }}"
     inside_low_c: "{{ (t_adapt_c - inside_half_c_eff - (setback_apply_c/2)) | round(2) }}"
     inside_high_c: "{{ (t_adapt_c + inside_half_c_eff + (setback_apply_c/2)) | round(2) }}"
 
@@ -1371,7 +1434,97 @@ variables:
         {% else %}
           {{ (sys if climate_is_imperial else (sys * 5/9)) }}
         {% endif %}
-    sep_cli_min: "{{ [auto_sep_cli_from_user | float(0), device_min_sep_cli | float(0)] | max }}"
+
+    thermostat_profile_val: !input thermostat_profile
+    vendor_min_override_sys_in: !input vendor_min_override_sys
+
+    # Map profile to a vendor minimum separation (in CLI units)
+    vendor_sep_cli_profile: >
+        {% set p = (thermostat_profile_val | string) %}
+        {% if p == 'Ecobee' %}
+          {# Ecobee default Heat•Cool separation is 5°F (installer 2–10°F). #}
+          {{ 5.0 if climate_is_imperial else (5.0 * 5/9) }}
+        {% elif p == 'Google Nest' %}
+          {# Nest enforces ~3°F separation in Heat•Cool. #}
+          {{ 3.0 if climate_is_imperial else (3.0 * 5/9) }}
+        {% elif p == 'Honeywell T-series (T5/T6/T9)' %}
+          {# Typical default ~3°F; many allow 0–5°F via installer. Use 3°F. #}
+          {{ 3.0 if climate_is_imperial else (3.0 * 5/9) }}
+        {% elif p == 'Honeywell Home/Resideo (Lyric/Prestige/VisionPRO)' %}
+          {# Pro lines often default ~3°F; documented minimum ~2°F. Use 2°F. #}
+          {{ 2.0 if climate_is_imperial else (2.0 * 5/9) }}
+        {% elif p == 'Honeywell T6 Pro Z-Wave' %}
+          {# Auto Differential 0–5°F available; safe default 3°F. #}
+          {{ 3.0 if climate_is_imperial else (3.0 * 5/9) }}
+        {% elif p == 'Emerson Sensi' %}
+          {# Conservative default 2°F. #}
+          {{ 2.0 if climate_is_imperial else (2.0 * 5/9) }}
+        {% elif p == 'Carrier Infinity/Edge' %}
+          {# Installer range 2–6°F; default/enforced minimum 2°F. #}
+          {{ 2.0 if climate_is_imperial else (2.0 * 5/9) }}
+        {% elif p == 'Bryant Evolution' %}
+          {# Same platform as Carrier Infinity. #}
+          {{ 2.0 if climate_is_imperial else (2.0 * 5/9) }}
+        {% elif p == 'Trane/American Standard' %}
+          {# Many models ~3°F minimum; some allow 2°F via installer. Use 3°F. #}
+          {{ 3.0 if climate_is_imperial else (3.0 * 5/9) }}
+        {% elif p == 'Lennox iComfort' %}
+          {# Default/enforced minimum ~3°F; installer up to ~9°F. #}
+          {{ 3.0 if climate_is_imperial else (3.0 * 5/9) }}
+        {% elif p == 'Bosch Connected Control' %}
+          {# Conservative default 2°F. #}
+          {{ 2.0 if climate_is_imperial else (2.0 * 5/9) }}
+        {% elif p == 'Amazon Smart Thermostat' %}
+          {# Honeywell OEM; conservative 2°F. #}
+          {{ 2.0 if climate_is_imperial else (2.0 * 5/9) }}
+        {% elif p == 'Wyze' %}
+          {# App enforces 5°F separation. #}
+          {{ 5.0 if climate_is_imperial else (5.0 * 5/9) }}
+        {% elif p == 'Tado' %}
+          {# Not true dual-setpoint auto; recommend 3°F if emulated. #}
+          {{ 3.0 if climate_is_imperial else (3.0 * 5/9) }}
+        {% elif p == 'Netatmo' %}
+          {# Heating-only; recommend 3°F if coordinating dual control. #}
+          {{ 3.0 if climate_is_imperial else (3.0 * 5/9) }}
+        {% elif p == 'Hive' %}
+          {# No published min; recommend 3°F. #}
+          {{ 3.0 if climate_is_imperial else (3.0 * 5/9) }}
+        {% elif p == 'Heatmiser Neo' %}
+          {# Typical min setpoint deadband 1.0°C (~1.8°F). #}
+          {{ (1.8) if climate_is_imperial else 1.0 }}
+        {% elif p == 'Mysa (Electric Heat)' %}
+          {# Not a native auto dual-setpoint; recommend 3°F. #}
+          {{ 3.0 if climate_is_imperial else (3.0 * 5/9) }}
+        {% elif p == 'Tuya Zigbee (Generic)' %}
+          {# Many Tuya Zigbee stats: min 1.0°C; default often 1.0–1.5°C. #}
+          {{ (1.8) if climate_is_imperial else 1.0 }}
+        {% elif p == 'Zigbee (ZHA Generic)' %}
+          {# Zigbee HA spec MinSetpointDeadBand = 1.0°C. #}
+          {{ (1.8) if climate_is_imperial else 1.0 }}
+        {% elif p == 'Z-Wave (ZWAVE_JS Generic)' %}
+          {# Common minimum 3°F across many Z-Wave stats. #}
+          {{ 3.0 if climate_is_imperial else (3.0 * 5/9) }}
+        {% else %}
+          0
+        {% endif %}
+
+    # For logging: vendor default separation in system units (°F/°C)
+    vendor_sep_sys_default: >
+        {% set v = vendor_sep_cli_profile | float(0) %}
+        {% if climate_is_imperial %}{{ v }}{% else %}{{ v }}{% endif %}
+
+    # Optional explicit override in system units -> convert to CLI units
+    vendor_sep_cli_override: >
+        {% set sys = vendor_min_override_sys_in | float(0) %}
+        {% if sys <= 0 %}
+          0
+        {% else %}
+          {{ sys if climate_is_imperial else (sys * 5/9) }}
+        {% endif %}
+
+    vendor_sep_cli: "{{ [vendor_sep_cli_override | float(0), vendor_sep_cli_profile | float(0)] | max }}"
+
+    sep_cli_min: "{{ [auto_sep_cli_from_user | float(0), device_min_sep_cli | float(0), vendor_sep_cli | float(0)] | max }}"
     sep_enforce: "{{ (sep_cli_min | float(0)) > 0 }}"
 
     # Clamp helper patterns (max(min(x, max), min))
@@ -1412,8 +1565,6 @@ variables:
         {% if low_band >= high_band %}{{ low_band + (cli_step | float(0.5)) }}{% else %}{{ high_band }}{% endif %}
 
     # --------- CLI epsilon and safe maximum (avoid floating spillover) ---------
-    cli_eps: 0.001
-    cli_max_safe: "{{ (max_allowed_cli | float) - (cli_eps | float) }}"
 
     # Rounding-safe cap aligned to device step (avoids 33.333... vs 33.3 edge case)
     # Step down a hair from the device max, then quantize to the device step.
@@ -1448,9 +1599,9 @@ variables:
     # Debug summary
     dbg_summary: >
         Region={{ region_pick }}; Season={{ season_now }}; In={{ t_in_c }}C (RH={{ rh_in }}%); Out={{ t_out_c }}C (RH={{ rh_out }}%);
-        Band={{ band_min_c_final }}-{{ band_max_c_final }}C; unit={{ unit_sym }}; NatVent={{ nat_vent_enable }}; AnyOpen={{ any_open }};
+        Band={{ band_min_c_final }}-{{ band_max_c_final }}C; unit={{ unit_sym }}; Occ={{ occ_now }}; NatVent={{ nat_vent_enable }}; AnyOpen={{ any_open }};
         dp_in={{ dp_in_c | round(1) }}C, dp_out={{ dp_out_c | round(1) }}C; AH_in={{ ah_in }} g/m³, AH_out={{ ah_out }} g/m³;
-        h_in={{ h_in }} kJ/kg, h_out={{ h_out }} kJ/kg; P={{ pressure_kpa | round(2) }} kPa; dv_sys={{ dv_sys }}; dp_max={{ max_outdoor_dp_sys }}; muggyΔ={{ muggy_delta_dp_sys }}; econ_dh={{ econ_dh }}; econ_dah={{ econ_dah }}; CO₂Δ={{ co2_delta_ppm }}
+        h_in={{ h_in }} kJ/kg, h_out={{ h_out }} kJ/kg; P={{ pressure_kpa | round(2) }} kPa; dv_sys={{ dv_sys }}; dp_max={{ max_outdoor_dp_sys }}; muggyΔ={{ muggy_delta_dp_sys }}; econ_dh={{ econ_dh }}; econ_dah={{ econ_dah }}; CO₂Δ={{ co2_delta_ppm }}; sep_min_cli={{ sep_cli_min }} (enforce={{ sep_enforce }}) ; vendor={{ vendor_sep_sys_default }}{{ unit_sym }}
         ; Sleep={{ sleep_active }} (bias={{ sleep_bias_c_eff }}, tighten={{ (inside_half_c - inside_half_c_eff) | round(2) }})
 
 
@@ -1553,17 +1704,7 @@ action:
                   t_adapt_base_c={{ t_adapt_base_c }}, season_bias_c={{ season_bias_c }}, co2_bias_c_eff={{ co2_bias_c_eff }}, sleep_bias_c_eff={{ sleep_bias_c_eff }},
                   tol_c={{ tol_c }}, setback_apply_c={{ setback_apply_c }}, 
                   t_adapt_c={{ t_adapt_c }}, t_adapt_c_guard={{ t_adapt_c_guard }},
-                  band_min_c={{ band_min_c }}, band_max_c={{ band_max_c }}; valid_band={{ band_min_c < band_max_c }}
-    # Diagnostic: log if band_min_c > band_max_c, indicating a swap occurred
-    - choose:
-        - conditions:
-            - condition: template
-              value_template: "{{ dbg in ['basic','verbose'] and (band_min_c > band_max_c) }}"
-          sequence:
-            - service: logbook.log
-              data:
-                name: "Adaptive Comfort (band guard v{{ blueprint_version }})"
-                message: "Band inverted (min {{ band_min_c }}C > max {{ band_max_c }}C). Using sane range {{ band_min_c_sane }}–{{ band_max_c_sane }}C."
+                  band_min_c={{ band_min_c }}, band_max_c={{ band_max_c }}; valid_band={{ band_min_c < band_max_c }}; inverted={{ band_min_c > band_max_c }}
     # Preflight log
     - choose:
         - conditions:
@@ -1810,6 +1951,6 @@ action:
                           Out={{ (t_out_c * 9/5 + 32) if is_imperial else t_out_c | round(1) }}{{ unit_sym }};
                           dp_out={{ dp_out_c | round(1) }}C, dp_in={{ dp_in_c | round(1) }}C, AH_out={{ ah_out }} g/m³, AH_in={{ ah_in }} g/m³, h_out={{ h_out }} kJ/kg, h_in={{ h_in }} kJ/kg;
                           Trigger={{ trigger.id | default('unknown') }}
-                          ; sep_enforce={{ sep_enforce }} sep_min={{ sep_cli_min | round(2) }}; step={{ cli_step }} bounds={{ min_allowed_cli }}–{{ max_allowed_cli }}
+                          ; sep_enforce={{ sep_enforce }} sep_min={{ sep_cli_min | round(2) }}; step={{ cli_step }} bounds={{ min_allowed_cli }}-{{ max_allowed_cli }}
 mode: single
 max_exceeded: silent
