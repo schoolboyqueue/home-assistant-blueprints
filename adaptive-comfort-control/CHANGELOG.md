@@ -1,47 +1,21 @@
-## [4.11] - 2025-11-02
+## [4.11] — 2025-11-02
 ### Added
-- Thermostat vendor profiles: enforce documented Heat•Cool minimum separation per brand/model.
-  - Ecobee = 5°F (default; range 2–10°F)
-  - Google Nest = 3°F
-  - Honeywell T-series (T5/T6/T9) = 3°F
-  - Honeywell Home/Resideo (Lyric/Prestige/VisionPRO) = 2°F
-  - Honeywell T6 Pro Z-Wave = 3°F (safe default; device supports 0–5°F Auto Differential)
-  - Emerson Sensi = 2°F
-  - Carrier Infinity/Edge = 2°F
-  - Bryant Evolution = 2°F
-  - Trane/American Standard = 3°F
-  - Lennox iComfort = 3°F
-  - Bosch Connected Control = 2°F
-  - Amazon Smart Thermostat = 2°F
-  - Wyze = 5°F
-  - Tado = 3°F (advisory; not true dual-setpoint auto)
-  - Netatmo = 3°F (advisory; heat-only)
-  - Hive = 3°F (conservative)
-  - Heatmiser Neo = 1.0°C (~1.8°F)
-  - Tuya Zigbee (Generic) = 1.0°C
-  - Zigbee (ZHA Generic) = 1.0°C (per spec MinSetpointDeadBand)
-  - Z-Wave (ZWAVE_JS Generic) = 3°F
-- Logging: `dbg_summary` now surfaces `vendor=<value><unit>` alongside `sep_min_cli` and `enforce` flags.
+- **Thermostat vendor profiles + auto-detect:** Infers profile from device manufacturer/model/name; enforces vendor minimum Auto/Heat-Cool separation (e.g., Ecobee = **5°F**). Optional user override preserved.
+- **Safety & Guards:** Absolute floor/ceiling in system units (freeze/overheat) with optional block on HVAC pause when at risk.
+- **Pause acceleration near risk:** Shortens resume (and optionally open) delays when indoor temp approaches guard thresholds; bounded by user-set minimums to avoid chatter.
+- **Regional presets:** State/region based seasonal/psychrometric defaults with intensity scaling.
+- **Verbose diagnostics:** Rich single-line logbook entries (no panel notifications) including band, setpoint, IN/OUT, device step, bounds, and separation enforcement status.
 
 ### Changed
-- Ecobee vendor default separation raised to **5°F** to match official app behavior.
-- Auto separation enforcement continues to use:
-  `sep_cli_min = max(user_override, device_advertised_min, vendor_profile_min)`.
+- **Quantization strategy:** Floor to device `target_temp_step` before separation checks; clamp all targets/bands to device allowed range.
+- **Band & target guards:** Always compute in °C internally; convert late to climate and UI units to avoid unit drift; keep ordering sane without a second pass.
+- **Natural ventilation gate:** Consolidated dewpoint/AH/enthalpy checks behind one condition; respects regional and psychrometric presets.
 
-### Performance
-- (From previous set of changes now included in this release)
-  - Lazy psychrometrics: dewpoint/AH/enthalpy only computed when feature enabled or debug=verbose.
-  - Simplified unit inference (removed scaffolding variables).
-  - Normalized weather.* checks to reduce repeated attr lookups.
-  - Collapsed “sane → final” band ordering into single ordered clamp.
-  - Removed unused epsilon/safe-cap variables.
-
-### Logging & Diagnostics
-- Band inversion note folded into the “sanity” log (removed separate band-guard block).
-
-### Compatibility
-- No input schema changes. Existing automations continue to load/save.
-- Manual vendor override still takes precedence over profile/device values.
+### Fixed
+- **“Provided temperature … not valid”**: Prevented overflow to `33.333…` by clamping and quantizing before service calls.
+- **Trigger/action tail restoration:** Reinstated full `trigger:` set (state sensors, time patterns, HA start) and the main action graph after earlier truncation.
+- **Undefined template vars & duplicate keys:** Resolved lingering lint errors (e.g., effective pause delays, unique map keys).
+- **Ecobee auto bounds too tight:** Enforce minimum separation explicitly even when device reports ambiguous diffs; avoids 74–75°F “auto” gaps.
 
 ## [4.9.0] - 2025-11-01
 ### Fixed
