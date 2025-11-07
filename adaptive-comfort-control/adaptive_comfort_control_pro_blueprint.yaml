@@ -830,7 +830,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.11"
+    blueprint_version: "4.12"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
@@ -1105,6 +1105,7 @@ variables:
     pause_open_delay_eff: >
         {% set base = pause_open_delay_base | int(0) %}
         {% if risk_active %}
+          {# Use 50% of acceleration strength for open delay (less aggressive than resume) #}
           {% set k = (0.5 * (accel_strength_in | float(0.8))) %}
           {% set scaled = (base * (1 - (k * (risk_near | float(0))))) | round(0) %}
           {{ [ min_open_delay_sec_in | int(5), scaled | int(0) ] | max }}
@@ -1376,8 +1377,8 @@ variables:
         {% if _psychro_on %}{% set Tk = t_in_c + 273.15 %}{{ (2.1674 * pv_in_kpa / Tk) * 1000.0 | round(2) }}{% else %}{{ none }}{% endif %}
     ah_out: >
         {% if _psychro_on %}{% set Tk = t_out_c + 273.15 %}{{ (2.1674 * pv_out_kpa / Tk) * 1000.0 | round(2) }}{% else %}{{ none }}{% endif %}
-    w_in:  "{{ (0.62198 * pv_in_kpa  / (pressure_kpa - pv_in_kpa))  if _psychro_on else none }}"
-    w_out: "{{ (0.62198 * pv_out_kpa / (pressure_kpa - pv_out_kpa)) if _psychro_on else none }}"
+    w_in:  "{{ (0.62198 * pv_in_kpa  / (pressure_kpa - pv_in_kpa))  if (_psychro_on and (pressure_kpa - pv_in_kpa) > 0.1) else none }}"
+    w_out: "{{ (0.62198 * pv_out_kpa / (pressure_kpa - pv_out_kpa)) if (_psychro_on and (pressure_kpa - pv_out_kpa) > 0.1) else none }}"
     h_in:  "{{ (1.006 * t_in_c  + w_in  * (2501 + 1.86 * t_in_c))  | round(2) if _psychro_on else none }}"
     h_out: "{{ (1.006 * t_out_c + w_out * (2501 + 1.86 * t_out_c)) | round(2) if _psychro_on else none }}"
 
@@ -1540,7 +1541,9 @@ variables:
     t_adapt_c_guard: "{{ [ [ t_adapt_c, (max_c - tol_c - setback_apply_c) ] | min , (min_c + tol_c + setback_apply_c) ] | max | round(2) }}"
     band_min_c: "{{ [ [ t_adapt_c_guard - tol_c - setback_apply_c, min_c ] | max, max_c ] | min | round(2) }}"
     band_max_c: "{{ [ [ t_adapt_c_guard + tol_c + setback_apply_c, max_c ] | min, min_c ] | max | round(2) }}"
-    # --- Final clamp with built-in ordering (no separate “sane” step needed) ---
+    # --- Final clamp with built-in ordering (no separate "sane" step needed) ---
+    # Ensure band_min <= band_max (handle edge cases where adjustments cause inversion),
+    # then apply final safety bounds to prevent exceeding user-configured limits.
     _band_min_ordered: "{{ [ band_min_c, band_max_c ] | min | round(2) }}"
     _band_max_ordered: "{{ [ band_min_c, band_max_c ] | max | round(2) }}"
     band_min_c_final: "{{ [ [ _band_min_ordered,  max_c ] | min , min_c ] | max }}"
@@ -1747,6 +1750,9 @@ variables:
     t_adapt_cli_q:  "{{ ((t_adapt_cli_capped  / cli_step) | round(0,'floor') * cli_step) }}"
 
     # ---------- Enforce minimum separation for Auto/Heat-Cool ----------
+    # Some thermostats require a minimum gap between heating and cooling setpoints.
+    # If the comfort band is narrower than this minimum, expand it symmetrically around
+    # the adaptive target to meet the device requirement.
     sep_needed: "{{ sep_cli_min | float(0) if (supports_auto or supports_heat_cool) else 0 }}"
     delta_q:    "{{ (band_max_cli_q - band_min_cli_q) | float(0) }}"
     need_expand: "{{ sep_needed > 0 and delta_q < sep_needed }}"
@@ -1771,9 +1777,9 @@ variables:
     climate_unit_sym: "{{ '°F' if climate_is_imperial else '°C' }}"
     dbg_prefix: "Adaptive Climate (final v{{ blueprint_version }})"
     dbg_line_basic: >
-        {{ dbg_prefix }} Band={{ band_min_sys | round(3) }}-{{ band_max_sys | round(3) }}{{ unit_sym }}; Set={{ t_adapt_sys | round(1) }}{{ unit_sym }}; In={{ t_in_sys | round(2) }}{{ unit_sym }}; Out={{ ((t_out_c * 9/5 + 32) if is_imperial else t_out_c) | round(2) }}{{ unit_sym }}; Trigger={{ (trigger.id if trigger is defined) if (trigger is defined) else 'unknown' }} ; sep_enforce={{ sep_needed > 0 }} sep_min={{ (sep_cli_min if climate_is_imperial else (sep_cli_min * 9/5)) | round(1) }}{{ climate_unit_sym }}; step={{ cli_step }} bounds={{ safety_min_sys_in }}–{{ safety_max_sys_in }}
+        {{ dbg_prefix }} Band={{ band_min_sys | round(3) }}-{{ band_max_sys | round(3) }}{{ unit_sym }}; Set={{ t_adapt_sys | round(1) }}{{ unit_sym }}; In={{ t_in_sys | round(2) }}{{ unit_sym }}; Out={{ ((t_out_c * 9/5 + 32) if is_imperial else t_out_c) | round(2) }}{{ unit_sym }}; Trigger={{ (trigger.id if trigger is defined) if (trigger is defined) else 'unknown' }} ; sep_enforce={{ sep_needed > 0 }} sep_min={{ sep_cli_min | round(1) }}{{ climate_unit_sym }}; step={{ cli_step }} bounds={{ safety_min_sys_in }}–{{ safety_max_sys_in }}
     dbg_line_verbose: >
-        {{ dbg_prefix }} Band={{ band_min_sys | round(3) }}-{{ band_max_sys | round(3) }}{{ unit_sym }}; Set={{ t_adapt_sys | round(1) }}{{ unit_sym }}; In={{ t_in_sys | round(2) }}{{ unit_sym }}; Out={{ ((t_out_c * 9/5 + 32) if is_imperial else t_out_c) | round(2) }}{{ unit_sym }}; dp_out={{ dp_out_c | default(none) | round(1) if dp_out_c is not none else 'n/a' }}C, dp_in={{ dp_in_c | default(none) | round(1) if dp_in_c is not none else 'n/a' }}C, AH_out={{ ah_out | default(none) if ah_out is not none else 'n/a' }} g/m³, AH_in={{ ah_in | default(none) if ah_in is not none else 'n/a' }} g/m³, h_out={{ h_out | default(none) if h_out is not none else 'n/a' }} kJ/kg, h_in={{ h_in | default(none) if h_in is not none else 'n/a' }} kJ/kg; Trigger={{ (trigger.id if trigger is defined) if (trigger is defined) else 'unknown' }} ; sep_enforce={{ sep_needed > 0 }} sep_min={{ (sep_cli_min if climate_is_imperial else (sep_cli_min * 9/5)) | round(1) }}{{ climate_unit_sym }}; step={{ cli_step }} bounds={{ safety_min_sys_in }}–{{ safety_max_sys_in }}
+        {{ dbg_prefix }} Band={{ band_min_sys | round(3) }}-{{ band_max_sys | round(3) }}{{ unit_sym }}; Set={{ t_adapt_sys | round(1) }}{{ unit_sym }}; In={{ t_in_sys | round(2) }}{{ unit_sym }}; Out={{ ((t_out_c * 9/5 + 32) if is_imperial else t_out_c) | round(2) }}{{ unit_sym }}; dp_out={{ dp_out_c | default(none) | round(1) if dp_out_c is not none else 'n/a' }}C, dp_in={{ dp_in_c | default(none) | round(1) if dp_in_c is not none else 'n/a' }}C, AH_out={{ ah_out | default(none) if ah_out is not none else 'n/a' }} g/m³, AH_in={{ ah_in | default(none) if ah_in is not none else 'n/a' }} g/m³, h_out={{ h_out | default(none) if h_out is not none else 'n/a' }} kJ/kg, h_in={{ h_in | default(none) if h_in is not none else 'n/a' }} kJ/kg; Trigger={{ (trigger.id if trigger is defined) if (trigger is defined) else 'unknown' }} ; sep_enforce={{ sep_needed > 0 }} sep_min={{ sep_cli_min | round(1) }}{{ climate_unit_sym }}; step={{ cli_step }} bounds={{ safety_min_sys_in }}–{{ safety_max_sys_in }}
 
 trigger:
   # Core reactive triggers
@@ -1896,6 +1902,14 @@ action:
               seconds: "{{ pause_close_delay_eff }}"
 
           # Natural ventilation preference (if enabled & suitable)
+          # Logic: Enable natural vent when ALL of these are true:
+          #   1. Feature is enabled (nat_vent_enable)
+          #   2. Indoor/outdoor temps are valid numbers
+          #   3. Outdoor temp is within threshold of indoor (not too different)
+          #   4. Either psychrometrics disabled OR all psychro guards pass:
+          #      - Outdoor dew point not too much higher than indoor (not muggy)
+          #      - Outdoor enthalpy lower OR outdoor absolute humidity lower (economizer)
+          #      - Outdoor dew point below maximum threshold
           - choose:
               - conditions:
                   - condition: template

@@ -1,3 +1,19 @@
+## [4.12] — 2025-11-07
+### Fixed
+- **Debug logging unit conversion:** Corrected `sep_cli_min` output that was incorrectly converting already-converted climate units to system units.
+
+### Improved
+- **Division by zero protection:** Added safety guard for humidity ratio calculation to prevent edge cases where vapor pressure approaches total pressure.
+- **Code documentation:** Added explanatory comments for complex logic sections:
+  - Natural ventilation psychrometric guards (4-part condition explanation)
+  - Minimum separation enforcement for Auto/Heat-Cool modes
+  - Comfort band ordering and inversion prevention
+  - Risk acceleration asymmetry (50% strength for open delay vs full strength for resume)
+
+### Notes
+- No behavioral changes to automation logic.
+- Improved maintainability and debugging clarity.
+
 ## [4.11] — 2025-11-02
 ### Added
 - **Thermostat vendor profiles + auto-detect:** Infers profile from device manufacturer/model/name; enforces vendor minimum Auto/Heat-Cool separation (e.g., Ecobee = **5°F**). Optional user override preserved.
