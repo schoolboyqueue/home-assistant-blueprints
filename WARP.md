@@ -66,6 +66,37 @@ git log --oneline -20
 **Debug logging:**
 Both blueprints support debug levels (`off`, `basic`, `verbose`). Set via the blueprint's Debug section.
 
+### Home Assistant Server Access
+
+**SSH access is configured** for direct server interaction:
+
+```bash
+# Connect to Home Assistant server
+ssh homeassistant
+```
+
+**Remote testing workflow:**
+
+1. **Copy blueprint to server:**
+   ```bash
+   scp adaptive-comfort-control/adaptive_comfort_control_pro_blueprint.yaml \
+       homeassistant:/config/blueprints/automation/adaptive-comfort/
+   ```
+
+2. **Reload automations** (via Home Assistant UI or CLI if available):
+   - Settings → System → Restart → Quick reload (automations only)
+   - Or: Developer Tools → YAML → Automations
+
+3. **Check Home Assistant logs:**
+   ```bash
+   ssh homeassistant "tail -f /config/home-assistant.log"
+   ```
+
+4. **View blueprint files on server:**
+   ```bash
+   ssh homeassistant "ls -la /config/blueprints/automation/"
+   ```
+
 ### Making Changes
 
 **When modifying blueprints:**
