@@ -870,7 +870,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.13"
+    blueprint_version: "4.14"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
@@ -1108,6 +1108,10 @@ variables:
     _is_weather_in:  "{{ indoor_sensor_id  is string and indoor_sensor_id.startswith('weather.') }}"
     _is_weather_out: "{{ outdoor_sensor_id is string and outdoor_sensor_id.startswith('weather.') }}"
     unit_sym: "{{ '°F' if is_imperial else '°C' }}"
+
+    # Unit conversion helpers (reduces repetition)
+    _to_sys_mult: "{{ 9/5 if is_imperial else 1 }}"
+    _to_sys_add: "{{ 32 if is_imperial else 0 }}"
 
     # Safety bounds & guards in °C and system units
     safety_min_c: "{{ ((safety_min_sys_in|float - 32) * 5/9) if is_imperial else (safety_min_sys_in|float) }}"
@@ -1589,19 +1593,17 @@ variables:
     # --- Final clamp with built-in ordering (no separate "sane" step needed) ---
     # Ensure band_min <= band_max (handle edge cases where adjustments cause inversion),
     # then apply final safety bounds to prevent exceeding user-configured limits.
-    _band_min_ordered: "{{ [ band_min_c, band_max_c ] | min | round(2) }}"
-    _band_max_ordered: "{{ [ band_min_c, band_max_c ] | max | round(2) }}"
-    band_min_c_final: "{{ [ [ _band_min_ordered,  max_c ] | min , min_c ] | max }}"
-    band_max_c_final: "{{ [ [ _band_max_ordered, max_c ] | min , min_c ] | max }}"
+    band_min_c_final: "{{ [ [ [ band_min_c, band_max_c ] | min | round(2), max_c ] | min, min_c ] | max }}"
+    band_max_c_final: "{{ [ [ [ band_min_c, band_max_c ] | max | round(2), max_c ] | min, min_c ] | max }}"
     inside_low_c: "{{ (t_adapt_c - inside_half_c_eff - (setback_apply_c/2)) | round(2) }}"
     inside_high_c: "{{ (t_adapt_c + inside_half_c_eff + (setback_apply_c/2)) | round(2) }}"
 
     # --------- System units conversion ---------
-    t_adapt_sys: "{{ (t_adapt_c * 9 / 5 + 32) if is_imperial else t_adapt_c }}"
-    band_min_sys: "{{ (band_min_c_final * 9 / 5 + 32) if is_imperial else band_min_c_final }}"
-    band_max_sys: "{{ (band_max_c_final * 9 / 5 + 32) if is_imperial else band_max_c_final }}"
-    inside_low_sys: "{{ (inside_low_c * 9 / 5 + 32) if is_imperial else inside_low_c }}"
-    inside_high_sys: "{{ (inside_high_c * 9 / 5 + 32) if is_imperial else inside_high_c }}"
+    t_adapt_sys: "{{ t_adapt_c * _to_sys_mult + _to_sys_add }}"
+    band_min_sys: "{{ band_min_c_final * _to_sys_mult + _to_sys_add }}"
+    band_max_sys: "{{ band_max_c_final * _to_sys_mult + _to_sys_add }}"
+    inside_low_sys: "{{ inside_low_c * _to_sys_mult + _to_sys_add }}"
+    inside_high_sys: "{{ inside_high_c * _to_sys_mult + _to_sys_add }}"
 
     # --------- Climate unit outputs (convert from °C regardless of system heuristic) ---------
     min_allowed_raw: "{{ state_attr(climate_entity_id, 'min_temp') | float(7.2) }}"
@@ -1718,58 +1720,35 @@ variables:
     vendor_min_override_sys_in: !input vendor_min_override_sys
 
     # Map profile to a vendor minimum separation (in CLI units)
+    # Lookup table: vendor profile -> minimum separation in °F
+    _vendor_sep_lut_f: >
+        {{ {
+          'Ecobee': 5.0,
+          'Google Nest': 3.0,
+          'Honeywell T-series (T5/T6/T9)': 3.0,
+          'Honeywell Home/Resideo (Lyric/Prestige/VisionPRO)': 2.0,
+          'Honeywell T6 Pro Z-Wave': 3.0,
+          'Emerson Sensi': 2.0,
+          'Carrier Infinity/Edge': 2.0,
+          'Bryant Evolution': 2.0,
+          'Trane/American Standard': 3.0,
+          'Lennox iComfort': 3.0,
+          'Bosch Connected Control': 2.0,
+          'Amazon Smart Thermostat': 2.0,
+          'Wyze': 5.0,
+          'Tado': 3.0,
+          'Netatmo': 3.0,
+          'Hive': 3.0,
+          'Heatmiser Neo': 1.8,
+          'Mysa (Electric Heat)': 3.0,
+          'Tuya Zigbee (Generic)': 1.8,
+          'Zigbee (ZHA Generic)': 1.8,
+          'Z-Wave (ZWAVE_JS Generic)': 1.8
+        } }}
     vendor_sep_cli_profile: >
-        {% set p = (thermostat_profile_eff | string) %}
-        {% if p == 'Ecobee' %}
-          {{ 5.0 if climate_is_imperial else (5.0 * 5/9) }}
-        {% elif p == 'Google Nest' %}
-          {{ 3.0 if climate_is_imperial else (3.0 * 5/9) }}
-        {% elif p == 'Honeywell T-series (T5/T6/T9)' %}
-          {{ 3.0 if climate_is_imperial else (3.0 * 5/9) }}
-        {% elif p == 'Honeywell Home/Resideo (Lyric/Prestige/VisionPRO)' %}
-          {{ 2.0 if climate_is_imperial else (2.0 * 5/9) }}
-        {% elif p == 'Honeywell T6 Pro Z-Wave' %}
-          {{ 3.0 if climate_is_imperial else (3.0 * 5/9) }}
-        {% elif p == 'Emerson Sensi' %}
-          {{ 2.0 if climate_is_imperial else (2.0 * 5/9) }}
-        {% elif p == 'Carrier Infinity/Edge' %}
-          {{ 2.0 if climate_is_imperial else (2.0 * 5/9) }}
-        {% elif p == 'Bryant Evolution' %}
-          {{ 2.0 if climate_is_imperial else (2.0 * 5/9) }}
-        {% elif p == 'Trane/American Standard' %}
-          {{ 3.0 if climate_is_imperial else (3.0 * 5/9) }}
-        {% elif p == 'Lennox iComfort' %}
-          {{ 3.0 if climate_is_imperial else (3.0 * 5/9) }}
-        {% elif p == 'Bosch Connected Control' %}
-          {{ 2.0 if climate_is_imperial else (2.0 * 5/9) }}
-        {% elif p == 'Amazon Smart Thermostat' %}
-          {{ 2.0 if climate_is_imperial else (2.0 * 5/9) }}
-        {% elif p == 'Wyze' %}
-          {{ 5.0 if climate_is_imperial else (5.0 * 5/9) }}
-        {% elif p == 'Tado' %}
-          {{ 3.0 if climate_is_imperial else (3.0 * 5/9) }}
-        {% elif p == 'Netatmo' %}
-          {{ 3.0 if climate_is_imperial else (3.0 * 5/9) }}
-        {% elif p == 'Hive' %}
-          {{ 3.0 if climate_is_imperial else (3.0 * 5/9) }}
-        {% elif p == 'Heatmiser Neo' %}
-          {{ (1.8) if climate_is_imperial else 1.0 }}
-        {% elif p == 'Mysa (Electric Heat)' %}
-          {{ 3.0 if climate_is_imperial else (3.0 * 5/9) }}
-        {% elif p == 'Tuya Zigbee (Generic)' %}
-          {{ (1.8) if climate_is_imperial else 1.0 }}
-        {% elif p == 'Zigbee (ZHA Generic)' %}
-          {{ (1.8) if climate_is_imperial else 1.0 }}
-        {% elif p == 'Z-Wave (ZWAVE_JS Generic)' %}
-          {{ (1.8) if climate_is_imperial else 1.0 }}
-        {% else %}
-          {{ 0 }}
-        {% endif %}
-
-    # For logging: vendor default separation in system units (°F/°C)
-    vendor_sep_sys_default: >
-        {% set v = vendor_sep_cli_profile | float(0) %}
-        {% if climate_is_imperial %}{{ v }}{% else %}{{ v }}{% endif %}
+        {% set p = thermostat_profile_eff | string %}
+        {% set sep_f = _vendor_sep_lut_f.get(p, 0) | float(0) %}
+        {{ sep_f if climate_is_imperial else (sep_f * 5/9) }}
 
     # Optional explicit override in system units -> convert to CLI units
     vendor_sep_cli_override: >
@@ -1818,22 +1797,22 @@ variables:
     target_low_cli:  "{{ [ [ target_low_cli_cap,  target_high_cli_cap ] | min , min_allowed_cli ] | max }}"
     target_high_cli: "{{ [ [ target_high_cli_cap, target_low_cli_cap  ] | max , min_allowed_cli ] | max }}"
 
-    # --------- Debug strings ---------
+    # --------- Debug helpers (strings computed in action when needed) ---------
     climate_unit_sym: "{{ '°F' if climate_is_imperial else '°C' }}"
     dbg_prefix: "Adaptive Climate (final v{{ blueprint_version }})"
-    dbg_line_basic: >
-        {{ dbg_prefix }} Band={{ band_min_sys | round(3) }}-{{ band_max_sys | round(3) }}{{ unit_sym }}; Set={{ t_adapt_sys | round(1) }}{{ unit_sym }}; In={{ t_in_sys | round(2) }}{{ unit_sym }}; Out={{ ((t_out_c * 9/5 + 32) if is_imperial else t_out_c) | round(2) }}{{ unit_sym }}; Trigger={{ (trigger.id if trigger is defined) if (trigger is defined) else 'unknown' }} ; sep_enforce={{ sep_needed > 0 }} sep_min={{ sep_cli_min | round(1) }}{{ climate_unit_sym }}; step={{ cli_step }} bounds={{ safety_min_sys_in }}–{{ safety_max_sys_in }}
-    dbg_line_verbose: >
-        {{ dbg_prefix }} Band={{ band_min_sys | round(3) }}-{{ band_max_sys | round(3) }}{{ unit_sym }}; Set={{ t_adapt_sys | round(1) }}{{ unit_sym }}; In={{ t_in_sys | round(2) }}{{ unit_sym }}; Out={{ ((t_out_c * 9/5 + 32) if is_imperial else t_out_c) | round(2) }}{{ unit_sym }}; dp_out={{ dp_out_c | default(none) | round(1) if dp_out_c is not none else 'n/a' }}C, dp_in={{ dp_in_c | default(none) | round(1) if dp_in_c is not none else 'n/a' }}C, AH_out={{ ah_out | default(none) if ah_out is not none else 'n/a' }} g/m³, AH_in={{ ah_in | default(none) if ah_in is not none else 'n/a' }} g/m³, h_out={{ h_out | default(none) if h_out is not none else 'n/a' }} kJ/kg, h_in={{ h_in | default(none) if h_in is not none else 'n/a' }} kJ/kg; Trigger={{ (trigger.id if trigger is defined) if (trigger is defined) else 'unknown' }} ; sep_enforce={{ sep_needed > 0 }} sep_min={{ sep_cli_min | round(1) }}{{ climate_unit_sym }}; step={{ cli_step }} bounds={{ safety_min_sys_in }}–{{ safety_max_sys_in }}
 
 trigger:
-  # Core reactive triggers
+  # Core reactive triggers (debounced to prevent rapid re-evaluations)
   - platform: state
     id: indoor_temp_state
     entity_id: !input indoor_temp_sensor
+    for:
+      seconds: 30
   - platform: state
     id: outdoor_temp_state
     entity_id: !input outdoor_temp_sensor
+    for:
+      seconds: 60
   - platform: state
     id: occupancy_state
     entity_id: !input occupancy_sensor
@@ -1945,18 +1924,24 @@ action:
           - condition: template
             value_template: "{{ dbg in ['basic','verbose'] }}"
         sequence:
+          - variables:
+              _dbg_basic: >
+                {{ dbg_prefix }} Band={{ band_min_sys | round(3) }}-{{ band_max_sys | round(3) }}{{ unit_sym }}; Set={{ t_adapt_sys | round(1) }}{{ unit_sym }}; In={{ t_in_sys | round(2) }}{{ unit_sym }}; Out={{ ((t_out_c * 9/5 + 32) if is_imperial else t_out_c) | round(2) }}{{ unit_sym }}; Trigger={{ (trigger.id if trigger is defined) if (trigger is defined) else 'unknown' }} ; sep_enforce={{ sep_needed > 0 }} sep_min={{ sep_cli_min | round(1) }}{{ climate_unit_sym }}; step={{ cli_step }} bounds={{ safety_min_sys_in }}–{{ safety_max_sys_in }}
           - service: logbook.log
             data:
               name: "HVAC Pro"
-              message: "{{ dbg_line_basic }}"
+              message: "{{ _dbg_basic }}"
       - conditions:
           - condition: template
             value_template: "{{ dbg == 'verbose' }}"
         sequence:
+          - variables:
+              _dbg_verbose: >
+                {{ dbg_prefix }} Band={{ band_min_sys | round(3) }}-{{ band_max_sys | round(3) }}{{ unit_sym }}; Set={{ t_adapt_sys | round(1) }}{{ unit_sym }}; In={{ t_in_sys | round(2) }}{{ unit_sym }}; Out={{ ((t_out_c * 9/5 + 32) if is_imperial else t_out_c) | round(2) }}{{ unit_sym }}; dp_out={{ dp_out_c | default(none) | round(1) if dp_out_c is not none else 'n/a' }}C, dp_in={{ dp_in_c | default(none) | round(1) if dp_in_c is not none else 'n/a' }}C, AH_out={{ ah_out | default(none) if ah_out is not none else 'n/a' }} g/m³, AH_in={{ ah_in | default(none) if ah_in is not none else 'n/a' }} g/m³, h_out={{ h_out | default(none) if h_out is not none else 'n/a' }} kJ/kg, h_in={{ h_in | default(none) if h_in is not none else 'n/a' }} kJ/kg; Trigger={{ (trigger.id if trigger is defined) if (trigger is defined) else 'unknown' }} ; sep_enforce={{ sep_needed > 0 }} sep_min={{ sep_cli_min | round(1) }}{{ climate_unit_sym }}; step={{ cli_step }} bounds={{ safety_min_sys_in }}–{{ safety_max_sys_in }}
           - service: logbook.log
             data:
               name: "HVAC Pro"
-              message: "{{ dbg_line_verbose }}"
+              message: "{{ _dbg_verbose }}"
 
   # ---------- Dynamic pause status & guard override ----------
   - variables:
