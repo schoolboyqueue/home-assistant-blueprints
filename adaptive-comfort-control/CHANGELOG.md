@@ -1,3 +1,17 @@
+## [4.13] — 2025-11-07
+### Added
+- **Manual Override Detection:** Automatically pauses automation when users manually adjust thermostat setpoints.
+  - Configurable pause duration (default: 60 minutes, up to 8 hours).
+  - Adjustable detection tolerance to prevent false triggers from minor drift.
+  - Optional notification action when override is detected.
+  - Monitors single setpoint (heat/cool) and dual setpoint (auto/heat_cool) modes.
+  - Respects user control while automatically resuming adaptive comfort after the pause period.
+
+### Notes
+- Feature is enabled by default but can be disabled via blueprint input.
+- Tolerance default (1.0 climate unit) prevents triggering on quantization noise.
+- When override detected, automation stops and waits for configured duration before resuming.
+
 ## [4.12] — 2025-11-07
 ### Fixed
 - **Debug logging unit conversion:** Corrected `sep_cli_min` output that was incorrectly converting already-converted climate units to system units.

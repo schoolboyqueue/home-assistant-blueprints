@@ -493,6 +493,46 @@ blueprint:
                         entity:
                             domain: ["sensor", "input_number"]
 
+        manual_override:
+            name: Manual Override Detection
+            icon: mdi:hand-back-right
+            collapsed: true
+            input:
+                manual_override_enable:
+                    name: "Enable Manual Override Detection"
+                    description: "Pause automation when user manually adjusts thermostat, allowing manual control for a period."
+                    default: true
+                    selector:
+                        boolean: {}
+
+                manual_override_duration_min:
+                    name: "Override Duration (minutes)"
+                    description: "How long to pause automation after detecting manual adjustment (0 = disabled)."
+                    default: 60
+                    selector:
+                        number:
+                            min: 0
+                            max: 480
+                            step: 5
+                            mode: slider
+
+                manual_override_tolerance:
+                    name: "Detection Tolerance (climate units)"
+                    description: "Minimum change to count as manual override. Prevents false triggers from small setpoint drift."
+                    default: 1.0
+                    selector:
+                        number:
+                            min: 0.1
+                            max: 5.0
+                            step: 0.1
+
+                manual_override_action:
+                    name: "Override Detected Action (optional)"
+                    description: "Actions to run when manual override is detected (notify user, etc.)."
+                    default: []
+                    selector:
+                        action: {}
+
         pause:
             name: HVAC Pause
             icon: mdi:pause-octagon
@@ -830,7 +870,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.12"
+    blueprint_version: "4.13"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
@@ -891,6 +931,11 @@ variables:
     sleep_end_str: !input sleep_end_time
     sleep_bias_sys_in: !input sleep_bias_sys
     sleep_tighten_sys_in: !input sleep_tighten_sys
+
+    # Manual override inputs
+    manual_override_enable: !input manual_override_enable
+    manual_override_duration_min: !input manual_override_duration_min
+    manual_override_tolerance: !input manual_override_tolerance
 
     mrt_sensor_id: >
         {% set raw = _raw_mrt_sensor_values %}
@@ -1799,6 +1844,20 @@ trigger:
     id: pause_any
     entity_id: !input pause_sensors
 
+  # Manual override detection - monitor climate entity for user changes
+  - platform: state
+    id: climate_manual_change
+    entity_id: !input climate_entity
+    attribute: temperature
+  - platform: state
+    id: climate_manual_change_low
+    entity_id: !input climate_entity
+    attribute: target_temp_low
+  - platform: state
+    id: climate_manual_change_high
+    entity_id: !input climate_entity
+    attribute: target_temp_high
+
   # Optional sensors affecting psychrometrics or RMOT
   - platform: state
     id: rh_in_state
@@ -1830,6 +1889,56 @@ trigger:
 condition: []
 
 action:
+  # ---------- Manual Override Detection ----------
+  # Check if this trigger was a manual thermostat adjustment outside automation control
+  - variables:
+      _manual_trigger: >
+        {{ trigger.id in ['climate_manual_change', 'climate_manual_change_low', 'climate_manual_change_high'] }}
+      _manual_change_detected: >
+        {% if not _manual_trigger or not manual_override_enable %} false
+        {% elif manual_override_duration_min | int(0) <= 0 %} false
+        {% else %}
+          {# Check if change exceeds tolerance threshold #}
+          {% set tol = manual_override_tolerance | float(1.0) %}
+          {% if trigger.id == 'climate_manual_change' %}
+            {% set old = trigger.from_state.attributes.temperature | float(0) if trigger.from_state.attributes.temperature is not none else 0 %}
+            {% set new = trigger.to_state.attributes.temperature | float(0) if trigger.to_state.attributes.temperature is not none else 0 %}
+            {{ (new - old) | abs >= tol }}
+          {% elif trigger.id == 'climate_manual_change_low' %}
+            {% set old = trigger.from_state.attributes.target_temp_low | float(0) if trigger.from_state.attributes.target_temp_low is not none else 0 %}
+            {% set new = trigger.to_state.attributes.target_temp_low | float(0) if trigger.to_state.attributes.target_temp_low is not none else 0 %}
+            {{ (new - old) | abs >= tol }}
+          {% elif trigger.id == 'climate_manual_change_high' %}
+            {% set old = trigger.from_state.attributes.target_temp_high | float(0) if trigger.from_state.attributes.target_temp_high is not none else 0 %}
+            {% set new = trigger.to_state.attributes.target_temp_high | float(0) if trigger.to_state.attributes.target_temp_high is not none else 0 %}
+            {{ (new - old) | abs >= tol }}
+          {% else %} false {% endif %}
+        {% endif %}
+
+  # If manual override detected, pause and exit
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ _manual_change_detected }}"
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ dbg in ['basic','verbose'] }}"
+                sequence:
+                  - service: logbook.log
+                    data:
+                      name: "HVAC Pro"
+                      message: "Manual override detected ({{ trigger.id }}). Pausing automation for {{ manual_override_duration_min }} minutes."
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ true }}"  # Always run if actions provided
+                sequence: !input manual_override_action
+          - delay:
+              minutes: "{{ manual_override_duration_min | int(60) }}"
+          - stop: "Manual override period ended"
+
   # ---------- Verbose/basic logging ----------
   - choose:
       - conditions:
