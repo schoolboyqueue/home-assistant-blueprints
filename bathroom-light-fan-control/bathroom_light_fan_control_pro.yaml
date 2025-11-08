@@ -17,16 +17,9 @@ blueprint:
       icon: mdi:lightbulb-on-outline
       description: Options that determine when lights turn on/off and how they behave.
       input:
-        presence_boolean:
-          name: Home Presence Boolean
-          description: Optional. Input boolean that indicates home is occupied. Presence is considered true if this is on or if any Additional Presence Entities are active.
-          default: ""
-          selector:
-            entity:
-              domain: input_boolean
         presence_entities:
-          name: Additional Presence Entities (any)
-          description: Optional. One or more person, device_tracker, binary_sensor, or input_boolean entities that indicate occupancy. Presence is true if any of these are active.
+          name: Presence Entities (any = home)
+          description: Optional. One or more entities that indicate someone is home. Lights turn on only when at least one shows 'on'/'home'. Leave empty to disable presence requirement.
           default: []
           selector:
             entity:
@@ -36,12 +29,7 @@ blueprint:
                 - domain: device_tracker
                 - domain: binary_sensor
                 - domain: input_boolean
-        require_presence:
-          name: Require presence to turn lights on
-          description: If enabled, lights turn on only when presence is true (either the Home Presence Boolean is on or any Additional Presence Entities are active).
-          default: false
-          selector:
-            boolean: {}
+                - domain: zone
         light_target:
           name: Bathroom Light(s)
           description: The light or light group to control.
@@ -391,8 +379,6 @@ mode: restart
 max_exceeded: silent
 
 variables:
-  require_presence: !input require_presence
-  presence_boolean: !input presence_boolean
   presence_entities: !input presence_entities
   light_target: !input light_target
   bathroom_humidity_sensor: !input bathroom_humidity_sensor
@@ -430,7 +416,7 @@ variables:
   ror_min_on_time_min: !input ror_min_on_time_min
   ror_latch_until: !input ror_latch_until
   light_area: !input light_area
-  blueprint_version: "1.5.2"
+  blueprint_version: "1.6.0"
   area_set: >-
     {{ light_area is not none and (light_area|string) != '' }}
 
@@ -465,15 +451,11 @@ variables:
     {{ (humidity_delta_on + (night_fan_delta_on_bias|float(0))) if in_night_schedule else humidity_delta_on }}
 
   presence_ok: >-
-    {% if not require_presence %}
+    {% set ents = presence_entities if presence_entities is defined and presence_entities is not none else [] %}
+    {% if ents | length == 0 %}
       true
     {% else %}
       {% set ok = false %}
-      {% set pb = presence_boolean if presence_boolean is defined and presence_boolean not in ['', 'unknown', 'unavailable', None] else none %}
-      {% if pb is not none and states(pb) == 'on' %}
-        {% set ok = true %}
-      {% endif %}
-      {% set ents = presence_entities if presence_entities is defined and presence_entities is not none else [] %}
       {% for e in ents %}
         {% if e not in ['', 'unknown', 'unavailable', None] and states(e) in ['on','home'] %}
           {% set ok = true %}

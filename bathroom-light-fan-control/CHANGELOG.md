@@ -1,5 +1,47 @@
 # Bathroom Light & Fan Control Pro - Changelog
 
+## [1.6.0] - 2025-01-08
+
+### Changed
+
+**Simplified Presence System (Breaking Change):**
+- Collapsed `presence_boolean`, `presence_entities`, and `require_presence` into single `presence_entities` input
+- Now accepts any combination of: person, device_tracker, binary_sensor, input_boolean, zone
+- Logic: If list is empty → lights always work. If list has entities → at least one must show 'on'/'home'
+- Cleaner, more intuitive configuration
+- Added zone domain support for location-based presence
+
+### Removed
+
+**Deprecated Inputs:**
+- `presence_boolean` - merge into `presence_entities` list
+- `require_presence` - now automatic (empty list = no requirement, populated list = requirement)
+
+### Migration Required
+
+**For existing automations:**
+
+1. **If you had `require_presence: false`:**
+   - Remove or leave `presence_entities: []` (empty)
+   - Behavior: lights work regardless of presence
+
+2. **If you had `presence_boolean: input_boolean.home`:**
+   - Change to: `presence_entities: [input_boolean.home]`
+
+3. **If you had both `presence_boolean` AND `presence_entities`:**
+   - Combine into single list: `presence_entities: [input_boolean.home, person.john, person.jane]`
+
+4. **If you had `require_presence: true` with entities:**
+   - Just keep your `presence_entities` list (requirement is now implicit)
+
+### Technical Details
+
+- `presence_ok` logic simplified: empty list → true, populated list → check if any entity is 'on'/'home'
+- Variable binding reduced from 3 inputs to 1
+- More flexible: can mix entity types (input_boolean, person, device_tracker, etc.)
+
+---
+
 ## [1.5.2] - 2025-01-08
 
 ### Fixed
