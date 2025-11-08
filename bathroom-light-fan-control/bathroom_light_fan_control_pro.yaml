@@ -376,7 +376,8 @@ blueprint:
                 - "basic"
                 - "verbose"
 
-mode: restart
+mode: queued
+max: 5
 max_exceeded: silent
 
 variables:
@@ -417,7 +418,7 @@ variables:
   ror_min_on_time_min: !input ror_min_on_time_min
   ror_latch_until: !input ror_latch_until
   light_area: !input light_area
-  blueprint_version: "1.7.1"
+  blueprint_version: "1.7.2"
   area_set: >-
     {{ light_area is not none and (light_area|string) != '' }}
 
