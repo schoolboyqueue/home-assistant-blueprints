@@ -313,6 +313,35 @@ Built-in psychrometrics prevent "muggy" natural ventilation:
    
    **Why this fails:** `states(input_datetime.helper)` returns a **string** in local timezone (e.g., "2025-11-08 11:34:47"). When `as_timestamp()` parses this string, it may interpret it as UTC, causing comparison failures. The `timestamp` attribute is a **float** (Unix epoch) with no timezone ambiguity.
 
+8. **State change trigger race conditions** — When an automation changes entity state AND that state change triggers another branch, add a small delay to avoid race conditions:
+   ```yaml
+   # WRONG - simultaneous state changes cause race conditions
+   - service: input_boolean.turn_on
+     target:
+       entity_id: input_boolean.flag
+   - service: light.turn_off  # This triggers light_manual_off
+     target:
+       entity_id: light.bathroom
+   - service: input_boolean.turn_off  # Might happen before trigger fires
+     target:
+       entity_id: input_boolean.flag
+   
+   # CORRECT - add delay to ensure trigger sees correct state
+   - service: input_boolean.turn_on
+     target:
+       entity_id: input_boolean.flag
+   - service: light.turn_off  # This triggers light_manual_off
+     target:
+       entity_id: light.bathroom
+   - delay:
+       milliseconds: 100  # Let state change settle
+   - service: input_boolean.turn_off
+     target:
+       entity_id: input_boolean.flag
+   ```
+   
+   **Why this matters:** When an entity state change triggers another automation or trigger within the same blueprint, the trigger fires immediately. If you change another entity's state in the same action sequence, both state changes might be processed simultaneously, causing the trigger to see the wrong state. A small delay (100ms) ensures the first state change is fully processed before the second occurs.
+
 ## Common Tasks
 
 ### Add a new blueprint input
