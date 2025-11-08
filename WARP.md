@@ -342,6 +342,154 @@ Built-in psychrometrics prevent "muggy" natural ventilation:
    
    **Why this matters:** When an entity state change triggers another automation or trigger within the same blueprint, the trigger fires immediately. If you change another entity's state in the same action sequence, both state changes might be processed simultaneously, causing the trigger to see the wrong state. A small delay (100ms) ensures the first state change is fully processed before the second occurs.
 
+9. **Using `target:` selector types in trigger `entity_id` fields** — A `selector:` of type `target:` may allow selection of devices, areas, or entities, returning a dictionary (not the plain entity ID list that state triggers expect).
+   ```yaml
+   # WRONG - target selector returns dictionary
+   input:
+     my_entity:
+       selector:
+         target: {}  # Returns {area_id: ..., device_id: ..., entity_id: [...]}
+   trigger:
+     - platform: state
+       entity_id: !input my_entity  # Fails - expects entity ID string/list
+   
+   # CORRECT - use entity selector for triggers
+   input:
+     my_entity:
+       selector:
+         entity: {}  # Returns entity ID string directly
+   trigger:
+     - platform: state
+       entity_id: !input my_entity  # Works
+   ```
+   
+   **Why this fails:** State triggers expect entity IDs, not target dictionaries. Blueprint fails to import or triggers silently never fire.
+
+10. **Using variables or `!input` in trigger templates or `for:` durations** — Variables defined in `variables:` section aren't available when triggers are evaluated. Templates in triggers have limited context.
+    ```yaml
+    # WRONG - variable not available in trigger
+    variables:
+      my_duration: !input delay_minutes
+    trigger:
+      - platform: state
+        entity_id: sensor.test
+        for:
+          minutes: "{{ my_duration }}"  # Undefined variable error
+    
+    # CORRECT - use !input directly or hardcode
+    trigger:
+      - platform: state
+        entity_id: sensor.test
+        for:
+          minutes: !input delay_minutes  # Works
+    ```
+    
+    **Why this fails:** Triggers are evaluated at blueprint compile time, before variables are available. Move logic to `action:` section using `wait_for_trigger` if needed.
+
+11. **Incorrect variable ordering in `variables:` section** — Variables referencing other variables must come after those variables in the list. Home Assistant evaluates variables sequentially.
+    ```yaml
+    # WRONG - order matters
+    variables:
+      result: "{{ base_value * 2 }}"  # Undefined variable error
+      base_value: 10
+    
+    # CORRECT - dependencies first
+    variables:
+      base_value: 10
+      result: "{{ base_value * 2 }}"  # Works
+    ```
+    
+    **Why this fails:** Variables are evaluated in order. Later variables can reference earlier ones, but not vice versa. See Pitfall #3.
+
+12. **Using `!input` inside Jinja2 template blocks** — Embedding `!input` directly inside `{{ }}` confuses YAML/Jinja parsing.
+    ```yaml
+    # WRONG - !input inside template
+    variables:
+      result: "{{ !input my_value * 2 }}"  # YAML parsing error
+    
+    # CORRECT - bind input to variable first
+    variables:
+      my_value: !input my_setting
+      result: "{{ my_value * 2 }}"  # Works
+    ```
+    
+    **Why this fails:** `!input` is a YAML tag processed before Jinja2 evaluation. Map inputs to variables first, then use variables in templates.
+
+13. **Blueprint limitations with complex trigger types** — Some trigger types (`template` triggers, webhook triggers) have inconsistent support in blueprints or may not work as expected.
+    ```yaml
+    # RISKY - template triggers in blueprints
+    trigger:
+      - platform: template
+        value_template: "{{ states('sensor.temp') | float > 25 }}"  # May not work reliably
+    
+    # SAFER - use well-supported triggers
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.temp
+        above: 25  # Better blueprint support
+    ```
+    
+    **Why this matters:** Stick to `state`, `numeric_state`, `time_pattern` triggers in blueprints. Test thoroughly if using advanced trigger types.
+
+14. **Not documenting required helpers/entities** — Users may not know they need to create helpers (input_boolean, input_datetime, etc.) before using the blueprint.
+    ```yaml
+    # Good practice - document requirements clearly
+    blueprint:
+      description: >
+        REQUIRED: Create these helpers before using:
+        1. input_datetime.my_override_until (date and time enabled)
+        2. input_boolean.my_automation_control
+      input:
+        helper:
+          description: "REQUIRED: Select the input_datetime helper you created"
+          selector:
+            entity:
+              domain: input_datetime
+    ```
+    
+    **Why this matters:** Clear documentation and selector filters prevent misconfiguration. Users should know what to create before importing the blueprint.
+
+15. **Time pattern triggers causing load spikes** — Multiple installations using identical `time_pattern` triggers fire simultaneously, potentially overwhelming external services.
+    ```yaml
+    # RISKY - all instances fire at same time
+    trigger:
+      - platform: time_pattern
+        minutes: "/5"  # Everyone fires at :00, :05, :10, etc.
+    action:
+      - service: notify.pushover  # May rate-limit if many instances
+    
+    # BETTER - add jitter/stagger
+    trigger:
+      - platform: time_pattern
+        minutes: "/5"
+    action:
+      - delay:
+          seconds: "{{ range(0, 60) | random }}"  # Random 0-60s delay
+      - service: notify.pushover
+    ```
+    
+    **Why this matters:** Synchronized triggers can cause rate limiting, service failures, or external API throttling. Add randomization for external service calls.
+
+16. **Using entity attributes in places expecting state** — Some automations try to use attributes directly in triggers/conditions that expect state values.
+    ```yaml
+    # WRONG - attribute in state trigger
+    trigger:
+      - platform: state
+        entity_id: sensor.temp
+        attribute: unit_of_measurement  # Triggers on attribute change
+        to: "°F"  # This works for attributes
+    
+    # BETTER - use attribute in template/condition
+    trigger:
+      - platform: state
+        entity_id: sensor.temp  # Trigger on state change
+    condition:
+      - condition: template
+        value_template: "{{ state_attr('sensor.temp', 'unit_of_measurement') == '°F' }}"  # Check attribute
+    ```
+    
+    **Why this matters:** Attributes and state are different. State triggers with `attribute:` key work but may not behave as expected. Use templates for attribute logic when possible.
+
 ## Common Tasks
 
 ### Add a new blueprint input
