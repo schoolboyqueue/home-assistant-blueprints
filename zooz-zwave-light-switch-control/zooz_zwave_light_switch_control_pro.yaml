@@ -1,0 +1,674 @@
+blueprint:
+  name: "Zooz Z-Wave Light Switch Control Pro"
+  description: >
+    Control a light with a Zooz Z-Wave switch using Central Scene (zwave_js).
+    - Single press Up: light on (restores last brightness)
+    - Single press Down: light off
+    - Hold Up: brighten repeatedly while held; stop on release
+    - Hold Down: dim repeatedly while held; stop on release; turn off at min threshold
+    - Optional 2x/3x custom actions for Up/Down
+    - Optional area targeting (actions target area instead of single entity)
+  domain: automation
+  author: "Jeremy Carter"
+  source_url: "https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/zooz-zwave-light-switch-control/zooz_zwave_light_switch_control_pro.yaml"
+
+  input:
+    core:
+      name: Device and Light
+      icon: mdi:light-switch
+      input:
+        zooz_device:
+          name: "Zooz switch device"
+          description: "Required. Z-Wave JS device (Zooz ZEN71/72/76/77, 700/800 series) that sends Central Scene events."
+          selector:
+            device:
+              integration: zwave_js
+              manufacturer: Zooz
+              model:
+                - ZEN71
+                - ZEN72
+                - ZEN76
+                - ZEN77
+                - ZEN71 800LR
+                - ZEN72 800LR
+                - ZEN76 800LR
+                - ZEN77 800LR
+        light_target:
+          name: "Light entity"
+          description: "Required. The primary light to control and read brightness from."
+          selector:
+            entity:
+              domain: light
+        light_area:
+          name: "Optional: Area to target"
+          description: "If set, actions target this area instead of the single light entity."
+          default: ""
+          selector:
+            area: {}
+
+    dimming:
+      name: Dimming Parameters
+      icon: mdi:brightness-6
+      input:
+        brightness_step_pct:
+          name: "Brightness step (%)"
+          description: "Amount to change per step while holding. Default 5%."
+          default: 5
+          selector:
+            number:
+              min: 1
+              max: 50
+              step: 1
+              mode: slider
+              unit_of_measurement: "%"
+        dim_interval_ms:
+          name: "Dim interval (ms)"
+          description: "Delay between each brightness step while holding. Default 200 ms."
+          default: 200
+          selector:
+            number:
+              min: 50
+              max: 1000
+              step: 10
+              mode: slider
+              unit_of_measurement: "ms"
+        min_on_brightness_pct:
+          name: "Minimum brightness on hold-up when off (%)"
+          description: "If the light is off and you hold Up, it will turn on to at least this brightness. Default 10%."
+          default: 10
+          selector:
+            number:
+              min: 1
+              max: 50
+              step: 1
+              mode: slider
+              unit_of_measurement: "%"
+        clamp_min_pct:
+          name: "Clamp minimum brightness (%)"
+          description: "If brightness at/under this level during dim-down, the light will turn off. Default 1%."
+          default: 1
+          selector:
+            number:
+              min: 0
+              max: 50
+              step: 1
+              mode: slider
+              unit_of_measurement: "%"
+        clamp_max_pct:
+          name: "Clamp maximum brightness (%)"
+          description: "Logical cap for max brightness check during brighten. Default 100%."
+          default: 100
+          selector:
+            number:
+              min: 50
+              max: 100
+              step: 1
+              mode: slider
+              unit_of_measurement: "%"
+
+    gestures:
+      name: Optional Gesture Actions
+      icon: mdi:gesture-double-tap
+      input:
+        double_tap_up_action:
+          name: "Double-tap Up action"
+          description: "Optional custom action when Up paddle is double-pressed."
+          default: []
+          selector:
+            action: {}
+        double_tap_down_action:
+          name: "Double-tap Down action"
+          description: "Optional custom action when Down paddle is double-pressed."
+          default: []
+          selector:
+            action: {}
+        triple_tap_up_action:
+          name: "Triple-tap Up action"
+          description: "Optional custom action when Up paddle is triple-pressed."
+          default: []
+          selector:
+            action: {}
+        triple_tap_down_action:
+          name: "Triple-tap Down action"
+          description: "Optional custom action when Down paddle is triple-pressed."
+          default: []
+          selector:
+            action: {}
+
+    diagnostics:
+      name: Diagnostics
+      icon: mdi:bug-outline
+      input:
+        debug_level:
+          name: "Debug level"
+          description: "off: none, basic: key transitions, verbose: detailed brightness/clamp logs."
+          default: "off"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - off
+                - basic
+                - verbose
+
+variables:
+  blueprint_version: "0.1.0"
+
+  # Bind inputs to variables first
+  light_entity: !input light_target
+  light_area_in: !input light_area
+  step_pct_in: !input brightness_step_pct
+  interval_ms_in: !input dim_interval_ms
+  min_on_brightness_pct_in: !input min_on_brightness_pct
+  clamp_min_pct_in: !input clamp_min_pct
+  clamp_max_pct_in: !input clamp_max_pct
+  debug_level_v: !input debug_level
+
+  step_pct: "{{ step_pct_in | float(5) }}"
+  interval_ms: "{{ interval_ms_in | int(200) }}"
+  min_on_brightness_pct_v: "{{ min_on_brightness_pct_in | float(10) }}"
+  clamp_min_pct_v: "{{ clamp_min_pct_in | float(1) }}"
+  clamp_max_pct_v: "{{ clamp_max_pct_in | float(100) }}"
+
+  # Derived absolute 0-255 thresholds
+  min_abs_brightness: "{{ (clamp_min_pct_v / 100.0 * 255) | round(0) | int }}"
+  min_on_abs_brightness: "{{ (min_on_brightness_pct_v / 100.0 * 255) | round(0) | int }}"
+  max_abs_brightness: "{{ (clamp_max_pct_v / 100.0 * 255) | round(0) | int }}"
+
+  # Area guard
+  area_set: >
+    {% set a = light_area_in %}
+    {{ a is string and a | length > 0 }}
+
+  # Debug flags
+  debug_enabled: "{{ debug_level_v in ['basic','verbose'] }}"
+  debug_verbose: "{{ debug_level_v == 'verbose' }}"
+
+mode: restart
+max_exceeded: silent
+
+trigger:
+  # Up single press
+  - platform: event
+    id: up_single
+    event_type: zwave_js_event
+    event_data:
+      device_id: !input zooz_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "001"
+      value: "KeyPressed"
+  - platform: event
+    id: up_single
+    event_type: zwave_js_value_notification
+    event_data:
+      device_id: !input zooz_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "001"
+      value: "KeyPressed"
+
+  # Down single press
+  - platform: event
+    id: down_single
+    event_type: zwave_js_event
+    event_data:
+      device_id: !input zooz_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "002"
+      value: "KeyPressed"
+  - platform: event
+    id: down_single
+    event_type: zwave_js_value_notification
+    event_data:
+      device_id: !input zooz_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "002"
+      value: "KeyPressed"
+
+  # Up hold start
+  - platform: event
+    id: up_hold_start
+    event_type: zwave_js_event
+    event_data:
+      device_id: !input zooz_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "001"
+      value: "KeyHeldDown"
+  - platform: event
+    id: up_hold_start
+    event_type: zwave_js_value_notification
+    event_data:
+      device_id: !input zooz_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "001"
+      value: "KeyHeldDown"
+
+  # Down hold start
+  - platform: event
+    id: down_hold_start
+    event_type: zwave_js_event
+    event_data:
+      device_id: !input zooz_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "002"
+      value: "KeyHeldDown"
+  - platform: event
+    id: down_hold_start
+    event_type: zwave_js_value_notification
+    event_data:
+      device_id: !input zooz_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "002"
+      value: "KeyHeldDown"
+
+  # Double taps
+  - platform: event
+    id: up_double
+    event_type: zwave_js_event
+    event_data:
+      device_id: !input zooz_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "001"
+      value: "KeyPressed2x"
+  - platform: event
+    id: up_double
+    event_type: zwave_js_value_notification
+    event_data:
+      device_id: !input zooz_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "001"
+      value: "KeyPressed2x"
+  - platform: event
+    id: down_double
+    event_type: zwave_js_event
+    event_data:
+      device_id: !input zooz_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "002"
+      value: "KeyPressed2x"
+  - platform: event
+    id: down_double
+    event_type: zwave_js_value_notification
+    event_data:
+      device_id: !input zooz_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "002"
+      value: "KeyPressed2x"
+
+  # Triple taps
+  - platform: event
+    id: up_triple
+    event_type: zwave_js_event
+    event_data:
+      device_id: !input zooz_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "001"
+      value: "KeyPressed3x"
+  - platform: event
+    id: up_triple
+    event_type: zwave_js_value_notification
+    event_data:
+      device_id: !input zooz_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "001"
+      value: "KeyPressed3x"
+  - platform: event
+    id: down_triple
+    event_type: zwave_js_event
+    event_data:
+      device_id: !input zooz_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "002"
+      value: "KeyPressed3x"
+  - platform: event
+    id: down_triple
+    event_type: zwave_js_value_notification
+    event_data:
+      device_id: !input zooz_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "002"
+      value: "KeyPressed3x"
+
+condition: []
+
+action:
+  - choose:
+      # Single press Up: turn on
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'up_single' }}"
+        sequence:
+          - choose:
+              - conditions: "{{ debug_enabled }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      level: info
+                      message: "[Zooz Light Pro] up_single → light.turn_on (restore last)"
+            default: []
+          - choose:
+              - conditions: "{{ area_set }}"
+                sequence:
+                  - service: light.turn_on
+                    target:
+                      area_id: "{{ light_area_in }}"
+            default:
+              - service: light.turn_on
+                target:
+                  entity_id: "{{ light_entity }}"
+
+      # Single press Down: turn off
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'down_single' }}"
+        sequence:
+          - choose:
+              - conditions: "{{ debug_enabled }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      level: info
+                      message: "[Zooz Light Pro] down_single → light.turn_off"
+            default: []
+          - choose:
+              - conditions: "{{ area_set }}"
+                sequence:
+                  - service: light.turn_off
+                    target:
+                      area_id: "{{ light_area_in }}"
+            default:
+              - service: light.turn_off
+                target:
+                  entity_id: "{{ light_entity }}"
+
+      # Hold Up: brighten
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'up_hold_start' }}"
+        sequence:
+          - choose:
+              - conditions: "{{ debug_enabled }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      level: info
+                      message: "[Zooz Light Pro] up_hold_start"
+            default: []
+          # If light is off, turn on to minimum on brightness
+          - condition: template
+            value_template: "{{ states(light_entity) not in ['unknown','unavailable',''] }}"
+          - choose:
+              - conditions: "{{ is_state(light_entity, 'off') }}"
+                sequence:
+                  - choose:
+                      - conditions: "{{ debug_enabled }}"
+                        sequence:
+                          - service: system_log.write
+                            data:
+                              level: info
+                              message: "[Zooz Light Pro] Light is off → turn_on to min_on_brightness_pct={{ min_on_brightness_pct_v | int }}%"
+                    default: []
+                  - choose:
+                      - conditions: "{{ area_set }}"
+                        sequence:
+                          - service: light.turn_on
+                            target:
+                              area_id: "{{ light_area_in }}"
+                            data:
+                              brightness_pct: "{{ min_on_brightness_pct_v | int }}"
+                    default:
+                      - service: light.turn_on
+                        target:
+                          entity_id: "{{ light_entity }}"
+                        data:
+                          brightness_pct: "{{ min_on_brightness_pct_v | int }}"
+            default: []
+          # Repeat step brighten until release
+          - repeat:
+              sequence:
+                - wait_for_trigger:
+                    - platform: event
+                      event_type: zwave_js_event
+                      event_data:
+                        device_id: !input zooz_device
+                        command_class_name: "Central Scene"
+                        property: "scene"
+                        property_key: "001"
+                        value: "KeyReleased"
+                    - platform: event
+                      event_type: zwave_js_value_notification
+                      event_data:
+                        device_id: !input zooz_device
+                        command_class_name: "Central Scene"
+                        property: "scene"
+                        property_key: "001"
+                        value: "KeyReleased"
+                  timeout:
+                    milliseconds: "{{ interval_ms }}"
+                - choose:
+                    - conditions: "{{ wait is defined and wait.completed }}"
+                      sequence:
+                        - choose:
+                            - conditions: "{{ debug_enabled }}"
+                              sequence:
+                                - service: system_log.write
+                                  data:
+                                    level: info
+                                    message: "[Zooz Light Pro] up_release → stop brighten"
+                          default: []
+                  default:
+                    - choose:
+                        - conditions: "{{ debug_verbose }}"
+                          sequence:
+                            - service: system_log.write
+                              data:
+                                level: debug
+                                message: >
+                                  [Zooz Light Pro] brighten step +{{ step_pct }}% | current={{ state_attr(light_entity,'brightness')|int(0) }}/255 cap={{ max_abs_brightness }}
+                      default: []
+                    - choose:
+                        - conditions: "{{ area_set }}"
+                          sequence:
+                            - service: light.turn_on
+                              target:
+                                area_id: "{{ light_area_in }}"
+                              data:
+                                brightness_step_pct: "{{ step_pct | float }}"
+                      default:
+                        - service: light.turn_on
+                          target:
+                            entity_id: "{{ light_entity }}"
+                          data:
+                            brightness_step_pct: "{{ step_pct | float }}"
+              until:
+                - condition: template
+                  value_template: "{{ wait is defined and wait.completed }}"
+
+      # Hold Down: dim, turn off at min threshold
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'down_hold_start' }}"
+        sequence:
+          - choose:
+              - conditions: "{{ debug_enabled }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      level: info
+                      message: "[Zooz Light Pro] down_hold_start"
+            default: []
+          # Do not turn on if off (avoid flicker). We will only dim if it's already on.
+          - repeat:
+              sequence:
+                - wait_for_trigger:
+                    - platform: event
+                      event_type: zwave_js_event
+                      event_data:
+                        device_id: !input zooz_device
+                        command_class_name: "Central Scene"
+                        property: "scene"
+                        property_key: "002"
+                        value: "KeyReleased"
+                    - platform: event
+                      event_type: zwave_js_value_notification
+                      event_data:
+                        device_id: !input zooz_device
+                        command_class_name: "Central Scene"
+                        property: "scene"
+                        property_key: "002"
+                        value: "KeyReleased"
+                  timeout:
+                    milliseconds: "{{ interval_ms }}"
+                - choose:
+                    - conditions: "{{ wait is defined and wait.completed }}"
+                      sequence:
+                        - choose:
+                            - conditions: "{{ debug_enabled }}"
+                              sequence:
+                                - service: system_log.write
+                                  data:
+                                    level: info
+                                    message: "[Zooz Light Pro] down_release → stop dim"
+                          default: []
+                  default:
+                    - choose:
+                        - conditions: "{{ is_state(light_entity, 'on') }}"
+                          sequence:
+                            - choose:
+                                - conditions: "{{ debug_verbose }}"
+                                  sequence:
+                                    - service: system_log.write
+                                      data:
+                                        level: debug
+                                        message: >
+                                          [Zooz Light Pro] dim step -{{ step_pct }}% | current={{ state_attr(light_entity,'brightness')|int(0) }}/255 min={{ min_abs_brightness }}
+                              default: []
+                            - choose:
+                                - conditions: "{{ area_set }}"
+                                  sequence:
+                                    - service: light.turn_on
+                                      target:
+                                        area_id: "{{ light_area_in }}"
+                                      data:
+                                        brightness_step_pct: "{{ (0 - step_pct | float) }}"
+                              default:
+                                - service: light.turn_on
+                                  target:
+                                    entity_id: "{{ light_entity }}"
+                                  data:
+                                    brightness_step_pct: "{{ (0 - step_pct | float) }}"
+                            # After step, check threshold and power off if at/under clamp_min
+                            - choose:
+                                - conditions:
+                                    - condition: template
+                                      value_template: >
+                                        {% set b = state_attr(light_entity,'brightness') %}
+                                        {{ (b if b is number else 0) | int(0) <= min_abs_brightness }}
+                                  sequence:
+                                    - choose:
+                                        - conditions: "{{ debug_enabled }}"
+                                          sequence:
+                                            - service: system_log.write
+                                              data:
+                                                level: info
+                                                message: "[Zooz Light Pro] brightness <= min clamp → light.turn_off"
+                                      default: []
+                                    - choose:
+                                        - conditions: "{{ area_set }}"
+                                          sequence:
+                                            - service: light.turn_off
+                                              target:
+                                                area_id: "{{ light_area_in }}"
+                                      default:
+                                        - service: light.turn_off
+                                          target:
+                                            entity_id: "{{ light_entity }}"
+                                    - stop: "Dim hold reached minimum; turning off"
+                          default: []
+              until:
+                - condition: template
+                  value_template: "{{ wait is defined and wait.completed }}"
+
+      # Double-tap Up
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'up_double' }}"
+        sequence:
+          - choose:
+              - conditions: "{{ debug_enabled }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      level: info
+                      message: "[Zooz Light Pro] up_double → run custom action"
+            default: []
+          - choose:
+              - conditions: []
+                sequence: !input double_tap_up_action
+
+      # Double-tap Down
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'down_double' }}"
+        sequence:
+          - choose:
+              - conditions: "{{ debug_enabled }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      level: info
+                      message: "[Zooz Light Pro] down_double → run custom action"
+            default: []
+          - choose:
+              - conditions: []
+                sequence: !input double_tap_down_action
+
+      # Triple-tap Up
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'up_triple' }}"
+        sequence:
+          - choose:
+              - conditions: "{{ debug_enabled }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      level: info
+                      message: "[Zooz Light Pro] up_triple → run custom action"
+            default: []
+          - choose:
+              - conditions: []
+                sequence: !input triple_tap_up_action
+
+      # Triple-tap Down
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'down_triple' }}"
+        sequence:
+          - choose:
+              - conditions: "{{ debug_enabled }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      level: info
+                      message: "[Zooz Light Pro] down_triple → run custom action"
+            default: []
+          - choose:
+              - conditions: []
+                sequence: !input triple_tap_down_action
+    default: []
