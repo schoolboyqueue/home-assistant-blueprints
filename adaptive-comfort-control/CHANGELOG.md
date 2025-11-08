@@ -1,3 +1,15 @@
+## [4.16] — 2025-11-07
+### Improved
+- **UI clarity for temperature unit fields:** Added visual indicators and clearer descriptions for Celsius/Fahrenheit input fields.
+  - Temperature fields now labeled "❄️ Minimum Comfort (°C) — Metric Only" and "🔥 Maximum Comfort (°F) — Imperial Only"
+  - Descriptions now explicitly state when each field is used vs ignored
+  - Units override selector options improved: "Auto-detect from sensors", "Force Celsius (°C)", "Force Fahrenheit (°F)"
+  - Added warning emoji and guidance in units_override description to clarify which fields to use
+
+### Notes
+- Home Assistant blueprints do not support conditional input visibility, so both °C and °F fields remain visible.
+- This update makes it clearer which fields are active based on the "Temperature Units" setting.
+
 ## [4.15] — 2025-11-07
 ### Added
 - **Adaptive Learning from Manual Overrides:** Blueprint now learns your temperature preferences over time.

@@ -81,11 +81,17 @@ blueprint:
             input:
                 units_override:
                     name: "Units"
-                    description: "Auto-detect by default. You can force °C or °F if your sensors/climate are mixed."
+                    description: "Auto-detect by default. You can force °C or °F if your sensors/climate are mixed. ⚠️ When set to 'c', use °C fields below. When 'f', use °F fields. When 'auto', use whichever matches your system."
                     default: "auto"
                     selector:
                         select:
-                            options: ["auto", "c", "f"]
+                            options:
+                                - label: "Auto-detect from sensors"
+                                  value: "auto"
+                                - label: "Force Celsius (°C)"
+                                  value: "c"
+                                - label: "Force Fahrenheit (°F)"
+                                  value: "f"
 
                 comfort_category:
                     name: "ASHRAE 55 Category (tolerance)"
@@ -102,8 +108,8 @@ blueprint:
                                   value: "III"
 
                 min_comfort_temp_c:
-                    name: "Minimum Comfort (°C)"
-                    description: "Hard lower bound for the comfort band in °C. Used when units are metric or when forced."
+                    name: "❄️ Minimum Comfort (°C) — Metric Only"
+                    description: "Hard lower bound for the comfort band. ℹ️ Only used when Units='auto' with metric sensors, or Units='c'. Ignored if using °F."
                     default: 18.0
                     selector:
                         number:
@@ -113,8 +119,8 @@ blueprint:
                             unit_of_measurement: "°C"
 
                 max_comfort_temp_c:
-                    name: "Maximum Comfort (°C)"
-                    description: "Hard upper bound for the comfort band in °C. Used when units are metric or when forced."
+                    name: "🔥 Maximum Comfort (°C) — Metric Only"
+                    description: "Hard upper bound for the comfort band. ℹ️ Only used when Units='auto' with metric sensors, or Units='c'. Ignored if using °F."
                     default: 28.0
                     selector:
                         number:
@@ -124,8 +130,8 @@ blueprint:
                             unit_of_measurement: "°C"
 
                 min_comfort_temp_f:
-                    name: "Minimum Comfort (°F)"
-                    description: "Hard lower bound for the comfort band in °F. Used when units are imperial or when forced."
+                    name: "❄️ Minimum Comfort (°F) — Imperial Only"
+                    description: "Hard lower bound for the comfort band. ℹ️ Only used when Units='auto' with imperial sensors, or Units='f'. Ignored if using °C."
                     default: 64.0
                     selector:
                         number:
@@ -135,8 +141,8 @@ blueprint:
                             unit_of_measurement: "°F"
 
                 max_comfort_temp_f:
-                    name: "Maximum Comfort (°F)"
-                    description: "Hard upper bound for the comfort band in °F. Used when units are imperial or when forced."
+                    name: "🔥 Maximum Comfort (°F) — Imperial Only"
+                    description: "Hard upper bound for the comfort band. ℹ️ Only used when Units='auto' with imperial sensors, or Units='f'. Ignored if using °C."
                     default: 82.0
                     selector:
                         number:
@@ -896,7 +902,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.15"
+    blueprint_version: "4.16"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
