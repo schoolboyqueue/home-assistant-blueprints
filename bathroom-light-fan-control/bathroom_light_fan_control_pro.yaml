@@ -417,7 +417,7 @@ variables:
   ror_min_on_time_min: !input ror_min_on_time_min
   ror_latch_until: !input ror_latch_until
   light_area: !input light_area
-  blueprint_version: "1.8.0"
+  blueprint_version: "1.8.1"
   area_set: >-
     {{ light_area is not none and (light_area|string) != '' }}
 
@@ -549,13 +549,13 @@ trigger:
     to: "off"
     for: { seconds: !input motion_sensor_turn_off_delay }
   
-  - id: wasp_motion_clear_with_grace
+  - id: wasp_vacancy_with_grace
     platform: state
     entity_id: !input motion_sensor
     from: "on"
     to: "off"
     for:
-      seconds: "{{ (motion_sensor_turn_off_delay + (lights_off_delay_min * 60)) | int }}"
+      minutes: !input lights_off_delay_min
 
   - id: wasp_door_left_open
     platform: state
@@ -605,7 +605,7 @@ action:
       - conditions:
           - condition: template
             value_template: >-
-              {{ trigger.id in ['wasp_motion','wasp_door_opened','wasp_door_closed','wasp_motion_clear','wasp_door_left_open'] }}
+              {{ trigger.id in ['wasp_motion','wasp_door_opened','wasp_door_closed','wasp_motion_clear','wasp_vacancy_with_grace','wasp_door_left_open'] }}
         sequence:
           # Debug: Show all condition states for motion/door open triggers
           - choose:
@@ -724,7 +724,7 @@ action:
               # New: Combined motion clear with full grace period - turn off immediately
               - conditions:
                   - condition: template
-                    value_template: "{{ trigger.id == 'wasp_motion_clear_with_grace' }}"
+                    value_template: "{{ trigger.id == 'wasp_vacancy_with_grace' }}"
                 sequence:
                   - choose:
                       - conditions:
