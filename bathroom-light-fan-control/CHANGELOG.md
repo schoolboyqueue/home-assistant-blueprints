@@ -1,5 +1,24 @@
 # Bathroom Light & Fan Control Pro - Changelog
 
+## [1.9.3] - 2025-01-08
+
+### Fixed
+
+**Manual Override Timezone Bug (Critical):**
+- `override_ok` variable now uses `state_attr(manual_override_until, 'timestamp')` instead of `as_timestamp(states(...))`
+- Previous approach had timezone conversion issues: helper stores UTC timestamp, `states()` returns local time string, `as_timestamp()` misinterprets it
+- Caused manual override to never expire - `override_ok` always returned False even after expiration
+- Now uses the `timestamp` attribute directly (Unix epoch), avoiding timezone parsing entirely
+
+### Technical Details
+
+- Line 486: Changed from `as_timestamp(states(manual_override_until))` to `state_attr(manual_override_until, 'timestamp')`
+- The `input_datetime` entity has a `timestamp` attribute containing the raw Unix timestamp (float)
+- Direct timestamp comparison: `now_ts > until_ts` (both in Unix epoch seconds)
+- Added extra check for unavailable state before accessing attribute
+
+---
+
 ## [1.9.2] - 2025-01-08
 
 ### Fixed

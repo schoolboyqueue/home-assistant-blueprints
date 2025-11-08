@@ -425,7 +425,7 @@ variables:
   ror_min_on_time_min: !input ror_min_on_time_min
   ror_latch_until: !input ror_latch_until
   light_area: !input light_area
-  blueprint_version: "1.9.2"
+  blueprint_version: "1.9.3"
   area_set: >-
     {{ light_area is not none and (light_area|string) != '' }}
 
@@ -474,14 +474,19 @@ variables:
     {% endif %}
 
   override_ok: >-
-    {% set until = states(manual_override_until) %}
     {% set disabled = manual_override_duration_min | int(0) == 0 %}
-    {% if disabled or until in ['unknown','', None] or manual_override_until in ['', None] %}
+    {% if disabled or manual_override_until in ['', None] %}
       true
     {% else %}
-      {% set until_ts = as_timestamp(until) %}
-      {% set now_ts = as_timestamp(now()) %}
-      {{ (now_ts is not none and until_ts is not none and now_ts > until_ts) }}
+      {% set until_state = states(manual_override_until) %}
+      {% if until_state in ['unknown','unavailable','', None] %}
+        true
+      {% else %}
+        {# Use timestamp attribute directly to avoid timezone conversion issues #}
+        {% set until_ts = state_attr(manual_override_until, 'timestamp') %}
+        {% set now_ts = as_timestamp(now()) %}
+        {{ (now_ts is not none and until_ts is not none and now_ts > until_ts) }}
+      {% endif %}
     {% endif %}
 
   lux_ok: >-
