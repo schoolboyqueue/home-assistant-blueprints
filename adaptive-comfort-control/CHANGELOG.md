@@ -1,3 +1,32 @@
+## [4.17] — 2025-01-08
+### Fixed
+- **CRITICAL: Manual override persistence bug:** Fixed issue where manual override would not persist across automation restarts.
+  - **Problem:** With `mode: restart`, any trigger (temp change, time pattern, etc.) would restart the automation, canceling the 60-minute delay and immediately resuming normal operation.
+  - **Solution:** Replaced delay-based override with persistent `input_datetime` helper to track override expiry timestamp.
+  - **Breaking change:** Manual override now **requires** `manual_override_until` input_datetime helper to function correctly.
+  - Without helper configured, override is detected and logged, but will NOT persist across automation restarts (warning logged).
+
+### Added
+- **Manual Override Until helper input:** New required `input_datetime` helper stores when manual override expires.
+- **Override persistence check:** Automation now checks `is_override_active` variable at start of each run to skip normal operation if override is still active.
+- **Enhanced logging:** Override detection logs now indicate whether helper is configured ("helper set" vs "WARNING: no helper - will NOT persist!").
+
+### Changed
+- Manual override sequence no longer uses `delay` action, relying entirely on helper timestamp comparison.
+- Override check happens before all other automation logic, ensuring override is respected even when automation is triggered frequently.
+
+### Migration Required
+1. Create `input_datetime` helper: Settings → Devices & Services → Helpers → Date and time
+2. Name: "Adaptive HVAC Manual Override Until"
+3. Enable "Date and time"
+4. Select helper in blueprint: "Manual Override Until (input_datetime helper)"
+
+### Technical Details
+- Automation has 13+ triggers including time patterns (every 10 minutes), temperature changes (30s/60s debounce), and state changes.
+- Previous implementation assumed no triggers would fire during 60-minute delay, which was unrealistic.
+- New implementation sets helper to `now() + 60 minutes` and checks `now() < helper` on every run.
+- Override state persists across HA restarts, automation reloads, and trigger-based restarts.
+
 ## [4.16] — 2025-11-07
 ### Improved
 - **UI clarity for temperature unit fields:** Added visual indicators and clearer descriptions for Celsius/Fahrenheit input fields.

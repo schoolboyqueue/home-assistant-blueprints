@@ -565,6 +565,15 @@ blueprint:
                             domain: ["input_number"]
                             multiple: false
 
+                manual_override_until:
+                    name: "Manual Override Until (input_datetime helper)"
+                    description: "Required for override to work correctly. Create an input_datetime helper (date and time) to store when manual override expires. Without this, override will not persist across automation restarts."
+                    default: ""
+                    selector:
+                        entity:
+                            domain: ["input_datetime"]
+                            multiple: false
+
         pause:
             name: HVAC Pause
             icon: mdi:pause-octagon
@@ -902,7 +911,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.16"
+    blueprint_version: "4.17"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
@@ -971,6 +980,7 @@ variables:
     learn_from_overrides: !input learn_from_overrides
     learning_rate: !input learning_rate
     _raw_learned_offset_helper: !input learned_offset_helper
+    _raw_manual_override_until: !input manual_override_until
 
     mrt_sensor_id: >
         {% set raw = _raw_mrt_sensor_values %}
@@ -1053,6 +1063,35 @@ variables:
           {{ states(learned_offset_helper_id) | float(0) }}
         {% else %}0{% endif %}
     learned_offset_c: "{{ (learned_offset_sys * 5/9) if is_imperial else learned_offset_sys }}"
+
+    # Manual override helper parsing
+    manual_override_until_id: >
+        {% set raw = _raw_manual_override_until %}
+        {% if raw is string %}
+          {% set e = raw %}
+        {% elif raw is iterable %}
+          {% set e = (raw[0] if raw|length > 0 else '') %}
+        {% else %}
+          {% set e = '' %}
+        {% endif %}
+        {% set e = e | default('', true) %}
+        {% set v = e | string | lower %}
+        {% if v not in ['', 'none', 'input_datetime.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
+
+    # Check if manual override is currently active
+    is_override_active: >
+        {% if not manual_override_enable or manual_override_duration_min | int(0) <= 0 or not manual_override_until_id %}
+          false
+        {% else %}
+          {% set until_state = states(manual_override_until_id) %}
+          {% if until_state in ['unknown', 'unavailable', '', None] %}
+            false
+          {% else %}
+            {% set until_ts = as_timestamp(until_state) %}
+            {% set now_ts = as_timestamp(now()) %}
+            {{ (until_ts is not none and now_ts is not none and now_ts < until_ts) }}
+          {% endif %}
+        {% endif %}
 
     # Regional Presets
     regional_defaults_enable: !input regional_defaults_enable
@@ -1986,6 +2025,22 @@ action:
                     data:
                       value: "{{ _new_offset_c | round(2) }}"
 
+          # Set override expiry timestamp if helper is configured
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ manual_override_until_id }}"
+                sequence:
+                  - variables:
+                      _now_ts: "{{ as_timestamp(now()) | float(0) }}"
+                      _duration_sec: "{{ manual_override_duration_min | int(60) * 60 }}"
+                      _until_ts: "{{ (_now_ts + _duration_sec) | int }}"
+                  - service: input_datetime.set_datetime
+                    target:
+                      entity_id: "{{ manual_override_until_id }}"
+                    data:
+                      timestamp: "{{ _until_ts }}"
+
           # Log override
           - choose:
               - conditions:
@@ -2000,7 +2055,7 @@ action:
                         {% if learn_from_overrides and learned_offset_helper_id %}
                         Learned offset: {{ _old_offset_c | round(2) }}°C → {{ _new_offset_c | round(2) }}°C.
                         {% endif %}
-                        Pausing for {{ manual_override_duration_min }} min.
+                        Pausing for {{ manual_override_duration_min }} min{{ ' (helper set)' if manual_override_until_id else ' (WARNING: no helper - will NOT persist!)' }}.
 
           # Run custom override action
           - choose:
@@ -2009,10 +2064,25 @@ action:
                     value_template: "{{ true }}"  # Always run if actions provided
                 sequence: !input manual_override_action
 
-          # Pause
-          - delay:
-              minutes: "{{ manual_override_duration_min | int(60) }}"
-          - stop: "Manual override period ended"
+          # Stop automation (override will persist via helper timestamp check)
+          - stop: "Manual override active - stopping automation"
+
+  # ---------- Check if override is still active (persists across restarts) ----------
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ is_override_active }}"
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ dbg in ['basic','verbose'] }}"
+                sequence:
+                  - service: logbook.log
+                    data:
+                      name: "HVAC Pro"
+                      message: "Manual override still active (expires {{ states(manual_override_until_id) }}). Skipping automation run."
+          - stop: "Manual override active - skipping this run"
 
   # ---------- Verbose/basic logging ----------
   - choose:
