@@ -416,7 +416,7 @@ variables:
   ror_min_on_time_min: !input ror_min_on_time_min
   ror_latch_until: !input ror_latch_until
   light_area: !input light_area
-  blueprint_version: "1.6.1"
+  blueprint_version: "1.6.2"
   area_set: >-
     {{ light_area is not none and (light_area|string) != '' }}
 
@@ -598,6 +598,18 @@ action:
             value_template: >-
               {{ trigger.id in ['wasp_motion','wasp_door_opened','wasp_door_closed','wasp_motion_clear','wasp_door_left_open'] }}
         sequence:
+          # Debug: Show all condition states for motion/door open triggers
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ debug_level == 'verbose' and trigger.id in ['wasp_motion','wasp_door_opened'] }}"
+                sequence:
+                  - service: logbook.log
+                    data:
+                      name: Bathroom Light & Fan Control
+                      message: >-
+                        Conditions Check: should_turn_on={{ should_turn_on_light }}, light_off={{ is_state(light_target,'off') }}, presence_ok={{ presence_ok }} (entities={{ presence_entities | length }} count), override_ok={{ override_ok }}, lux_ok={{ lux_ok }} (v{{ blueprint_version }})
+
           - choose:
               # Motion or Door opened: unified light ON logic
               - conditions:
