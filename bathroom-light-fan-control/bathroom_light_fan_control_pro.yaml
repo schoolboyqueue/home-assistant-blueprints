@@ -39,7 +39,7 @@ blueprint:
         require_presence:
           name: Require presence to turn lights on
           description: If enabled, lights turn on only when presence is true (either the Home Presence Boolean is on or any Additional Presence Entities are active).
-          default: true
+          default: false
           selector:
             boolean: {}
         light_target:
@@ -430,7 +430,7 @@ variables:
   ror_min_on_time_min: !input ror_min_on_time_min
   ror_latch_until: !input ror_latch_until
   light_area: !input light_area
-  blueprint_version: "1.5.1"
+  blueprint_version: "1.5.2"
   area_set: >-
     {{ light_area is not none and (light_area|string) != '' }}
 

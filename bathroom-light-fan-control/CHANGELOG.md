@@ -1,5 +1,30 @@
 # Bathroom Light & Fan Control Pro - Changelog
 
+## [1.5.2] - 2025-01-08
+
+### Fixed
+
+**Require Presence Default:**
+- Changed `require_presence` default from `true` to `false`
+- Lights now turn on by default regardless of home presence system
+- Previous default prevented lights from turning on unless presence entities showed someone home
+- Better default for typical bathroom use case where motion/door should always trigger lights
+
+### Migration Notes
+
+**Existing automations using this blueprint:**
+- If you want the OLD behavior (require presence), explicitly set `require_presence: true` in your automation config
+- If you have presence entities configured but lights weren't turning on, this fixes it
+- The presence check logic itself is unchanged, only the default value
+
+### Technical Details
+
+- `require_presence` input default changed from `true` → `false` in blueprint definition
+- When `false`: lights turn on from motion/door regardless of presence entities
+- When `true`: lights turn on only if presence_boolean OR any presence_entities show 'on'/'home'
+
+---
+
 ## [1.5.1] - 2025-01-08
 
 ### Added
