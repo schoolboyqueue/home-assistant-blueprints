@@ -1,5 +1,46 @@
 # Bathroom Light & Fan Control Pro - Changelog
 
+## [1.5.0] - 2025-01-08
+
+### Changed
+
+**Debug System Upgrade:**
+- Replaced boolean debug toggle with three-level system matching Adaptive Comfort Control Pro
+- Debug levels: `off`, `basic`, `verbose`
+- Default is now `basic` (was `false`/off)
+- UI changed from toggle to dropdown selector
+- Icon changed from `mdi:bug` to `mdi:bug-outline` for consistency
+
+### Added
+
+**Verbose Debug Logging:**
+- **Light ON (verbose)**: Adds night mode breakdown (enabled vs schedule), illuminance sensor value, area control status
+- **Light OFF (verbose)**: Adds motion and door sensor states at time of vacancy
+- **Fan ON (verbose)**: Adds bathroom/home humidity sensor raw values, night bias value, night schedule status
+- **Fan OFF (verbose)**: Adds bathroom/home humidity sensor raw values, minimum runtime setting
+
+**Basic Debug Logging (unchanged):**
+- All existing basic logs preserved with same format
+- Light ON/OFF, Fan ON/OFF, Manual override, ROR latch, Startup checks
+
+### Migration Notes
+
+**Existing automations will automatically default to `basic` logging** (previously equivalent to `debug_enabled: true`).
+
+To restore previous behavior:
+- **Old `debug_enabled: false`** → Set `debug_level: off`
+- **Old `debug_enabled: true`** → Already at `basic` (default), no change needed
+- **For detailed troubleshooting** → Set `debug_level: verbose`
+
+### Technical Details
+
+- All log conditions changed from `debug_enabled` to `debug_level in ['basic','verbose']` or specific level checks
+- Variable binding changed from `debug_enabled: !input debug_enabled` to `debug_level: !input debug_level`
+- Verbose logs use separate conditions to provide enhanced context without cluttering basic logs
+- Blueprint version incremented to track breaking configuration change
+
+---
+
 ## [1.4.0] - 2025-01-08
 
 ### Fixed

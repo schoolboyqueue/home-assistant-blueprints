@@ -373,14 +373,19 @@ blueprint:
 
     diagnostics:
       name: Diagnostics & Logging
-      icon: mdi:bug
+      icon: mdi:bug-outline
       collapsed: true
       input:
-        debug_enabled:
-          name: Enable Debug Logging
-          default: false
+        debug_level:
+          name: Level
+          description: "Select 'basic' for helpful trace logs; 'verbose' adds detailed sensor states and calculations."
+          default: basic
           selector:
-            boolean: {}
+            select:
+              options:
+                - "off"
+                - "basic"
+                - "verbose"
 
 mode: restart
 max_exceeded: silent
@@ -415,7 +420,7 @@ variables:
   rate_of_fall_enabled: !input rate_of_fall_enabled
   rate_of_fall_threshold: !input rate_of_fall_threshold
   rate_of_fall_window_min: !input rate_of_fall_window_min
-  debug_enabled: !input debug_enabled
+  debug_level: !input debug_level
   illuminance_sensor: !input illuminance_sensor
   illuminance_threshold: !input illuminance_threshold
   night_enabled: !input night_enabled
@@ -425,7 +430,7 @@ variables:
   ror_min_on_time_min: !input ror_min_on_time_min
   ror_latch_until: !input ror_latch_until
   light_area: !input light_area
-  blueprint_version: "1.4.0"
+  blueprint_version: "1.5.0"
   area_set: >-
     {{ light_area is not none and (light_area|string) != '' }}
 
@@ -588,7 +593,7 @@ action:
                     target:
                       entity_id: !input fan_target
                   - choose:
-                      - conditions: "{{ debug_enabled }}"
+                      - conditions: "{{ debug_level in ['basic','verbose'] }}"
                         sequence:
                           - service: logbook.log
                             data:
@@ -678,13 +683,20 @@ action:
                                   entity_id: !input light_target
                       # Debug logging for light ON events
                       - choose:
-                          - conditions: "{{ debug_enabled }}"
+                          - conditions: "{{ debug_level == 'basic' }}"
                             sequence:
                               - service: logbook.log
                                 data:
                                   name: Bathroom Light & Fan Control
                                   message: >-
                                     Light ON: trigger={{ trigger.id }}, night_mode={{ night_mode_active }}, presence={{ presence_ok }}, lux_ok={{ lux_ok }} (v{{ blueprint_version }})
+                          - conditions: "{{ debug_level == 'verbose' }}"
+                            sequence:
+                              - service: logbook.log
+                                data:
+                                  name: Bathroom Light & Fan Control
+                                  message: >-
+                                    Light ON: trigger={{ trigger.id }}, night_mode={{ night_mode_active }} (enabled={{ night_mode_enabled }}, schedule={{ in_night_schedule }}), presence={{ presence_ok }}, lux={{ states(illuminance_sensor) if illuminance_sensor else 'n/a' }} (ok={{ lux_ok }}), area={{ area_set }} (v{{ blueprint_version }})
                     else: []
 
               # Clear cases: compute wasp conditions to turn off light
@@ -765,12 +777,18 @@ action:
                                   entity_id: !input light_target
                           # Debug logging for light OFF events
                           - choose:
-                              - conditions: "{{ debug_enabled }}"
+                              - conditions: "{{ debug_level == 'basic' }}"
                                 sequence:
                                   - service: logbook.log
                                     data:
                                       name: Bathroom Light & Fan Control
                                       message: "Light OFF: trigger={{ trigger.id }}, vacancy detected after {{ lights_off_delay_min }}min grace (v{{ blueprint_version }})"
+                              - conditions: "{{ debug_level == 'verbose' }}"
+                                sequence:
+                                  - service: logbook.log
+                                    data:
+                                      name: Bathroom Light & Fan Control
+                                      message: "Light OFF: trigger={{ trigger.id }}, vacancy detected after {{ lights_off_delay_min }}min grace, motion={{ is_state(motion_sensor, 'off') }}, door={{ is_state(door_sensor, 'off') }} (v{{ blueprint_version }})"
           - stop: "WITB branch completed"
 
       # Manual override: user turned off lights, suspend auto-on
@@ -794,7 +812,7 @@ action:
                   entity_id: "{{ manual_override_until }}"
                   timestamp: "{{ _until_ts }}"
               - choose:
-                  - conditions: "{{ debug_enabled }}"
+                  - conditions: "{{ debug_level in ['basic','verbose'] }}"
                     sequence:
                       - service: logbook.log
                         data:
@@ -802,7 +820,7 @@ action:
                           message: "Manual override activated, suspending auto-on for {{ manual_override_duration_min }} minutes. (v{{ blueprint_version }})"
             else:
               - choose:
-                  - conditions: "{{ debug_enabled }}"
+                  - conditions: "{{ debug_level in ['basic','verbose'] }}"
                     sequence:
                       - service: logbook.log
                         data:
@@ -852,20 +870,27 @@ action:
                       entity_id: "{{ ror_latch_until }}"
                       timestamp: "{{ _latch_until_ts }}"
                   - choose:
-                      - conditions: "{{ debug_enabled }}"
+                      - conditions: "{{ debug_level in ['basic','verbose'] }}"
                         sequence:
                           - service: logbook.log
                             data:
                               name: Bathroom Light & Fan Control
                               message: "ROR latch set: fan must stay on for {{ ror_min_on_time_min }} minutes. (v{{ blueprint_version }})"
           - choose:
-              - conditions: "{{ debug_enabled }}"
+              - conditions: "{{ debug_level == 'basic' }}"
                 sequence:
                   - service: logbook.log
                     data:
                       name: Bathroom Light & Fan Control
                       message: >-
                         Fan ON: {{ 'ROR boost' if _ror_triggered else 'delta' }}; delta={{ humidity_delta | round(1) }}% (threshold={{ fan_delta_on_effective | round(1) }}%) (v{{ blueprint_version }})
+              - conditions: "{{ debug_level == 'verbose' }}"
+                sequence:
+                  - service: logbook.log
+                    data:
+                      name: Bathroom Light & Fan Control
+                      message: >-
+                        Fan ON: {{ 'ROR boost' if _ror_triggered else 'delta' }}; bath={{ states(bathroom_humidity_sensor) }}%, home={{ states(home_humidity_sensor) }}%, delta={{ humidity_delta | round(1) }}% (threshold={{ fan_delta_on_effective | round(1) }}%, night_bias={{ night_fan_delta_on_bias }}), in_night={{ in_night_schedule }} (v{{ blueprint_version }})
           - service: "{{ turn_fan_on }}"
             target:
               entity_id: !input fan_target
@@ -933,12 +958,18 @@ action:
             target:
               entity_id: !input fan_target
           - choose:
-              - conditions: "{{ debug_enabled }}"
+              - conditions: "{{ debug_level == 'basic' }}"
                 sequence:
                   - service: logbook.log
                     data:
                       name: Bathroom Light & Fan Control
                       message: "Fan OFF: delta={{ humidity_delta | round(1) }}% below threshold ({{ humidity_delta_off }}%); min runtime and ROR latch met. (v{{ blueprint_version }})"
+              - conditions: "{{ debug_level == 'verbose' }}"
+                sequence:
+                  - service: logbook.log
+                    data:
+                      name: Bathroom Light & Fan Control
+                      message: "Fan OFF: bath={{ states(bathroom_humidity_sensor) }}%, home={{ states(home_humidity_sensor) }}%, delta={{ humidity_delta | round(1) }}% below threshold ({{ humidity_delta_off }}%); min runtime={{ fan_min_runtime_min }}min, ROR latch cleared (v{{ blueprint_version }})"
 
       # Auto fan off when lights have been off for specified duration and humidity is below off threshold
       - conditions:
@@ -954,7 +985,7 @@ action:
             target:
               entity_id: !input fan_target
           - choose:
-              - conditions: "{{ debug_enabled }}"
+              - conditions: "{{ debug_level in ['basic','verbose'] }}"
                 sequence:
                   - service: logbook.log
                     data:
@@ -975,7 +1006,7 @@ action:
             target:
               entity_id: !input fan_target
           - choose:
-              - conditions: "{{ debug_enabled }}"
+              - conditions: "{{ debug_level in ['basic','verbose'] }}"
                 sequence:
                   - service: logbook.log
                     data:
