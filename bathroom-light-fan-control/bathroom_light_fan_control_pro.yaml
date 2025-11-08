@@ -416,7 +416,7 @@ variables:
   ror_min_on_time_min: !input ror_min_on_time_min
   ror_latch_until: !input ror_latch_until
   light_area: !input light_area
-  blueprint_version: "1.6.0"
+  blueprint_version: "1.6.1"
   area_set: >-
     {{ light_area is not none and (light_area|string) != '' }}
 
@@ -557,6 +557,16 @@ trigger:
 condition: []
 
 action:
+  # Universal debug: log every trigger (helps diagnose why automation fires but doesn't execute expected path)
+  - choose:
+      - conditions: "{{ debug_level == 'verbose' }}"
+        sequence:
+          - service: logbook.log
+            data:
+              name: Bathroom Light & Fan Control
+              message: >-
+                Triggered: id={{ trigger.id if trigger is defined else 'undefined' }}, entity={{ trigger.entity_id if (trigger is defined and trigger.entity_id is defined) else 'n/a' }}, from={{ trigger.from_state.state if (trigger is defined and trigger.from_state is defined) else 'n/a' }} to={{ trigger.to_state.state if (trigger is defined and trigger.to_state is defined) else 'n/a' }} (v{{ blueprint_version }})
+
   - choose:
       # --- Home Assistant start: check if fan should be off at startup ---
       - conditions:
