@@ -334,8 +334,27 @@ Built-in psychrometrics prevent "muggy" natural ventilation:
 
 1. Edit `blueprint_version: "X.Y"` in YAML
 2. Document in CHANGELOG.md (see existing format)
-3. Commit: `feat(adaptive-comfort): description` or `fix(adaptive-comfort): description`
-4. Users will see the new version when they update the blueprint in Home Assistant
+3. **Update blueprint input descriptions** if changing user-facing behavior or adding inputs
+4. **Update README.md** to reflect changes (version number, configuration sections, troubleshooting)
+5. Commit: `feat(adaptive-comfort): description` or `fix(adaptive-comfort): description`
+6. Users will see the new version when they update the blueprint in Home Assistant
+
+### Update blueprint input descriptions and README
+
+When making user-facing changes to inputs or behavior:
+
+1. **Update input descriptions** in blueprint YAML (`description:` field)
+   - Explain options clearly (e.g., "Set to 0 to disable", "Optional: ...", "Required: ...")
+   - Mention defaults and edge cases
+   - Keep descriptions concise but complete
+
+2. **Update README.md**:
+   - Version number at top of file
+   - Configuration Guide sections (explain new inputs, update existing descriptions)
+   - Use Cases section if behavior changed
+   - Troubleshooting section for new edge cases or common issues
+
+3. **Why this matters**: Users rely on descriptions in the UI and README to configure blueprints correctly. Outdated docs lead to misconfiguration and support questions.
 
 ## Common Commands
 

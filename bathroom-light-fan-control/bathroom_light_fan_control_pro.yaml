@@ -70,7 +70,7 @@ blueprint:
               step: 1
         manual_override_duration_min:
           name: Manual Override Duration (minutes)
-          description: Duration to suspend auto-on after manual light off.
+          description: "Duration to suspend auto-on after manual light off. Set to 0 to disable manual override entirely. Without automation_control helper, may trigger when automation turns off lights."
           default: 30
           selector:
             number:
@@ -88,7 +88,7 @@ blueprint:
               domain: input_datetime
         automation_control:
           name: Automation Control Helper (input_boolean)
-          description: "Optional: Input boolean helper to prevent false manual override triggers. If you use manual override, create an input_boolean helper and select it here. Without this, automation turning off lights will trigger manual override."
+          description: "Optional: Prevents manual override from triggering when automation turns off lights. If using manual override, create an input_boolean helper and select it here. Without this helper, manual override may activate when automation turns off lights (not just user manual control). To disable manual override entirely, set duration to 0 instead."
           default: ""
           selector:
             entity:
@@ -425,7 +425,7 @@ variables:
   ror_min_on_time_min: !input ror_min_on_time_min
   ror_latch_until: !input ror_latch_until
   light_area: !input light_area
-  blueprint_version: "1.9.1"
+  blueprint_version: "1.9.2"
   area_set: >-
     {{ light_area is not none and (light_area|string) != '' }}
 
@@ -838,6 +838,13 @@ action:
                                     value_template: >-
                                       {{ (door_sensor in states and motion_sensor in states) and (states[door_sensor].last_changed > states[motion_sensor].last_changed) }}
                         sequence:
+                          # Signal that automation is turning off lights (not user manual control)
+                          - choose:
+                              - conditions: "{{ automation_control not in ['', None] }}"
+                                sequence:
+                                  - service: input_boolean.turn_on
+                                    target:
+                                      entity_id: "{{ automation_control }}"
                           - choose:
                               - conditions:
                                   - condition: template
@@ -854,6 +861,13 @@ action:
                               - service: light.turn_off
                                 target:
                                   entity_id: !input light_target
+                          # Reset the control helper
+                          - choose:
+                              - conditions: "{{ automation_control not in ['', None] }}"
+                                sequence:
+                                  - service: input_boolean.turn_off
+                                    target:
+                                      entity_id: "{{ automation_control }}"
                           # Debug logging for light OFF events
                           - choose:
                               - conditions: "{{ debug_level == 'basic' }}"

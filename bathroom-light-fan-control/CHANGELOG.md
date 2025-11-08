@@ -1,5 +1,33 @@
 # Bathroom Light & Fan Control Pro - Changelog
 
+## [1.9.2] - 2025-01-08
+
+### Fixed
+
+**Manual Override False Triggers (Critical Bug):**
+- Added `automation_control` helper set/reset logic to old vacancy path (wasp_motion_clear, wasp_door_closed, wasp_door_left_open)
+- v1.9.1 only fixed the new `wasp_vacancy_with_grace` trigger path
+- If lights turned off via old fallback path, helper remained OFF, causing manual override to activate incorrectly
+- Now both light-off paths properly signal automation control
+
+### Changed
+
+**Manual Override Descriptions:**
+- Updated `manual_override_duration_min` description to mention disabling by setting to 0
+- Updated `automation_control` description with clearer explanation of three options:
+  - No helper: Simple setup, may get false triggers
+  - With helper: Perfect behavior, no false triggers
+  - Duration = 0: Disable manual override entirely
+
+### Technical Details
+
+- Lines 841-847: Added helper ON before lights off in old vacancy path
+- Lines 864-870: Added helper OFF after lights off in old vacancy path
+- Matches helper logic from lines 737-762 (wasp_vacancy_with_grace path)
+- Both light-off code paths now prevent false manual override triggers
+
+---
+
 ## [1.9.1] - 2025-01-08
 
 ### Changed

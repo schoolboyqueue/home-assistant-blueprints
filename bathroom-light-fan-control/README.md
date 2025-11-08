@@ -1,6 +1,6 @@
 # Bathroom Light & Fan Control Pro
 
-**Version:** 1.4.0  
+**Version:** 1.9.2
 **Author:** Jeremy Carter  
 **Home Assistant Blueprint for Intelligent Bathroom Automation**
 
@@ -214,10 +214,13 @@ Brightness level (0-255) when night mode is active.
 Warm color temperature for night mode.
 
 **Manual Override Duration** (default: 30 min)  
-Duration to suspend auto-on after user manually turns lights off.
+Duration to suspend auto-on after user manually turns lights off. Set to 0 to disable manual override entirely.
 
 **Manual Override Until** (optional)  
 `input_datetime` helper to store when auto-on is allowed again. Required for manual override to persist across HA restarts.
+
+**Automation Control Helper** (optional)  
+`input_boolean` helper that prevents false manual override triggers when the automation (not user) turns off lights. Without this helper, manual override may activate when the automation turns off lights after vacancy. Create and select a helper for perfect behavior, or leave blank for simple setup with occasional false triggers.
 
 ---
 
@@ -354,6 +357,11 @@ Motion sensor's own clear delay. Add buffer to prevent false positives. Set to -
 4. Person moves around → Motion detected but lights don't turn back on
 5. After 30 minutes, manual override expires → Auto-on resumes
 
+**Configuration Options:**
+- **No helper configured:** Simple setup. Manual override works but may occasionally trigger when automation turns off lights after vacancy.
+- **With `automation_control` helper:** Perfect behavior. Manual override only triggers on actual user manual control.
+- **Duration set to 0:** Disables manual override entirely. Lights always respond to motion/door sensors.
+
 ### Night Mode
 
 1. Person enters bathroom at 3 AM
@@ -417,15 +425,23 @@ Motion sensor's own clear delay. Add buffer to prevent false positives. Set to -
 3. **Area lights:** Night mode parameters apply to area lights in v1.4.0+
 4. **Light capabilities:** Some lights don't support brightness or color temp
 
-### Manual override not persisting
+### Manual override not working correctly
 
-**Cause:** No `input_datetime` helper configured
-
+**Problem 1: Override not persisting across HA restarts**  
+**Cause:** No `input_datetime` helper configured  
 **Solution:**
 1. Create helper: Settings → Devices & Services → Helpers → Date and time
 2. Name: "Bathroom Manual Override Until"
 3. Enable "Date and time"
 4. Select helper in blueprint configuration
+
+**Problem 2: Override triggers when automation turns off lights**  
+**Cause:** No `automation_control` helper configured  
+**Solution:**
+1. Create helper: Settings → Devices & Services → Helpers → Toggle
+2. Name: "Bathroom Automation Control"
+3. Select helper in blueprint's "Automation Control Helper" setting
+4. Alternative: Set "Manual Override Duration" to 0 to disable override entirely
 
 ---
 
