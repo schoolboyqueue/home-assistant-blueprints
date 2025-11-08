@@ -86,6 +86,12 @@ blueprint:
           selector:
             entity:
               domain: input_datetime
+        automation_control:
+          name: Automation Control Helper (input_boolean)
+          description: "REQUIRED: Input boolean helper to prevent false manual override triggers. Create an input_boolean helper and select it here. The automation uses this to signal when IT is turning off lights (vs user manual control)."
+          selector:
+            entity:
+              domain: input_boolean
 
     fan_and_humidity:
       name: Fan & Humidity (Core)
@@ -401,6 +407,7 @@ variables:
   door_sensor_turn_off_delay: !input door_sensor_turn_off_delay
   motion_sensor_delay: !input motion_sensor_delay
   manual_override_until: !input manual_override_until
+  automation_control: !input automation_control
   rate_of_rise_enabled: !input rate_of_rise_enabled
   rate_of_rise_threshold: !input rate_of_rise_threshold
   rate_of_rise_window_min: !input rate_of_rise_window_min
@@ -417,7 +424,7 @@ variables:
   ror_min_on_time_min: !input ror_min_on_time_min
   ror_latch_until: !input ror_latch_until
   light_area: !input light_area
-  blueprint_version: "1.8.1"
+  blueprint_version: "1.9.0"
   area_set: >-
     {{ light_area is not none and (light_area|string) != '' }}
 
@@ -726,6 +733,10 @@ action:
                   - condition: template
                     value_template: "{{ trigger.id == 'wasp_vacancy_with_grace' }}"
                 sequence:
+                  # Signal that automation is turning off lights (not user manual control)
+                  - service: input_boolean.turn_on
+                    target:
+                      entity_id: "{{ automation_control }}"
                   - choose:
                       - conditions:
                           - condition: template
@@ -738,6 +749,10 @@ action:
                       - service: light.turn_off
                         target:
                           entity_id: !input light_target
+                  # Reset the control helper
+                  - service: input_boolean.turn_off
+                    target:
+                      entity_id: "{{ automation_control }}"
                   - choose:
                       - conditions: "{{ debug_level in ['basic','verbose'] }}"
                         sequence:
@@ -855,6 +870,10 @@ action:
           # Only trigger override if manual_override_duration > 0
           - condition: template
             value_template: "{{ manual_override_duration_min | int(0) > 0 }}"
+          # Only trigger if automation_control helper is OFF (means user turned off, not automation)
+          - condition: state
+            entity_id: !input automation_control
+            state: "off"
         sequence:
           - if:
               - condition: template
