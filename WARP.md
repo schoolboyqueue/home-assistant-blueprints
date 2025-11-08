@@ -298,6 +298,21 @@ Built-in psychrometrics prevent "muggy" natural ventilation:
    {{ ns.found }}  # Correctly returns true if any entity was 'on'
    ```
 
+7. **input_datetime timezone issues** — When comparing `input_datetime` helpers with current time, **always use the `timestamp` attribute**, not `states()`:
+   ```yaml
+   # WRONG - timezone conversion causes comparison failures
+   {% set until_ts = as_timestamp(states(input_datetime.helper)) %}
+   {% set now_ts = as_timestamp(now()) %}
+   {{ now_ts > until_ts }}  # May fail due to timezone mismatch
+   
+   # CORRECT - use timestamp attribute directly
+   {% set until_ts = state_attr(input_datetime.helper, 'timestamp') %}
+   {% set now_ts = as_timestamp(now()) %}
+   {{ now_ts > until_ts }}  # Both in Unix epoch seconds
+   ```
+   
+   **Why this fails:** `states(input_datetime.helper)` returns a **string** in local timezone (e.g., "2025-11-08 11:34:47"). When `as_timestamp()` parses this string, it may interpret it as UTC, causing comparison failures. The `timestamp` attribute is a **float** (Unix epoch) with no timezone ambiguity.
+
 ## Common Tasks
 
 ### Add a new blueprint input
