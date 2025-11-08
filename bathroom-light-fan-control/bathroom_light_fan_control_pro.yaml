@@ -425,7 +425,7 @@ variables:
   ror_min_on_time_min: !input ror_min_on_time_min
   ror_latch_until: !input ror_latch_until
   light_area: !input light_area
-  blueprint_version: "1.9.3"
+  blueprint_version: "1.9.4"
   area_set: >-
     {{ light_area is not none and (light_area|string) != '' }}
 
@@ -746,6 +746,7 @@ action:
                           - service: input_boolean.turn_on
                             target:
                               entity_id: "{{ automation_control }}"
+                  # Turn off lights
                   - choose:
                       - conditions:
                           - condition: template
@@ -758,7 +759,10 @@ action:
                       - service: light.turn_off
                         target:
                           entity_id: !input light_target
-                  # Reset the control helper
+                  # Wait a moment for light state to settle
+                  - delay:
+                      milliseconds: 100
+                  # Reset the control helper AFTER lights are off and settled
                   - choose:
                       - conditions: "{{ automation_control not in ['', None] }}"
                         sequence:
@@ -850,6 +854,7 @@ action:
                                   - service: input_boolean.turn_on
                                     target:
                                       entity_id: "{{ automation_control }}"
+                          # Wait grace period, then turn off lights
                           - choose:
                               - conditions:
                                   - condition: template
@@ -866,7 +871,10 @@ action:
                               - service: light.turn_off
                                 target:
                                   entity_id: !input light_target
-                          # Reset the control helper
+                          # Wait a moment for light state to settle
+                          - delay:
+                              milliseconds: 100
+                          # Reset the control helper AFTER lights are off and settled
                           - choose:
                               - conditions: "{{ automation_control not in ['', None] }}"
                                 sequence:

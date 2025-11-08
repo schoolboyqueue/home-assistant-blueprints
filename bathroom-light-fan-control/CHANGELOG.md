@@ -1,5 +1,25 @@
 # Bathroom Light & Fan Control Pro - Changelog
 
+## [1.9.4] - 2025-01-08
+
+### Fixed
+
+**Manual Override Race Condition (Critical):**
+- Added 100ms delay after turning off lights before resetting `automation_control` helper
+- Previous timing: helper OFF happened simultaneously with lights OFF, causing race condition
+- `light_manual_off` trigger fired when lights turned off, checked helper state, found it OFF (already resetting), activated manual override incorrectly
+- Now: lights turn OFF → wait 100ms → helper resets to OFF
+- `light_manual_off` trigger now sees helper still ON during the 100ms window, correctly blocking manual override
+
+### Technical Details
+
+- Added `delay: milliseconds: 100` after light.turn_off in both paths (lines 763-764, 875-876)
+- Ensures light state change is fully processed before helper resets
+- Prevents simultaneous state changes that cause race conditions
+- Applied to both `wasp_vacancy_with_grace` and old vacancy paths
+
+---
+
 ## [1.9.3] - 2025-01-08
 
 ### Fixed
