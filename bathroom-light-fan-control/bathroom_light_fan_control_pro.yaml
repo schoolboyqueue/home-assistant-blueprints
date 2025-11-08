@@ -416,7 +416,7 @@ variables:
   ror_min_on_time_min: !input ror_min_on_time_min
   ror_latch_until: !input ror_latch_until
   light_area: !input light_area
-  blueprint_version: "1.6.3"
+  blueprint_version: "1.6.4"
   area_set: >-
     {{ light_area is not none and (light_area|string) != '' }}
 
@@ -455,13 +455,13 @@ variables:
     {% if ents | length == 0 %}
       true
     {% else %}
-      {% set ok = false %}
+      {% set ns = namespace(found=false) %}
       {% for e in ents %}
         {% if e not in ['', 'unknown', 'unavailable', None] and states(e) in ['on','home'] %}
-          {% set ok = true %}
+          {% set ns.found = true %}
         {% endif %}
       {% endfor %}
-      {{ ok }}
+      {{ ns.found }}
     {% endif %}
 
   override_ok: >-
