@@ -911,7 +911,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.17"
+    blueprint_version: "4.18"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
@@ -1891,6 +1891,31 @@ variables:
     target_low_cli:  "{{ [ [ target_low_cli_cap,  target_high_cli_cap ] | min , min_allowed_cli ] | max }}"
     target_high_cli: "{{ [ [ target_high_cli_cap, target_low_cli_cap  ] | max , min_allowed_cli ] | max }}"
 
+    # --------- Check if thermostat already at target setpoints (avoid unnecessary commands) ---------
+    # Compare with tolerance to account for quantization/rounding
+    _setpoint_tolerance: "{{ cli_step * 0.6 }}"  # Slightly more than half a step
+    
+    # For dual setpoint modes (auto/heat_cool)
+    _dual_mode_matches: >
+        {% if not (supports_auto or supports_heat_cool) %}
+          false
+        {% else %}
+          {% set low_match = (temp_low_now_sys - target_low_cli) | abs < _setpoint_tolerance %}
+          {% set high_match = (temp_high_now_sys - target_high_cli) | abs < _setpoint_tolerance %}
+          {{ low_match and high_match }}
+        {% endif %}
+    
+    # For single setpoint modes (heat/cool)
+    _single_mode_matches: >
+        {% if hvac_mode_now not in ['cool','heat'] %}
+          false
+        {% else %}
+          {{ (temp_now_sys - t_adapt_cli_q) | abs < _setpoint_tolerance }}
+        {% endif %}
+    
+    # Check if we need to send commands
+    needs_temp_update: "{{ not (_dual_mode_matches or _single_mode_matches) }}"
+
     # --------- Debug helpers (strings computed in action when needed) ---------
     climate_unit_sym: "{{ '°F' if climate_is_imperial else '°C' }}"
     dbg_prefix: "Adaptive Climate (final v{{ blueprint_version }})"
@@ -2203,32 +2228,98 @@ action:
                               name: "HVAC Pro"
                               message: "Natural ventilation preferred; HVAC kept off."
 
-          # Otherwise enforce targets
+          # Otherwise enforce targets (only if values changed)
           - choose:
               - conditions:
                   - condition: template
                     value_template: "{{ supports_auto or supports_heat_cool }}"
                 sequence:
-                  - service: climate.set_hvac_mode
-                    target:
-                      entity_id: !input climate_entity
-                    data:
-                      hvac_mode: "heat_cool"
-                  - service: climate.set_temperature
-                    target:
-                      entity_id: !input climate_entity
-                    data:
-                      target_temp_low:  "{{ target_low_cli  | float }}"
-                      target_temp_high: "{{ target_high_cli | float }}"
+                  # Set mode if needed
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ hvac_mode_now != 'heat_cool' }}"
+                        sequence:
+                          - service: climate.set_hvac_mode
+                            target:
+                              entity_id: !input climate_entity
+                            data:
+                              hvac_mode: "heat_cool"
+                          - choose:
+                              - conditions:
+                                  - condition: template
+                                    value_template: "{{ dbg == 'verbose' }}"
+                                sequence:
+                                  - service: logbook.log
+                                    data:
+                                      name: "HVAC Pro"
+                                      message: "Mode changed: {{ hvac_mode_now }} → heat_cool"
+                  # Set temperature if needed
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ needs_temp_update }}"
+                        sequence:
+                          - service: climate.set_temperature
+                            target:
+                              entity_id: !input climate_entity
+                            data:
+                              target_temp_low:  "{{ target_low_cli  | float }}"
+                              target_temp_high: "{{ target_high_cli | float }}"
+                          - choose:
+                              - conditions:
+                                  - condition: template
+                                    value_template: "{{ dbg == 'verbose' }}"
+                                sequence:
+                                  - service: logbook.log
+                                    data:
+                                      name: "HVAC Pro"
+                                      message: "Temps updated: {{ temp_low_now_sys | round(1) }}/{{ temp_high_now_sys | round(1) }}{{ climate_unit_sym }} → {{ target_low_cli | round(1) }}/{{ target_high_cli | round(1) }}{{ climate_unit_sym }}"
+                    default:
+                      - choose:
+                          - conditions:
+                              - condition: template
+                                value_template: "{{ dbg == 'verbose' }}"
+                            sequence:
+                              - service: logbook.log
+                                data:
+                                  name: "HVAC Pro"
+                                  message: "Setpoints unchanged ({{ target_low_cli | round(1) }}/{{ target_high_cli | round(1) }}{{ climate_unit_sym }}), skipping update"
               - conditions:
                   - condition: template
                     value_template: "{{ hvac_mode_now in ['cool','heat'] }}"
                 sequence:
-                  - service: climate.set_temperature
-                    target:
-                      entity_id: !input climate_entity
-                    data:
-                      temperature: "{{ t_adapt_cli_q | float }}"
+                  # Set temperature if needed
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ needs_temp_update }}"
+                        sequence:
+                          - service: climate.set_temperature
+                            target:
+                              entity_id: !input climate_entity
+                            data:
+                              temperature: "{{ t_adapt_cli_q | float }}"
+                          - choose:
+                              - conditions:
+                                  - condition: template
+                                    value_template: "{{ dbg == 'verbose' }}"
+                                sequence:
+                                  - service: logbook.log
+                                    data:
+                                      name: "HVAC Pro"
+                                      message: "Temp updated: {{ temp_now_sys | round(1) }}{{ climate_unit_sym }} → {{ t_adapt_cli_q | round(1) }}{{ climate_unit_sym }}"
+                    default:
+                      - choose:
+                          - conditions:
+                              - condition: template
+                                value_template: "{{ dbg == 'verbose' }}"
+                            sequence:
+                              - service: logbook.log
+                                data:
+                                  name: "HVAC Pro"
+                                  message: "Setpoint unchanged ({{ t_adapt_cli_q | round(1) }}{{ climate_unit_sym }}), skipping update"
+          # Turn on climate if off (always safe to call)
           - service: climate.turn_on
             target:
               entity_id: !input climate_entity

@@ -1,3 +1,27 @@
+## [4.18] — 2025-01-08
+### Optimized
+- **Skip unnecessary thermostat commands:** Automation now checks if calculated setpoints match current thermostat state before sending commands.
+  - Compares target temperatures to current temperatures with tolerance (0.6 × step size) to account for quantization.
+  - Separately validates dual setpoint modes (auto/heat_cool) and single setpoint modes (heat/cool).
+  - Only sends `climate.set_temperature` when setpoints differ from current values.
+  - Only sends `climate.set_hvac_mode` when mode needs to change.
+  - Reduces unnecessary writes that could trigger manual override detection.
+  - Reduces network traffic for cloud-connected thermostats.
+  - Reduces logbook noise from redundant setpoint commands.
+
+### Added
+- **Verbose logging for skipped commands:** When debug mode is `verbose`, automation logs when setpoints are unchanged and commands are skipped.
+- **State comparison variables:** New helper variables `_dual_mode_matches`, `_single_mode_matches`, and `needs_temp_update` track whether thermostat commands are necessary.
+
+### Technical Details
+- Tolerance set to 60% of device step size (e.g., 0.3°F for 0.5°F step thermostats) to handle floating point rounding.
+- Comparison happens after all unit conversions and quantization, ensuring accurate state matching.
+- `climate.turn_on` always called (safe to call when already on).
+
+### Performance Impact
+- Estimated 50-80% reduction in thermostat service calls during stable conditions.
+- Prevents false manual override detection on no-change updates.
+
 ## [4.17] — 2025-01-08
 ### Fixed
 - **CRITICAL: Manual override persistence bug:** Fixed issue where manual override would not persist across automation restarts.
