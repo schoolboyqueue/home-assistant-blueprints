@@ -533,6 +533,32 @@ blueprint:
                     selector:
                         action: {}
 
+                learn_from_overrides:
+                    name: "Learn from Manual Adjustments"
+                    description: "Gradually adjust comfort model based on your manual temperature changes. Learns your preferences over time."
+                    default: true
+                    selector:
+                        boolean: {}
+
+                learning_rate:
+                    name: "Learning Rate"
+                    description: "How quickly to adapt to manual changes. Higher = faster learning but less stable. 0.1 = conservative, 0.3 = aggressive."
+                    default: 0.15
+                    selector:
+                        number:
+                            min: 0.05
+                            max: 0.5
+                            step: 0.05
+
+                learned_offset_helper:
+                    name: "Learned Offset Storage (input_number helper)"
+                    description: "Create an input_number helper to store learned preferences. Leave empty to disable learning persistence."
+                    default: ""
+                    selector:
+                        entity:
+                            domain: ["input_number"]
+                            multiple: false
+
         pause:
             name: HVAC Pause
             icon: mdi:pause-octagon
@@ -870,7 +896,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.14"
+    blueprint_version: "4.15"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
@@ -936,6 +962,9 @@ variables:
     manual_override_enable: !input manual_override_enable
     manual_override_duration_min: !input manual_override_duration_min
     manual_override_tolerance: !input manual_override_tolerance
+    learn_from_overrides: !input learn_from_overrides
+    learning_rate: !input learning_rate
+    _raw_learned_offset_helper: !input learned_offset_helper
 
     mrt_sensor_id: >
         {% set raw = _raw_mrt_sensor_values %}
@@ -998,6 +1027,26 @@ variables:
         {% set e = e | default('', true) %}
         {% set v = e | string | lower %}
         {% if v not in ['', 'none', 'binary_sensor.none', 'input_boolean.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
+
+    learned_offset_helper_id: >
+        {% set raw = _raw_learned_offset_helper %}
+        {% if raw is string %}
+          {% set e = raw %}
+        {% elif raw is iterable %}
+          {% set e = (raw[0] if raw|length > 0 else '') %}
+        {% else %}
+          {% set e = '' %}
+        {% endif %}
+        {% set e = e | default('', true) %}
+        {% set v = e | string | lower %}
+        {% if v not in ['', 'none', 'input_number.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
+
+    # Read current learned offset (in system units, will be converted to C)
+    learned_offset_sys: >
+        {% if learned_offset_helper_id %}
+          {{ states(learned_offset_helper_id) | float(0) }}
+        {% else %}0{% endif %}
+    learned_offset_c: "{{ (learned_offset_sys * 5/9) if is_imperial else learned_offset_sys }}"
 
     # Regional Presets
     regional_defaults_enable: !input regional_defaults_enable
@@ -1575,16 +1624,16 @@ variables:
           {{ co2_dir * mag }}
         {% else %} 0 {% endif %}
 
-    # --------- Adaptive model ---------
+    # --------- Adaptive model with learning ---------
     dv_c: "{{ (dv_sys|float * 5/9) if is_imperial else (dv_sys|float) }}"
     t_adapt_base_c: "{{ (18.9 + 0.255 * t_out_c) | round(2) }}"
     out_valid: "{{ t_out_c >= 10 and t_out_c <= 40 }}"
     t_adapt_c_raw: >
-        {% set base = t_adapt_base_c + season_bias_c + co2_bias_c_eff + sleep_bias_c_eff %}
+        {% set base = t_adapt_base_c + season_bias_c + co2_bias_c_eff + sleep_bias_c_eff + learned_offset_c %}
         {% if out_valid %}
           {% if precision %}{{ (base + 0 + 0) | round(2) }}
           {% else %}{{ base | round(2) }}{% endif %}
-        {% else %}{{ (22.0 + season_bias_c + co2_bias_c_eff + sleep_bias_c_eff) | round(2) }}{% endif %}
+        {% else %}{{ (22.0 + season_bias_c + co2_bias_c_eff + sleep_bias_c_eff + learned_offset_c) | round(2) }}{% endif %}
     t_adapt_c: "{{ (t_adapt_c_raw) | round(2) }}"
     # Guard: keep adaptive target within [min_c+tol+setback, max_c-tol-setback] so band doesn't collapse to the edges
     t_adapt_c_guard: "{{ [ [ t_adapt_c, (max_c - tol_c - setback_apply_c) ] | min , (min_c + tol_c + setback_apply_c) ] | max | round(2) }}"
@@ -1900,6 +1949,38 @@ action:
           - condition: template
             value_template: "{{ _manual_change_detected }}"
         sequence:
+          # Calculate learned offset adjustment
+          - variables:
+              _manual_temp_cli: >
+                {% if trigger.id == 'climate_manual_change' %}
+                  {{ trigger.to_state.attributes.temperature | float(0) }}
+                {% elif trigger.id == 'climate_manual_change_low' or trigger.id == 'climate_manual_change_high' %}
+                  {# For dual setpoint, use midpoint #}
+                  {% set low = trigger.to_state.attributes.target_temp_low | float(0) %}
+                  {% set high = trigger.to_state.attributes.target_temp_high | float(0) %}
+                  {{ (low + high) / 2 }}
+                {% else %}0{% endif %}
+              _manual_temp_c: "{{ (_manual_temp_cli - 32) * 5/9 if climate_is_imperial else _manual_temp_cli }}"
+              _predicted_temp_c: "{{ t_adapt_c_guard }}"
+              _error_c: "{{ _manual_temp_c - _predicted_temp_c }}"
+              _old_offset_c: "{{ learned_offset_c }}"
+              _alpha: "{{ learning_rate | float(0.15) }}"
+              _new_offset_c: "{{ (1 - _alpha) * _old_offset_c + _alpha * _error_c }}"
+              _new_offset_sys: "{{ _new_offset_c * 9/5 if is_imperial else _new_offset_c }}"
+
+          # Update learned offset if learning enabled and helper provided
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ learn_from_overrides and learned_offset_helper_id }}"
+                sequence:
+                  - service: input_number.set_value
+                    target:
+                      entity_id: "{{ learned_offset_helper_id }}"
+                    data:
+                      value: "{{ _new_offset_c | round(2) }}"
+
+          # Log override
           - choose:
               - conditions:
                   - condition: template
@@ -1908,12 +1989,21 @@ action:
                   - service: logbook.log
                     data:
                       name: "HVAC Pro"
-                      message: "Manual override detected ({{ trigger.id }}). Pausing automation for {{ manual_override_duration_min }} minutes."
+                      message: >
+                        Manual override detected ({{ trigger.id }}). Manual={{ _manual_temp_c | round(1) }}°C, Predicted={{ _predicted_temp_c | round(1) }}°C, Error={{ _error_c | round(2) }}°C. 
+                        {% if learn_from_overrides and learned_offset_helper_id %}
+                        Learned offset: {{ _old_offset_c | round(2) }}°C → {{ _new_offset_c | round(2) }}°C.
+                        {% endif %}
+                        Pausing for {{ manual_override_duration_min }} min.
+
+          # Run custom override action
           - choose:
               - conditions:
                   - condition: template
                     value_template: "{{ true }}"  # Always run if actions provided
                 sequence: !input manual_override_action
+
+          # Pause
           - delay:
               minutes: "{{ manual_override_duration_min | int(60) }}"
           - stop: "Manual override period ended"

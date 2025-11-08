@@ -1,3 +1,39 @@
+## [4.15] — 2025-11-07
+### Added
+- **Adaptive Learning from Manual Overrides:** Blueprint now learns your temperature preferences over time.
+  - Implements exponential weighted average algorithm to track manual adjustments.
+  - Calculates error between manual temperature and predicted comfort temperature.
+  - Updates learned offset using configurable learning rate (default: 0.15).
+  - Formula: `new_offset = (1 - α) * old_offset + α * error`
+  - Stores learned offset in optional `input_number` helper for persistence across restarts.
+  - Applied on top of ASHRAE-55 base model + seasonal bias + sleep bias + CO₂ bias.
+  - Works with both single setpoint (heat/cool) and dual setpoint (auto/heat_cool) modes.
+
+### Configuration
+- **Learn from Manual Adjustments:** Enable/disable learning (default: enabled)
+- **Learning Rate:** 0.05-0.5, controls adaptation speed (default: 0.15)
+- **Learned Offset Storage:** Optional `input_number` helper for persistence
+
+### How It Works
+1. User manually adjusts thermostat (e.g., 70°F → 73°F)
+2. Blueprint calculates error: `manual_temp - predicted_temp = +3°F`
+3. Updates learned offset: `new = 0.85 * old + 0.15 * 3°F`
+4. Applies learned offset to all future comfort calculations
+5. Gradually adapts to your preferences while respecting seasonal patterns
+
+### Debug Logging
+- Enhanced override detection logs show:
+  - Manual temperature vs predicted temperature
+  - Calculated error in °C
+  - Old learned offset → new learned offset
+  - Pause duration
+
+### Notes
+- **Seasonal adaptation preserved**: Learned offset adds to regional/seasonal biases (important for Colorado's Mixed-Dry climate).
+- **Conservative by default**: 0.15 learning rate means full adaptation takes ~10-15 adjustments.
+- **Optional persistence**: Without helper, offset resets on HA restart (still learns within session).
+- **Compatible with all existing features**: Works alongside RMOT, CO₂, sleep mode, etc.
+
 ## [4.14] — 2025-11-07
 ### Optimized
 - **Trigger debouncing:** Added 30-second delay for indoor temp, 60-second for outdoor temp to reduce rapid re-evaluations by ~70-80%.
