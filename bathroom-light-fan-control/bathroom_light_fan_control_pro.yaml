@@ -154,11 +154,11 @@ blueprint:
               mode: slider
         fan_max_runtime_min:
           name: Maximum Fan Runtime (minutes)
-          description: Maximum allowed fan runtime before a forced turn off. Set to 0 to disable.
+          description: Maximum allowed fan runtime before a forced turn off. Use a large value (e.g., 240) to effectively disable.
           default: 60
           selector:
             number:
-              min: 0
+              min: 1
               max: 240
               step: 1
               unit_of_measurement: min
@@ -425,7 +425,7 @@ variables:
   ror_min_on_time_min: !input ror_min_on_time_min
   ror_latch_until: !input ror_latch_until
   light_area: !input light_area
-  blueprint_version: "1.9.4"
+  blueprint_version: "1.9.5"
   area_set: >-
     {{ light_area is not none and (light_area|string) != '' }}
 
@@ -528,7 +528,7 @@ trigger:
     entity_id: !input fan_target
     to: "on"
     for:
-      minutes: "{{ fan_max_runtime_min if (fan_max_runtime_min|int(0) > 0) else 9999 }}"
+      minutes: !input fan_max_runtime_min
 
   - id: lights_off_for_fan_auto_off
     platform: state
@@ -1109,8 +1109,6 @@ action:
           - condition: state
             entity_id: !input fan_target
             state: "on"
-          - condition: template
-            value_template: "{{ fan_max_runtime_min | int(0) > 0 }}"
         sequence:
           - service: "{{ turn_fan_off }}"
             target:

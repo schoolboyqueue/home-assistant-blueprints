@@ -1,5 +1,32 @@
 # Bathroom Light & Fan Control Pro - Changelog
 
+## [1.9.5] - 2025-01-08
+
+### Fixed
+
+**Pitfall #10: Template in trigger `for:` duration (Best Practice):**
+- Removed template from `fan_max_runtime_expired` trigger `for:` parameter (line 531)
+- Changed from `{{ fan_max_runtime_min if ... else 9999 }}` to direct `!input fan_max_runtime_min`
+- Variables aren't available at trigger compile time - using templates in triggers is risky
+- Changed `fan_max_runtime_min` minimum from 0 to 1 minute (use 240 to effectively disable)
+- Removed unnecessary condition check `fan_max_runtime_min > 0` from action (line 1113)
+
+### Changed
+
+**fan_max_runtime_min input:**
+- Minimum value changed from 0 to 1 minute
+- Description updated: "Use a large value (e.g., 240) to effectively disable"
+- Simplifies trigger logic and follows blueprint best practices
+
+### Technical Details
+
+- Line 531: Now uses `!input fan_max_runtime_min` directly without template
+- Line 161: Changed `min: 0` to `min: 1`
+- Line 1113: Removed condition checking if value > 0
+- Adheres to Common Pitfall #10 documented in WARP.md
+
+---
+
 ## [1.9.4] - 2025-01-08
 
 ### Fixed
