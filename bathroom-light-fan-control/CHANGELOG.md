@@ -1,5 +1,22 @@
 # Bathroom Light & Fan Control Pro - Changelog
 
+## [1.5.1] - 2025-01-08
+
+### Added
+
+**Debug Logging for Failed Light Turn-On:**
+- Added log message when light should turn on but conditions fail
+- Shows which condition blocked the light: `light_already_on`, `presence_ok`, `override_ok`, or `lux_ok`
+- Helps diagnose why lights don't respond to motion/door triggers
+- Logged at both `basic` and `verbose` debug levels
+
+### Technical Details
+
+- Added `else` branch to light turn-on logic that logs failed conditions
+- Message format: `Light NOT turned on: trigger=X, light_already_on=X, presence_ok=X, override_ok=X, lux_ok=X`
+
+---
+
 ## [1.5.0] - 2025-01-08
 
 ### Changed
