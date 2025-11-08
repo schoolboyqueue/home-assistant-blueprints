@@ -1,5 +1,33 @@
 # Bathroom Light & Fan Control Pro - Changelog
 
+## [1.10.0] - 2025-01-08
+
+### Fixed
+
+**Wasp-in-a-Box Concept Violation (Critical Bug):**
+- Removed `wasp_vacancy_with_grace` trigger that turned off lights after motion clear regardless of door state
+- Removed `wasp_door_closed` trigger that turned off lights when door closed
+- Core principle: Door closed = occupancy (even without motion detection)
+- Lights now only turn off when: motion clear AND (door open OR door left open too long)
+- Fixes lights turning off during showers when behind curtain (no motion but door closed)
+
+### Technical Details
+
+- Removed trigger at line 565-571: `wasp_vacancy_with_grace` (motion clear for full grace period)
+- Removed trigger at line 547-550: `wasp_door_closed` (door closing)
+- Removed corresponding action logic for both triggers
+- Simplified vacancy detection to two valid cases:
+  1. Motion clear + door open (person left)
+  2. Motion clear + door left open too long (person left, forgot to close door)
+- Door closing while motion is off no longer triggers lights off (was breaking Wasp-in-a-Box)
+
+### Migration Notes
+
+**Behavior change:** Lights will stay on longer if door remains closed, even without motion.
+This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
+
+---
+
 ## [1.9.5] - 2025-01-08
 
 ### Fixed

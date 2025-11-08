@@ -425,7 +425,7 @@ variables:
   ror_min_on_time_min: !input ror_min_on_time_min
   ror_latch_until: !input ror_latch_until
   light_area: !input light_area
-  blueprint_version: "1.9.5"
+  blueprint_version: "1.10.0"
   area_set: >-
     {{ light_area is not none and (light_area|string) != '' }}
 
@@ -549,26 +549,12 @@ trigger:
     from: "off"
     to: "on"
 
-  - id: wasp_door_closed
-    platform: state
-    entity_id: !input door_sensor
-    from: "on"
-    to: "off"
-
   - id: wasp_motion_clear
     platform: state
     entity_id: !input motion_sensor
     from: "on"
     to: "off"
     for: { seconds: !input motion_sensor_turn_off_delay }
-  
-  - id: wasp_vacancy_with_grace
-    platform: state
-    entity_id: !input motion_sensor
-    from: "on"
-    to: "off"
-    for:
-      minutes: !input lights_off_delay_min
 
   - id: wasp_door_left_open
     platform: state
@@ -618,7 +604,7 @@ action:
       - conditions:
           - condition: template
             value_template: >-
-              {{ trigger.id in ['wasp_motion','wasp_door_opened','wasp_door_closed','wasp_motion_clear','wasp_vacancy_with_grace','wasp_door_left_open'] }}
+              {{ trigger.id in ['wasp_motion','wasp_door_opened','wasp_door_closed','wasp_motion_clear','wasp_door_left_open'] }}
         sequence:
           # Debug: Show all condition states for motion/door open triggers
           - choose:
@@ -734,54 +720,13 @@ action:
                                   message: >-
                                     Light NOT turned on: trigger={{ trigger.id }}, light_already_on={{ is_state(light_target, 'on') }}, presence_ok={{ presence_ok }}, override_ok={{ override_ok }}, lux_ok={{ lux_ok }} (v{{ blueprint_version }})
 
-              # New: Combined motion clear with full grace period - turn off immediately
-              - conditions:
-                  - condition: template
-                    value_template: "{{ trigger.id == 'wasp_vacancy_with_grace' }}"
-                sequence:
-                  # Signal that automation is turning off lights (not user manual control)
-                  - choose:
-                      - conditions: "{{ automation_control not in ['', None] }}"
-                        sequence:
-                          - service: input_boolean.turn_on
-                            target:
-                              entity_id: "{{ automation_control }}"
-                  # Turn off lights
-                  - choose:
-                      - conditions:
-                          - condition: template
-                            value_template: "{{ area_set }}"
-                        sequence:
-                          - service: light.turn_off
-                            target:
-                              area_id: !input light_area
-                    default:
-                      - service: light.turn_off
-                        target:
-                          entity_id: !input light_target
-                  # Wait a moment for light state to settle
-                  - delay:
-                      milliseconds: 100
-                  # Reset the control helper AFTER lights are off and settled
-                  - choose:
-                      - conditions: "{{ automation_control not in ['', None] }}"
-                        sequence:
-                          - service: input_boolean.turn_off
-                            target:
-                              entity_id: "{{ automation_control }}"
-                  - choose:
-                      - conditions: "{{ debug_level in ['basic','verbose'] }}"
-                        sequence:
-                          - service: logbook.log
-                            data:
-                              name: Bathroom Light & Fan Control
-                              message: "Light OFF: vacancy confirmed after full grace period (v{{ blueprint_version }})"
-
-              # Clear cases: compute wasp conditions to turn off light
+              # Wasp-in-a-Box: Compute vacancy conditions to turn off light
+              # Vacancy requires motion clear AND (door open OR door left open too long)
+              # Door closed = occupancy (even without motion)
               - conditions:
                   - condition: template
                     value_template: >-
-                      {{ trigger.id in ['wasp_motion_clear','wasp_door_closed','wasp_door_left_open'] }}
+                      {{ trigger.id in ['wasp_motion_clear','wasp_door_left_open'] }}
                 sequence:
                   # Debug: Show clear trigger received
                   - choose:
@@ -826,16 +771,6 @@ action:
                                           {% else %}
                                             false
                                           {% endif %}
-                              - condition: and
-                                conditions:
-                                  - condition: template
-                                    value_template: "{{ trigger.id == 'wasp_door_closed' }}"
-                                  - condition: state
-                                    entity_id: !input motion_sensor
-                                    state: "off"
-                                  - condition: template
-                                    value_template: >-
-                                      {{ (door_sensor in states and motion_sensor in states) and (states[door_sensor].last_changed > states[motion_sensor].last_changed) }}
                               - condition: and
                                 conditions:
                                   - condition: template
