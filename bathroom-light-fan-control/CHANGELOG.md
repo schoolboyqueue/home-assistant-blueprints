@@ -1,5 +1,134 @@
 # Bathroom Light & Fan Control Pro - Changelog
 
+## [1.9.1] - 2025-01-08
+
+### Changed
+
+**Made Manual Override Helper Optional:**
+- `automation_control` helper is now optional (was required)
+- If not configured: Manual override works with simple behavior (may trigger when automation turns off lights)
+- If configured: Helper prevents false manual override triggers when automation turns off lights automatically
+- Users can now choose between simple setup or perfect behavior
+- Alternative: Set `manual_override_duration_min: 0` to disable manual override entirely
+
+### Technical Details
+
+- Helper checks wrapped in conditions: `{{ automation_control not in ['', None] }}`
+- Manual override condition: `{{ automation_control in ['', None] or is_state(automation_control, 'off') }}`
+- When helper not provided, automation skips helper ON/OFF service calls
+- Backward compatible with v1.9.0 automations that have helper configured
+
+---
+
+## [1.9.0] - 2025-01-08
+
+### Added
+
+**Manual Override False Trigger Prevention:**
+- New required input: `automation_control` (input_boolean helper)
+- Prevents manual override from activating when automation turns off lights automatically
+- Automation sets helper ON before turning off lights, then resets to OFF
+- Manual override logic checks helper is OFF before activating (means user turned off, not automation)
+
+### Fixed
+
+**Manual Override Logic:**
+- Manual override no longer triggers when automation turns off lights after vacancy
+- Only triggers when user manually turns off lights via physical switch or app
+- Prevents false override that blocked lights from turning back on
+
+### Migration Required
+
+**BREAKING CHANGE - Requires new helper:**
+
+1. Create an input_boolean helper:
+   - Settings → Devices & Services → Helpers → Create Helper → Toggle
+   - Name: "[Bathroom Name] Automation Control"
+   - Icon: `mdi:robot` (optional)
+
+2. Select the helper in blueprint's "Automation Control Helper" setting
+
+3. Manual override will now only trigger on actual user manual control
+
+### Technical Details
+
+- Helper set ON at lines 736-739 before automation turns off lights
+- Helper reset to OFF at lines 752-755 after lights turn off
+- Manual override condition checks helper is OFF at lines 873-876
+- Without helper, manual override cannot distinguish automation vs user control
+
+---
+
+## [1.8.1] - 2025-01-08
+
+### Fixed
+
+**Trigger-Level Delay:**
+- Removed unsupported template from trigger `for:` parameter
+- Changed to use `!input lights_off_delay_min` directly
+- Home Assistant doesn't support template evaluation in trigger `for:` duration
+
+### Technical Details
+
+- Line 557: `for: minutes: !input lights_off_delay_min` (was template)
+- Trigger fires only after motion sensor stays 'off' for full grace period
+- Action turns off lights immediately when trigger fires
+
+---
+
+## [1.8.0] - 2025-01-08
+
+### Fixed
+
+**Lights Not Turning Off After Vacancy:**
+- Root cause: Humidity triggers canceled light-off delay in action sequence
+- Solution: Moved grace period delay from action to trigger using `for:` parameter
+- New trigger: `wasp_vacancy_with_grace` waits full `lights_off_delay_min` at trigger level
+- If motion detected during wait, trigger cancels (desired behavior)
+- Humidity triggers no longer interfere with motion sensor's wait state
+
+### Changed
+
+- Mode changed back to `restart` (from `queued`) for better responsiveness
+- Light-off delay now handled at trigger level (lines 552-558)
+- Action turns off lights immediately when vacancy trigger fires
+- No more cancelable delays in action sequence
+
+### Technical Details
+
+- Trigger: `platform: state, entity_id: !input motion_sensor, from: "on", to: "off", for: minutes: !input lights_off_delay_min`
+- Prevents queueing multiple redundant runs from frequent sensor updates
+- More efficient than `mode: queued, max: 5` approach
+
+---
+
+## [1.7.2] - 2025-01-08
+
+### Changed
+
+**Mode Changed to Queued:**
+- Mode changed from `restart` to `queued` with `max: 5`
+- Prevents humidity triggers from canceling light-off delay
+- Multiple sensor updates queue up instead of restarting automation
+
+### Known Issues
+
+- Queued runs can be wasteful with frequent sensor updates
+- Better solution: move delay to trigger level (planned for v1.8.0)
+
+---
+
+## [1.7.1] - 2025-01-08
+
+### Added
+
+**Debug Logging for Lights Not Turning Off:**
+- Added logs when `wasp_motion_clear` and `wasp_vacancy_with_grace` triggers fire
+- Shows motion sensor state, grace period, and whether lights are being turned off
+- Helps diagnose delay cancellation issues
+
+---
+
 ## [1.7.0] - 2025-01-08
 
 ### Changed
