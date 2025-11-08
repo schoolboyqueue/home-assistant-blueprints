@@ -68,30 +68,6 @@ blueprint:
               min: 1
               max: 2000
               step: 1
-        night_mode_enabled:
-          name: Enable Night Mode Dimming/Color Temp
-          description: When enabled, lights turn on with night mode brightness or color temp.
-          default: false
-          selector:
-            boolean: {}
-        night_mode_brightness:
-          name: Night Mode Brightness
-          description: Brightness level (0-255) when night mode is active.
-          default: 50
-          selector:
-            number:
-              min: 1
-              max: 255
-              step: 1
-        night_mode_color_temp:
-          name: Night Mode Color Temperature (mireds)
-          description: Color temperature in mireds when night mode is active.
-          default: 400
-          selector:
-            number:
-              min: 153
-              max: 500
-              step: 1
         manual_override_duration_min:
           name: Manual Override Duration (minutes)
           description: Duration to suspend auto-on after manual light off.
@@ -276,10 +252,11 @@ blueprint:
       name: Night Schedule
       icon: mdi:weather-night
       collapsed: true
-      description: Quiet hours for lights and a bias for fan ON threshold.
+      description: Quiet hours for lights (dim/warm) and fan threshold bias. Night mode activates during schedule OR when explicitly enabled.
       input:
         night_enabled:
           name: Enable Night Schedule
+          description: When enabled, night mode automatically activates during the schedule below.
           default: true
           selector:
             boolean: {}
@@ -293,6 +270,30 @@ blueprint:
           default: '06:00:00'
           selector:
             time: {}
+        night_mode_enabled:
+          name: Force Night Mode Always On
+          description: When enabled, night mode (dim/warm lights) is ALWAYS active, ignoring the schedule. Use for permanent dim lighting.
+          default: false
+          selector:
+            boolean: {}
+        night_mode_brightness:
+          name: Night Mode Brightness
+          description: Brightness level (0-255) when night mode is active.
+          default: 50
+          selector:
+            number:
+              min: 1
+              max: 255
+              step: 1
+        night_mode_color_temp:
+          name: Night Mode Color Temperature (mireds)
+          description: Color temperature in mireds when night mode is active (400 = warm white).
+          default: 400
+          selector:
+            number:
+              min: 153
+              max: 500
+              step: 1
         night_fan_delta_on_bias:
           name: Night Fan ON Bias (Δ% RH)
           description: Value added to the ON threshold during the night schedule. Negative values make the fan more aggressive at night.
@@ -416,7 +417,7 @@ variables:
   ror_min_on_time_min: !input ror_min_on_time_min
   ror_latch_until: !input ror_latch_until
   light_area: !input light_area
-  blueprint_version: "1.6.4"
+  blueprint_version: "1.7.0"
   area_set: >-
     {{ light_area is not none and (light_area|string) != '' }}
 

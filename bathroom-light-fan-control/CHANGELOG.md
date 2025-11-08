@@ -1,5 +1,28 @@
 # Bathroom Light & Fan Control Pro - Changelog
 
+## [1.7.0] - 2025-01-08
+
+### Changed
+
+**UI Reorganization - Night Settings:**
+- Moved all night-related settings from "Presence & Lighting" to "Night Schedule" section
+- Settings now logically grouped: schedule, force-on, brightness, color temp, fan bias
+- Improved descriptions to clarify night mode behavior
+- `night_mode_enabled` renamed to "Force Night Mode Always On" for clarity
+- Better explains that night mode activates during schedule OR when forced on
+
+### Technical Details
+
+- No logic changes - purely UI/organizational improvement
+- All settings retain same default values and behavior
+- Variable bindings unchanged
+
+### Migration Notes
+
+**Existing automations will continue to work** - this is a non-breaking change. All inputs have the same IDs and defaults. The UI will show the reorganized layout next time you edit the automation.
+
+---
+
 ## [1.6.0] - 2025-01-08
 
 ### Changed
