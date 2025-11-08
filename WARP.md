@@ -10,13 +10,17 @@ This repository contains **Home Assistant Blueprints** — reusable automation t
 
 1. **Adaptive Comfort Control Pro** (`adaptive-comfort-control/`)
    - Advanced HVAC automation implementing ASHRAE-55 adaptive comfort model
-   - Features: psychrometrics (dew point, absolute humidity, enthalpy), seasonal bias, regional presets, CO₂-driven ventilation, RMOT support, intelligent HVAC pause with risk acceleration
+   - Features: psychrometrics (dew point, absolute humidity, enthalpy), seasonal bias, regional presets, CO₂-driven ventilation, RMOT support, intelligent HVAC pause with risk acceleration, manual override persistence
    - Supports mixed °C/°F units with auto-detection
    - Vendor-specific thermostat profiles (Ecobee, Nest, Honeywell, etc.) with auto-detection
-   - Version: 4.11 (as of latest commit)
+   - Optimized to skip unnecessary thermostat commands (50-80% reduction)
+   - Version: 4.18 (current)
 
 2. **Bathroom Light Fan Control Pro** (`bathroom-light-fan-control/`)
-   - Coordinated bathroom light and fan automation
+   - Coordinated bathroom light and fan automation using "Wasp-in-a-Box" occupancy detection
+   - Features: humidity delta control, rate-of-rise/fall detection, night mode, manual override, presence-based activation
+   - Supports mixed light entity and area control, fan or switch domains
+   - Version: 1.6.4 (current)
 
 ### File Structure
 
@@ -65,6 +69,9 @@ git log --oneline -20
 
 **Debug logging:**
 Both blueprints support debug levels (`off`, `basic`, `verbose`). Set via the blueprint's Debug section.
+- `off`: No debug output
+- `basic`: Key events (light ON/OFF, fan ON/OFF, manual override, etc.)
+- `verbose`: Detailed state information, sensor values, condition breakdowns
 
 ### Home Assistant Server Access
 
@@ -77,10 +84,13 @@ ssh homeassistant
 
 **Remote testing workflow:**
 
-1. **Copy blueprint to server:**
+1. **Copy blueprint to server** (SCP doesn't work, use pipe through SSH):
    ```bash
-   scp adaptive-comfort-control/adaptive_comfort_control_pro_blueprint.yaml \
-       homeassistant:/config/blueprints/automation/adaptive-comfort/
+   cat adaptive-comfort-control/adaptive_comfort_control_pro_blueprint.yaml | \
+       ssh homeassistant "cat > /tmp/blueprint.yaml && sudo mv /tmp/blueprint.yaml /config/blueprints/automation/schoolboyqueue/adaptive_comfort_control_pro_blueprint.yaml"
+   
+   cat bathroom-light-fan-control/bathroom_light_fan_control_pro.yaml | \
+       ssh homeassistant "cat > /tmp/blueprint.yaml && sudo mv /tmp/blueprint.yaml /config/blueprints/automation/schoolboyqueue/bathroom_light_fan_control_pro.yaml"
    ```
 
 2. **Reload automations** (via Home Assistant UI or CLI if available):
@@ -109,6 +119,7 @@ ssh homeassistant
 3. **Maintain variable ordering** — variables can depend on earlier definitions; order matters
 4. **Test unit conversions** — many values support both °C and °F; validate both paths
 5. **Document in CHANGELOG.md** — users need to know what changed
+6. **Beware Jinja2 variable scoping** — variables set inside loops don't persist; use `namespace()` for mutable state
 
 ## Architecture Deep Dive
 
@@ -264,6 +275,27 @@ Built-in psychrometrics prevent "muggy" natural ventilation:
    {% else %}
      {{ (now >= start) or (now < end) }}
    {% endif %}
+   ```
+
+6. **Jinja2 variable scoping in loops** — Setting a variable inside a loop doesn't persist outside the loop. Use `namespace()` for mutable state:
+   ```yaml
+   # WRONG - ok will always be false outside loop
+   {% set ok = false %}
+   {% for e in entities %}
+     {% if states(e) == 'on' %}
+       {% set ok = true %}  # This doesn't persist!
+     {% endif %}
+   {% endfor %}
+   {{ ok }}  # Always false
+   
+   # CORRECT - use namespace for mutable state
+   {% set ns = namespace(found=false) %}
+   {% for e in entities %}
+     {% if states(e) == 'on' %}
+       {% set ns.found = true %}  # This persists!
+     {% endif %}
+   {% endfor %}
+   {{ ns.found }}  # Correctly returns true if any entity was 'on'
    ```
 
 ## Common Tasks
