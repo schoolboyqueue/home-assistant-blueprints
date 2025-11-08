@@ -417,7 +417,7 @@ variables:
   ror_min_on_time_min: !input ror_min_on_time_min
   ror_latch_until: !input ror_latch_until
   light_area: !input light_area
-  blueprint_version: "1.7.0"
+  blueprint_version: "1.7.1"
   area_set: >-
     {{ light_area is not none and (light_area|string) != '' }}
 
@@ -719,6 +719,16 @@ action:
                     value_template: >-
                       {{ trigger.id in ['wasp_motion_clear','wasp_door_closed','wasp_door_left_open'] }}
                 sequence:
+                  # Debug: Show clear trigger received
+                  - choose:
+                      - conditions: "{{ debug_level == 'verbose' }}"
+                        sequence:
+                          - service: logbook.log
+                            data:
+                              name: Bathroom Light & Fan Control
+                              message: >-
+                                Clear trigger: id={{ trigger.id }}, motion={{ is_state(motion_sensor, 'off') }}, door={{ is_state(door_sensor, 'off') }} (v{{ blueprint_version }})
+
                   - choose:
                       - conditions:
                           # Case A: motion cleared AND (door open/unknown) OR door closed with proper sequencing
