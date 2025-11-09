@@ -21,9 +21,13 @@ A Home Assistant blueprint that combines Zooz Z-Wave Central Scene presses with 
 - Zooz Z-Wave switch supporting Central Scene (ZEN71/72/76/77; includes 800LR variants)
 - Central Scene/Scene Control must be enabled on the device (check device parameters in Z-Wave JS). On many Zooz models this is "Scene Control" parameter (often parameter 1). Ensure your firmware supports Central Scene.
 
+## Import Blueprint
+
+[![Import Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fschoolboyqueue%2Fhome-assistant-blueprints%2Fblob%2Fmain%2Fzooz-zwave-light-switch-control%2Fzooz_zwave_light_switch_control_pro.yaml)
+
 ## Configuration
 
-1. Import this blueprint into Home Assistant.
+1. Import this blueprint into Home Assistant (click the badge above or manually add the URL).
 2. Create an automation from the blueprint.
 3. Select the Zooz switch device (integration: Z-Wave JS).
 4. Select the primary light entity to control (used to read brightness and default target).
