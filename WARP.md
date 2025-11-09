@@ -2,6 +2,19 @@
 
 This file provides guidance to WARP (warp.dev) when working with code in this repository.
 
+**IMPORTANT:** This file should be kept up-to-date whenever:
+- New blueprints are added to the repository
+- Blueprint versions change
+- New architectural patterns are introduced
+- Common pitfalls are discovered
+- Remote testing workflows change
+
+**When adding a new blueprint, update:**
+1. The "Blueprints" section below with blueprint name, features, and version
+2. The "File Structure" tree
+3. The "Remote testing workflow" section with copy command
+4. Any architecture sections if the blueprint introduces new patterns
+
 ## Repository Overview
 
 This repository contains **Home Assistant Blueprints** — reusable automation templates written in YAML with Jinja2 templating. These blueprints are designed to be imported into Home Assistant instances and configured through the UI.
@@ -20,7 +33,14 @@ This repository contains **Home Assistant Blueprints** — reusable automation t
    - Coordinated bathroom light and fan automation using "Wasp-in-a-Box" occupancy detection
    - Features: humidity delta control, rate-of-rise/fall detection, night mode, manual override, presence-based activation
    - Supports mixed light entity and area control, fan or switch domains
-   - Version: 1.6.4 (current)
+   - Version: 1.10.0 (current)
+
+3. **Zooz Z-Wave Light Switch Control Pro** (`zooz-zwave-light-switch-control/`)
+   - Z-Wave switch light dimming using Central Scene events (ZEN71/72/76/77)
+   - Features: single press on/off, hold-to-dim with release detection, optional double/triple-tap custom actions, area targeting
+   - Supports both zwave_js_event and zwave_js_value_notification event types
+   - Configurable dimming parameters (step size, interval, brightness thresholds)
+   - Version: 0.1.0 (current)
 
 ### File Structure
 
@@ -28,10 +48,16 @@ This repository contains **Home Assistant Blueprints** — reusable automation t
 .
 ├── adaptive-comfort-control/
 │   ├── adaptive_comfort_control_pro_blueprint.yaml  # Main blueprint
-│   └── CHANGELOG.md
+│   ├── CHANGELOG.md
+│   └── README.md
 ├── bathroom-light-fan-control/
 │   ├── bathroom_light_fan_control_pro.yaml          # Main blueprint
-│   └── CHANGELOG.md
+│   ├── CHANGELOG.md
+│   └── README.md
+├── zooz-zwave-light-switch-control/
+│   ├── zooz_zwave_light_switch_control_pro.yaml     # Main blueprint
+│   ├── CHANGELOG.md
+│   └── README.md
 └── .gitignore
 ```
 
@@ -68,10 +94,10 @@ git log --oneline -20
 6. Check automation traces: Settings → Automations & Scenes → [Your Automation] → Traces
 
 **Debug logging:**
-Both blueprints support debug levels (`off`, `basic`, `verbose`). Set via the blueprint's Debug section.
+All blueprints support debug levels (`off`, `basic`, `verbose`). Set via the blueprint's Debug/Diagnostics section.
 - `off`: No debug output
-- `basic`: Key events (light ON/OFF, fan ON/OFF, manual override, etc.)
-- `verbose`: Detailed state information, sensor values, condition breakdowns
+- `basic`: Key events (light ON/OFF, fan ON/OFF, manual override, press/hold/release, etc.)
+- `verbose`: Detailed state information, sensor values, condition breakdowns, brightness calculations
 
 ### Home Assistant Server Access
 
@@ -91,6 +117,9 @@ ssh homeassistant
    
    cat bathroom-light-fan-control/bathroom_light_fan_control_pro.yaml | \
        ssh homeassistant "cat > /tmp/blueprint.yaml && sudo mv /tmp/blueprint.yaml /config/blueprints/automation/schoolboyqueue/bathroom_light_fan_control_pro.yaml"
+   
+   cat zooz-zwave-light-switch-control/zooz_zwave_light_switch_control_pro.yaml | \
+       ssh homeassistant "cat > /tmp/blueprint.yaml && sudo mv /tmp/blueprint.yaml /config/blueprints/automation/schoolboyqueue/zooz_zwave_light_switch_control_pro.yaml"
    ```
 
 2. **Reload automations** (via Home Assistant UI or CLI if available):
