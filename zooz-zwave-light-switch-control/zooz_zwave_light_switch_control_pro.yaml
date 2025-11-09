@@ -352,13 +352,14 @@ action:
                       level: info
                       message: "[Zooz Light Pro] up_single → light.turn_on (restore last)"
             default: []
-          - choose:
-              - conditions: "{{ area_set }}"
-                sequence:
-                  - service: light.turn_on
-                    target:
-                      area_id: "{{ light_area_in }}"
-            default:
+          - if:
+              - condition: template
+                value_template: "{{ area_set }}"
+            then:
+              - service: light.turn_on
+                target:
+                  area_id: "{{ light_area_in }}"
+            else:
               - service: light.turn_on
                 target:
                   entity_id: "{{ light_entity }}"
@@ -376,13 +377,14 @@ action:
                       level: info
                       message: "[Zooz Light Pro] down_single → light.turn_off"
             default: []
-          - choose:
-              - conditions: "{{ area_set }}"
-                sequence:
-                  - service: light.turn_off
-                    target:
-                      area_id: "{{ light_area_in }}"
-            default:
+          - if:
+              - condition: template
+                value_template: "{{ area_set }}"
+            then:
+              - service: light.turn_off
+                target:
+                  area_id: "{{ light_area_in }}"
+            else:
               - service: light.turn_off
                 target:
                   entity_id: "{{ light_entity }}"
@@ -414,15 +416,16 @@ action:
                               level: info
                               message: "[Zooz Light Pro] Light is off → turn_on to min_on_brightness_pct={{ min_on_brightness_pct_v | int }}%"
                     default: []
-                  - choose:
-                      - conditions: "{{ area_set }}"
-                        sequence:
-                          - service: light.turn_on
-                            target:
-                              area_id: "{{ light_area_in }}"
-                            data:
-                              brightness_pct: "{{ min_on_brightness_pct_v | int }}"
-                    default:
+                  - if:
+                      - condition: template
+                        value_template: "{{ area_set }}"
+                    then:
+                      - service: light.turn_on
+                        target:
+                          area_id: "{{ light_area_in }}"
+                        data:
+                          brightness_pct: "{{ min_on_brightness_pct_v | int }}"
+                    else:
                       - service: light.turn_on
                         target:
                           entity_id: "{{ light_entity }}"
@@ -472,15 +475,16 @@ action:
                                 message: >
                                   [Zooz Light Pro] brighten step +{{ step_pct }}% | current={{ state_attr(light_entity,'brightness')|int(0) }}/255 cap={{ max_abs_brightness }}
                       default: []
-                    - choose:
-                        - conditions: "{{ area_set }}"
-                          sequence:
-                            - service: light.turn_on
-                              target:
-                                area_id: "{{ light_area_in }}"
-                              data:
-                                brightness_step_pct: "{{ step_pct | float }}"
-                      default:
+                    - if:
+                        - condition: template
+                          value_template: "{{ area_set }}"
+                      then:
+                        - service: light.turn_on
+                          target:
+                            area_id: "{{ light_area_in }}"
+                          data:
+                            brightness_step_pct: "{{ step_pct | float }}"
+                      else:
                         - service: light.turn_on
                           target:
                             entity_id: "{{ light_entity }}"
@@ -549,15 +553,16 @@ action:
                                         message: >
                                           [Zooz Light Pro] dim step -{{ step_pct }}% | current={{ state_attr(light_entity,'brightness')|int(0) }}/255 min={{ min_abs_brightness }}
                               default: []
-                            - choose:
-                                - conditions: "{{ area_set }}"
-                                  sequence:
-                                    - service: light.turn_on
-                                      target:
-                                        area_id: "{{ light_area_in }}"
-                                      data:
-                                        brightness_step_pct: "{{ (0 - step_pct | float) }}"
-                              default:
+                            - if:
+                                - condition: template
+                                  value_template: "{{ area_set }}"
+                              then:
+                                - service: light.turn_on
+                                  target:
+                                    area_id: "{{ light_area_in }}"
+                                  data:
+                                    brightness_step_pct: "{{ (0 - step_pct | float) }}"
+                              else:
                                 - service: light.turn_on
                                   target:
                                     entity_id: "{{ light_entity }}"
@@ -579,13 +584,14 @@ action:
                                                 level: info
                                                 message: "[Zooz Light Pro] brightness <= min clamp → light.turn_off"
                                       default: []
-                                    - choose:
-                                        - conditions: "{{ area_set }}"
-                                          sequence:
-                                            - service: light.turn_off
-                                              target:
-                                                area_id: "{{ light_area_in }}"
-                                      default:
+                                    - if:
+                                        - condition: template
+                                          value_template: "{{ area_set }}"
+                                      then:
+                                        - service: light.turn_off
+                                          target:
+                                            area_id: "{{ light_area_in }}"
+                                      else:
                                         - service: light.turn_off
                                           target:
                                             entity_id: "{{ light_entity }}"
