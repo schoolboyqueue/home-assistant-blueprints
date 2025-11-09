@@ -541,62 +541,61 @@ action:
                                     message: "[Zooz Light Pro] down_release → stop dim"
                           default: []
                   default:
-                    - choose:
-                        - conditions: "{{ is_state(light_entity, 'on') }}"
-                          sequence:
+                    - if:
+                        - condition: template
+                          value_template: "{{ is_state(light_entity, 'on') }}"
+                      then:
+                        - choose:
+                            - conditions: "{{ debug_verbose }}"
+                              sequence:
+                                - service: system_log.write
+                                  data:
+                                    level: debug
+                                    message: >
+                                      [Zooz Light Pro] dim step -{{ step_pct }}% | current={{ state_attr(light_entity,'brightness')|int(0) }}/255 min={{ min_abs_brightness }}
+                          default: []
+                        - if:
+                            - condition: template
+                              value_template: "{{ area_set }}"
+                          then:
+                            - service: light.turn_on
+                              target:
+                                area_id: "{{ light_area_in }}"
+                              data:
+                                brightness_step_pct: "{{ (0 - step_pct | float) }}"
+                          else:
+                            - service: light.turn_on
+                              target:
+                                entity_id: "{{ light_entity }}"
+                              data:
+                                brightness_step_pct: "{{ (0 - step_pct | float) }}"
+                        # After step, check threshold and power off if at/under clamp_min
+                        - if:
+                            - condition: template
+                              value_template: >
+                                {% set b = state_attr(light_entity,'brightness') %}
+                                {{ (b if b is number else 0) | int(0) <= min_abs_brightness }}
+                          then:
                             - choose:
-                                - conditions: "{{ debug_verbose }}"
+                                - conditions: "{{ debug_enabled }}"
                                   sequence:
                                     - service: system_log.write
                                       data:
-                                        level: debug
-                                        message: >
-                                          [Zooz Light Pro] dim step -{{ step_pct }}% | current={{ state_attr(light_entity,'brightness')|int(0) }}/255 min={{ min_abs_brightness }}
+                                        level: info
+                                        message: "[Zooz Light Pro] brightness <= min clamp → light.turn_off"
                               default: []
                             - if:
                                 - condition: template
                                   value_template: "{{ area_set }}"
                               then:
-                                - service: light.turn_on
+                                - service: light.turn_off
                                   target:
                                     area_id: "{{ light_area_in }}"
-                                  data:
-                                    brightness_step_pct: "{{ (0 - step_pct | float) }}"
                               else:
-                                - service: light.turn_on
+                                - service: light.turn_off
                                   target:
                                     entity_id: "{{ light_entity }}"
-                                  data:
-                                    brightness_step_pct: "{{ (0 - step_pct | float) }}"
-                            # After step, check threshold and power off if at/under clamp_min
-                            - choose:
-                                - conditions:
-                                    - condition: template
-                                      value_template: >
-                                        {% set b = state_attr(light_entity,'brightness') %}
-                                        {{ (b if b is number else 0) | int(0) <= min_abs_brightness }}
-                                  sequence:
-                                    - choose:
-                                        - conditions: "{{ debug_enabled }}"
-                                          sequence:
-                                            - service: system_log.write
-                                              data:
-                                                level: info
-                                                message: "[Zooz Light Pro] brightness <= min clamp → light.turn_off"
-                                      default: []
-                                    - if:
-                                        - condition: template
-                                          value_template: "{{ area_set }}"
-                                      then:
-                                        - service: light.turn_off
-                                          target:
-                                            area_id: "{{ light_area_in }}"
-                                      else:
-                                        - service: light.turn_off
-                                          target:
-                                            entity_id: "{{ light_entity }}"
-                                    - stop: "Dim hold reached minimum; turning off"
-                          default: []
+                            - stop: "Dim hold reached minimum; turning off"
               until:
                 - condition: template
                   value_template: "{{ wait is defined and wait.completed }}"
