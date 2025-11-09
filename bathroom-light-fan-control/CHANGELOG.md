@@ -1,5 +1,28 @@
 # Bathroom Light & Fan Control Pro - Changelog
 
+## [1.10.1] - 2025-01-09
+
+### Fixed
+
+**Vacancy Detection When Door Opened Before Motion Cleared:**
+- Removed overly restrictive timestamp comparison in `wasp_door_left_open` vacancy condition
+- Previous logic required `door.last_changed > motion.last_changed`, which failed when:
+  - User opened door while motion was still active
+  - User left immediately
+  - Motion cleared after door opened
+  - Lights stayed on because timestamp check failed
+- Now only requires: door open for delay + motion sensor off
+- Fixes lights not turning off when leaving bathroom with door opened before motion cleared
+
+### Technical Details
+- Removed lines 781-783: timestamp comparison condition
+- `wasp_door_left_open` trigger now properly detects vacancy with simpler logic:
+  1. Door has been open for configured delay (default 15 seconds)
+  2. Motion sensor shows "off" (no motion)
+- Handles edge case where door opens while motion is still detecting
+
+---
+
 ## [1.10.0] - 2025-01-08
 
 ### Fixed
