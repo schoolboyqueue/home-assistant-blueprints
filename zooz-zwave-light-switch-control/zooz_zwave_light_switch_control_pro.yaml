@@ -24,15 +24,6 @@ blueprint:
             device:
               integration: zwave_js
               manufacturer: Zooz
-              model:
-                - ZEN71
-                - ZEN72
-                - ZEN76
-                - ZEN77
-                - ZEN71 800LR
-                - ZEN72 800LR
-                - ZEN76 800LR
-                - ZEN77 800LR
         light_target:
           name: "Light entity"
           description: "Required. The primary light to control and read brightness from."
@@ -147,9 +138,9 @@ blueprint:
             select:
               mode: dropdown
               options:
-                - off
-                - basic
-                - verbose
+                - "off"
+                - "basic"
+                - "verbose"
 
 variables:
   blueprint_version: "0.1.0"
