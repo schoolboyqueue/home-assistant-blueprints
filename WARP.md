@@ -519,6 +519,36 @@ Built-in psychrometrics prevent "muggy" natural ventilation:
     
     **Why this matters:** Attributes and state are different. State triggers with `attribute:` key work but may not behave as expected. Use templates for attribute logic when possible.
 
+17. **Using `choose` when you mean `if/then/else`** — When you have a simple binary condition (one check, two outcomes), use `if/then/else`, not `choose`. Using `choose` with a `default:` section that contains more action items at the same indentation level creates malformed YAML.
+    ```yaml
+    # WRONG - choose for binary condition
+    - choose:
+        - conditions: "{{ area_set }}"
+          sequence:
+            - service: light.turn_on
+              target:
+                area_id: "{{ light_area }}"
+      default:
+        - service: light.turn_on
+          target:
+            entity_id: "{{ light_entity }}"
+    
+    # CORRECT - if/then/else for binary condition
+    - if:
+        - condition: template
+          value_template: "{{ area_set }}"
+      then:
+        - service: light.turn_on
+          target:
+            area_id: "{{ light_area }}"
+      else:
+        - service: light.turn_on
+          target:
+            entity_id: "{{ light_entity }}"
+    ```
+    
+    **Why this fails:** `choose` is for multiple conditions (like switch/case), while `if/then/else` is for binary decisions. The Home Assistant schema validator rejects `choose` blocks with `default:` followed by additional sequence items, producing errors like "extra keys not allowed @ data['actions'][...]['default']". This error occurs when `choose`/`default` is used instead of `if/then/else`, especially in nested action sequences.
+
 ## Common Tasks
 
 ### Add a new blueprint input
