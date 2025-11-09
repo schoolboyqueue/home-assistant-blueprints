@@ -1,5 +1,5 @@
 blueprint:
-    name: Adaptive Comfort Control Pro
+    name: "Adaptive Comfort Control Pro v4.18"
     description: >
         Adaptive comfort control + HVAC pause with unit awareness (°C/°F), seasonal bias,
         built-in psychrometrics (dew point, absolute humidity, enthalpy), optional RMOT,

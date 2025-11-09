@@ -86,9 +86,10 @@ git log --oneline -20
 
 **Create new version:**
 1. Update `blueprint_version` variable in the YAML (e.g., `blueprint_version: "4.12"`)
-2. Document changes in the blueprint's `CHANGELOG.md`
-3. Commit with conventional commit format: `feat(component): description` or `fix(component): description`
-4. Version numbers are stored in blueprint YAML files only (not in WARP.md to save tokens)
+2. Update the `name:` field in the blueprint to include the new version (e.g., `name: "Blueprint Name v4.12"`)
+3. Document changes in the blueprint's `CHANGELOG.md`
+4. Commit with conventional commit format: `feat(component): description` or `fix(component): description`
+5. Version numbers appear in blueprint names and variables only (not in WARP.md to save tokens)
 
 ### Testing Blueprints
 

@@ -1,5 +1,5 @@
 blueprint:
-  name: "Zooz Z-Wave Light Switch Control Pro"
+  name: "Zooz Z-Wave Light Switch Control Pro v0.1.0"
   description: >
     Control a light with a Zooz Z-Wave switch using Central Scene (zwave_js).
     - Single press Up: light on (restores last brightness)
