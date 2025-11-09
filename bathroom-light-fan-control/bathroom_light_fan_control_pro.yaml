@@ -1,5 +1,5 @@
 blueprint:
-  name: "Bathroom Light Fan Control Pro v1.10.1"
+  name: "Bathroom Light Fan Control Pro v1.10.2"
   description: >-
     Smart bathroom controller for lights and exhaust fan.
     Lights: Turns on from motion or door activity (Wasp-in-a-Box), respects presence and optional lux threshold, supports Night Mode (dim and color temperature), and shuts off after vacancy with a grace period. Includes a manual-off override window to prevent auto-on.
@@ -425,7 +425,7 @@ variables:
   ror_min_on_time_min: !input ror_min_on_time_min
   ror_latch_until: !input ror_latch_until
   light_area: !input light_area
-  blueprint_version: "1.10.1"
+  blueprint_version: "1.10.2"
   area_set: >-
     {{ light_area is not none and (light_area|string) != '' }}
 
@@ -736,48 +736,152 @@ action:
                             data:
                               name: Bathroom Light & Fan Control
                               message: >-
-                                Clear trigger: id={{ trigger.id }}, motion={{ is_state(motion_sensor, 'off') }}, door={{ is_state(door_sensor, 'off') }} (v{{ blueprint_version }})
+                                Clear trigger: id={{ trigger.id }}, motion={{ is_state(motion_sensor, 'off') }}, door={{ is_state(door_sensor, 'on') }} (v{{ blueprint_version }})
 
                   - choose:
                       - conditions:
-                          # Case A: motion cleared AND (door open/unknown) OR door closed with proper sequencing
-                          - condition: or
+                          # Case A: motion cleared AND door is already open/unknown (vacancy)
+                          - condition: and
                             conditions:
-                              - condition: and
+                              - condition: template
+                                value_template: "{{ trigger.id == 'wasp_motion_clear' }}"
+                              - condition: or
                                 conditions:
-                                  - condition: template
-                                    value_template: "{{ trigger.id == 'wasp_motion_clear' }}"
-                                  - condition: or
-                                    conditions:
-                                      - condition: state
-                                        entity_id: !input door_sensor
-                                        state: "on"
-                                      - condition: state
-                                        entity_id: !input door_sensor
-                                        state: "unavailable"
-                                      - condition: state
-                                        entity_id: !input door_sensor
-                                        state: "unknown"
-                                      - condition: template
-                                        value_template: >-
-                                          {% if door_sensor in states and motion_sensor in states %}
-                                            {{ is_state(door_sensor, 'off') and (
-                                                states[door_sensor].last_changed > states[motion_sensor].last_changed and (
-                                                  motion_sensor_delay == -1 or (
-                                                    motion_sensor_delay > -1 and states[door_sensor].last_changed >= states[motion_sensor].last_changed - timedelta(seconds=motion_sensor_delay)
-                                                  )
-                                                )
-                                              ) }}
-                                          {% else %}
-                                            false
-                                          {% endif %}
-                              - condition: and
-                                conditions:
-                                  - condition: template
-                                    value_template: "{{ trigger.id == 'wasp_door_left_open' }}"
                                   - condition: state
-                                    entity_id: !input motion_sensor
-                                    state: "off"
+                                    entity_id: !input door_sensor
+                                    state: "on"
+                                  - condition: state
+                                    entity_id: !input door_sensor
+                                    state: "unavailable"
+                                  - condition: state
+                                    entity_id: !input door_sensor
+                                    state: "unknown"
+                        sequence:
+                          # Signal that automation is turning off lights (not user manual control)
+                          - choose:
+                              - conditions: "{{ automation_control not in ['', None] }}"
+                                sequence:
+                                  - service: input_boolean.turn_on
+                                    target:
+                                      entity_id: "{{ automation_control }}"
+                          # Wait grace period, then turn off lights
+                          - choose:
+                              - conditions:
+                                  - condition: template
+                                    value_template: "{{ area_set }}"
+                                sequence:
+                                  - delay:
+                                      minutes: "{{ lights_off_delay_min }}"
+                                  - service: light.turn_off
+                                    target:
+                                      area_id: !input light_area
+                            default:
+                              - delay:
+                                  minutes: "{{ lights_off_delay_min }}"
+                              - service: light.turn_off
+                                target:
+                                  entity_id: !input light_target
+                          # Wait a moment for light state to settle
+                          - delay:
+                              milliseconds: 100
+                          # Reset the control helper AFTER lights are off and settled
+                          - choose:
+                              - conditions: "{{ automation_control not in ['', None] }}"
+                                sequence:
+                                  - service: input_boolean.turn_off
+                                    target:
+                                      entity_id: "{{ automation_control }}"
+                          # Debug logging for light OFF events
+                          - choose:
+                              - conditions: "{{ debug_level == 'basic' }}"
+                                sequence:
+                                  - service: logbook.log
+                                    data:
+                                      name: Bathroom Light & Fan Control
+                                      message: "Light OFF: trigger={{ trigger.id }}, vacancy detected after {{ lights_off_delay_min }}min grace (v{{ blueprint_version }})"
+                              - conditions: "{{ debug_level == 'verbose' }}"
+                                sequence:
+                                  - service: logbook.log
+                                    data:
+                                      name: Bathroom Light & Fan Control
+                                      message: "Light OFF: trigger={{ trigger.id }}, vacancy detected after {{ lights_off_delay_min }}min grace, motion={{ is_state(motion_sensor, 'off') }}, door={{ is_state(door_sensor, 'off') }} (v{{ blueprint_version }})"
+                      # Case B: motion cleared AND door closed but closed after motion cleared (edge case)
+                      - conditions:
+                          - condition: and
+                            conditions:
+                              - condition: template
+                                value_template: "{{ trigger.id == 'wasp_motion_clear' }}"
+                              - condition: template
+                                value_template: >-
+                                  {% if door_sensor in states and motion_sensor in states %}
+                                    {{ is_state(door_sensor, 'off') and (
+                                        states[door_sensor].last_changed > states[motion_sensor].last_changed and (
+                                          motion_sensor_delay == -1 or (
+                                            motion_sensor_delay > -1 and states[door_sensor].last_changed >= states[motion_sensor].last_changed - timedelta(seconds=motion_sensor_delay)
+                                          )
+                                        )
+                                      ) }}
+                                  {% else %}
+                                    false
+                                  {% endif %}
+                        sequence:
+                          # Signal that automation is turning off lights (not user manual control)
+                          - choose:
+                              - conditions: "{{ automation_control not in ['', None] }}"
+                                sequence:
+                                  - service: input_boolean.turn_on
+                                    target:
+                                      entity_id: "{{ automation_control }}"
+                          # Wait grace period, then turn off lights
+                          - choose:
+                              - conditions:
+                                  - condition: template
+                                    value_template: "{{ area_set }}"
+                                sequence:
+                                  - delay:
+                                      minutes: "{{ lights_off_delay_min }}"
+                                  - service: light.turn_off
+                                    target:
+                                      area_id: !input light_area
+                            default:
+                              - delay:
+                                  minutes: "{{ lights_off_delay_min }}"
+                              - service: light.turn_off
+                                target:
+                                  entity_id: !input light_target
+                          # Wait a moment for light state to settle
+                          - delay:
+                              milliseconds: 100
+                          # Reset the control helper AFTER lights are off and settled
+                          - choose:
+                              - conditions: "{{ automation_control not in ['', None] }}"
+                                sequence:
+                                  - service: input_boolean.turn_off
+                                    target:
+                                      entity_id: "{{ automation_control }}"
+                          # Debug logging for light OFF events
+                          - choose:
+                              - conditions: "{{ debug_level == 'basic' }}"
+                                sequence:
+                                  - service: logbook.log
+                                    data:
+                                      name: Bathroom Light & Fan Control
+                                      message: "Light OFF: trigger={{ trigger.id }}, vacancy detected after {{ lights_off_delay_min }}min grace (v{{ blueprint_version }})"
+                              - conditions: "{{ debug_level == 'verbose' }}"
+                                sequence:
+                                  - service: logbook.log
+                                    data:
+                                      name: Bathroom Light & Fan Control
+                                      message: "Light OFF: trigger={{ trigger.id }}, vacancy detected after {{ lights_off_delay_min }}min grace, motion={{ is_state(motion_sensor, 'off') }}, door={{ is_state(door_sensor, 'off') }} (v{{ blueprint_version }})"
+                      # Case C: door left open for too long AND motion is off
+                      - conditions:
+                          - condition: and
+                            conditions:
+                              - condition: template
+                                value_template: "{{ trigger.id == 'wasp_door_left_open' }}"
+                              - condition: state
+                                entity_id: !input motion_sensor
+                                state: "off"
                         sequence:
                           # Signal that automation is turning off lights (not user manual control)
                           - choose:

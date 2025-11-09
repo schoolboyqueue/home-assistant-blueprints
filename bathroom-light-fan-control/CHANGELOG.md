@@ -1,5 +1,28 @@
 # Bathroom Light & Fan Control Pro - Changelog
 
+## [1.10.2] - 2025-01-09
+
+### Fixed
+
+**Vacancy Detection After Shower (Door Already Open):**
+- Fixed lights staying on when leaving bathroom with door already open after shower
+- Separated vacancy logic into three distinct cases for clarity:
+  - Case A: Motion clears AND door already open/unknown → immediate vacancy (no timing gate)
+  - Case B: Motion clears AND door closed but closed after motion cleared → apply timing window
+  - Case C: Door left open too long AND no motion → vacancy
+- Previous logic combined Cases A and B in a single OR condition, causing the door-close timing check (Case B) to block Case A
+- Now when motion clears with door already open, vacancy proceeds immediately without evaluating door-close timing
+
+### Technical Details
+- Restructured lines 741-786: Changed from nested OR with AND to separate choose branches
+- Case A (lines 742-758): Door open/unknown check - no timestamp comparison
+- Case B (lines 759-777): Door closed after motion - keeps existing timestamp logic
+- Case C (lines 778-786): Door left open trigger - unchanged
+- Preserves all existing behavior for Cases B and C
+- Fixes scenario: door closed during shower → open door and leave → motion clears → lights should turn off
+
+---
+
 ## [1.10.1] - 2025-01-09
 
 ### Fixed

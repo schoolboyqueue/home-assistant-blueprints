@@ -6,12 +6,12 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 - New blueprints are added to the repository
 - New architectural patterns are introduced
 - Common pitfalls are discovered
-- Remote testing workflows change
+- Documentation and distribution guidance changes
 
 **When adding a new blueprint, update:**
 1. The "Blueprints" section below with blueprint name and features (no version numbers)
 2. The "File Structure" tree
-3. The "Remote testing workflow" section with copy command
+3. The "Blueprint Distribution" section if distribution approach changes
 4. Any architecture sections if the blueprint introduces new patterns
 
 **META-INSTRUCTION FOR WARP:**
@@ -129,42 +129,6 @@ All blueprints support debug levels (`off`, `basic`, `verbose`). Set via the blu
 - `basic`: Key events (light ON/OFF, fan ON/OFF, manual override, press/hold/release, etc.)
 - `verbose`: Detailed state information, sensor values, condition breakdowns, brightness calculations
 
-### Home Assistant Server Access
-
-**SSH access is configured** for direct server interaction:
-
-```bash
-# Connect to Home Assistant server
-ssh homeassistant
-```
-
-**Remote testing workflow:**
-
-1. **Copy blueprint to server** (SCP doesn't work, use pipe through SSH):
-   ```bash
-   cat adaptive-comfort-control/adaptive_comfort_control_pro_blueprint.yaml | \
-       ssh homeassistant "cat > /tmp/blueprint.yaml && sudo mv /tmp/blueprint.yaml /config/blueprints/automation/schoolboyqueue/adaptive_comfort_control_pro_blueprint.yaml"
-   
-   cat bathroom-light-fan-control/bathroom_light_fan_control_pro.yaml | \
-       ssh homeassistant "cat > /tmp/blueprint.yaml && sudo mv /tmp/blueprint.yaml /config/blueprints/automation/schoolboyqueue/bathroom_light_fan_control_pro.yaml"
-   
-   cat zooz-zwave-light-switch-control/zooz_zwave_light_switch_control_pro.yaml | \
-       ssh homeassistant "cat > /tmp/blueprint.yaml && sudo mv /tmp/blueprint.yaml /config/blueprints/automation/schoolboyqueue/zooz_zwave_light_switch_control_pro.yaml"
-   ```
-
-2. **Reload automations** (via Home Assistant UI or CLI if available):
-   - Settings → System → Restart → Quick reload (automations only)
-   - Or: Developer Tools → YAML → Automations
-
-3. **Check Home Assistant logs:**
-   ```bash
-   ssh homeassistant "tail -f /config/home-assistant.log"
-   ```
-
-4. **View blueprint files on server:**
-   ```bash
-   ssh homeassistant "ls -la /config/blueprints/automation/"
-   ```
 
 ### Making Changes
 
