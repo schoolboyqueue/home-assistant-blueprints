@@ -6,8 +6,8 @@ blueprint:
     - Single press Down: light off
     - Hold Up: brighten repeatedly while held; stop on release
     - Hold Down: dim repeatedly while held; stop on release; turn off at min threshold
-    - Optional 2x/3x custom actions for Up/Down
     - Optional area targeting (actions target area instead of single entity)
+    - 2x/3x tap events trigger but don't execute actions (use separate automations if needed)
   domain: automation
   author: "Jeremy Carter"
   source_url: "https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/zooz-zwave-light-switch-control/zooz_zwave_light_switch_control_pro.yaml"
@@ -96,35 +96,6 @@ blueprint:
               step: 1
               mode: slider
               unit_of_measurement: "%"
-
-    gestures:
-      name: Optional Gesture Actions
-      icon: mdi:gesture-double-tap
-      input:
-        double_tap_up_action:
-          name: "Double-tap Up action"
-          description: "Optional custom action when Up paddle is double-pressed."
-          default: []
-          selector:
-            action: {}
-        double_tap_down_action:
-          name: "Double-tap Down action"
-          description: "Optional custom action when Down paddle is double-pressed."
-          default: []
-          selector:
-            action: {}
-        triple_tap_up_action:
-          name: "Triple-tap Up action"
-          description: "Optional custom action when Up paddle is triple-pressed."
-          default: []
-          selector:
-            action: {}
-        triple_tap_down_action:
-          name: "Triple-tap Down action"
-          description: "Optional custom action when Down paddle is triple-pressed."
-          default: []
-          selector:
-            action: {}
 
     diagnostics:
       name: Diagnostics
@@ -613,8 +584,6 @@ action:
                       level: info
                       message: "[Zooz Light Pro] up_double → run custom action"
             default: []
-          - choose: []
-            default: !input double_tap_up_action
 
       # Double-tap Down
       - conditions:
@@ -629,8 +598,6 @@ action:
                       level: info
                       message: "[Zooz Light Pro] down_double → run custom action"
             default: []
-          - choose: []
-            default: !input double_tap_down_action
 
       # Triple-tap Up
       - conditions:
@@ -645,8 +612,6 @@ action:
                       level: info
                       message: "[Zooz Light Pro] up_triple → run custom action"
             default: []
-          - choose: []
-            default: !input triple_tap_up_action
 
       # Triple-tap Down
       - conditions:
@@ -661,6 +626,4 @@ action:
                       level: info
                       message: "[Zooz Light Pro] down_triple → run custom action"
             default: []
-          - choose: []
-            default: !input triple_tap_down_action
     default: []
