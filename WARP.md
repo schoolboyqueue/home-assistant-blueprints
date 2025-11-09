@@ -556,18 +556,22 @@ Built-in psychrometrics prevent "muggy" natural ventilation:
           target:
             entity_id: "{{ light_entity }}"
     
-    # WRONG - wrapping optional !input actions in choose
+    # WRONG - wrapping optional !input actions in choose with conditions
     - choose:
         - conditions: []
           sequence: !input double_tap_action
     
-    # CORRECT - call !input actions directly
-    - !input double_tap_action
+    # WRONG - calling !input actions directly as list item
+    - !input double_tap_action  # Error: expects dictionary, got list
+    
+    # CORRECT - use choose with empty condition list and default
+    - choose: []
+      default: !input double_tap_action
     ```
     
     **Why this fails:** `choose` is for multiple conditions (like switch/case), while `if/then/else` is for binary decisions. The Home Assistant schema validator rejects `choose` blocks with `default:` followed by additional sequence items, producing errors like "extra keys not allowed @ data['actions'][...]['default']". This error occurs when `choose`/`default` is used instead of `if/then/else`, especially in nested action sequences.
     
-    **Optional input actions:** When an input has `default: []` (empty action list), you can call it directly with `!input`. Home Assistant will execute an empty list if no actions are provided, which is safe. Don't wrap it in `choose` with `conditions: []` - this is unnecessarily complex and may cause validation errors.
+    **Optional input actions:** When an input has `default: []` (empty action list), you cannot call it directly as a sequence item because `!input` returns a **list** of actions, not a single action. The correct pattern is `choose: []` with `default: !input action_name`. This means "no conditions match, so always execute the default actions". The empty `choose: []` is required for proper YAML structure.
 
 ## Common Tasks
 
