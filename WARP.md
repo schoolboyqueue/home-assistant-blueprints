@@ -15,6 +15,16 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 3. The "Remote testing workflow" section with copy command
 4. Any architecture sections if the blueprint introduces new patterns
 
+**META-INSTRUCTION FOR WARP:**
+Whenever you discover new patterns, pitfalls, solutions, or architectural insights while working on this repository, **proactively update this WARP.md file** with that knowledge. Do not wait for the user to ask. This includes:
+- New common errors and their solutions
+- New architectural patterns that work well
+- New pitfalls to avoid
+- Updates to existing sections when you learn better approaches
+- Clarifications when existing documentation is ambiguous or incomplete
+
+This ensures the knowledge base grows continuously and future sessions benefit from past learnings.
+
 ## Repository Overview
 
 This repository contains **Home Assistant Blueprints** — reusable automation templates written in YAML with Jinja2 templating. These blueprints are designed to be imported into Home Assistant instances and configured through the UI.
@@ -545,9 +555,19 @@ Built-in psychrometrics prevent "muggy" natural ventilation:
         - service: light.turn_on
           target:
             entity_id: "{{ light_entity }}"
+    
+    # WRONG - wrapping optional !input actions in choose
+    - choose:
+        - conditions: []
+          sequence: !input double_tap_action
+    
+    # CORRECT - call !input actions directly
+    - !input double_tap_action
     ```
     
     **Why this fails:** `choose` is for multiple conditions (like switch/case), while `if/then/else` is for binary decisions. The Home Assistant schema validator rejects `choose` blocks with `default:` followed by additional sequence items, producing errors like "extra keys not allowed @ data['actions'][...]['default']". This error occurs when `choose`/`default` is used instead of `if/then/else`, especially in nested action sequences.
+    
+    **Optional input actions:** When an input has `default: []` (empty action list), you can call it directly with `!input`. Home Assistant will execute an empty list if no actions are provided, which is safe. Don't wrap it in `choose` with `conditions: []` - this is unnecessarily complex and may cause validation errors.
 
 ## Common Tasks
 
