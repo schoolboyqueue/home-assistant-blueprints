@@ -405,33 +405,33 @@ action:
           # If light is off, turn on to minimum on brightness
           - condition: template
             value_template: "{{ states(light_entity) not in ['unknown','unavailable',''] }}"
-          - choose:
-              - conditions: "{{ is_state(light_entity, 'off') }}"
-                sequence:
-                  - choose:
-                      - conditions: "{{ debug_enabled }}"
-                        sequence:
-                          - service: system_log.write
-                            data:
-                              level: info
-                              message: "[Zooz Light Pro] Light is off → turn_on to min_on_brightness_pct={{ min_on_brightness_pct_v | int }}%"
-                    default: []
-                  - if:
-                      - condition: template
-                        value_template: "{{ area_set }}"
-                    then:
-                      - service: light.turn_on
-                        target:
-                          area_id: "{{ light_area_in }}"
+          - if:
+              - condition: template
+                value_template: "{{ is_state(light_entity, 'off') }}"
+            then:
+              - choose:
+                  - conditions: "{{ debug_enabled }}"
+                    sequence:
+                      - service: system_log.write
                         data:
-                          brightness_pct: "{{ min_on_brightness_pct_v | int }}"
-                    else:
-                      - service: light.turn_on
-                        target:
-                          entity_id: "{{ light_entity }}"
-                        data:
-                          brightness_pct: "{{ min_on_brightness_pct_v | int }}"
-            default: []
+                          level: info
+                          message: "[Zooz Light Pro] Light is off → turn_on to min_on_brightness_pct={{ min_on_brightness_pct_v | int }}%"
+                default: []
+              - if:
+                  - condition: template
+                    value_template: "{{ area_set }}"
+                then:
+                  - service: light.turn_on
+                    target:
+                      area_id: "{{ light_area_in }}"
+                    data:
+                      brightness_pct: "{{ min_on_brightness_pct_v | int }}"
+                else:
+                  - service: light.turn_on
+                    target:
+                      entity_id: "{{ light_entity }}"
+                    data:
+                      brightness_pct: "{{ min_on_brightness_pct_v | int }}"
           # Repeat step brighten until release
           - repeat:
               sequence:
