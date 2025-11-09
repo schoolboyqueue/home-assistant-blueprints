@@ -613,9 +613,7 @@ action:
                       level: info
                       message: "[Zooz Light Pro] up_double → run custom action"
             default: []
-          - choose:
-              - conditions: []
-                sequence: !input double_tap_up_action
+          - !input double_tap_up_action
 
       # Double-tap Down
       - conditions:
@@ -630,9 +628,7 @@ action:
                       level: info
                       message: "[Zooz Light Pro] down_double → run custom action"
             default: []
-          - choose:
-              - conditions: []
-                sequence: !input double_tap_down_action
+          - !input double_tap_down_action
 
       # Triple-tap Up
       - conditions:
@@ -647,9 +643,7 @@ action:
                       level: info
                       message: "[Zooz Light Pro] up_triple → run custom action"
             default: []
-          - choose:
-              - conditions: []
-                sequence: !input triple_tap_up_action
+          - !input triple_tap_up_action
 
       # Triple-tap Down
       - conditions:
@@ -664,7 +658,5 @@ action:
                       level: info
                       message: "[Zooz Light Pro] down_triple → run custom action"
             default: []
-          - choose:
-              - conditions: []
-                sequence: !input triple_tap_down_action
+          - !input triple_tap_down_action
     default: []
