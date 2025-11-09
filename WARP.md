@@ -4,13 +4,12 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 
 **IMPORTANT:** This file should be kept up-to-date whenever:
 - New blueprints are added to the repository
-- Blueprint versions change
 - New architectural patterns are introduced
 - Common pitfalls are discovered
 - Remote testing workflows change
 
 **When adding a new blueprint, update:**
-1. The "Blueprints" section below with blueprint name, features, and version
+1. The "Blueprints" section below with blueprint name and features (no version numbers)
 2. The "File Structure" tree
 3. The "Remote testing workflow" section with copy command
 4. Any architecture sections if the blueprint introduces new patterns
@@ -37,20 +36,18 @@ This repository contains **Home Assistant Blueprints** — reusable automation t
    - Supports mixed °C/°F units with auto-detection
    - Vendor-specific thermostat profiles (Ecobee, Nest, Honeywell, etc.) with auto-detection
    - Optimized to skip unnecessary thermostat commands (50-80% reduction)
-   - Version: 4.18 (current)
 
 2. **Bathroom Light Fan Control Pro** (`bathroom-light-fan-control/`)
    - Coordinated bathroom light and fan automation using "Wasp-in-a-Box" occupancy detection
    - Features: humidity delta control, rate-of-rise/fall detection, night mode, manual override, presence-based activation
    - Supports mixed light entity and area control, fan or switch domains
-   - Version: 1.10.0 (current)
 
 3. **Zooz Z-Wave Light Switch Control Pro** (`zooz-zwave-light-switch-control/`)
    - Z-Wave switch light dimming using Central Scene events (ZEN71/72/76/77)
-   - Features: single press on/off, hold-to-dim with release detection, optional double/triple-tap custom actions, area targeting
+   - Features: single press on/off, hold-to-dim with release detection, area targeting
    - Supports both zwave_js_event and zwave_js_value_notification event types
    - Configurable dimming parameters (step size, interval, brightness thresholds)
-   - Version: 0.1.0 (current)
+   - Note: Double/triple tap triggers fire but don't execute actions (use separate automations if needed)
 
 ### File Structure
 
@@ -91,6 +88,7 @@ git log --oneline -20
 1. Update `blueprint_version` variable in the YAML (e.g., `blueprint_version: "4.12"`)
 2. Document changes in the blueprint's `CHANGELOG.md`
 3. Commit with conventional commit format: `feat(component): description` or `fix(component): description`
+4. Version numbers are stored in blueprint YAML files only (not in WARP.md to save tokens)
 
 ### Testing Blueprints
 
