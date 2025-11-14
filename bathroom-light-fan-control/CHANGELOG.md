@@ -1,5 +1,15 @@
 # Bathroom Light & Fan Control Pro - Changelog
 
+## [1.10.6] - 2025-11-14
+
+### Fixed
+
+- Restored door-state dependency for the startup light sanity check to remain consistent with Wasp-in-a-Box semantics.
+- Added a short 30s delay after Home Assistant start before evaluating startup light conditions, giving motion and door sensors time to report stable states.
+- At startup, the light is now auto-turned off only when it is ON, motion is OFF, and the door is open/unknown, after `lights_off_delay_min` minutes.
+
+---
+
 ## [1.10.5] - 2025-11-14
 
 ### Fixed
