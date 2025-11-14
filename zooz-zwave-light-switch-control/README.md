@@ -1,6 +1,6 @@
 # Zooz Z-Wave Light Switch Control Pro
 
-**Version:** 0.1.0  
+**Version:** 1.0.0  
 **Author:** Jeremy Carter  
 **Home Assistant Blueprint for Z-Wave Switch Light Dimming**
 

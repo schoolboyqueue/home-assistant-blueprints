@@ -150,6 +150,8 @@ mode: restart
 max_exceeded: silent
 
 trigger:
+  # zwave_js_event reports key attributes as numeric codes:
+  # 0=KeyPressed, 1=KeyReleased, 2=KeyHeldDown, 3=KeyPressed2x, 4=KeyPressed3x
   # Up single press
   - platform: event
     id: up_single
@@ -159,7 +161,7 @@ trigger:
       command_class_name: "Central Scene"
       property: "scene"
       property_key: "001"
-      value: "KeyPressed"
+      value: 0
   - platform: event
     id: up_single
     event_type: zwave_js_value_notification
@@ -179,7 +181,7 @@ trigger:
       command_class_name: "Central Scene"
       property: "scene"
       property_key: "002"
-      value: "KeyPressed"
+      value: 0
   - platform: event
     id: down_single
     event_type: zwave_js_value_notification
@@ -199,7 +201,7 @@ trigger:
       command_class_name: "Central Scene"
       property: "scene"
       property_key: "001"
-      value: "KeyHeldDown"
+      value: 2
   - platform: event
     id: up_hold_start
     event_type: zwave_js_value_notification
@@ -219,7 +221,7 @@ trigger:
       command_class_name: "Central Scene"
       property: "scene"
       property_key: "002"
-      value: "KeyHeldDown"
+      value: 2
   - platform: event
     id: down_hold_start
     event_type: zwave_js_value_notification
@@ -239,7 +241,7 @@ trigger:
       command_class_name: "Central Scene"
       property: "scene"
       property_key: "001"
-      value: "KeyPressed2x"
+      value: 3
   - platform: event
     id: up_double
     event_type: zwave_js_value_notification
@@ -257,7 +259,7 @@ trigger:
       command_class_name: "Central Scene"
       property: "scene"
       property_key: "002"
-      value: "KeyPressed2x"
+      value: 3
   - platform: event
     id: down_double
     event_type: zwave_js_value_notification
@@ -277,7 +279,7 @@ trigger:
       command_class_name: "Central Scene"
       property: "scene"
       property_key: "001"
-      value: "KeyPressed3x"
+      value: 4
   - platform: event
     id: up_triple
     event_type: zwave_js_value_notification
@@ -295,7 +297,7 @@ trigger:
       command_class_name: "Central Scene"
       property: "scene"
       property_key: "002"
-      value: "KeyPressed3x"
+      value: 4
   - platform: event
     id: down_triple
     event_type: zwave_js_value_notification
@@ -414,7 +416,7 @@ action:
                         command_class_name: "Central Scene"
                         property: "scene"
                         property_key: "001"
-                        value: "KeyReleased"
+                        value: 1
                     - platform: event
                       event_type: zwave_js_value_notification
                       event_data:
@@ -489,7 +491,7 @@ action:
                         command_class_name: "Central Scene"
                         property: "scene"
                         property_key: "002"
-                        value: "KeyReleased"
+                        value: 1
                     - platform: event
                       event_type: zwave_js_value_notification
                       event_data:

@@ -1,6 +1,6 @@
 # Bathroom Light & Fan Control Pro
 
-**Version:** 1.10.0
+**Version:** 1.10.3
 **Author:** Jeremy Carter  
 **Home Assistant Blueprint for Intelligent Bathroom Automation**
 

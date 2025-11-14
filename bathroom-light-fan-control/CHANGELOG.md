@@ -1,5 +1,15 @@
 # Bathroom Light & Fan Control Pro - Changelog
 
+## [1.10.3] - 2025-11-14
+
+### Fixed
+
+- Prevented bathroom lights staying on after showers when using `mode: restart` with frequent humidity updates.
+- Moved the lights-off grace period (`lights_off_delay_min`) from an action-level delay to the `wasp_motion_clear` trigger `for:` duration, so humidity triggers no longer cancel the vacancy grace.
+- Removed extra action-level delays before turning lights off in Wasp-in-a-Box vacancy Cases A/B/C; lights now turn off immediately once vacancy is detected.
+
+---
+
 ## [1.10.2] - 2025-01-09
 
 ### Fixed

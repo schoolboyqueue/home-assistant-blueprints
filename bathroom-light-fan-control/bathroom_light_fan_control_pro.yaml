@@ -1,5 +1,5 @@
 blueprint:
-  name: "Bathroom Light Fan Control Pro v1.10.2"
+  name: "Bathroom Light Fan Control Pro v1.10.3"
   description: >-
     Smart bathroom controller for lights and exhaust fan.
     Lights: Turns on from motion or door activity (Wasp-in-a-Box), respects presence and optional lux threshold, supports Night Mode (dim and color temperature), and shuts off after vacancy with a grace period. Includes a manual-off override window to prevent auto-on.
@@ -425,7 +425,7 @@ variables:
   ror_min_on_time_min: !input ror_min_on_time_min
   ror_latch_until: !input ror_latch_until
   light_area: !input light_area
-  blueprint_version: "1.10.2"
+  blueprint_version: "1.10.3"
   area_set: >-
     {{ light_area is not none and (light_area|string) != '' }}
 
@@ -554,7 +554,8 @@ trigger:
     entity_id: !input motion_sensor
     from: "on"
     to: "off"
-    for: { seconds: !input motion_sensor_turn_off_delay }
+    for:
+      minutes: !input lights_off_delay_min
 
   - id: wasp_door_left_open
     platform: state
@@ -764,20 +765,16 @@ action:
                                   - service: input_boolean.turn_on
                                     target:
                                       entity_id: "{{ automation_control }}"
-                          # Wait grace period, then turn off lights
+                          # Turn off lights immediately (grace handled at trigger level)
                           - choose:
                               - conditions:
                                   - condition: template
                                     value_template: "{{ area_set }}"
                                 sequence:
-                                  - delay:
-                                      minutes: "{{ lights_off_delay_min }}"
                                   - service: light.turn_off
                                     target:
                                       area_id: !input light_area
                             default:
-                              - delay:
-                                  minutes: "{{ lights_off_delay_min }}"
                               - service: light.turn_off
                                 target:
                                   entity_id: !input light_target
@@ -832,20 +829,16 @@ action:
                                   - service: input_boolean.turn_on
                                     target:
                                       entity_id: "{{ automation_control }}"
-                          # Wait grace period, then turn off lights
+                          # Turn off lights immediately (grace handled at trigger level)
                           - choose:
                               - conditions:
                                   - condition: template
                                     value_template: "{{ area_set }}"
                                 sequence:
-                                  - delay:
-                                      minutes: "{{ lights_off_delay_min }}"
                                   - service: light.turn_off
                                     target:
                                       area_id: !input light_area
                             default:
-                              - delay:
-                                  minutes: "{{ lights_off_delay_min }}"
                               - service: light.turn_off
                                 target:
                                   entity_id: !input light_target
@@ -890,20 +883,16 @@ action:
                                   - service: input_boolean.turn_on
                                     target:
                                       entity_id: "{{ automation_control }}"
-                          # Wait grace period, then turn off lights
+                          # Turn off lights immediately (grace handled at trigger level)
                           - choose:
                               - conditions:
                                   - condition: template
                                     value_template: "{{ area_set }}"
                                 sequence:
-                                  - delay:
-                                      minutes: "{{ lights_off_delay_min }}"
                                   - service: light.turn_off
                                     target:
                                       area_id: !input light_area
                             default:
-                              - delay:
-                                  minutes: "{{ lights_off_delay_min }}"
                               - service: light.turn_off
                                 target:
                                   entity_id: !input light_target

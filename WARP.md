@@ -84,6 +84,16 @@ This repository contains **no build tools, test frameworks, or CI/CD**. Developm
 git log --oneline -20
 ```
 
+**Agent wrap-up expectations (auto-commit & push):**
+- When an agent modifies any blueprint YAML (or its README/CHANGELOG), it should by default:
+  1. Determine the correct SemVer bump (MAJOR/MINOR/PATCH) based on the change.
+  2. Update `blueprint_version` and `blueprint.name` to the new version.
+  3. Update the corresponding `CHANGELOG.md` with a dated entry summarizing the change.
+  4. Update the blueprint `README.md` version header to match.
+  5. Run a basic YAML syntax check (optional but preferred).
+  6. Stage the relevant files, create a conventional commit, and push to the default branch.
+- This should happen automatically as part of the agent’s workflow without needing an explicit user request.
+
 **Semantic Versioning:**
 
 All blueprints follow [Semantic Versioning](https://semver.org/) (MAJOR.MINOR.PATCH):

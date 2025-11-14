@@ -1,1 +1,35 @@
-.DS_Store
+# Python Cache Files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Log, Temporary, Backup Files
+*.log
+*.tmp
+*.bak
+*.swp
+*.swn
+*.swo
+*.orig
+*.rej
+*.lock
+*.pid
+*.sock
+
+# Package Management Files
+*.egg-info/
+*.whl
+*.dist-info/
+
+# Jupyter Notebook Checkpoint Files
+.ipynb_checkpoints/
+
+# Editor Configuration Files
+*.vscode/
+*.idea/
+
+# General File Extensions
+*.DS_Store
+*.env
+*.continue/
