@@ -1,5 +1,5 @@
 blueprint:
-  name: "Bathroom Light Fan Control Pro v1.10.3"
+  name: "Bathroom Light Fan Control Pro v1.10.4"
   description: >-
     Smart bathroom controller for lights and exhaust fan.
     Lights: Turns on from motion or door activity (Wasp-in-a-Box), respects presence and optional lux threshold, supports Night Mode (dim and color temperature), and shuts off after vacancy with a grace period. Includes a manual-off override window to prevent auto-on.
@@ -425,7 +425,7 @@ variables:
   ror_min_on_time_min: !input ror_min_on_time_min
   ror_latch_until: !input ror_latch_until
   light_area: !input light_area
-  blueprint_version: "1.10.3"
+  blueprint_version: "1.10.4"
   area_set: >-
     {{ light_area is not none and (light_area|string) != '' }}
 
@@ -582,6 +582,7 @@ action:
           - condition: template
             value_template: "{{ trigger.id == 'ha_start' }}"
         sequence:
+          # Fan startup sanity check
           - choose:
               - conditions:
                   - condition: state
@@ -600,6 +601,75 @@ action:
                             data:
                               name: Bathroom Light & Fan Control
                               message: "Startup check: Fan turned OFF due to low delta ({{ humidity_delta | round(1) }}%). (v{{ blueprint_version }})"
+          # Light startup sanity check: if lights are on with motion off and door open/unknown, treat as vacancy
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: !input light_target
+                    state: "on"
+                  - condition: state
+                    entity_id: !input motion_sensor
+                    state: "off"
+                  - condition: or
+                    conditions:
+                      - condition: state
+                        entity_id: !input door_sensor
+                        state: "on"
+                      - condition: state
+                        entity_id: !input door_sensor
+                        state: "unavailable"
+                      - condition: state
+                        entity_id: !input door_sensor
+                        state: "unknown"
+                sequence:
+                  # Signal that automation is turning off lights (not user manual control)
+                  - choose:
+                      - conditions: "{{ automation_control not in ['', None] }}"
+                        sequence:
+                          - service: input_boolean.turn_on
+                            target:
+                              entity_id: "{{ automation_control }}"
+                  # Wait startup grace period, then turn off lights
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ area_set }}"
+                        sequence:
+                          - delay:
+                              minutes: "{{ lights_off_delay_min }}"
+                          - service: light.turn_off
+                            target:
+                              area_id: !input light_area
+                    default:
+                      - delay:
+                          minutes: "{{ lights_off_delay_min }}"
+                      - service: light.turn_off
+                        target:
+                          entity_id: !input light_target
+                  # Wait a moment for light state to settle
+                  - delay:
+                      milliseconds: 100
+                  # Reset the control helper AFTER lights are off and settled
+                  - choose:
+                      - conditions: "{{ automation_control not in ['', None] }}"
+                        sequence:
+                          - service: input_boolean.turn_off
+                            target:
+                              entity_id: "{{ automation_control }}"
+                  # Debug logging for startup light OFF events
+                  - choose:
+                      - conditions: "{{ debug_level == 'basic' }}"
+                        sequence:
+                          - service: logbook.log
+                            data:
+                              name: Bathroom Light & Fan Control
+                              message: "Startup check: Light OFF after {{ lights_off_delay_min }}min grace (motion off, door open/unknown). (v{{ blueprint_version }})"
+                      - conditions: "{{ debug_level == 'verbose' }}"
+                        sequence:
+                          - service: logbook.log
+                            data:
+                              name: Bathroom Light & Fan Control
+                              message: "Startup check: Light OFF after {{ lights_off_delay_min }}min grace (motion={{ is_state(motion_sensor, 'off') }}, door={{ states(door_sensor) }}, light={{ states(light_target) }}). (v{{ blueprint_version }})"
 
       # --- Wasp-in-a-Box: manage light directly based on motion/door ---
       - conditions:

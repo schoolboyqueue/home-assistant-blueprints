@@ -1,5 +1,15 @@
 # Bathroom Light & Fan Control Pro - Changelog
 
+## [1.10.4] - 2025-11-14
+
+### Fixed
+
+- During Home Assistant startup, if the bathroom light is already ON while motion is OFF and the door is open/unknown, treat this as vacancy.
+- Added a startup light sanity check that waits `lights_off_delay_min` minutes, then turns off the light using the same automation_control helper semantics, preventing lights from staying on indefinitely across restarts.
+- Kept Wasp-in-a-Box semantics (door closed = occupancy); startup light auto-off only applies when the door is open/unknown.
+
+---
+
 ## [1.10.3] - 2025-11-14
 
 ### Fixed
