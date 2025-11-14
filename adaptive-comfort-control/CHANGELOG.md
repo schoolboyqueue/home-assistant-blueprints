@@ -1,3 +1,12 @@
+## [4.18.1] — 2025-11-14
+### Fixed
+- **Manual override persistence timestamp:** `is_override_active` now uses the `input_datetime` helper's `timestamp` attribute instead of parsing the string state, eliminating timezone parsing edge cases and making override checks robust across restarts.
+- **Learning helper unit alignment:** When learning from manual adjustments, the blueprint now writes the learned offset back to the helper in system units (°C/°F) consistently with how it is read, preserving correct scaling in imperial setups.
+
+### Documentation
+- Updated blueprint input description for **Learned Offset Storage** to explicitly require a negative minimum (e.g., -10) and positive maximum so both warmer and cooler manual changes can be learned.
+- Updated README version and learning helper setup instructions to call out the need for negative minimum values and clarify recommended helper configuration.
+
 ## [4.18] — 2025-01-08
 ### Optimized
 - **Skip unnecessary thermostat commands:** Automation now checks if calculated setpoints match current thermostat state before sending commands.

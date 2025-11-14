@@ -1,6 +1,6 @@
 # Adaptive Comfort Control Pro
 
-**Version:** 4.16  
+**Version:** 4.18.1  
 **Author:** Jeremy Carter  
 **Home Assistant Blueprint for Intelligent HVAC Automation**
 
@@ -501,7 +501,7 @@ Learn from your manual adjustments over time.
 
 **Setup:**
 1. Create helper: Settings → Devices & Services → Helpers → Number
-2. Configure: Min: -10, Max: 10, Step: 0.01, Unit: °F or °C
+2. Configure: Min: -10 (must be negative), Max: 10, Step: 0.01, Unit: °F or °C. Do not leave the minimum at 0 or above, or cooling adjustments cannot be learned.
 3. Select in blueprint: "Learned Offset Storage"
 
 See [LEARNING_SETUP.md](LEARNING_SETUP.md) for detailed setup guide.

@@ -1,5 +1,5 @@
 blueprint:
-    name: "Adaptive Comfort Control Pro v4.18"
+    name: "Adaptive Comfort Control Pro v4.18.1"
     description: >
         Adaptive comfort control + HVAC pause with unit awareness (°C/°F), seasonal bias,
         built-in psychrometrics (dew point, absolute humidity, enthalpy), optional RMOT,
@@ -558,7 +558,7 @@ blueprint:
 
                 learned_offset_helper:
                     name: "Learned Offset Storage (input_number helper)"
-                    description: "Create an input_number helper to store learned preferences. Leave empty to disable learning persistence."
+                    description: "Create an input_number helper to store learned preferences. IMPORTANT: set its minimum below 0 (e.g., -10) and maximum above 0 so both warmer and cooler manual changes can be learned. Leave empty to disable learning persistence."
                     default: ""
                     selector:
                         entity:
@@ -911,7 +911,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.18"
+    blueprint_version: "4.18.1"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
@@ -981,6 +981,31 @@ variables:
     learning_rate: !input learning_rate
     _raw_learned_offset_helper: !input learned_offset_helper
     _raw_manual_override_until: !input manual_override_until
+
+    # --------- Unit inference ---------
+    _u_indoor: "{{ state_attr(indoor_sensor_id, 'unit_of_measurement') | default('', true) | string }}"
+    _u_outdoor: >
+        {% if outdoor_sensor_id|string and outdoor_sensor_id.startswith('weather.') %}
+          {{ state_attr(outdoor_sensor_id, 'temperature_unit') | default('', true) | string }}
+        {% else %}
+          {{ state_attr(outdoor_sensor_id, 'unit_of_measurement') | default('', true) | string }}
+        {% endif %}
+    _u_climate: >
+        {{ state_attr(climate_entity_id, 'temperature_unit') | default(state_attr(climate_entity_id, 'unit_of_measurement'), true) | default('', true) | string }}
+    is_imperial: >
+        {% if units_override_val == 'c' %} false
+        {% elif units_override_val == 'f' %} true
+        {% else %}
+          {% set u = (_u_indoor or _u_outdoor or _u_climate) | lower %}
+          {{ 'f' in u }}
+        {% endif %}
+    _is_weather_in:  "{{ indoor_sensor_id  is string and indoor_sensor_id.startswith('weather.') }}"
+    _is_weather_out: "{{ outdoor_sensor_id is string and outdoor_sensor_id.startswith('weather.') }}"
+    unit_sym: "{{ '°F' if is_imperial else '°C' }}"
+
+    # Unit conversion helpers (reduces repetition)
+    _to_sys_mult: "{{ 9/5 if is_imperial else 1 }}"
+    _to_sys_add: "{{ 32 if is_imperial else 0 }}"
 
     mrt_sensor_id: >
         {% set raw = _raw_mrt_sensor_values %}
@@ -1083,13 +1108,12 @@ variables:
         {% if not manual_override_enable or manual_override_duration_min | int(0) <= 0 or not manual_override_until_id %}
           false
         {% else %}
-          {% set until_state = states(manual_override_until_id) %}
-          {% if until_state in ['unknown', 'unavailable', '', None] %}
+          {% set until_ts = state_attr(manual_override_until_id, 'timestamp') %}
+          {% set now_ts = as_timestamp(now()) %}
+          {% if until_ts is none or now_ts is none %}
             false
           {% else %}
-            {% set until_ts = as_timestamp(until_state) %}
-            {% set now_ts = as_timestamp(now()) %}
-            {{ (until_ts is not none and now_ts is not none and now_ts < until_ts) }}
+            {{ now_ts < until_ts }}
           {% endif %}
         {% endif %}
 
@@ -1181,31 +1205,6 @@ variables:
 
     # Numeric normalization
     bias_intensity: "{{ bias_intensity_raw | float(1.0) }}"
-
-    # --------- Unit inference ---------
-    _u_indoor: "{{ state_attr(indoor_sensor_id, 'unit_of_measurement') | default('', true) | string }}"
-    _u_outdoor: >
-        {% if outdoor_sensor_id|string and outdoor_sensor_id.startswith('weather.') %}
-          {{ state_attr(outdoor_sensor_id, 'temperature_unit') | default('', true) | string }}
-        {% else %}
-          {{ state_attr(outdoor_sensor_id, 'unit_of_measurement') | default('', true) | string }}
-        {% endif %}
-    _u_climate: >
-        {{ state_attr(climate_entity_id, 'temperature_unit') | default(state_attr(climate_entity_id, 'unit_of_measurement'), true) | default('', true) | string }}
-    is_imperial: >
-        {% if units_override_val == 'c' %} false
-        {% elif units_override_val == 'f' %} true
-        {% else %}
-          {% set u = (_u_indoor or _u_outdoor or _u_climate) | lower %}
-          {{ 'f' in u }}
-        {% endif %}
-    _is_weather_in:  "{{ indoor_sensor_id  is string and indoor_sensor_id.startswith('weather.') }}"
-    _is_weather_out: "{{ outdoor_sensor_id is string and outdoor_sensor_id.startswith('weather.') }}"
-    unit_sym: "{{ '°F' if is_imperial else '°C' }}"
-
-    # Unit conversion helpers (reduces repetition)
-    _to_sys_mult: "{{ 9/5 if is_imperial else 1 }}"
-    _to_sys_add: "{{ 32 if is_imperial else 0 }}"
 
     # Safety bounds & guards in °C and system units
     safety_min_c: "{{ ((safety_min_sys_in|float - 32) * 5/9) if is_imperial else (safety_min_sys_in|float) }}"
@@ -2048,7 +2047,7 @@ action:
                     target:
                       entity_id: "{{ learned_offset_helper_id }}"
                     data:
-                      value: "{{ _new_offset_c | round(2) }}"
+                      value: "{{ _new_offset_sys | round(2) }}"
 
           # Set override expiry timestamp if helper is configured
           - choose:
