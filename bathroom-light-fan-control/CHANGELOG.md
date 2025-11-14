@@ -1,5 +1,15 @@
 # Bathroom Light & Fan Control Pro - Changelog
 
+## [1.10.5] - 2025-11-14
+
+### Fixed
+
+- Relaxed the startup light sanity check so that it no longer depends on the door being open/unknown.
+- At Home Assistant startup, if the bathroom light is ON and the motion sensor is OFF, the automation now treats this as vacancy after `lights_off_delay_min` and turns the light off using the automation_control helper semantics.
+- This prevents lights from staying on indefinitely across restarts even when the door is closed, while leaving normal Wasp-in-a-Box behavior unchanged during runtime.
+
+---
+
 ## [1.10.4] - 2025-11-14
 
 ### Fixed

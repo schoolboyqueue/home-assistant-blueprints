@@ -1,5 +1,5 @@
 blueprint:
-  name: "Bathroom Light Fan Control Pro v1.10.4"
+  name: "Bathroom Light Fan Control Pro v1.10.5"
   description: >-
     Smart bathroom controller for lights and exhaust fan.
     Lights: Turns on from motion or door activity (Wasp-in-a-Box), respects presence and optional lux threshold, supports Night Mode (dim and color temperature), and shuts off after vacancy with a grace period. Includes a manual-off override window to prevent auto-on.
@@ -425,7 +425,7 @@ variables:
   ror_min_on_time_min: !input ror_min_on_time_min
   ror_latch_until: !input ror_latch_until
   light_area: !input light_area
-  blueprint_version: "1.10.4"
+  blueprint_version: "1.10.5"
   area_set: >-
     {{ light_area is not none and (light_area|string) != '' }}
 
@@ -601,7 +601,7 @@ action:
                             data:
                               name: Bathroom Light & Fan Control
                               message: "Startup check: Fan turned OFF due to low delta ({{ humidity_delta | round(1) }}%). (v{{ blueprint_version }})"
-          # Light startup sanity check: if lights are on with motion off and door open/unknown, treat as vacancy
+          # Light startup sanity check: if lights are on with motion off at HA start, treat as vacancy
           - choose:
               - conditions:
                   - condition: state
@@ -610,17 +610,6 @@ action:
                   - condition: state
                     entity_id: !input motion_sensor
                     state: "off"
-                  - condition: or
-                    conditions:
-                      - condition: state
-                        entity_id: !input door_sensor
-                        state: "on"
-                      - condition: state
-                        entity_id: !input door_sensor
-                        state: "unavailable"
-                      - condition: state
-                        entity_id: !input door_sensor
-                        state: "unknown"
                 sequence:
                   # Signal that automation is turning off lights (not user manual control)
                   - choose:
