@@ -1,3 +1,8 @@
+## [4.18.3] — 2025-11-15
+### Changed
+- **Learning decoupled from override duration:** Manual learning now triggers whenever a manual setpoint change exceeds the tolerance, even if manual override duration is set to 0 or override is disabled; override pause behavior (helper timestamp, stop, and custom override actions) only runs when override is enabled and duration > 0.
+- **Respect manual HVAC off:** Final `climate.turn_on` call is now skipped when the climate entity's `hvac_mode` is currently `'off'`, so the blueprint will not automatically re-enable the system if you've manually turned it off.
+
 ## [4.18.2] — 2025-11-15
 ### Fixed
 - **Learning helper update path instrumentation:** Added explicit debug log when writing to the learned offset helper and tightened the conditional to require a non-empty helper id string, making it easier to verify that the helper-write branch executes.
