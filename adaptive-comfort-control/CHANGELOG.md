@@ -1,3 +1,7 @@
+## [4.18.4] — 2025-11-15
+### Changed
+- **Safety-first auto-on when guards enabled:** Final `climate.turn_on` is now allowed even from a manual `hvac_mode: off` state *only* when freeze or overheat protection is enabled and currently blocking pause (`pause_blocked_now`), preserving manual off in normal conditions but restoring HVAC when approaching configured safety guards.
+
 ## [4.18.3] — 2025-11-15
 ### Changed
 - **Learning decoupled from override duration:** Manual learning now triggers whenever a manual setpoint change exceeds the tolerance, even if manual override duration is set to 0 or override is disabled; override pause behavior (helper timestamp, stop, and custom override actions) only runs when override is enabled and duration > 0.
