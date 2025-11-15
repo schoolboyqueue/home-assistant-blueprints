@@ -1,3 +1,7 @@
+## [4.18.5] — 2025-11-15
+### Changed
+- **Preemptive safety re-enable:** When freeze or overheat protection is enabled, the blueprint will re-enable HVAC from a manual off state once `risk_near` exceeds 0.7 (approaching configured guards), rather than waiting until the indoor temperature actually crosses the guard thresholds.
+
 ## [4.18.4] — 2025-11-15
 ### Changed
 - **Safety-first auto-on when guards enabled:** Final `climate.turn_on` is now allowed even from a manual `hvac_mode: off` state *only* when freeze or overheat protection is enabled and currently blocking pause (`pause_blocked_now`), preserving manual off in normal conditions but restoring HVAC when approaching configured safety guards.
