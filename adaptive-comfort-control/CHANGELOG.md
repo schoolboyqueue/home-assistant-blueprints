@@ -1,3 +1,8 @@
+## [4.18.6] — 2025-11-15
+### Changed
+- **Directional safety re-enable:** When freeze-protect is enabled and indoor temperature approaches the freeze guard, the blueprint will re-enable HVAC from a manual off state in heat-only mode and hold the safety minimum. When overheat-protect is enabled and indoor temperature approaches the overheat guard, it will re-enable HVAC in cool-only mode and hold the safety maximum. Manual off is still respected when guards are disabled or risk is low.
+- **Safety defaults updated:** Adjusted `safety_min_sys` and `freeze_guard_sys` defaults to 40°F (≈4.4°C) to better match typical freeze-protection recommendations.
+
 ## [4.18.5] — 2025-11-15
 ### Changed
 - **Preemptive safety re-enable:** When freeze or overheat protection is enabled, the blueprint will re-enable HVAC from a manual off state once `risk_near` exceeds 0.7 (approaching configured guards), rather than waiting until the indoor temperature actually crosses the guard thresholds.

@@ -1,5 +1,5 @@
 blueprint:
-    name: "Adaptive Comfort Control Pro v4.18.5"
+    name: "Adaptive Comfort Control Pro v4.18.6"
     description: >
         Adaptive comfort control + HVAC pause with unit awareness (°C/°F), seasonal bias,
         built-in psychrometrics (dew point, absolute humidity, enthalpy), optional RMOT,
@@ -697,7 +697,7 @@ blueprint:
                 safety_min_sys:
                     name: "Absolute Minimum Temperature (system units)"
                     description: "Hard floor to prevent freeze risk. Set ≥ 40°F / 4.4°C. All targets and bands will never go below this."
-                    default: 45.0
+                    default: 40.0
                     selector:
                         number:
                             min: 35.0
@@ -721,7 +721,7 @@ blueprint:
                 freeze_guard_sys:
                     name: "Freeze Guard Threshold (system units)"
                     description: "If indoor temp ≤ this, HVAC Pause is disabled (doors/windows ignored)."
-                    default: 45.0
+                    default: 40.0
                     selector:
                         number:
                             min: 35.0
@@ -911,7 +911,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.18.5"
+    blueprint_version: "4.18.6"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
@@ -1229,10 +1229,18 @@ variables:
     risk_active: >
         {{ (accelerate_resume_enable | bool) and (risk_near | float(0)) > 0 and not ((t_in_sys | float(0)) <= (freeze_guard_sys_in | float(45)) or (t_in_sys | float(0)) >= (overheat_guard_sys_in | float(88))) }}
 
-    # Safety re-enable flag: when approaching guards (risk_near high) and any guard is enabled
-    safety_reenable_needed: >
-        {% set r = risk_near | float(0) %}
-        {{ (freeze_protect_enable or overheat_protect_enable) and (r >= 0.7) }}
+    # Safety re-enable flags: when approaching guards (risk_near high) and corresponding guard is enabled
+    safety_reenable_freeze_needed: >
+        {% set wb = warn_band_sys | float(3.0) %}
+        {% set rc = _risk_cold | float(0) %}
+        {% set r = 0.0 if wb <= 0 else (rc / wb) %}
+        {{ freeze_protect_enable and (r >= 0.7) }}
+    safety_reenable_overheat_needed: >
+        {% set wb = warn_band_sys | float(3.0) %}
+        {% set rh = _risk_hot | float(0) %}
+        {% set r = 0.0 if wb <= 0 else (rh / wb) %}
+        {{ overheat_protect_enable and (r >= 0.7) }}
+    safety_reenable_needed: "{{ safety_reenable_freeze_needed or safety_reenable_overheat_needed }}"
 
     # Keep copies of user-configured base delays (seconds)
     pause_open_delay_base: "{{ pause_open_delay_in | int(0) }}"
@@ -1724,6 +1732,12 @@ variables:
     min_allowed_cli: "{{ min_allowed_raw }}"
     max_allowed_cli: "{{ max_allowed_raw }}"
 
+    # Safety setpoints in climate units (clamped to device range)
+    safety_min_cli: "{{ (safety_min_c * 9/5 + 32) if climate_is_imperial else safety_min_c }}"
+    safety_max_cli: "{{ (safety_max_c * 9/5 + 32) if climate_is_imperial else safety_max_c }}"
+    safety_min_cli_capped: "{{ [[ safety_min_cli, max_allowed_cli ] | min, min_allowed_cli ] | max }}"
+    safety_max_cli_capped: "{{ [[ safety_max_cli, max_allowed_cli ] | min, min_allowed_cli ] | max }}"
+
     # HVAC capabilities
     hvac_modes: "{{ state_attr(climate_entity_id, 'hvac_modes') | default([], true) }}"
     supports_auto: "{{ 'auto' in hvac_modes }}"
@@ -2197,6 +2211,40 @@ action:
         sequence:
           - delay:
               seconds: "{{ pause_close_delay_eff }}"
+
+          # Safety-only branches: if HVAC is manually off but we are near freeze/overheat guards,
+          # re-enable in heat-only / cool-only to hold safety minima/maxima.
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ hvac_mode_now == 'off' and safety_reenable_freeze_needed }}"
+                sequence:
+                  - service: climate.set_hvac_mode
+                    target:
+                      entity_id: !input climate_entity
+                    data:
+                      hvac_mode: "heat"
+                  - service: climate.set_temperature
+                    target:
+                      entity_id: !input climate_entity
+                    data:
+                      temperature: "{{ safety_min_cli_capped | float }}"
+                  - stop: "Safety freeze-protect active - holding minimum temperature"
+              - conditions:
+                  - condition: template
+                    value_template: "{{ hvac_mode_now == 'off' and safety_reenable_overheat_needed }}"
+                sequence:
+                  - service: climate.set_hvac_mode
+                    target:
+                      entity_id: !input climate_entity
+                    data:
+                      hvac_mode: "cool"
+                  - service: climate.set_temperature
+                    target:
+                      entity_id: !input climate_entity
+                    data:
+                      temperature: "{{ safety_max_cli_capped | float }}"
+                  - stop: "Safety overheat-protect active - holding maximum temperature"
 
           # Natural ventilation preference (if enabled & suitable)
           # Logic: Enable natural vent when ALL of these are true:

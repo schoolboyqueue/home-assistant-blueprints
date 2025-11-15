@@ -1,6 +1,6 @@
 # Adaptive Comfort Control Pro
 
-**Version:** 4.18.5  
+**Version:** 4.18.6  
 **Author:** Jeremy Carter  
 **Home Assistant Blueprint for Intelligent HVAC Automation**
 
