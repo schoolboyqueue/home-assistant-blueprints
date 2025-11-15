@@ -1,3 +1,7 @@
+## [4.18.2] — 2025-11-15
+### Fixed
+- **Learning helper update path instrumentation:** Added explicit debug log when writing to the learned offset helper and tightened the conditional to require a non-empty helper id string, making it easier to verify that the helper-write branch executes.
+
 ## [4.18.1] — 2025-11-14
 ### Fixed
 - **Manual override persistence timestamp:** `is_override_active` now uses the `input_datetime` helper's `timestamp` attribute instead of parsing the string state, eliminating timezone parsing edge cases and making override checks robust across restarts.
