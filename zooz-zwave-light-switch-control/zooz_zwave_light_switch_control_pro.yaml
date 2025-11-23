@@ -1,5 +1,5 @@
 blueprint:
-  name: "Zooz Z-Wave Light Switch Control Pro v1.0.0"
+  name: "Zooz Z-Wave Light Switch Control Pro v1.0.1"
   description: >
     Control a light with a Zooz Z-Wave switch using Central Scene (zwave_js).
     - Single press Up: light on (restores last brightness)
@@ -114,7 +114,7 @@ blueprint:
                 - "verbose"
 
 variables:
-  blueprint_version: "1.0.0"
+  blueprint_version: "1.0.1"
 
   # Bind inputs to variables first
   light_entity: !input light_target
@@ -131,6 +131,7 @@ variables:
   min_on_brightness_pct_v: "{{ min_on_brightness_pct_in | float(10) }}"
   clamp_min_pct_v: "{{ clamp_min_pct_in | float(1) }}"
   clamp_max_pct_v: "{{ clamp_max_pct_in | float(100) }}"
+  step_abs_value: "{{ (step_pct / 100.0 * 255) | round(0) | int }}"
 
   # Derived absolute 0-255 thresholds
   min_abs_brightness: "{{ (clamp_min_pct_v / 100.0 * 255) | round(0) | int }}"
@@ -398,13 +399,13 @@ action:
                     target:
                       area_id: "{{ light_area_in }}"
                     data:
-                      brightness_pct: "{{ min_on_brightness_pct_v | int }}"
+                      brightness: "{{ min_on_abs_brightness | int }}"
                 else:
                   - service: light.turn_on
                     target:
                       entity_id: "{{ light_entity }}"
                     data:
-                      brightness_pct: "{{ min_on_brightness_pct_v | int }}"
+                      brightness: "{{ min_on_abs_brightness | int }}"
           # Repeat step brighten until release
           - repeat:
               sequence:
@@ -439,6 +440,11 @@ action:
                                     message: "[Zooz Light Pro] up_release → stop brighten"
                           default: []
                   default:
+                    - variables:
+                        current_brightness: "{{ state_attr(light_entity,'brightness') | int(0) }}"
+                        target_brightness: >
+                          {% set proposed = current_brightness + step_abs_value %}
+                          {{ [proposed, max_abs_brightness] | min }}
                     - choose:
                         - conditions: "{{ debug_verbose }}"
                           sequence:
@@ -446,23 +452,27 @@ action:
                               data:
                                 level: debug
                                 message: >
-                                  [Zooz Light Pro] brighten step +{{ step_pct }}% | current={{ state_attr(light_entity,'brightness')|int(0) }}/255 cap={{ max_abs_brightness }}
+                                  [Zooz Light Pro] brighten step to {{ target_brightness }}/255 | current={{ current_brightness }}/255 cap={{ max_abs_brightness }}
                       default: []
                     - if:
                         - condition: template
-                          value_template: "{{ area_set }}"
+                          value_template: "{{ target_brightness > current_brightness }}"
                       then:
-                        - service: light.turn_on
-                          target:
-                            area_id: "{{ light_area_in }}"
-                          data:
-                            brightness_step_pct: "{{ step_pct | float }}"
-                      else:
-                        - service: light.turn_on
-                          target:
-                            entity_id: "{{ light_entity }}"
-                          data:
-                            brightness_step_pct: "{{ step_pct | float }}"
+                        - if:
+                            - condition: template
+                              value_template: "{{ area_set }}"
+                          then:
+                            - service: light.turn_on
+                              target:
+                                area_id: "{{ light_area_in }}"
+                              data:
+                                brightness: "{{ target_brightness | int }}"
+                          else:
+                            - service: light.turn_on
+                              target:
+                                entity_id: "{{ light_entity }}"
+                              data:
+                                brightness: "{{ target_brightness | int }}"
               until:
                 - condition: template
                   value_template: "{{ wait is defined and wait.completed }}"
@@ -518,6 +528,11 @@ action:
                         - condition: template
                           value_template: "{{ is_state(light_entity, 'on') }}"
                       then:
+                        - variables:
+                            current_brightness: "{{ state_attr(light_entity,'brightness') | int(0) }}"
+                            target_brightness: >
+                              {% set proposed = current_brightness - step_abs_value %}
+                              {{ [proposed, 0] | max }}
                         - choose:
                             - conditions: "{{ debug_verbose }}"
                               sequence:
@@ -525,50 +540,51 @@ action:
                                   data:
                                     level: debug
                                     message: >
-                                      [Zooz Light Pro] dim step -{{ step_pct }}% | current={{ state_attr(light_entity,'brightness')|int(0) }}/255 min={{ min_abs_brightness }}
+                                      [Zooz Light Pro] dim step to {{ target_brightness }}/255 | current={{ current_brightness }}/255 min={{ min_abs_brightness }}
                           default: []
-                        - if:
-                            - condition: template
-                              value_template: "{{ area_set }}"
-                          then:
-                            - service: light.turn_on
-                              target:
-                                area_id: "{{ light_area_in }}"
-                              data:
-                                brightness_step_pct: "{{ (0 - step_pct | float) }}"
-                          else:
-                            - service: light.turn_on
-                              target:
-                                entity_id: "{{ light_entity }}"
-                              data:
-                                brightness_step_pct: "{{ (0 - step_pct | float) }}"
-                        # After step, check threshold and power off if at/under clamp_min
-                        - if:
-                            - condition: template
-                              value_template: >
-                                {% set b = state_attr(light_entity,'brightness') %}
-                                {{ (b if b is number else 0) | int(0) <= min_abs_brightness }}
-                          then:
-                            - choose:
-                                - conditions: "{{ debug_enabled }}"
-                                  sequence:
-                                    - service: system_log.write
-                                      data:
-                                        level: info
-                                        message: "[Zooz Light Pro] brightness <= min clamp → light.turn_off"
-                              default: []
+                        - choose:
+                            - conditions: "{{ target_brightness <= min_abs_brightness }}"
+                              sequence:
+                                - choose:
+                                    - conditions: "{{ debug_enabled }}"
+                                      sequence:
+                                        - service: system_log.write
+                                          data:
+                                            level: info
+                                            message: "[Zooz Light Pro] brightness <= min clamp → light.turn_off"
+                                  default: []
+                                - if:
+                                    - condition: template
+                                      value_template: "{{ area_set }}"
+                                  then:
+                                    - service: light.turn_off
+                                      target:
+                                        area_id: "{{ light_area_in }}"
+                                  else:
+                                    - service: light.turn_off
+                                      target:
+                                        entity_id: "{{ light_entity }}"
+                                - stop: "Dim hold reached minimum; turning off"
+                          default:
                             - if:
                                 - condition: template
-                                  value_template: "{{ area_set }}"
+                                  value_template: "{{ target_brightness < current_brightness }}"
                               then:
-                                - service: light.turn_off
-                                  target:
-                                    area_id: "{{ light_area_in }}"
-                              else:
-                                - service: light.turn_off
-                                  target:
-                                    entity_id: "{{ light_entity }}"
-                            - stop: "Dim hold reached minimum; turning off"
+                                - if:
+                                    - condition: template
+                                      value_template: "{{ area_set }}"
+                                  then:
+                                    - service: light.turn_on
+                                      target:
+                                        area_id: "{{ light_area_in }}"
+                                      data:
+                                        brightness: "{{ target_brightness | int }}"
+                                  else:
+                                    - service: light.turn_on
+                                      target:
+                                        entity_id: "{{ light_entity }}"
+                                      data:
+                                        brightness: "{{ target_brightness | int }}"
               until:
                 - condition: template
                   value_template: "{{ wait is defined and wait.completed }}"
