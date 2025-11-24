@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.1 - 2025-11-24
+### Added
+- Display the selected device's vendor/model/name below the switch selector so you can confirm the detected hardware before saving.
+### Changed
+- Generalized the hold-step delay and on/off transition inputs so the dimming controls apply to both Central Scene switches and Lutron Pico remotes, keeping the fade timings consistent.
+
 ## 1.1.0 - 2025-11-24
 ### Added
 - Rename the blueprint to **Multi Switch Light Control Pro** and allow a single automation to target Zooz/Z-Wave, Inovelli, or Lutron Pico hardware.

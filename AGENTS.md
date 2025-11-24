@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- Blueprints live one per folder at the repo root: `adaptive-comfort-control/`, `bathroom-light-fan-control/`, `zooz-zwave-light-switch-control/`.
+- Blueprints live one per folder at the repo root: `adaptive-comfort-control/`, `bathroom-light-fan-control/`, `multi-switch-light-control/`, `zooz-zwave-light-switch-control/`.
 - Each blueprint folder contains the YAML (`*_blueprint.yaml` or `*_pro.yaml`), a `README.md`, and `CHANGELOG.md`. Treat each folder as a self-contained module with its own version and docs.
 - Cross-blueprint guidance sits in `README.md` (overview) and `WARP.md` (agent workflow). No build artifacts or generated files are committed.
 

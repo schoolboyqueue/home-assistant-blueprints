@@ -1,6 +1,6 @@
 ---
 blueprint:
-  name: "Multi Switch Light Control Pro v1.1.0"
+  name: "Multi Switch Light Control Pro v1.1.1"
   description: >
     Turn a supported Zooz or Inovelli Z-Wave switch, or a Lutron Pico remote, into
     a smart light controller. The blueprint inspects the selected device at runtime,
@@ -23,6 +23,11 @@ blueprint:
             REQUIRED. Select any Zooz/Inovelli Z-Wave JS switch or a Lutron Pico remote.
             The blueprint auto-detects the device's vendor/model and adapts the
             trigger grammar that follows so the automation uses the correct events.
+            {% if switch_device is defined %}
+            Selected device: {{ device_attr(switch_device, 'name') | default('Unknown device') }}
+            ({{ device_attr(switch_device, 'manufacturer') | default('Unknown vendor') }}
+            {{ device_attr(switch_device, 'model') | default('Unknown model') }})
+            {% endif %}
           selector:
             device:
               multiple: false
@@ -56,7 +61,7 @@ blueprint:
               unit_of_measurement: "%"
         dim_interval_ms:
           name: "Dim interval (ms)"
-          description: "Delay between each brightness step while holding the paddle."
+          description: "Delay between each brightness step while holding the paddle or a Lutron raise/lower button."
           default: 200
           selector:
             number:
@@ -103,16 +108,6 @@ blueprint:
       name: Lutron Pico tuning
       icon: mdi:remote
       input:
-        lutron_step_delay_ms:
-          name: "Lutron step delay (ms)"
-          description: "Wait time between brightness steps while holding the raise/lower buttons."
-          default: 450
-          selector:
-            number:
-              min: 100
-              max: 1000
-              step: 50
-              unit_of_measurement: "ms"
         lutron_middle_button_action:
           name: "Middle (favorite) button action"
           description: "Optional sequence to run when the Pico favorite button is pressed."
@@ -148,7 +143,7 @@ blueprint:
               unit_of_measurement: seconds
         lutron_on_transition_s:
           name: "Lutron On transition (seconds)"
-          description: "Fade time when the Pico On button turns the lights on."
+          description: "Fade time when the Pico or a Central Scene on command turns the lights on."
           default: 1
           selector:
             number:
@@ -157,7 +152,7 @@ blueprint:
               unit_of_measurement: seconds
         lutron_off_transition_s:
           name: "Lutron Off transition (seconds)"
-          description: "Fade time when the Pico Off button turns the lights off."
+          description: "Fade time when the Pico or a Central Scene off command turns the lights off."
           default: 2
           selector:
             number:
@@ -181,7 +176,7 @@ blueprint:
                 - "basic"
                 - "verbose"
 variables:
-  blueprint_version: "1.1.0"
+  blueprint_version: "1.1.1"
 
   switch_device: !input switch_device
   light_entity: !input light_target
@@ -191,7 +186,6 @@ variables:
   min_on_brightness_pct_in: !input min_on_brightness_pct
   clamp_min_pct_in: !input clamp_min_pct
   clamp_max_pct_in: !input clamp_max_pct
-  lutron_step_delay_ms_in: !input lutron_step_delay_ms
   lutron_middle_button_action_input: !input lutron_middle_button_action
   lutron_middle_button_brightness_pct_in: !input lutron_middle_button_brightness_pct
   lutron_middle_button_kelvin_in: !input lutron_middle_button_kelvin
@@ -211,7 +205,6 @@ variables:
   min_on_abs_brightness: "{{ (min_on_brightness_pct_v / 100.0 * 255) | round(0) | int }}"
   max_abs_brightness: "{{ (clamp_max_pct_v / 100.0 * 255) | round(0) | int }}"
 
-  lutron_step_delay_ms: "{{ lutron_step_delay_ms_in | int(450) }}"
   lutron_middle_button_brightness_pct: "{{ lutron_middle_button_brightness_pct_in | float(80) }}"
   lutron_middle_button_kelvin: "{{ lutron_middle_button_kelvin_in | int(2800) }}"
   lutron_middle_button_transition_s: "{{ lutron_middle_button_transition_s_in | float(1) }}"
@@ -512,7 +505,7 @@ action:
                   type: release
                   subtype: raise
               timeout:
-                milliseconds: "{{ lutron_step_delay_ms }}"
+                milliseconds: "{{ interval_ms }}"
               continue_on_timeout: true
             - if:
                 - condition: template
@@ -618,7 +611,7 @@ action:
                   type: release
                   subtype: lower
               timeout:
-                milliseconds: "{{ lutron_step_delay_ms }}"
+                milliseconds: "{{ interval_ms }}"
               continue_on_timeout: true
             - if:
                 - condition: template
@@ -690,10 +683,14 @@ action:
           - service: light.turn_on
             target:
               area_id: "{{ light_area_in }}"
+            data:
+              transition: "{{ lutron_on_transition_s }}"
         else:
           - service: light.turn_on
             target:
               entity_id: "{{ light_entity }}"
+            data:
+              transition: "{{ lutron_on_transition_s }}"
   - if:
       - condition: template
         value_template: >
@@ -715,10 +712,14 @@ action:
           - service: light.turn_off
             target:
               area_id: "{{ light_area_in }}"
+            data:
+              transition: "{{ lutron_off_transition_s }}"
         else:
           - service: light.turn_off
             target:
               entity_id: "{{ light_entity }}"
+            data:
+              transition: "{{ lutron_off_transition_s }}"
   - if:
       - condition: template
         value_template: >

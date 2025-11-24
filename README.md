@@ -56,7 +56,7 @@ Advanced HVAC automation implementing ASHRAE‑55 adaptive comfort with built‑
 ---
 
 ### 2) Bathroom Light Fan Control Pro
-Coordinated bathroom light and fan automation with occupancy ("Wasp‑in‑a‑Box"), humidity delta and rate‑of‑change detection, night mode, and manual override.
+Coordinated bathroom light and fan automation with occupancy ("Wasp-in-a-Box"), humidity delta and rate-of-change detection, night mode, and manual override.
 
 <a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/bathroom-light-fan-control/bathroom_light_fan_control_pro.yaml"><img alt="Import Bathroom Light & Fan" src="https://img.shields.io/badge/Import-Home%20Assistant-2D9BF0?logo=homeassistant&logoColor=white"></a>
 
@@ -67,10 +67,22 @@ Coordinated bathroom light and fan automation with occupancy ("Wasp‑in‑a‑B
 
 ---
 
-### 3) Zooz Z‑Wave Light Switch Control Pro
-Z‑Wave dimming via Central Scene events (ZEN71/72/76/77). Single press on/off, hold‑to‑dim with release detection, and configurable parameters. Supports `zwave_js_event` and `zwave_js_value_notification`.
+### 3) Multi Switch Light Control Pro
+A single automation that adapts to Zooz/Inovelli Central Scene switches or Lutron Pico remotes, auto-detects the selected hardware, and unifies dimming/transition tuning across every trigger.
 
-<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/zooz-zwave-light-switch-control/zooz_zwave_light_switch_control_pro.yaml"><img alt="Import Zooz Z‑Wave" src="https://img.shields.io/badge/Import-Home%20Assistant-2D9BF0?logo=homeassistant&logoColor=white"></a>
+<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/multi-switch-light-control/multi_switch_light_control_pro.yaml"><img alt="Import Multi Switch Light Control" src="https://img.shields.io/badge/Import-Home%20Assistant-2D9BF0?logo=homeassistant&logoColor=white"></a>
+
+**Quick Links:**
+<a href="https://raw.githubusercontent.com/schoolboyqueue/home-assistant-blueprints/main/multi-switch-light-control/multi_switch_light_control_pro.yaml">Raw</a> •
+<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/multi-switch-light-control/README.md">Docs</a> •
+<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/multi-switch-light-control/CHANGELOG.md">Changelog</a>
+
+---
+
+### 4) Zooz Z-Wave Light Switch Control Pro
+Z-Wave dimming via Central Scene events (ZEN71/72/76/77). Single press on/off, hold-to-dim with release detection, and configurable parameters. Supports `zwave_js_event` and `zwave_js_value_notification`.
+
+<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/zooz-zwave-light-switch-control/zooz_zwave_light_switch_control_pro.yaml"><img alt="Import Zooz Z-Wave" src="https://img.shields.io/badge/Import-Home%20Assistant-2D9BF0?logo=homeassistant&logoColor=white"></a>
 
 **Quick Links:**
 <a href="https://raw.githubusercontent.com/schoolboyqueue/home-assistant-blueprints/main/zooz-zwave-light-switch-control/zooz_zwave_light_switch_control_pro.yaml">Raw</a> •
@@ -105,6 +117,10 @@ Z‑Wave dimming via Central Scene events (ZEN71/72/76/77). Single press on/off,
 │   └── README.md
 ├── bathroom-light-fan-control/
 │   ├── bathroom_light_fan_control_pro.yaml
+│   ├── CHANGELOG.md
+│   └── README.md
+├── multi-switch-light-control/
+│   ├── multi_switch_light_control_pro_blueprint.yaml
 │   ├── CHANGELOG.md
 │   └── README.md
 ├── zooz-zwave-light-switch-control/
