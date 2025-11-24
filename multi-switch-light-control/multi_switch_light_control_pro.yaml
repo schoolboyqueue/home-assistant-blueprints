@@ -23,11 +23,6 @@ blueprint:
             REQUIRED. Select any Zooz/Inovelli Z-Wave JS switch or a Lutron Pico remote.
             The blueprint auto-detects the device's vendor/model and adapts the
             trigger grammar that follows so the automation uses the correct events.
-            {% if switch_device is defined %}
-            Selected device: {{ device_attr(switch_device, 'name') | default('Unknown device') }}
-            ({{ device_attr(switch_device, 'manufacturer') | default('Unknown vendor') }}
-            {{ device_attr(switch_device, 'model') | default('Unknown model') }})
-            {% endif %}
           selector:
             device:
               multiple: false
