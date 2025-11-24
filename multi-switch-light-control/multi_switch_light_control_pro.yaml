@@ -1,6 +1,6 @@
 ---
 blueprint:
-  name: "Multi Switch Light Control Pro v1.1.1"
+  name: "Multi Switch Light Control Pro v1.2.0"
   description: >
     Turn a supported Zooz or Inovelli Z-Wave switch, or a Lutron Pico remote, into
     a smart light controller. The blueprint inspects the selected device at runtime,
@@ -98,6 +98,70 @@ blueprint:
               step: 1
               mode: slider
               unit_of_measurement: "%"
+    scene_actions:
+      name: Central Scene actions
+      icon: mdi:gesture-tap
+      input:
+        up_press_1_action:
+          name: "Up button press (1x)"
+          description: "Optional custom action when the Up button is pressed once."
+          selector:
+            action: {}
+          default: []
+        up_press_2_action:
+          name: "Up button press (2x)"
+          description: "Optional custom action when the Up button is pressed twice."
+          selector:
+            action: {}
+          default: []
+        up_press_3_action:
+          name: "Up button press (3x)"
+          description: "Optional custom action when the Up button is pressed three times."
+          selector:
+            action: {}
+          default: []
+        up_press_4_action:
+          name: "Up button press (4x)"
+          description: "Optional custom action when the Up button is pressed four times."
+          selector:
+            action: {}
+          default: []
+        up_press_5_action:
+          name: "Up button press (5x)"
+          description: "Optional custom action when the Up button is pressed five times."
+          selector:
+            action: {}
+          default: []
+        down_press_1_action:
+          name: "Down button press (1x)"
+          description: "Optional custom action when the Down button is pressed once."
+          selector:
+            action: {}
+          default: []
+        down_press_2_action:
+          name: "Down button press (2x)"
+          description: "Optional custom action when the Down button is pressed twice."
+          selector:
+            action: {}
+          default: []
+        down_press_3_action:
+          name: "Down button press (3x)"
+          description: "Optional custom action when the Down button is pressed three times."
+          selector:
+            action: {}
+          default: []
+        down_press_4_action:
+          name: "Down button press (4x)"
+          description: "Optional custom action when the Down button is pressed four times."
+          selector:
+            action: {}
+          default: []
+        down_press_5_action:
+          name: "Down button press (5x)"
+          description: "Optional custom action when the Down button is pressed five times."
+          selector:
+            action: {}
+          default: []
 
     lutron:
       name: Lutron Pico tuning
@@ -171,7 +235,7 @@ blueprint:
                 - "basic"
                 - "verbose"
 variables:
-  blueprint_version: "1.1.1"
+  blueprint_version: "1.2.0"
 
   switch_device: !input switch_device
   light_entity: !input light_target
@@ -181,6 +245,16 @@ variables:
   min_on_brightness_pct_in: !input min_on_brightness_pct
   clamp_min_pct_in: !input clamp_min_pct
   clamp_max_pct_in: !input clamp_max_pct
+  up_press_1_action_input: !input up_press_1_action
+  up_press_2_action_input: !input up_press_2_action
+  up_press_3_action_input: !input up_press_3_action
+  up_press_4_action_input: !input up_press_4_action
+  up_press_5_action_input: !input up_press_5_action
+  down_press_1_action_input: !input down_press_1_action
+  down_press_2_action_input: !input down_press_2_action
+  down_press_3_action_input: !input down_press_3_action
+  down_press_4_action_input: !input down_press_4_action
+  down_press_5_action_input: !input down_press_5_action
   lutron_middle_button_action_input: !input lutron_middle_button_action
   lutron_middle_button_brightness_pct_in: !input lutron_middle_button_brightness_pct
   lutron_middle_button_kelvin_in: !input lutron_middle_button_kelvin
@@ -375,6 +449,78 @@ trigger:
       property: "scene"
       property_key: "002"
       value: "KeyPressed3x"
+  - platform: event
+    id: up_quad
+    event_type: zwave_js_event
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "001"
+      value: 5
+  - platform: event
+    id: up_quad
+    event_type: zwave_js_value_notification
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "001"
+      value: "KeyPressed4x"
+  - platform: event
+    id: down_quad
+    event_type: zwave_js_event
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "002"
+      value: 5
+  - platform: event
+    id: down_quad
+    event_type: zwave_js_value_notification
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "002"
+      value: "KeyPressed4x"
+  - platform: event
+    id: up_quint
+    event_type: zwave_js_event
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "001"
+      value: 6
+  - platform: event
+    id: up_quint
+    event_type: zwave_js_value_notification
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "001"
+      value: "KeyPressed5x"
+  - platform: event
+    id: down_quint
+    event_type: zwave_js_event
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "002"
+      value: 6
+  - platform: event
+    id: down_quint
+    event_type: zwave_js_value_notification
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "002"
+      value: "KeyPressed5x"
   - trigger: device
     device_id: !input switch_device
     domain: lutron_caseta
@@ -664,26 +810,41 @@ action:
     then:
       - if:
           - condition: template
-            value_template: "{{ debug_enabled }}"
+            value_template: "{{ up_press_1_action_input | length > 0 }}"
         then:
-          - service: system_log.write
-            data:
-              level: info
-              message: >
-                [Multi Switch Light Pro] up_single → light.turn_on (restore last)
-      - if:
-          - condition: template
-            value_template: "{{ area_set }}"
-        then:
-          - service: light.turn_on
-            target:
-              area_id: "{{ light_area_in }}"
-            data:
-              transition: "{{ lutron_on_transition_s }}"
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+                  level: info
+                  message: >
+                    [Multi Switch Light Pro] up_single → custom action
+          - sequence: !input up_press_1_action
         else:
-          - service: light.turn_on
-            target:
-              entity_id: "{{ light_entity }}"
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+                  level: info
+                  message: >
+                    [Multi Switch Light Pro] up_single → light.turn_on (restore last)
+          - if:
+              - condition: template
+                value_template: "{{ area_set }}"
+            then:
+              - service: light.turn_on
+                target:
+                  area_id: "{{ light_area_in }}"
+                data:
+                  transition: "{{ lutron_on_transition_s }}"
+            else:
+              - service: light.turn_on
+                target:
+                  entity_id: "{{ light_entity }}"
             data:
               transition: "{{ lutron_on_transition_s }}"
   - if:
@@ -693,28 +854,43 @@ action:
     then:
       - if:
           - condition: template
-            value_template: "{{ debug_enabled }}"
+            value_template: "{{ down_press_1_action_input | length > 0 }}"
         then:
-          - service: system_log.write
-            data:
-              level: info
-              message: >
-                [Multi Switch Light Pro] down_single → light.turn_off
-      - if:
-          - condition: template
-            value_template: "{{ area_set }}"
-        then:
-          - service: light.turn_off
-            target:
-              area_id: "{{ light_area_in }}"
-            data:
-              transition: "{{ lutron_off_transition_s }}"
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+                  level: info
+                  message: >
+                    [Multi Switch Light Pro] down_single → custom action
+          - sequence: !input down_press_1_action
         else:
-          - service: light.turn_off
-            target:
-              entity_id: "{{ light_entity }}"
-            data:
-              transition: "{{ lutron_off_transition_s }}"
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+                  level: info
+                  message: >
+                    [Multi Switch Light Pro] down_single → light.turn_off
+          - if:
+              - condition: template
+                value_template: "{{ area_set }}"
+            then:
+              - service: light.turn_off
+                target:
+                  area_id: "{{ light_area_in }}"
+                data:
+                  transition: "{{ lutron_off_transition_s }}"
+            else:
+              - service: light.turn_off
+                target:
+                  entity_id: "{{ light_entity }}"
+                data:
+                  transition: "{{ lutron_off_transition_s }}"
   - if:
       - condition: template
         value_template: >
@@ -962,13 +1138,28 @@ action:
     then:
       - if:
           - condition: template
-            value_template: "{{ debug_enabled }}"
+            value_template: "{{ up_press_2_action_input | length > 0 }}"
         then:
-          - service: system_log.write
-            data:
-              level: info
-              message: >
-                [Multi Switch Light Pro] up_double → run custom action
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+                  level: info
+                  message: >
+                    [Multi Switch Light Pro] up_double → custom action
+          - sequence: !input up_press_2_action
+        else:
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+                  level: info
+                  message: >
+                    [Multi Switch Light Pro] up_double → run custom action
   - if:
       - condition: template
         value_template: >
@@ -976,13 +1167,28 @@ action:
     then:
       - if:
           - condition: template
-            value_template: "{{ debug_enabled }}"
+            value_template: "{{ down_press_2_action_input | length > 0 }}"
         then:
-          - service: system_log.write
-            data:
-              level: info
-              message: >
-                [Multi Switch Light Pro] down_double → run custom action
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+                  level: info
+                  message: >
+                    [Multi Switch Light Pro] down_double → custom action
+          - sequence: !input down_press_2_action
+        else:
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+                  level: info
+                  message: >
+                    [Multi Switch Light Pro] down_double → run custom action
   - if:
       - condition: template
         value_template: >
@@ -990,13 +1196,28 @@ action:
     then:
       - if:
           - condition: template
-            value_template: "{{ debug_enabled }}"
+            value_template: "{{ up_press_3_action_input | length > 0 }}"
         then:
-          - service: system_log.write
-            data:
-              level: info
-              message: >
-                [Multi Switch Light Pro] up_triple → run custom action
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+                  level: info
+                  message: >
+                    [Multi Switch Light Pro] up_triple → custom action
+          - sequence: !input up_press_3_action
+        else:
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+                  level: info
+                  message: >
+                    [Multi Switch Light Pro] up_triple → run custom action
   - if:
       - condition: template
         value_template: >
@@ -1004,10 +1225,141 @@ action:
     then:
       - if:
           - condition: template
-            value_template: "{{ debug_enabled }}"
+            value_template: "{{ down_press_3_action_input | length > 0 }}"
         then:
-          - service: system_log.write
-            data:
-              level: info
-              message: >
-                [Multi Switch Light Pro] down_triple → run custom action
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+                  level: info
+                  message: >
+                    [Multi Switch Light Pro] down_triple → custom action
+          - sequence: !input down_press_3_action
+        else:
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+            level: info
+            message: >
+              [Multi Switch Light Pro] down_triple → run custom action
+  - if:
+      - condition: template
+        value_template: >
+          {{ switch_type != 'lutron' and trigger.id == 'up_quad' }}
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ up_press_4_action_input | length > 0 }}"
+        then:
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+                  level: info
+                  message: >
+                    [Multi Switch Light Pro] up_quad → custom action
+          - sequence: !input up_press_4_action
+        else:
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+                  level: info
+                  message: >
+                    [Multi Switch Light Pro] up_quad → no action defined
+  - if:
+      - condition: template
+        value_template: >
+          {{ switch_type != 'lutron' and trigger.id == 'down_quad' }}
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ down_press_4_action_input | length > 0 }}"
+        then:
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+                  level: info
+                  message: >
+                    [Multi Switch Light Pro] down_quad → custom action
+          - sequence: !input down_press_4_action
+        else:
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+                  level: info
+                  message: >
+                    [Multi Switch Light Pro] down_quad → no action defined
+  - if:
+      - condition: template
+        value_template: >
+          {{ switch_type != 'lutron' and trigger.id == 'up_quint' }}
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ up_press_5_action_input | length > 0 }}"
+        then:
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+                  level: info
+                  message: >
+                    [Multi Switch Light Pro] up_quint → custom action
+          - sequence: !input up_press_5_action
+        else:
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+                  level: info
+                  message: >
+                    [Multi Switch Light Pro] up_quint → no action defined
+  - if:
+      - condition: template
+        value_template: >
+          {{ switch_type != 'lutron' and trigger.id == 'down_quint' }}
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ down_press_5_action_input | length > 0 }}"
+        then:
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+                  level: info
+                  message: >
+                    [Multi Switch Light Pro] down_quint → custom action
+          - sequence: !input down_press_5_action
+        else:
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+                  level: info
+                  message: >
+                    [Multi Switch Light Pro] down_quint → no action defined

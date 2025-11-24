@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.0 - 2025-11-24
+### Added
+- Custom Central Scene actions for up/down presses (1x through 5x) so each tap count can run a user-defined automation, including full logging and quadruple/quintuple event support.
 ## 1.1.1 - 2025-11-24
 ### Added
 - Display the selected device's vendor/model/name below the switch selector so you can confirm the detected hardware before saving.

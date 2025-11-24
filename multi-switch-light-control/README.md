@@ -1,6 +1,6 @@
 # Multi Switch Light Control Pro
 
-**Version:** 1.1.0  
+**Version:** 1.2.0  
 **Author:** Jeremy Carter  
 **Home Assistant blueprint that supports Zooz/Inovelli Z-Wave switches plus Lutron Pico remotes.**
 
@@ -32,6 +32,7 @@ Supported behaviors:
 - **Light entity/area:** The blueprint always reads brightness from the chosen light entity, even when commands target an area.
 - **Dimming parameters:** Adjust brightness step, interval, and min/max clamps. These values drive both Z-Wave and Lutron hold loops.
 - **Lutron tuning:** Configure the favorite button defaults, transition speeds, and hold step delay specific to Pico remotes.
+- **Central Scene actions:** Optional custom sequences for up/down presses (1x-5x) let you wire multi-tap gestures to other automations while still running the default turn on/off/dim behavior when left blank.
 - **Diagnostics:** `basic`/`verbose` logging prints both central scene transitions and brightness calculations as the automation runs.
 
 ## Debug & Troubleshooting
