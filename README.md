@@ -79,16 +79,6 @@ A single automation that adapts to Zooz/Inovelli Central Scene switches or Lutro
 
 ---
 
-### 4) Zooz Z-Wave Light Switch Control Pro
-Z-Wave dimming via Central Scene events (ZEN71/72/76/77). Single press on/off, hold-to-dim with release detection, and configurable parameters. Supports `zwave_js_event` and `zwave_js_value_notification`.
-
-<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/zooz-zwave-light-switch-control/zooz_zwave_light_switch_control_pro.yaml"><img alt="Import Zooz Z-Wave" src="https://img.shields.io/badge/Import-Home%20Assistant-2D9BF0?logo=homeassistant&logoColor=white"></a>
-
-**Quick Links:**
-<a href="https://raw.githubusercontent.com/schoolboyqueue/home-assistant-blueprints/main/zooz-zwave-light-switch-control/zooz_zwave_light_switch_control_pro.yaml">Raw</a> •
-<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/zooz-zwave-light-switch-control/README.md">Docs</a> •
-<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/zooz-zwave-light-switch-control/CHANGELOG.md">Changelog</a>
-
 ---
 
 ## Quick Start
@@ -121,10 +111,6 @@ Z-Wave dimming via Central Scene events (ZEN71/72/76/77). Single press on/off, h
 │   └── README.md
 ├── multi-switch-light-control/
 │   ├── multi_switch_light_control_pro_blueprint.yaml
-│   ├── CHANGELOG.md
-│   └── README.md
-├── zooz-zwave-light-switch-control/
-│   ├── zooz_zwave_light_switch_control_pro.yaml
 │   ├── CHANGELOG.md
 │   └── README.md
 ├── WARP.md
