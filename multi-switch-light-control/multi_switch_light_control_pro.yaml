@@ -1,6 +1,6 @@
 ---
 blueprint:
-  name: "Multi Switch Light Control Pro"
+  name: "Multi Switch Light Control Pro v1.1.0"
   description: >
     Turn a supported Zooz or Inovelli Z-Wave switch, or a Lutron Pico remote, into
     a smart light controller. The blueprint inspects the selected device at runtime,
