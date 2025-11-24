@@ -1,6 +1,6 @@
 # Multi Switch Light Control Pro
 
-**Version:** 1.1.0  
+**Version:** 1.1.1  
 **Author:** Jeremy Carter  
 **Home Assistant blueprint that supports Zooz/Inovelli Z-Wave switches plus Lutron Pico remotes.**
 
