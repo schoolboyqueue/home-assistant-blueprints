@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.0 - 2025-11-24
+### Added
+- Rename the blueprint to **Multi Switch Light Control Pro** and allow a single automation to target Zooz/Z-Wave, Inovelli, or Lutron Pico hardware.
+- Auto-detect the selected device's manufacturer/model/type and log it when diagnostics are enabled so you can verify the detection.
+- Add dedicated Lutron Pico tuning inputs (favorite button defaults, transition speeds, hold step delay) and a favorite button override action.
+- Include Lutron press/release triggers alongside the existing Z-Wave Central Scene events so each device type uses the proper button grammar.
+### Changed
+- Reworked the description, README, and folder/file names to describe the new multi-switch experience.
+- Keep the existing Zooz/Inovelli hold-to-dim logic while offering the same configurable dimming inputs to Lutrons.
+
 ## 1.0.0 - 2025-01-09
 ### Added
 - Initial stable release of Zooz Z-Wave Light Switch Control Pro

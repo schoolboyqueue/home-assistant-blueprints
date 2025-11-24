@@ -1,0 +1,1017 @@
+---
+blueprint:
+  name: "Multi Switch Light Control Pro"
+  description: >
+    Turn a supported Zooz or Inovelli Z-Wave switch, or a Lutron Pico remote, into
+    a smart light controller. The blueprint inspects the selected device at runtime,
+    logs the detected manufacturer/model/type when diagnostics are enabled, and
+    automatically adapts triggers + logic for Zooz, Inovelli, or Lutron hardware.
+  domain: automation
+  author: "Jeremy Carter"
+  source_url: >
+    https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/
+    multi-switch-light-control/multi_switch_light_control_pro.yaml
+
+  input:
+    core:
+      name: Device & Lights
+      icon: mdi:light-switch
+      input:
+        switch_device:
+          name: "Switch or remote device"
+          description: >
+            REQUIRED. Select any Zooz/Inovelli Z-Wave JS switch or a Lutron Pico remote.
+            The blueprint auto-detects the device's vendor/model and adapts the
+            trigger grammar that follows so the automation uses the correct events.
+          selector:
+            device:
+              multiple: false
+        light_target:
+          name: "Light entity"
+          description: "Primary light used for brightness reads and the default target."
+          selector:
+            entity:
+              domain: light
+        light_area:
+          name: "Optional: Area target"
+          description: "If set, actions target this area instead of the single light entity."
+          default: ""
+          selector:
+            area: {}
+
+    dimming:
+      name: Dimming parameters
+      icon: mdi:brightness-6
+      input:
+        brightness_step_pct:
+          name: "Brightness step (%)"
+          description: "Amount to change the light each time the hold loop steps."
+          default: 5
+          selector:
+            number:
+              min: 1
+              max: 50
+              step: 1
+              mode: slider
+              unit_of_measurement: "%"
+        dim_interval_ms:
+          name: "Dim interval (ms)"
+          description: "Delay between each brightness step while holding the paddle."
+          default: 200
+          selector:
+            number:
+              min: 50
+              max: 1000
+              step: 10
+              mode: slider
+              unit_of_measurement: "ms"
+        min_on_brightness_pct:
+          name: "Min on brightness when holding up (%)"
+          description: "When the light is off, hold Up ensures it starts at least this bright."
+          default: 10
+          selector:
+            number:
+              min: 1
+              max: 50
+              step: 1
+              mode: slider
+              unit_of_measurement: "%"
+        clamp_min_pct:
+          name: "Clamp minimum brightness (%)"
+          description: "Light turns off when dimming reaches this level or lower."
+          default: 1
+          selector:
+            number:
+              min: 0
+              max: 50
+              step: 1
+              mode: slider
+              unit_of_measurement: "%"
+        clamp_max_pct:
+          name: "Clamp maximum brightness (%)"
+          description: "Logical cap for verbose logging and hold loops."
+          default: 100
+          selector:
+            number:
+              min: 50
+              max: 100
+              step: 1
+              mode: slider
+              unit_of_measurement: "%"
+
+    lutron:
+      name: Lutron Pico tuning
+      icon: mdi:remote
+      input:
+        lutron_step_delay_ms:
+          name: "Lutron step delay (ms)"
+          description: "Wait time between brightness steps while holding the raise/lower buttons."
+          default: 450
+          selector:
+            number:
+              min: 100
+              max: 1000
+              step: 50
+              unit_of_measurement: "ms"
+        lutron_middle_button_action:
+          name: "Middle (favorite) button action"
+          description: "Optional sequence to run when the Pico favorite button is pressed."
+          selector:
+            action: {}
+          default: []
+        lutron_middle_button_brightness_pct:
+          name: "Middle button brightness"
+          description: "Brightness level when the favorite button uses the default action."
+          default: 80
+          selector:
+            number:
+              min: 1
+              max: 100
+              unit_of_measurement: "%"
+        lutron_middle_button_kelvin:
+          name: "Middle button color temperature"
+          description: "Color temperature used when the default favorite action fires."
+          default: 2800
+          selector:
+            number:
+              min: 1500
+              max: 40000
+              unit_of_measurement: kelvin
+        lutron_middle_button_transition_s:
+          name: "Middle button transition (seconds)"
+          description: "Fade time when the favorite button executes the default action."
+          default: 1
+          selector:
+            number:
+              min: 0
+              max: 10
+              unit_of_measurement: seconds
+        lutron_on_transition_s:
+          name: "Lutron On transition (seconds)"
+          description: "Fade time when the Pico On button turns the lights on."
+          default: 1
+          selector:
+            number:
+              min: 0
+              max: 10
+              unit_of_measurement: seconds
+        lutron_off_transition_s:
+          name: "Lutron Off transition (seconds)"
+          description: "Fade time when the Pico Off button turns the lights off."
+          default: 2
+          selector:
+            number:
+              min: 0
+              max: 10
+              unit_of_measurement: seconds
+
+    diagnostics:
+      name: Diagnostics
+      icon: mdi:bug-outline
+      input:
+        debug_level:
+          name: "Debug level"
+          description: "off: none, basic: key transitions, verbose: detailed brightness/clamp logging."
+          default: "off"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - "off"
+                - "basic"
+                - "verbose"
+variables:
+  blueprint_version: "1.1.0"
+
+  switch_device: !input switch_device
+  light_entity: !input light_target
+  light_area_in: !input light_area
+  step_pct_in: !input brightness_step_pct
+  interval_ms_in: !input dim_interval_ms
+  min_on_brightness_pct_in: !input min_on_brightness_pct
+  clamp_min_pct_in: !input clamp_min_pct
+  clamp_max_pct_in: !input clamp_max_pct
+  lutron_step_delay_ms_in: !input lutron_step_delay_ms
+  lutron_middle_button_action_input: !input lutron_middle_button_action
+  lutron_middle_button_brightness_pct_in: !input lutron_middle_button_brightness_pct
+  lutron_middle_button_kelvin_in: !input lutron_middle_button_kelvin
+  lutron_middle_button_transition_s_in: !input lutron_middle_button_transition_s
+  lutron_on_transition_s_in: !input lutron_on_transition_s
+  lutron_off_transition_s_in: !input lutron_off_transition_s
+  debug_level_v: !input debug_level
+
+  step_pct: "{{ step_pct_in | float(5) }}"
+  interval_ms: "{{ interval_ms_in | int(200) }}"
+  min_on_brightness_pct_v: "{{ min_on_brightness_pct_in | float(10) }}"
+  clamp_min_pct_v: "{{ clamp_min_pct_in | float(1) }}"
+  clamp_max_pct_v: "{{ clamp_max_pct_in | float(100) }}"
+  step_abs_value: "{{ (step_pct / 100.0 * 255) | round(0) | int }}"
+
+  min_abs_brightness: "{{ (clamp_min_pct_v / 100.0 * 255) | round(0) | int }}"
+  min_on_abs_brightness: "{{ (min_on_brightness_pct_v / 100.0 * 255) | round(0) | int }}"
+  max_abs_brightness: "{{ (clamp_max_pct_v / 100.0 * 255) | round(0) | int }}"
+
+  lutron_step_delay_ms: "{{ lutron_step_delay_ms_in | int(450) }}"
+  lutron_middle_button_brightness_pct: "{{ lutron_middle_button_brightness_pct_in | float(80) }}"
+  lutron_middle_button_kelvin: "{{ lutron_middle_button_kelvin_in | int(2800) }}"
+  lutron_middle_button_transition_s: "{{ lutron_middle_button_transition_s_in | float(1) }}"
+  lutron_on_transition_s: "{{ lutron_on_transition_s_in | float(1) }}"
+  lutron_off_transition_s: "{{ lutron_off_transition_s_in | float(2) }}"
+
+  detected_name: "{{ device_attr(switch_device, 'name') | default('Unknown device') }}"
+  detected_manufacturer: "{{ device_attr(switch_device, 'manufacturer') | default('Unknown vendor') }}"
+  detected_model: "{{ device_attr(switch_device, 'model') | default('Unknown model') }}"
+  detected_label: >
+    {{ detected_name }} | {{ detected_manufacturer }} {{ detected_model }}
+  switch_type: >
+    {% set manufacturer = detected_manufacturer | lower %}
+    {% if 'lutron' in manufacturer %}
+      lutron
+    {% elif 'inovelli' in manufacturer %}
+      inovelli
+    {% elif 'zooz' in manufacturer %}
+      zooz
+    {% else %}
+      generic
+    {% endif %}
+  area_set: >
+    {% set a = light_area_in %}
+    {{ a is string and a | length > 0 }}
+
+  debug_enabled: "{{ debug_level_v in ['basic','verbose'] }}"
+  debug_verbose: "{{ debug_level_v == 'verbose' }}"
+mode: restart
+max_exceeded: silent
+trigger:
+  - platform: event
+    id: up_single
+    event_type: zwave_js_event
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "001"
+      value: 0
+  - platform: event
+    id: up_single
+    event_type: zwave_js_value_notification
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "001"
+      value: "KeyPressed"
+  - platform: event
+    id: down_single
+    event_type: zwave_js_event
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "002"
+      value: 0
+  - platform: event
+    id: down_single
+    event_type: zwave_js_value_notification
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "002"
+      value: "KeyPressed"
+  - platform: event
+    id: up_hold_start
+    event_type: zwave_js_event
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "001"
+      value: 2
+  - platform: event
+    id: up_hold_start
+    event_type: zwave_js_value_notification
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "001"
+      value: "KeyHeldDown"
+  - platform: event
+    id: down_hold_start
+    event_type: zwave_js_event
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "002"
+      value: 2
+  - platform: event
+    id: down_hold_start
+    event_type: zwave_js_value_notification
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "002"
+      value: "KeyHeldDown"
+  - platform: event
+    id: up_double
+    event_type: zwave_js_event
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "001"
+      value: 3
+  - platform: event
+    id: up_double
+    event_type: zwave_js_value_notification
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "001"
+      value: "KeyPressed2x"
+  - platform: event
+    id: down_double
+    event_type: zwave_js_event
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "002"
+      value: 3
+  - platform: event
+    id: down_double
+    event_type: zwave_js_value_notification
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "002"
+      value: "KeyPressed2x"
+  - platform: event
+    id: up_triple
+    event_type: zwave_js_event
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "001"
+      value: 4
+  - platform: event
+    id: up_triple
+    event_type: zwave_js_value_notification
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "001"
+      value: "KeyPressed3x"
+  - platform: event
+    id: down_triple
+    event_type: zwave_js_event
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "002"
+      value: 4
+  - platform: event
+    id: down_triple
+    event_type: zwave_js_value_notification
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "002"
+      value: "KeyPressed3x"
+  - trigger: device
+    device_id: !input switch_device
+    domain: lutron_caseta
+    type: press
+    subtype: on
+    id: lutron_on
+  - trigger: device
+    device_id: !input switch_device
+    domain: lutron_caseta
+    type: press
+    subtype: raise
+    id: lutron_raise
+  - trigger: device
+    device_id: !input switch_device
+    domain: lutron_caseta
+    type: press
+    subtype: stop
+    id: lutron_stop
+  - trigger: device
+    device_id: !input switch_device
+    domain: lutron_caseta
+    type: press
+    subtype: lower
+    id: lutron_lower
+  - trigger: device
+    device_id: !input switch_device
+    domain: lutron_caseta
+    type: press
+    subtype: "off"
+    id: lutron_off
+  - trigger: device
+    device_id: !input switch_device
+    domain: lutron_caseta
+    type: release
+    subtype: raise
+    id: lutron_raise_release
+  - trigger: device
+    device_id: !input switch_device
+    domain: lutron_caseta
+    type: release
+    subtype: lower
+    id: lutron_lower_release
+condition: []
+action:
+  - if:
+      - condition: template
+        value_template: "{{ debug_enabled }}"
+    then:
+      - service: system_log.write
+        data:
+          level: info
+          message: >
+            [Multi Switch Light Pro] Detected switch {{ detected_label }}
+            | type={{ switch_type }}
+  - if:
+      - condition: template
+        value_template: >
+          {{ switch_type == 'lutron' and trigger.id == 'lutron_on' }}
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ debug_enabled }}"
+        then:
+          - service: system_log.write
+            data:
+              level: info
+              message: >
+                [Multi Switch Light Pro] lutron_on → light.turn_on
+      - if:
+          - condition: template
+            value_template: "{{ area_set }}"
+        then:
+          - service: light.turn_on
+            target:
+              area_id: "{{ light_area_in }}"
+            data:
+              brightness_pct: 100
+              transition: "{{ lutron_on_transition_s }}"
+        else:
+          - service: light.turn_on
+            target:
+              entity_id: "{{ light_entity }}"
+            data:
+              brightness_pct: 100
+              transition: "{{ lutron_on_transition_s }}"
+  - if:
+      - condition: template
+        value_template: >
+          {{ switch_type == 'lutron' and trigger.id == 'lutron_raise' }}
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ debug_enabled }}"
+        then:
+          - service: system_log.write
+            data:
+              level: info
+              message: >
+                [Multi Switch Light Pro] lutron_raise → hold brighten
+      - repeat:
+          sequence:
+            - if:
+                - condition: template
+                  value_template: "{{ area_set }}"
+              then:
+                - service: light.turn_on
+                  target:
+                    area_id: "{{ light_area_in }}"
+                  data:
+                    brightness_step_pct: "{{ step_pct }}"
+                  continue_on_error: true
+              else:
+                - service: light.turn_on
+                  target:
+                    entity_id: "{{ light_entity }}"
+                  data:
+                    brightness_step_pct: "{{ step_pct }}"
+                  continue_on_error: true
+            - wait_for_trigger:
+                - trigger: device
+                  device_id: !input switch_device
+                  domain: lutron_caseta
+                  type: release
+                  subtype: raise
+              timeout:
+                milliseconds: "{{ lutron_step_delay_ms }}"
+              continue_on_timeout: true
+            - if:
+                - condition: template
+                  value_template: >
+                    {{ wait is defined and wait.completed }}
+              then:
+                - if:
+                    - condition: template
+                      value_template: "{{ debug_enabled }}"
+                  then:
+                    - service: system_log.write
+                      data:
+                        level: info
+                        message: >
+                          [Multi Switch Light Pro] lutron_raise release → stop
+                          brighten
+                - stop:
+          until:
+            - condition: numeric_state
+              entity_id: "{{ light_entity }}"
+              attribute: brightness
+              above: 254
+  - if:
+      - condition: template
+        value_template: >
+          {{ switch_type == 'lutron' and trigger.id == 'lutron_stop' }}
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ debug_enabled }}"
+        then:
+          - service: system_log.write
+            data:
+              level: info
+              message: >
+                [Multi Switch Light Pro] lutron_stop → favorite button
+      - if:
+          - condition: template
+            value_template: >
+              {{
+                lutron_middle_button_action_input is defined and
+                lutron_middle_button_action_input | length > 0
+              }}
+        then:
+          - sequence: !input lutron_middle_button_action
+        else:
+          - if:
+              - condition: template
+                value_template: "{{ area_set }}"
+            then:
+              - service: light.turn_on
+                target:
+                  area_id: "{{ light_area_in }}"
+                data:
+                  brightness_pct: "{{ lutron_middle_button_brightness_pct }}"
+                  kelvin: "{{ lutron_middle_button_kelvin }}"
+                  transition: "{{ lutron_middle_button_transition_s }}"
+            else:
+              - service: light.turn_on
+                target:
+                  entity_id: "{{ light_entity }}"
+                data:
+                  brightness_pct: "{{ lutron_middle_button_brightness_pct }}"
+                  kelvin: "{{ lutron_middle_button_kelvin }}"
+                  transition: "{{ lutron_middle_button_transition_s }}"
+  - if:
+      - condition: template
+        value_template: >
+          {{ switch_type == 'lutron' and trigger.id == 'lutron_lower' }}
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ debug_enabled }}"
+        then:
+          - service: system_log.write
+            data:
+              level: info
+              message: >
+                [Multi Switch Light Pro] lutron_lower → hold dim
+      - repeat:
+          sequence:
+            - if:
+                - condition: template
+                  value_template: "{{ area_set }}"
+              then:
+                - service: light.turn_on
+                  target:
+                    area_id: "{{ light_area_in }}"
+                  data:
+                    brightness_step_pct: "{{ step_pct * -1 }}"
+                  continue_on_error: true
+              else:
+                - service: light.turn_on
+                  target:
+                    entity_id: "{{ light_entity }}"
+                  data:
+                    brightness_step_pct: "{{ step_pct * -1 }}"
+                  continue_on_error: true
+            - wait_for_trigger:
+                - trigger: device
+                  device_id: !input switch_device
+                  domain: lutron_caseta
+                  type: release
+                  subtype: lower
+              timeout:
+                milliseconds: "{{ lutron_step_delay_ms }}"
+              continue_on_timeout: true
+            - if:
+                - condition: template
+                  value_template: >
+                    {{ wait is defined and wait.completed }}
+              then:
+                - if:
+                    - condition: template
+                      value_template: "{{ debug_enabled }}"
+                  then:
+                    - service: system_log.write
+                      data:
+                        level: info
+                        message: >
+                          [Multi Switch Light Pro] lutron_lower release → stop dim
+                - stop:
+          until:
+            - condition: numeric_state
+              entity_id: "{{ light_entity }}"
+              attribute: brightness
+              below: 1
+  - if:
+      - condition: template
+        value_template: >
+          {{ switch_type == 'lutron' and trigger.id == 'lutron_off' }}
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ debug_enabled }}"
+        then:
+          - service: system_log.write
+            data:
+              level: info
+              message: >
+                [Multi Switch Light Pro] lutron_off → light.turn_off
+      - if:
+          - condition: template
+            value_template: "{{ area_set }}"
+        then:
+          - service: light.turn_off
+            target:
+              area_id: "{{ light_area_in }}"
+            data:
+              transition: "{{ lutron_off_transition_s }}"
+        else:
+          - service: light.turn_off
+            target:
+              entity_id: "{{ light_entity }}"
+            data:
+              transition: "{{ lutron_off_transition_s }}"
+  - if:
+      - condition: template
+        value_template: >
+          {{ switch_type != 'lutron' and trigger.id == 'up_single' }}
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ debug_enabled }}"
+        then:
+          - service: system_log.write
+            data:
+              level: info
+              message: >
+                [Multi Switch Light Pro] up_single → light.turn_on (restore last)
+      - if:
+          - condition: template
+            value_template: "{{ area_set }}"
+        then:
+          - service: light.turn_on
+            target:
+              area_id: "{{ light_area_in }}"
+        else:
+          - service: light.turn_on
+            target:
+              entity_id: "{{ light_entity }}"
+  - if:
+      - condition: template
+        value_template: >
+          {{ switch_type != 'lutron' and trigger.id == 'down_single' }}
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ debug_enabled }}"
+        then:
+          - service: system_log.write
+            data:
+              level: info
+              message: >
+                [Multi Switch Light Pro] down_single → light.turn_off
+      - if:
+          - condition: template
+            value_template: "{{ area_set }}"
+        then:
+          - service: light.turn_off
+            target:
+              area_id: "{{ light_area_in }}"
+        else:
+          - service: light.turn_off
+            target:
+              entity_id: "{{ light_entity }}"
+  - if:
+      - condition: template
+        value_template: >
+          {{ switch_type != 'lutron' and trigger.id == 'up_hold_start' }}
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ debug_enabled }}"
+        then:
+          - service: system_log.write
+            data:
+              level: info
+              message: >
+                [Multi Switch Light Pro] up_hold_start
+      - condition: template
+        value_template: "{{ states(light_entity) not in ['unknown','unavailable',''] }}"
+      - if:
+          - condition: template
+            value_template: "{{ is_state(light_entity, 'off') }}"
+        then:
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+                  level: info
+                  message: >
+                    [Multi Switch Light Pro] Light is off → turn_on to
+                    min_on_brightness_pct={{ min_on_brightness_pct_v | int }}%
+          - if:
+              - condition: template
+                value_template: "{{ area_set }}"
+            then:
+              - service: light.turn_on
+                target:
+                  area_id: "{{ light_area_in }}"
+                data:
+                  brightness: "{{ min_on_abs_brightness | int }}"
+            else:
+              - service: light.turn_on
+                target:
+                  entity_id: "{{ light_entity }}"
+                data:
+                  brightness: "{{ min_on_abs_brightness | int }}"
+      - repeat:
+          sequence:
+            - wait_for_trigger:
+                - platform: event
+                  event_type: zwave_js_event
+                  event_data:
+                    device_id: !input switch_device
+                    command_class_name: "Central Scene"
+                    property: "scene"
+                    property_key: "001"
+                    value: 1
+                - platform: event
+                  event_type: zwave_js_value_notification
+                  event_data:
+                    device_id: !input switch_device
+                    command_class_name: "Central Scene"
+                    property: "scene"
+                    property_key: "001"
+                    value: "KeyReleased"
+              timeout:
+                milliseconds: "{{ interval_ms }}"
+            - if:
+                - condition: template
+                  value_template: >
+                    {{ wait is defined and wait.completed }}
+              then:
+                - if:
+                    - condition: template
+                      value_template: "{{ debug_enabled }}"
+                  then:
+                    - service: system_log.write
+                      data:
+                        level: info
+                        message: >
+                          [Multi Switch Light Pro] up_release → stop brighten
+                - stop:
+            - variables:
+                current_brightness: "{{ state_attr(light_entity,'brightness') | int(0) }}"
+                target_brightness: >
+                  {% set proposed = current_brightness + step_abs_value %}
+                  {{ [proposed, max_abs_brightness] | min }}
+            - if:
+                - condition: template
+                  value_template: "{{ debug_verbose }}"
+              then:
+                - service: system_log.write
+                  data:
+                    level: debug
+                    message: >
+                      [Multi Switch Light Pro] brighten step to
+                      {{ target_brightness }}/255 | current={{ current_brightness }}/255
+                      cap={{ max_abs_brightness }}
+            - if:
+                - condition: template
+                  value_template: "{{ target_brightness > current_brightness }}"
+              then:
+                - if:
+                    - condition: template
+                      value_template: "{{ area_set }}"
+                  then:
+                    - service: light.turn_on
+                      target:
+                        area_id: "{{ light_area_in }}"
+                      data:
+                        brightness: "{{ target_brightness | int }}"
+                  else:
+                    - service: light.turn_on
+                      target:
+                        entity_id: "{{ light_entity }}"
+                      data:
+                        brightness: "{{ target_brightness | int }}"
+          until:
+            - condition: template
+              value_template: >
+                {{ wait is defined and wait.completed }}
+  - if:
+      - condition: template
+        value_template: >
+          {{ switch_type != 'lutron' and trigger.id == 'down_hold_start' }}
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ debug_enabled }}"
+        then:
+          - service: system_log.write
+            data:
+              level: info
+              message: >
+                [Multi Switch Light Pro] down_hold_start
+      - repeat:
+          sequence:
+            - wait_for_trigger:
+                - platform: event
+                  event_type: zwave_js_event
+                  event_data:
+                    device_id: !input switch_device
+                    command_class_name: "Central Scene"
+                    property: "scene"
+                    property_key: "002"
+                    value: 1
+                - platform: event
+                  event_type: zwave_js_value_notification
+                  event_data:
+                    device_id: !input switch_device
+                    command_class_name: "Central Scene"
+                    property: "scene"
+                    property_key: "002"
+                    value: "KeyReleased"
+              timeout:
+                milliseconds: "{{ interval_ms }}"
+            - if:
+                - condition: template
+                  value_template: >
+                    {{ wait is defined and wait.completed }}
+              then:
+                - if:
+                    - condition: template
+                      value_template: "{{ debug_enabled }}"
+                  then:
+                    - service: system_log.write
+                      data:
+                        level: info
+                        message: >
+                          [Multi Switch Light Pro] down_release → stop dim
+                - stop:
+            - if:
+                - condition: template
+                  value_template: "{{ is_state(light_entity, 'on') }}"
+              then:
+                - variables:
+                    current_brightness: "{{ state_attr(light_entity,'brightness') | int(0) }}"
+                    target_brightness: >
+                      {% set proposed = current_brightness - step_abs_value %}
+                      {{ [proposed, 0] | max }}
+                - if:
+                    - condition: template
+                      value_template: "{{ debug_verbose }}"
+                  then:
+                    - service: system_log.write
+                      data:
+                        level: debug
+                        message: >
+                          [Multi Switch Light Pro] dim step to
+                          {{ target_brightness }}/255 | current={{ current_brightness }}/255
+                          min={{ min_abs_brightness }}
+                - if:
+                    - condition: template
+                      value_template: "{{ target_brightness <= min_abs_brightness }}"
+                  then:
+                    - if:
+                        - condition: template
+                          value_template: "{{ debug_enabled }}"
+                      then:
+                        - service: system_log.write
+                          data:
+                            level: info
+                            message: >
+                              [Multi Switch Light Pro] brightness <= min clamp →
+                              light.turn_off
+                    - if:
+                        - condition: template
+                          value_template: "{{ area_set }}"
+                      then:
+                        - service: light.turn_off
+                          target:
+                            area_id: "{{ light_area_in }}"
+                      else:
+                        - service: light.turn_off
+                          target:
+                            entity_id: "{{ light_entity }}"
+                    - stop: "Dim hold reached minimum; turning off"
+                  else:
+                    - if:
+                        - condition: template
+                          value_template: "{{ target_brightness < current_brightness }}"
+                      then:
+                        - if:
+                            - condition: template
+                              value_template: "{{ area_set }}"
+                          then:
+                            - service: light.turn_on
+                              target:
+                                area_id: "{{ light_area_in }}"
+                              data:
+                                brightness: "{{ target_brightness | int }}"
+                          else:
+                            - service: light.turn_on
+                              target:
+                                entity_id: "{{ light_entity }}"
+                              data:
+                                brightness: "{{ target_brightness | int }}"
+          until:
+            - condition: template
+              value_template: >
+                {{ wait is defined and wait.completed }}
+  - if:
+      - condition: template
+        value_template: >
+          {{ switch_type != 'lutron' and trigger.id == 'up_double' }}
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ debug_enabled }}"
+        then:
+          - service: system_log.write
+            data:
+              level: info
+              message: >
+                [Multi Switch Light Pro] up_double → run custom action
+  - if:
+      - condition: template
+        value_template: >
+          {{ switch_type != 'lutron' and trigger.id == 'down_double' }}
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ debug_enabled }}"
+        then:
+          - service: system_log.write
+            data:
+              level: info
+              message: >
+                [Multi Switch Light Pro] down_double → run custom action
+  - if:
+      - condition: template
+        value_template: >
+          {{ switch_type != 'lutron' and trigger.id == 'up_triple' }}
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ debug_enabled }}"
+        then:
+          - service: system_log.write
+            data:
+              level: info
+              message: >
+                [Multi Switch Light Pro] up_triple → run custom action
+  - if:
+      - condition: template
+        value_template: >
+          {{ switch_type != 'lutron' and trigger.id == 'down_triple' }}
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ debug_enabled }}"
+        then:
+          - service: system_log.write
+            data:
+              level: info
+              message: >
+                [Multi Switch Light Pro] down_triple → run custom action
