@@ -381,10 +381,11 @@ variables:
   blueprint_version: "1.8.4"
   cover_target: !input cover_target
   base_cover: >-
-    {% if cover_target is string %}
-      {{ cover_target }}
-    {% elif cover_target is sequence and (cover_target | length > 0) %}
-      {{ cover_target[0] }}
+    {% set ct = cover_target | default('') %}
+    {% if ct is string %}
+      {{ ct }}
+    {% elif ct is sequence and (ct | length > 0) %}
+      {{ ct[0] }}
     {% else %}
       ""
     {% endif %}
@@ -498,9 +499,9 @@ variables:
   sun_on_window: >-
     {% set delta = (((sun_azimuth - window_orientation_deg + 540) % 360) - 180) | abs %}
     {{ sun_elevation >= min_sun_elevation and delta <= sun_tolerance_deg }}
-  indoor_temp: "{{ states(indoor_temp_sensor) | float(none) if indoor_temp_sensor else none }}"
-  outdoor_temp: "{{ states(outdoor_temp_sensor) | float(none) if outdoor_temp_sensor else none }}"
-  indoor_lux: "{{ states(indoor_lux_sensor) | float(none) if indoor_lux_sensor else none }}"
+  indoor_temp: "{{ states(indoor_temp_sensor | default('')) | float(none) if indoor_temp_sensor else none }}"
+  outdoor_temp: "{{ states(outdoor_temp_sensor | default('')) | float(none) if outdoor_temp_sensor else none }}"
+  indoor_lux: "{{ states(indoor_lux_sensor | default('')) | float(none) if indoor_lux_sensor else none }}"
   presence_present: >-
     {% if not presence_entity %}
       false
@@ -522,7 +523,9 @@ variables:
     {% else %}
       {{ presence_present }}
     {% endif %}
-  manual_override_active: "{{ manual_override and is_state(manual_override, 'on') }}"
+  manual_override_active: >-
+    {% set mo = manual_override | default('') %}
+    {{ mo != '' and is_state(mo, 'on') }}
   auto_override_active: >-
     {% if manual_timeout_minutes | int(0) <= 0 or not base_cover %}
       false
@@ -564,7 +567,7 @@ variables:
     {% else %}
       false
     {% endif %}
-  measured_irradiance: "{{ states(vertical_irradiance_sensor) | float(none) if vertical_irradiance_sensor else none }}"
+  measured_irradiance: "{{ states(vertical_irradiance_sensor | default('')) | float(none) if vertical_irradiance_sensor else none }}"
   cos_az_offset: "{{ ((sun_azimuth - window_orientation_deg) | float * deg_to_rad) | cos }}"
   sin_elevation: "{{ (sun_elevation | float * deg_to_rad) | sin }}"
   cos_elevation: "{{ (sun_elevation | float * deg_to_rad) | cos }}"
