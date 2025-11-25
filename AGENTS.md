@@ -16,7 +16,7 @@
 - Avoid raw bitwise operators in Jinja (`&`), which can trigger template parse errors in Home Assistant. Use filters like `bitwise_and` instead (e.g., `{{ (supported_features | int(0) | bitwise_and(16)) > 0 }}`) when checking feature flags.
 - YAML must contain a **single document**. Do not include more than one `---` document separator in blueprint files.
 - Home Assistant’s Jinja environment is restricted. Do not assume arbitrary Jinja extensions or Python are available.
- - HA selectors: when using `selector.select`, `options` should be simple strings (quote them, e.g., `- "off"`) or full `label`/`value` pairs. Avoid mixed/partial structures; malformed options will cause import errors.
+- HA selectors: when using `selector.select`, `options` should be either quoted strings (e.g., `- "off"`) **or** full `label`/`value` pairs (both quoted). Avoid mixing styles or leaving values unquoted; malformed options will cause import errors.
 
 ## Home Assistant Jinja2 Compliance
 
