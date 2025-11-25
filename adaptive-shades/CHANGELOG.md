@@ -18,6 +18,12 @@
 
 - Multi-cover support hardened: state/feature lookups now use the first cover (base_cover) to avoid unhashable list errors in HA templates.
 
+## [1.8.4] - 2025-11-25
+
+### Changed
+
+- Expanded manual comfort setpoint ranges (0–120) so users can input Fahrenheit or Celsius; climate-derived setpoints still take priority when a climate entity is provided.
+
 ## [Unreleased]
 
 ### Changed
