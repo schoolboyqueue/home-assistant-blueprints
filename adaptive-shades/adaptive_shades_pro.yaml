@@ -355,12 +355,15 @@ blueprint:
           selector:
             select:
               options:
-                - off
-                - basic
-                - verbose
+                - label: off
+                  value: off
+                - label: basic
+                  value: basic
+                - label: verbose
+                  value: verbose
 
 variables:
-  blueprint_version: "1.5.4"
+  blueprint_version: "1.5.5"
   cover_target: !input cover_target
   window_orientation_deg: !input window_orientation_deg
   sun_tolerance_deg: !input sun_tolerance_deg
