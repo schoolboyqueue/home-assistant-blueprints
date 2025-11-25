@@ -18,6 +18,12 @@
 
 - Multi-cover support hardened: state/feature lookups now use the first cover (base_cover) to avoid unhashable list errors in HA templates.
 
+## [Unreleased]
+
+### Changed
+
+- Comfort setpoints now derive from the climate entity when provided; manual setpoints are used only when no climate is configured. Mode detection prefers HVAC actions (heating/cooling) when available.
+
 ## [1.6.0] - 2025-11-25
 
 ### Added

@@ -156,8 +156,8 @@ blueprint:
         cooling_setpoint:
           name: Cooling comfort upper bound
           description: >-
-            Temperature (°C or °F) at which shades should bias toward blocking heat.
-            Use the same units as your indoor temperature sensor.
+            Temperature (°C or °F) at which shades should bias toward blocking heat when no climate entity is provided.
+            If a climate entity is set, its target cooling setpoint will be used instead.
           default: 25
           selector:
             number:
@@ -167,8 +167,8 @@ blueprint:
         heating_setpoint:
           name: Heating comfort lower bound
           description: >-
-            Temperature (°C or °F) at which shades should bias toward admitting solar gain.
-            Use the same units as your indoor temperature sensor.
+            Temperature (°C or °F) at which shades should bias toward admitting solar gain when no climate entity is provided.
+            If a climate entity is set, its target heating setpoint will be used instead.
           default: 20
           selector:
             number:
@@ -433,6 +433,19 @@ variables:
     {{ (block_position_pct | float(85) / 100.0) * 180.0 }}
   climate_hvac_mode: "{{ state_attr(climate_entity, 'hvac_mode') if climate_entity else none }}"
   climate_hvac_action: "{{ state_attr(climate_entity, 'hvac_action') if climate_entity else none }}"
+  climate_target_high: "{{ state_attr(climate_entity, 'target_temp_high') | float(none) if climate_entity else none }}"
+  climate_target_low: "{{ state_attr(climate_entity, 'target_temp_low') | float(none) if climate_entity else none }}"
+  climate_target_temp: >-
+    {% if climate_entity %}
+      {% set t = state_attr(climate_entity, 'temperature') | float(none) %}
+      {% if t is number %}
+        {{ t }}
+      {% else %}
+        {{ state_attr(climate_entity, 'target_temperature') | float(none) }}
+      {% endif %}
+    {% else %}
+      {{ none }}
+    {% endif %}
   climate_heating: >-
     {% if not climate_entity %}
       false
@@ -456,6 +469,30 @@ variables:
     {% else %}
       {% set s = weather_state %}
       {{ s in ['cloudy', 'overcast', 'rainy', 'pouring', 'snowy', 'hail', 'partlycloudy'] }}
+    {% endif %}
+  effective_heating_setpoint: >-
+    {% if climate_entity %}
+      {% if climate_target_high is number %}
+        {{ climate_target_high }}
+      {% elif climate_target_temp is number %}
+        {{ climate_target_temp }}
+      {% else %}
+        {{ heating_setpoint }}
+      {% endif %}
+    {% else %}
+      {{ heating_setpoint }}
+    {% endif %}
+  effective_cooling_setpoint: >-
+    {% if climate_entity %}
+      {% if climate_target_low is number %}
+        {{ climate_target_low }}
+      {% elif climate_target_temp is number %}
+        {{ climate_target_temp }}
+      {% else %}
+        {{ cooling_setpoint }}
+      {% endif %}
+    {% else %}
+      {{ cooling_setpoint }}
     {% endif %}
   # Normalize azimuth delta to [-180, 180] then take absolute value to test if the sun is hitting the window.
   sun_on_window: >-
@@ -513,7 +550,7 @@ variables:
     {% endif %}
   cooling_needed: >-
     {% if indoor_temp is not none %}
-      {{ indoor_temp >= (cooling_setpoint - comfort_margin) or climate_cooling }}
+      {{ indoor_temp >= (effective_cooling_setpoint - comfort_margin) or climate_cooling }}
     {% elif climate_cooling %}
       true
     {% else %}
@@ -521,7 +558,7 @@ variables:
     {% endif %}
   heating_needed: >-
     {% if indoor_temp is not none %}
-      {{ indoor_temp <= (heating_setpoint + comfort_margin) or climate_heating }}
+      {{ indoor_temp <= (effective_heating_setpoint + comfort_margin) or climate_heating }}
     {% elif climate_heating %}
       true
     {% else %}
@@ -585,15 +622,15 @@ variables:
     {% endif %}
   mode_temp: >-
     {% set t = indoor_temp %}
-    {% set heat_sp = heating_setpoint %}
-    {% set cool_sp = cooling_setpoint %}
+    {% set heat_sp = effective_heating_setpoint %}
+    {% set cool_sp = effective_cooling_setpoint %}
     {% if t is none and not climate_entity %}
       unknown
     {% elif climate_entity %}
       {# Climate mode takes precedence when clearly heating or cooling #}
-      {% if climate_heating %}
+      {% if climate_hvac_action in ['heating'] %}
         winter
-      {% elif climate_cooling %}
+      {% elif climate_hvac_action in ['cooling'] %}
         summer
       {% elif t is none %}
         unknown
