@@ -12,6 +12,12 @@
 - Comfort mode detection now prefers active HVAC state when provided, falling back to setpoints.
 - Glare detection uses the profile-adjusted threshold; documentation updated for clarity.
 
+## [1.5.3] - 2025-11-25
+
+### Fixed
+
+- Replaced unsupported Jinja `exp` filter in clear-sky irradiance calculation with explicit exponent math (uses `e_const ** exponent`).
+
 ## [1.5.2] - 2025-11-25
 
 ### Fixed

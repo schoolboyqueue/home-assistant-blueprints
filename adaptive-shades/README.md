@@ -1,6 +1,6 @@
 # Adaptive Shades Pro
 
-**Version:** 1.5.2  
+**Version:** 1.5.3  
 **Author:** Jeremy Carter  
 **Home Assistant Blueprint for Solar-Adaptive Shade Control**
 
