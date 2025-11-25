@@ -218,7 +218,9 @@ blueprint:
           selector:
             entity:
               domain: binary_sensor
-              device_class: window
+              device_class:
+                - window
+                - door
               multiple: true
 
     scheduling_and_overrides:
