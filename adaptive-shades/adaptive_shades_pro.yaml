@@ -1,5 +1,5 @@
 blueprint:
-  name: "Adaptive Shades Pro v1.8.4"
+  name: "Adaptive Shades Pro v1.9.0"
   description: >-
     Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
     Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
@@ -208,6 +208,18 @@ blueprint:
                 - living
                 - office
                 - bedroom
+        window_contacts:
+          name: (Optional) Window contact sensors
+          description: >-
+            Optional: one window contact sensor per shade, in the same order as the Shade cover(s)
+            list in Core Setup. When a mapped window sensor is open, that shade is forced fully open
+            and will not close for glare or cooling until the window is closed again.
+          default: []
+          selector:
+            entity:
+              domain: binary_sensor
+              device_class: window
+              multiple: true
 
     scheduling_and_overrides:
       name: Scheduling & Overrides
@@ -378,7 +390,7 @@ blueprint:
                   value: "verbose"
 
 variables:
-  blueprint_version: "1.8.4"
+  blueprint_version: "1.9.0"
   cover_target: !input cover_target
   base_cover: >-
     {% set ct = cover_target | default('') %}
@@ -403,6 +415,7 @@ variables:
   indoor_temp_sensor: !input indoor_temp_sensor
   outdoor_temp_sensor: !input outdoor_temp_sensor
   indoor_lux_sensor: !input indoor_lux_sensor
+  window_contacts: !input window_contacts
   cooling_setpoint: !input cooling_setpoint
   heating_setpoint: !input heating_setpoint
   comfort_margin: !input comfort_margin
@@ -771,21 +784,13 @@ variables:
         {% endif %}
       {% endif %}
     {% endif %}
-  desired_position_raw: >-
+  desired_position_room: >-
     {% if shading_mode == 'slat' %}
       {{ slat_target_position }}
     {% elif shading_mode == 'zebra' %}
       {{ zebra_target_position }}
     {% else %}
       {{ none }}
-    {% endif %}
-  desired_position: >-
-    {% if desired_position_raw is none %}
-      {{ none }}
-    {% elif inverted_shades %}
-      {{ 100 - (desired_position_raw | int) }}
-    {% else %}
-      {{ desired_position_raw }}
     {% endif %}
 
 trigger:
@@ -827,96 +832,127 @@ action:
               name: "Adaptive Shades"
               message: "Skipped: presence requirement not met. (v{{ blueprint_version }})"
               domain: cover
-  - variables:
-      current_position: "{{ state_attr(base_cover, 'current_position') if base_cover else none }}"
-      current_tilt: "{{ state_attr(base_cover, 'current_tilt_position') if base_cover and cover_supports_tilt else none }}"
-      target_position: "{{ desired_position }}"
-      target_tilt: >-
-        {% if cover_supports_tilt and shading_mode == 'slat' and target_position is not none %}
-          {{ target_position | int }}
-        {% else %}
-          {{ none }}
-        {% endif %}
-  - choose:
-      - conditions:
-          - condition: template
-            value_template: "{{ debug_verbose }}"
-          - condition: template
-            value_template: "{{ target_position is none }}"
-        sequence:
-          - service: logbook.log
-            data:
-              name: "Adaptive Shades"
-              message: >-
-                No movement: target_position is none
-                (sun_on_window={{ sun_on_window }},
-                direct_sun={{ direct_sun_detected }},
-                mode_temp={{ mode_temp }}). (v{{ blueprint_version }})
-              domain: cover
-  - choose:
-      - conditions:
-          - condition: template
-            value_template: "{{ debug_verbose }}"
-          - condition: template
-            value_template: >-
-              {% if cover_supports_tilt and shading_mode == 'slat' %}
-                {{ target_tilt is not none and current_tilt is not none and (current_tilt - target_tilt) | abs < 3 }}
+  - repeat:
+      for_each: "{{ cover_target if cover_target is sequence else [cover_target] }}"
+      sequence:
+        - variables:
+            this_cover: "{{ repeat.item }}"
+            idx: "{{ repeat.index - 1 }}"
+            this_window: >-
+              {% set sensors = window_contacts %}
+              {% if sensors is sequence and (sensors | length > idx) %}
+                {{ sensors[idx] }}
               {% else %}
-                {{ current_position is not none and target_position is not none and (current_position - target_position) | abs < 3 }}
+                ""
               {% endif %}
-        sequence:
-          - service: logbook.log
-            data:
-              name: "Adaptive Shades"
-              message: >-
-                No movement: change below hysteresis
-                (current={{ current_position }}, target={{ target_position }}). (v{{ blueprint_version }})
-              domain: cover
-  - condition: template
-    value_template: "{{ target_position is not none }}"
-  - condition: template
-    value_template: >-
-      {% if cover_supports_tilt and shading_mode == 'slat' %}
-        {{ target_tilt is not none and (current_tilt is none or (current_tilt - target_tilt) | abs >= 3) }}
-      {% else %}
-        {{ current_position is none or (current_position - target_position) | abs >= 3 }}
-      {% endif %}
-  - choose:
-      - conditions:
-          - condition: template
-            value_template: "{{ base_cover and (is_state(base_cover, 'unavailable') or is_state(base_cover, 'unknown')) }}"
-        sequence:
-          - service: logbook.log
-            data:
-              name: "Adaptive Shades"
-              message: "Cover unavailable; no movement. (v{{ blueprint_version }})"
-              domain: cover
-      - conditions: []
-        sequence:
-          - choose:
-              - conditions: "{{ cover_supports_tilt and shading_mode == 'slat' }}"
-                sequence:
-                  - service: cover.set_cover_tilt_position
-                    target:
-                      entity_id: "{{ cover_target }}"
-                    data:
-                      tilt_position: "{{ target_tilt | int }}"
-              - conditions: []
-                sequence:
-                  - service: cover.set_cover_position
-                    target:
-                      entity_id: "{{ cover_target }}"
-                    data:
-                      position: "{{ target_position | int }}"
-          - condition: template
-            value_template: "{{ debug_basic }}"
-          - service: logbook.log
-            data:
-              name: "Adaptive Shades"
-              message: >-
-                Set shade to {{ target_position | int }}% (sun_on_window={{ sun_on_window }},
-                heating_needed={{ heating_needed }}, cooling_needed={{ cooling_needed }},
-                glare={{ glare_detected }}, az={{ sun_azimuth | round(1) }}°, el={{ sun_elevation | round(1) }}°). (v{{ blueprint_version }})
-              domain: cover
+            this_window_open: "{{ this_window and is_state(this_window, 'on') }}"
+            this_current_position: "{{ state_attr(this_cover, 'current_position') }}"
+            this_current_tilt: "{{ state_attr(this_cover, 'current_tilt_position') if cover_supports_tilt else none }}"
+            this_target_base: "{{ desired_position_room }}"
+            this_target_position: >-
+              {% if this_target_base is none %}
+                {{ none }}
+              {% elif this_window_open %}
+                {% if inverted_shades %}
+                  100
+                {% else %}
+                  0
+                {% endif %}
+              {% elif inverted_shades %}
+                {{ 100 - (this_target_base | int) }}
+              {% else %}
+                {{ this_target_base | int }}
+              {% endif %}
+            this_target_tilt: >-
+              {% if cover_supports_tilt and shading_mode == 'slat' and this_target_position is not none %}
+                {{ this_target_position | int }}
+              {% else %}
+                {{ none }}
+              {% endif %}
+
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ debug_verbose }}"
+                - condition: template
+                  value_template: "{{ this_target_position is none }}"
+              sequence:
+                - service: logbook.log
+                  data:
+                    name: "Adaptive Shades"
+                    message: >-
+                      No movement for {{ this_cover }}: target_position is none
+                      (sun_on_window={{ sun_on_window }},
+                      direct_sun={{ direct_sun_detected }},
+                      mode_temp={{ mode_temp }}). (v{{ blueprint_version }})
+                    domain: cover
+
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ debug_verbose }}"
+                - condition: template
+                  value_template: >-
+                    {% if cover_supports_tilt and shading_mode == 'slat' %}
+                      {{ this_target_tilt is not none and this_current_tilt is not none and (this_current_tilt - this_target_tilt) | abs < 3 }}
+                    {% else %}
+                      {{ this_current_position is not none and this_target_position is not none and (this_current_position - this_target_position) | abs < 3 }}
+                    {% endif %}
+              sequence:
+                - service: logbook.log
+                  data:
+                    name: "Adaptive Shades"
+                    message: >-
+                      No movement for {{ this_cover }}: change below hysteresis
+                      (current={{ this_current_position }}, target={{ this_target_position }}). (v{{ blueprint_version }})
+                    domain: cover
+
+        - condition: template
+          value_template: "{{ this_target_position is not none }}"
+        - condition: template
+          value_template: >-
+            {% if cover_supports_tilt and shading_mode == 'slat' %}
+              {{ this_target_tilt is not none and (this_current_tilt is none or (this_current_tilt - this_target_tilt) | abs >= 3) }}
+            {% else %}
+              {{ this_current_position is none or (this_current_position - this_target_position) | abs >= 3 }}
+            {% endif %}
+
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ is_state(this_cover, 'unavailable') or is_state(this_cover, 'unknown') }}"
+              sequence:
+                - service: logbook.log
+                  data:
+                    name: "Adaptive Shades"
+                    message: "Cover {{ this_cover }} unavailable; no movement. (v{{ blueprint_version }})"
+                    domain: cover
+            - conditions: []
+              sequence:
+                - choose:
+                    - conditions: "{{ cover_supports_tilt and shading_mode == 'slat' }}"
+                      sequence:
+                        - service: cover.set_cover_tilt_position
+                          target:
+                            entity_id: "{{ this_cover }}"
+                          data:
+                            tilt_position: "{{ this_target_tilt | int }}"
+                    - conditions: []
+                      sequence:
+                        - service: cover.set_cover_position
+                          target:
+                            entity_id: "{{ this_cover }}"
+                          data:
+                            position: "{{ this_target_position | int }}"
+                - condition: template
+                  value_template: "{{ debug_basic }}"
+                - service: logbook.log
+                  data:
+                    name: "Adaptive Shades"
+                    message: >-
+                      Set shade {{ this_cover }} to {{ this_target_position | int }}% (sun_on_window={{ sun_on_window }},
+                      heating_needed={{ heating_needed }}, cooling_needed={{ cooling_needed }},
+                      glare={{ glare_detected }}, az={{ sun_azimuth | round(1) }}°, el={{ sun_elevation | round(1) }}°). (v{{ blueprint_version }})
+                    domain: cover
 
 mode: restart

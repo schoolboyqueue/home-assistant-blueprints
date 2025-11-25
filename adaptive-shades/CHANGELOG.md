@@ -24,6 +24,14 @@
 
 - Expanded manual comfort setpoint ranges (0–120) so users can input Fahrenheit or Celsius; climate-derived setpoints still take priority when a climate entity is provided.
 
+## [1.9.0] - 2025-11-25
+
+### Added
+
+- Optional window contact mapping (one per shade, index-matched) that forces a shade fully open when its window is open.
+- Per-cover loop for movement, hysteresis, and logging; honors inverted shades per cover.
+- Presence/sun/comfort logic remains shared at room level.
+
 ## [Unreleased]
 
 ### Changed
