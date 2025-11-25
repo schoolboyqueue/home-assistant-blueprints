@@ -1,3 +1,4 @@
+---
 blueprint:
   name: "Adaptive Shades Pro v1.3.1"
   description: >-
@@ -257,7 +258,7 @@ blueprint:
               step: 0.05
         max_tilt_angle:
           name: Maximum tilt angle (degrees)
-          description: Cap for computed slat angle (0° fully open, 180° fully closed). Used when mapping to cover position.
+          description: Cap for computed slat angle (0 deg fully open, 180 deg fully closed). Used when mapping to cover position.
           default: 175
           selector:
             number:
