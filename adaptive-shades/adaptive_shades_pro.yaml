@@ -355,9 +355,12 @@ blueprint:
           selector:
             select:
               options:
-                - "off"
-                - "basic"
-                - "verbose"
+                - label: "Off"
+                  value: "off"
+                - label: "Basic"
+                  value: "basic"
+                - label: "Verbose"
+                  value: "verbose"
 
 variables:
   blueprint_version: "1.5.6"
