@@ -446,13 +446,17 @@ variables:
       {{ is_state(presence_entity, 'on') or is_state(presence_entity, 'home') }}
     {% endif %}
   manual_override_active: "{{ manual_override and is_state(manual_override, 'on') }}"
-  cover_last_changed: "{{ states[cover_target].last_changed }}"
   auto_override_active: >-
-    {% if manual_timeout_minutes | int(0) <= 0 or not cover_last_changed %}
+    {% if manual_timeout_minutes | int(0) <= 0 or not cover_target %}
       false
     {% else %}
-      {% set delta = (now() - cover_last_changed).total_seconds() / 60 %}
-      {{ delta < (manual_timeout_minutes | float) }}
+      {% set s = states[cover_target] %}
+      {% if s is none or s.last_changed is none %}
+        false
+      {% else %}
+        {% set delta = (as_timestamp(now()) - as_timestamp(s.last_changed)) / 60 %}
+        {{ delta < (manual_timeout_minutes | float) }}
+      {% endif %}
     {% endif %}
   in_quiet_hours: >-
     {% if not quiet_hours_start or not quiet_hours_end %}
@@ -688,18 +692,6 @@ trigger:
 condition: []
 
 action:
-  # Unconditional debug entry – should fire on every run (manual or triggered)
-  - service: persistent_notification.create
-    data:
-      title: "Adaptive Shades Debug"
-      message: >-
-        Automation ran at {{ now() }}.
-        debug_level={{ debug_level }},
-        shading_mode={{ shading_mode }},
-        sun_on_window={{ sun_on_window }},
-        direct_sun={{ direct_sun_detected }},
-        desired_position={{ desired_position }}.
-
   - choose:
       - conditions: "{{ manual_override_active }}"
         sequence:

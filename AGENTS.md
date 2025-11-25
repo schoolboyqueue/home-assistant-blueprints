@@ -17,6 +17,7 @@
 - YAML must contain a **single document**. Do not include more than one `---` document separator in blueprint files.
 - Home Assistant’s Jinja environment is restricted. Do not assume arbitrary Jinja extensions or Python are available.
 - HA selectors: when using `selector.select`, `options` should be either quoted strings (e.g., `- "off"`) **or** full `label`/`value` pairs (both quoted). Avoid mixing styles or leaving values unquoted; malformed options will cause import errors.
+- When computing time deltas, convert datetimes to timestamps with `as_timestamp()` before subtraction (e.g., `(as_timestamp(now()) - as_timestamp(state.last_changed)) / 60`) to avoid type errors.
 
 ## Home Assistant Jinja2 Compliance
 
