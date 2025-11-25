@@ -1,5 +1,11 @@
 # Adaptive Shades Pro - Changelog
 
+## [1.9.2] - 2025-11-25
+
+### Fixed
+
+- Manual adjustment timeout now only activates when the last cover change includes a user context (manual interaction). Automation-initiated movements no longer trigger the timeout.
+
 ## [1.7.0] - 2025-11-25
 
 ### Added

@@ -1,5 +1,5 @@
 blueprint:
-  name: "Adaptive Shades Pro v1.9.1"
+  name: "Adaptive Shades Pro v1.9.2"
   description: >-
     Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
     Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
@@ -392,7 +392,7 @@ blueprint:
                   value: "verbose"
 
 variables:
-  blueprint_version: "1.9.1"
+  blueprint_version: "1.9.2"
   cover_target: !input cover_target
   base_cover: >-
     {% set ct = cover_target | default('') %}
@@ -550,7 +550,9 @@ variables:
         false
       {% else %}
         {% set delta = (as_timestamp(now()) - as_timestamp(s.last_changed)) / 60 %}
-        {{ delta < (manual_timeout_minutes | float) }}
+        {% set user_id = s.context.user_id if s.context is defined else '' %}
+        {% set has_user = user_id is string and (user_id | length > 0) %}
+        {{ has_user and (delta < (manual_timeout_minutes | float)) }}
       {% endif %}
     {% endif %}
   in_quiet_hours: >-
@@ -860,7 +862,9 @@ action:
                   false
                 {% else %}
                   {% set delta = (as_timestamp(now()) - as_timestamp(s.last_changed)) / 60 %}
-                  {{ delta < (manual_timeout_minutes | float) }}
+                  {% set user_id = s.context.user_id if s.context is defined else '' %}
+                  {% set has_user = user_id is string and (user_id | length > 0) %}
+                  {{ has_user and (delta < (manual_timeout_minutes | float)) }}
                 {% endif %}
               {% endif %}
             this_target_position: >-
