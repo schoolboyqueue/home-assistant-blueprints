@@ -1,5 +1,5 @@
 blueprint:
-  name: "Adaptive Shades Pro v1.7.0"
+  name: "Adaptive Shades Pro v1.8.0"
   description: >-
     Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
     Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
@@ -225,6 +225,12 @@ blueprint:
                 - domain: device_tracker
                 - domain: binary_sensor
                 - domain: input_boolean
+        presence_required:
+          name: Require presence to move
+          description: If true, automation moves only when the presence entity looks present (on/home/occupied/present). If false, presence affects glare behavior but movement is allowed.
+          default: false
+          selector:
+            boolean: {}
         manual_override:
           name: (Optional) Manual override helper
           description: When this input_boolean is 'on', shade adjustments pause. Turn off to resume automation.
@@ -372,7 +378,7 @@ blueprint:
                   value: "verbose"
 
 variables:
-  blueprint_version: "1.7.0"
+  blueprint_version: "1.8.0"
   cover_target: !input cover_target
   base_cover: >-
     {% if cover_target is string %}
@@ -401,6 +407,7 @@ variables:
   comfort_margin: !input comfort_margin
   glare_lux_threshold: !input glare_lux_threshold
   presence_entity: !input presence_entity
+  presence_required: !input presence_required
   manual_override: !input manual_override
   manual_timeout_minutes: !input manual_timeout_minutes
   quiet_hours_start: !input quiet_hours_start
@@ -457,11 +464,26 @@ variables:
   indoor_temp: "{{ states(indoor_temp_sensor) | float(none) if indoor_temp_sensor else none }}"
   outdoor_temp: "{{ states(outdoor_temp_sensor) | float(none) if outdoor_temp_sensor else none }}"
   indoor_lux: "{{ states(indoor_lux_sensor) | float(none) if indoor_lux_sensor else none }}"
+  presence_present: >-
+    {% if not presence_entity %}
+      false
+    {% else %}
+      {% set s = states(presence_entity) %}
+      {{ s in ['on', 'home', 'occupied', 'present'] }}
+    {% endif %}
   presence_ok: >-
     {% if not presence_entity %}
       true
+    {% elif not presence_required %}
+      true
     {% else %}
-      {{ is_state(presence_entity, 'on') or is_state(presence_entity, 'home') }}
+      {{ presence_present }}
+    {% endif %}
+  occupied: >-
+    {% if not presence_entity %}
+      true
+    {% else %}
+      {{ presence_present }}
     {% endif %}
   manual_override_active: "{{ manual_override and is_state(manual_override, 'on') }}"
   auto_override_active: >-
@@ -666,17 +688,37 @@ variables:
     {% else %}
       {% set frontlit = direct_sun_detected or sun_on_window %}
       {% set mode = mode_temp %}
+      {% set occ = occupied %}
       {% set glare = glare_detected %}
-      {% set occ = presence_ok %}
+
       {% if not occ %}
-        {% if mode == 'summer' and frontlit %}
-          {{ block_position_pct }}
-        {% elif mode == 'winter' and not frontlit %}
-          {{ admit_position_pct }}
+        {# UNOCCUPIED:
+           - Summer: bias to blocking when frontlit & cooling is a concern
+           - Winter: bias to admitting when not frontlit & heating is a concern
+           - Otherwise: sit in the middle (dim) to avoid extremes
+        #}
+        {% if mode == 'summer' %}
+          {% if frontlit and cooling_needed %}
+            {{ block_position_pct }}
+          {% else %}
+            {{ dim_position_pct }}
+          {% endif %}
+        {% elif mode == 'winter' %}
+          {% if not frontlit and heating_needed %}
+            {{ admit_position_pct }}
+          {% else %}
+            {{ dim_position_pct }}
+          {% endif %}
         {% else %}
           {{ dim_position_pct }}
         {% endif %}
+
       {% else %}
+        {# OCCUPIED:
+           - When frontlit, glare drives behavior strongly.
+           - In summer, if there is sun but no glare, err more closed.
+           - When not frontlit, admit light.
+        #}
         {% if frontlit %}
           {% if glare %}
             {{ block_position_pct }}

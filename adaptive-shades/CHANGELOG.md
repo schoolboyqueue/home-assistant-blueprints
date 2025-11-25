@@ -6,6 +6,12 @@
 
 - Inverted shades option to flip open/block percentages for devices that report 0% as fully closed and 100% as fully open.
 
+## [1.8.0] - 2025-11-25
+
+### Added
+
+- Presence-required toggle and refined presence/glare handling for zebra mode: presence now gates movement (when required) and drives glare-sensitive behavior while unoccupied paths still consider heating/cooling needs.
+
 ## [1.6.0] - 2025-11-25
 
 ### Added
