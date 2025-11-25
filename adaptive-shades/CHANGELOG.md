@@ -1,5 +1,11 @@
 # Adaptive Shades Pro - Changelog
 
+## [1.9.3] - 2025-11-25
+
+### Fixed
+
+- Ensures zebra shades close to the configured block position whenever the sun is below the horizon, even on manual runs or if other triggers were missed.
+
 ## [1.9.2] - 2025-11-25
 
 ### Fixed
