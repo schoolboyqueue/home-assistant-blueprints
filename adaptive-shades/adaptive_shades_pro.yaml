@@ -26,7 +26,10 @@ blueprint:
               domain: cover
         window_orientation_deg:
           name: Window orientation (degrees)
-          description: Cardinal direction the window faces (0° = North, 90° = East, 180° = South, 270° = West).
+          description: >-
+            Direction the window faces, in degrees. Use 0° for North, 90° for East, 180° for South,
+            270° for West. For diagonals, you can approximate: 45° = NE, 135° = SE, 225° = SW,
+            315° = NW. Exact degrees are optional; a close compass direction is usually sufficient.
           default: 180
           selector:
             number:
@@ -44,8 +47,11 @@ blueprint:
             entity:
               domain: sun
         sun_tolerance_deg:
-          name: Sun azimuth tolerance (degrees)
-          description: How wide the acceptance cone is around the window azimuth to consider the sun "on this window".
+          name: Sun exposure cone (degrees)
+          description: >-
+            Half-angle around the window direction where the sun counts as "on this window".
+            Most users can leave this at 45°. Try 30° if the shade reacts too often, or 60°
+            if it does not react enough. This does not need to be exact.
           default: 45
           selector:
             number:
