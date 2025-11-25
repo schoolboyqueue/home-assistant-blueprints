@@ -12,6 +12,12 @@
 
 - Presence-required toggle and refined presence/glare handling for zebra mode: presence now gates movement (when required) and drives glare-sensitive behavior while unoccupied paths still consider heating/cooling needs.
 
+## [1.8.3] - 2025-11-25
+
+### Fixed
+
+- Multi-cover support hardened: state/feature lookups now use the first cover (base_cover) to avoid unhashable list errors in HA templates.
+
 ## [1.6.0] - 2025-11-25
 
 ### Added
