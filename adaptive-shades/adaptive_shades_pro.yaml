@@ -1,5 +1,5 @@
 blueprint:
-  name: "Adaptive Shades Pro v1.5.7"
+  name: "Adaptive Shades Pro v1.6.0"
   description: >-
     Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
     Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
@@ -17,11 +17,12 @@ blueprint:
       description: Primary shade control and solar geometry parameters.
       input:
         cover_target:
-          name: Shade cover
-          description: The vertical shade (cover) to control. Works with blackout or zebra style shades that support position.
+          name: Shade cover(s)
+          description: One or more vertical shades (covers) to control. Works with blackout or zebra style shades that support position.
           selector:
             entity:
               domain: cover
+              multiple: true
         window_orientation_deg:
           name: Window orientation (degrees)
           description: >-
@@ -363,8 +364,16 @@ blueprint:
                   value: "verbose"
 
 variables:
-  blueprint_version: "1.5.7"
+  blueprint_version: "1.6.0"
   cover_target: !input cover_target
+  base_cover: >-
+    {% if cover_target is string %}
+      {{ cover_target }}
+    {% elif cover_target is sequence and (cover_target | length > 0) %}
+      {{ cover_target[0] }}
+    {% else %}
+      ""
+    {% endif %}
   window_orientation_deg: !input window_orientation_deg
   sun_tolerance_deg: !input sun_tolerance_deg
   admit_position_pct: !input admit_position_pct
@@ -420,7 +429,7 @@ variables:
     {% else %}
       {{ climate_hvac_action in ['cooling'] or climate_hvac_mode in ['cool'] }}
     {% endif %}
-  cover_supported_features: "{{ state_attr(cover_target, 'supported_features') | int(0) }}"
+  cover_supported_features: "{{ state_attr(base_cover, 'supported_features') | int(0) if base_cover else 0 }}"
   cover_supports_tilt: "{{ (cover_supported_features | bitwise_and(16)) > 0 }}"
   sun_azimuth: "{{ state_attr(sun_entity, 'azimuth') | float(0) }}"
   sun_elevation: "{{ state_attr(sun_entity, 'elevation') | float(-90) }}"
@@ -447,10 +456,10 @@ variables:
     {% endif %}
   manual_override_active: "{{ manual_override and is_state(manual_override, 'on') }}"
   auto_override_active: >-
-    {% if manual_timeout_minutes | int(0) <= 0 or not cover_target %}
+    {% if manual_timeout_minutes | int(0) <= 0 or not base_cover %}
       false
     {% else %}
-      {% set s = states[cover_target] %}
+      {% set s = states[base_cover] %}
       {% if s is none or s.last_changed is none %}
         false
       {% else %}

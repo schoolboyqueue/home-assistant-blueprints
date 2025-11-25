@@ -1,5 +1,15 @@
 # Adaptive Shades Pro - Changelog
 
+## [1.6.0] - 2025-11-25
+
+### Added
+
+- Shade cover selector now supports multiple covers, enabling grouped shade control.
+
+### Fixed
+
+- Manual override timeout now uses the first selected cover safely for last_changed and supported_features checks.
+
 ## [1.5.0] - 2025-11-25
 
 ### Added
