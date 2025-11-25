@@ -13,6 +13,7 @@
 
 ## Home Assistant Blueprint Schema Pitfalls
 - `variables:` must be at the root of the YAML (same level as `blueprint`, `trigger`, `action`), not nested under `blueprint:`—otherwise import fails with “extra keys not allowed @ data['blueprint']['variables']”.
+- Avoid raw bitwise operators in Jinja (`&`), which can trigger template parse errors in Home Assistant. Use filters like `bitwise_and` instead (e.g., `{{ (supported_features | int(0) | bitwise_and(16)) > 0 }}`) when checking feature flags.
 
 ## Coding Style & Naming Conventions
 - YAML with 4-space indentation, double-quoted strings when needed, and folded blocks (`>`) for long descriptions.
