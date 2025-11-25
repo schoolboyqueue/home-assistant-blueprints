@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- Blueprints live one per folder at the repo root: `adaptive-comfort-control/`, `bathroom-light-fan-control/`, `multi-switch-light-control/`.
+- Blueprints live one per folder at the repo root: `adaptive-comfort-control/`, `bathroom-light-fan-control/`, `multi-switch-light-control/`, `adaptive-shades/`.
 - Each blueprint folder contains the YAML (`*_blueprint.yaml` or `*_pro.yaml`), a `README.md`, and `CHANGELOG.md`. Treat each folder as a self-contained module with its own version and docs.
 - Cross-blueprint guidance sits in `README.md` (overview) and `WARP.md` (agent workflow). No build artifacts or generated files are committed.
 
@@ -10,6 +10,9 @@
 - Manual sanity check: `git diff --stat` to verify touched files are limited to the intended blueprint.
 - Optional lint if available locally: `yamllint adaptive-comfort-control/adaptive_comfort_control_pro_blueprint.yaml` (or the file you edited).
 - Manual runtime test happens in Home Assistant: import the Raw YAML URL, create an automation, and review Traces/Logs.
+
+## Home Assistant Blueprint Schema Pitfalls
+- `variables:` must be at the root of the YAML (same level as `blueprint`, `trigger`, `action`), not nested under `blueprint:`—otherwise import fails with “extra keys not allowed @ data['blueprint']['variables']”.
 
 ## Coding Style & Naming Conventions
 - YAML with 4-space indentation, double-quoted strings when needed, and folded blocks (`>`) for long descriptions.
