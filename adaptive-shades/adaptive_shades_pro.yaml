@@ -1,0 +1,590 @@
+blueprint:
+  name: "Adaptive Shades Pro v1.3.0"
+  description: >-
+    Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
+    Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
+    and temperature bands (winter/intermediate/summer) with distinct occupied vs unoccupied behavior. Select your shade and orientation,
+    optionally add irradiance/temperature/lux sensors, and the blueprint will balance solar gain, glare control, and cooling load.
+  domain: automation
+  author: "Jeremy Carter"
+  source_url: https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/adaptive-shades/adaptive_shades_pro.yaml
+
+  input:
+
+    core:
+      name: Core Setup
+      icon: mdi:blinds
+      description: Primary shade control and solar geometry parameters.
+      input:
+        cover_target:
+          name: Shade cover
+          description: The vertical shade (cover) to control. Works with blackout or zebra style shades that support position.
+          selector:
+            entity:
+              domain: cover
+        window_orientation_deg:
+          name: Window orientation (degrees)
+          description: Cardinal direction the window faces (0° = North, 90° = East, 180° = South, 270° = West).
+          default: 180
+          selector:
+            number:
+              min: 0
+              max: 359
+              unit_of_measurement: "°"
+              step: 1
+        sun_tolerance_deg:
+          name: Sun azimuth tolerance (degrees)
+          description: How wide the acceptance cone is around the window azimuth to consider the sun "on this window".
+          default: 45
+          selector:
+            number:
+              min: 5
+              max: 90
+              step: 1
+              unit_of_measurement: "°"
+        admit_position_pct:
+          name: Preferred open position (%)
+          description: Position used to admit daylight/solar gain. 0 = fully open, 100 = fully closed.
+          default: 20
+          selector:
+            number:
+              min: 0
+              max: 100
+              step: 5
+              unit_of_measurement: "%"
+        dim_position_pct:
+          name: Preferred dimmed position (%)
+          description: Position for filtered light with minimal glare.
+          default: 50
+          selector:
+            number:
+              min: 0
+              max: 100
+              step: 5
+              unit_of_measurement: "%"
+        block_position_pct:
+          name: Preferred block position (%)
+          description: Position used to block glare or heat. 0 = fully open, 100 = fully closed.
+          default: 85
+          selector:
+            number:
+              min: 0
+              max: 100
+              step: 5
+              unit_of_measurement: "%"
+        shading_mode:
+          name: Shading mode
+          description: >-
+            Select 'slat' for venetian/vertical-louver style control using solar geometry,
+            or 'zebra' for banded zebra shades (handled in a later step). For now, leave on 'slat'.
+          default: slat
+          selector:
+            select:
+              options:
+                - slat
+                - zebra
+
+    sensors_and_targets:
+      name: Comfort & Sensor Inputs
+      icon: mdi:thermometer-auto
+      description: Optional comfort and glare sensors. Blueprint falls back to sun geometry when sensors are omitted.
+      input:
+        indoor_temp_sensor:
+          name: (Optional) Indoor temperature
+          description: Temperature sensor inside the room. Used to bias shades open for heating or closed for cooling.
+          default: ""
+          selector:
+            entity:
+              domain: sensor
+        outdoor_temp_sensor:
+          name: (Optional) Outdoor temperature
+          description: Outdoor temperature sensor. Used to gauge cooling load versus solar gain potential.
+          default: ""
+          selector:
+            entity:
+              domain: sensor
+        indoor_lux_sensor:
+          name: (Optional) Indoor illuminance
+          description: Illuminance sensor near the window to detect glare. Leave empty to rely on sun geometry alone.
+          default: ""
+          selector:
+            entity:
+              domain: sensor
+        cooling_setpoint:
+          name: Cooling comfort upper bound
+          description: Temperature at which shades should bias toward blocking heat. Use the same units as your sensors.
+          default: 25
+          selector:
+            number:
+              min: 10
+              max: 35
+              step: 0.5
+        heating_setpoint:
+          name: Heating comfort lower bound
+          description: Temperature at which shades should bias toward admitting solar gain.
+          default: 20
+          selector:
+            number:
+              min: 5
+              max: 30
+              step: 0.5
+        comfort_margin:
+          name: Comfort margin
+          description: Hysteresis around the comfort setpoints to reduce chatter. Same units as sensors.
+          default: 0.5
+          selector:
+            number:
+              min: 0
+              max: 3
+              step: 0.1
+        glare_lux_threshold:
+          name: Glare illuminance threshold (lux)
+          description: If indoor illuminance rises above this, shades move to the block position (when sun is on the window).
+          default: 1200
+          selector:
+            number:
+              min: 100
+              max: 40000
+              step: 100
+
+    scheduling_and_overrides:
+      name: Scheduling & Overrides
+      icon: mdi:clock-check
+      description: Optional presence and override helpers to suppress movement.
+      input:
+        presence_entity:
+          name: (Optional) Presence entity
+          description: When provided, shades adjust only if this entity is 'on' or 'home'. Leave empty to ignore presence.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: person
+                - domain: device_tracker
+                - domain: binary_sensor
+                - domain: input_boolean
+        manual_override:
+          name: (Optional) Manual override helper
+          description: When this input_boolean is 'on', shade adjustments pause. Turn off to resume automation.
+          default: ""
+          selector:
+            entity:
+              domain: input_boolean
+        quiet_hours_start:
+          name: (Optional) Quiet hours start
+          description: Time-of-day to stop moving shades (keeps last position). Leave empty for no quiet hours.
+          default: ""
+          selector:
+            time: {}
+        quiet_hours_end:
+          name: (Optional) Quiet hours end
+          description: Time-of-day to resume movement after quiet hours. Leave empty for no quiet hours.
+          default: ""
+          selector:
+            time: {}
+
+    irradiance:
+      name: Solar Irradiance (Optional)
+      icon: mdi:white-balance-sunny
+      description: Optional vertical-plane irradiance to detect direct sun per the paper. Leave empty to fall back to sun position only.
+      input:
+        vertical_irradiance_sensor:
+          name: (Optional) Vertical irradiance sensor
+          description: Solarimeter on the same facade (W/m²). If set, used with clear-sky model to classify direct vs diffuse.
+          default: ""
+          selector:
+            entity:
+              domain: sensor
+        clear_sky_A:
+          name: Clear-sky coefficient A
+          description: ASHRAE clear-sky A coefficient (default 1160 W/m²).
+          default: 1160
+          selector:
+            number:
+              min: 200
+              max: 1400
+              step: 10
+        clear_sky_B:
+          name: Clear-sky coefficient B
+          description: ASHRAE clear-sky B coefficient (default 0.14).
+          default: 0.14
+          selector:
+            number:
+              min: 0.05
+              max: 0.6
+              step: 0.01
+        direct_ratio_threshold:
+          name: Direct sun detection ratio
+          description: Measured / theoretical direct irradiance ratio to classify direct sun. Lower is more permissive.
+          default: 0.35
+          selector:
+            number:
+              min: 0.1
+              max: 1
+              step: 0.05
+        direct_irradiance_floor:
+          name: Direct irradiance floor (W/m²)
+          description: Minimum theoretical direct component before checking ratios (avoids noise at low sun angles).
+          default: 50
+          selector:
+            number:
+              min: 0
+              max: 400
+              step: 10
+        diffuse_glare_threshold:
+          name: Diffuse threshold (W/m²)
+          description: Threshold used in diffuse mode per paper (G < 300 W/m²). Keeps original 300 default.
+          default: 300
+          selector:
+            number:
+              min: 100
+              max: 800
+              step: 10
+
+    slat_geometry:
+      name: Slat Geometry (Optional)
+      icon: mdi:angle-acute
+      description: Used for the glare-limiting angle (Equation 8). Defaults suit typical zebra/venetian proportions.
+      input:
+        slat_gap_ratio:
+          name: Slat gap to width ratio (d/L)
+          description: Ratio of slat spacing to slat width. Leave default (0.9) for zebra/venetian-like behavior.
+          default: 0.9
+          selector:
+            number:
+              min: 0.2
+              max: 1.5
+              step: 0.05
+        max_tilt_angle:
+          name: Maximum tilt angle (degrees)
+          description: Cap for computed slat angle (0° fully open, 180° fully closed). Used when mapping to cover position.
+          default: 175
+          selector:
+            number:
+              min: 90
+              max: 180
+              step: 1
+
+  variables:
+    blueprint_version: "1.3.0"
+    cover_target: !input cover_target
+    window_orientation_deg: !input window_orientation_deg
+    sun_tolerance_deg: !input sun_tolerance_deg
+    admit_position_pct: !input admit_position_pct
+    dim_position_pct: !input dim_position_pct
+    block_position_pct: !input block_position_pct
+    shading_mode: !input shading_mode
+    indoor_temp_sensor: !input indoor_temp_sensor
+    outdoor_temp_sensor: !input outdoor_temp_sensor
+    indoor_lux_sensor: !input indoor_lux_sensor
+    cooling_setpoint: !input cooling_setpoint
+    heating_setpoint: !input heating_setpoint
+    comfort_margin: !input comfort_margin
+    glare_lux_threshold: !input glare_lux_threshold
+    presence_entity: !input presence_entity
+    manual_override: !input manual_override
+    quiet_hours_start: !input quiet_hours_start
+    quiet_hours_end: !input quiet_hours_end
+    vertical_irradiance_sensor: !input vertical_irradiance_sensor
+    clear_sky_A: !input clear_sky_A
+    clear_sky_B: !input clear_sky_B
+    direct_ratio_threshold: !input direct_ratio_threshold
+    direct_irradiance_floor: !input direct_irradiance_floor
+    diffuse_glare_threshold: !input diffuse_glare_threshold
+    slat_gap_ratio: !input slat_gap_ratio
+    max_tilt_angle: !input max_tilt_angle
+    pi: 3.141592653589793
+    sun_above_horizon: "{{ is_state('sun.sun', 'above_horizon') }}"
+    min_sun_elevation: "{{ 1 if sun_above_horizon else 90 }}"
+    cover_supported_features: "{{ state_attr(cover_target, 'supported_features') | int(0) }}"
+    cover_supports_tilt: "{{ (cover_supported_features & 16) > 0 }}"
+    sun_azimuth: "{{ state_attr('sun.sun', 'azimuth') | float(0) }}"
+    sun_elevation: "{{ state_attr('sun.sun', 'elevation') | float(-90) }}"
+    # Normalize azimuth delta to [-180, 180] then take absolute value to test if the sun is hitting the window.
+    sun_on_window: >-
+      {% set delta = (((sun_azimuth - window_orientation_deg + 540) % 360) - 180) | abs %}
+      {{ sun_elevation >= min_sun_elevation and delta <= sun_tolerance_deg }}
+    indoor_temp: "{{ states(indoor_temp_sensor) | float(none) if indoor_temp_sensor else none }}"
+    outdoor_temp: "{{ states(outdoor_temp_sensor) | float(none) if outdoor_temp_sensor else none }}"
+    indoor_lux: "{{ states(indoor_lux_sensor) | float(none) if indoor_lux_sensor else none }}"
+    presence_ok: >-
+      {% if not presence_entity %}
+        true
+      {% else %}
+        {{ is_state(presence_entity, 'on') or is_state(presence_entity, 'home') }}
+      {% endif %}
+    manual_override_active: "{{ manual_override and is_state(manual_override, 'on') }}"
+    in_quiet_hours: >-
+      {% if not quiet_hours_start or not quiet_hours_end %}
+        false
+      {% else %}
+        {% set now_time = now().time() %}
+        {% set start = strptime(quiet_hours_start, '%H:%M:%S').time() %}
+        {% set end = strptime(quiet_hours_end, '%H:%M:%S').time() %}
+        {% if start < end %}
+          {{ start <= now_time < end }}
+        {% else %}
+          {{ now_time >= start or now_time < end }}
+        {% endif %}
+      {% endif %}
+    cooling_needed: >-
+      {% if indoor_temp is not none %}
+        {{ indoor_temp >= (cooling_setpoint - comfort_margin) }}
+      {% else %}
+        false
+      {% endif %}
+    heating_needed: >-
+      {% if indoor_temp is not none %}
+        {{ indoor_temp <= (heating_setpoint + comfort_margin) }}
+      {% else %}
+        false
+      {% endif %}
+    measured_irradiance: "{{ states(vertical_irradiance_sensor) | float(none) if vertical_irradiance_sensor else none }}"
+    cos_az_offset: "{{ (sun_azimuth - window_orientation_deg) | float | radians | cos }}"
+    sin_elevation: "{{ sun_elevation | float | radians | sin }}"
+    cos_elevation: "{{ sun_elevation | float | radians | cos }}"
+    clear_sky_direct_normal: >-
+      {% set sin_el = [sin_elevation, 0.017].max() %}
+      {{ clear_sky_A * ((-clear_sky_B / sin_el) | exp) }}
+    direct_incidence_cos: "{{ cos_az_offset * cos_elevation }}"
+    direct_vertical_component: >-
+      {% if direct_incidence_cos > 0 %}
+        {{ clear_sky_direct_normal * direct_incidence_cos }}
+      {% else %}
+        0
+      {% endif %}
+    direct_sun_detected: >-
+      {% if measured_irradiance is not none and direct_vertical_component > direct_irradiance_floor %}
+        {{ measured_irradiance >= (direct_ratio_threshold * direct_vertical_component) }}
+      {% else %}
+        {{ sun_on_window }}
+      {% endif %}
+    glare_detected: >-
+      {% if indoor_lux is not none %}
+        {{ indoor_lux >= glare_lux_threshold }}
+      {% else %}
+        false
+      {% endif %}
+    beta_deg: >-
+      {% if cos_az_offset == 0 %}
+        90
+      {% else %}
+        {{ (((sun_elevation | float | radians) | tan) / cos_az_offset) | atan * 180 / pi }}
+      {% endif %}
+    beta_plus_90: "{{ beta_deg + 90 }}"
+    diffuse_empirical_angle: "{{ 120 - (0.66 * sun_elevation) }}"
+    slat_star_deg: >-
+      {% set tan_beta = (beta_deg | radians) | tan %}
+      {% set ratio = slat_gap_ratio | float(0.9) %}
+      {% set radicand = tan_beta*tan_beta - (ratio*ratio) + 1 %}
+      {% if radicand <= 0 %}
+        {{ beta_plus_90 }}
+      {% else %}
+        {% set num = tan_beta + (radicand | sqrt) %}
+        {% set denom = 1 + ratio %}
+        {{ 2 * (num / denom) | atan * 180 / pi }}
+      {% endif %}
+    mode_temp: >-
+      {% if indoor_temp is none %}
+        unknown
+      {% elif indoor_temp < 21 %}
+        winter
+      {% elif indoor_temp > 25 %}
+        summer
+      {% else %}
+        intermediate
+      {% endif %}
+    occupied: "{{ presence_ok }}"
+    target_angle_deg: >-
+      {# Pause paths #}
+      {% if manual_override_active or in_quiet_hours or not presence_ok %}
+        {{ none }}
+      {% elif not direct_sun_detected and not sun_on_window %}
+        {{ admit_position_pct / 100 * 180 }}
+      {% else %}
+        {% set G = measured_irradiance %}
+        {% set angle = none %}
+        {% if not occupied %}
+          {% if mode_temp == 'winter' %}
+            {% if not direct_sun_detected %}
+              {% set angle = 110 %}
+            {% else %}
+              {% if beta_deg < 65 %}
+                {% set angle = beta_plus_90 %}
+              {% elif G is not none and G > diffuse_glare_threshold %}
+                {% set angle = beta_plus_90 %}
+              {% else %}
+                {% set angle = diffuse_empirical_angle %}
+              {% endif %}
+            {% endif %}
+          {% elif mode_temp == 'summer' %}
+            {% set angle = max_tilt_angle %}
+          {% elif mode_temp == 'intermediate' %}
+            {% set angle = 80 %}
+          {% else %}
+            {% set angle = block_position_pct / 100 * 180 %}
+          {% endif %}
+        {% else %}
+          {% if mode_temp == 'winter' %}
+            {% if not direct_sun_detected %}
+              {% set angle = 110 %}
+            {% else %}
+              {% set angle = slat_star_deg %}
+            {% endif %}
+          {% elif mode_temp == 'summer' %}
+            {% set angle = 45 %}
+          {% elif mode_temp == 'intermediate' %}
+            {% if not direct_sun_detected %}
+              {% set angle = 80 %}
+            {% else %}
+              {% set angle = slat_star_deg %}
+            {% endif %}
+          {% else %}
+            {% set angle = block_position_pct / 100 * 180 %}
+          {% endif %}
+        {% endif %}
+        {% if angle is none %}
+          {{ none }}
+        {% else %}
+          {{ [0, [angle, max_tilt_angle].min()].max() }}
+        {% endif %}
+      {% endif %}
+    slat_target_position: >-
+      {% if shading_mode != 'slat' %}
+        {{ none }}
+      {% else %}
+        {% if target_angle_deg is none %}
+          {{ none }}
+        {% else %}
+          {{ (target_angle_deg / 180 * 100) | round(0) }}
+        {% endif %}
+      {% endif %}
+    zebra_target_position: >-
+      {% if shading_mode != 'zebra' %}
+        {{ none }}
+      {% else %}
+        {% set frontlit = direct_sun_detected or sun_on_window %}
+        {% set mode = mode_temp %}
+        {% set glare = glare_detected %}
+        {% set occ = presence_ok %}
+        {% if not occ %}
+          {% if mode == 'summer' and frontlit %}
+            {{ block_position_pct }}
+          {% elif mode == 'winter' and not frontlit %}
+            {{ admit_position_pct }}
+          {% else %}
+            {{ dim_position_pct }}
+          {% endif %}
+        {% else %}
+          {% if frontlit %}
+            {% if glare %}
+              {{ block_position_pct }}
+            {% elif mode == 'summer' %}
+              {{ [dim_position_pct, block_position_pct] | max }}
+            {% else %}
+              {{ dim_position_pct }}
+            {% endif %}
+          {% else %}
+            {{ admit_position_pct }}
+          {% endif %}
+        {% endif %}
+      {% endif %}
+    desired_position: >-
+      {% if shading_mode == 'slat' %}
+        {{ slat_target_position }}
+      {% elif shading_mode == 'zebra' %}
+        {{ zebra_target_position }}
+      {% else %}
+        {{ none }}
+      {% endif %}
+
+trigger:
+  - platform: time_pattern
+    minutes: "/5"
+  - platform: state
+    entity_id: sun.sun
+  - platform: homeassistant
+    event: start
+
+condition: []
+
+action:
+  - choose:
+      - conditions: "{{ manual_override_active }}"
+        sequence:
+          - service: logbook.log
+            data:
+              name: "Adaptive Shades"
+              message: "Paused: manual override is ON. (v{{ blueprint_version }})"
+              domain: cover
+      - conditions: "{{ in_quiet_hours }}"
+        sequence:
+          - service: logbook.log
+            data:
+              name: "Adaptive Shades"
+              message: "Paused during quiet hours. (v{{ blueprint_version }})"
+              domain: cover
+      - conditions: "{{ not presence_ok }}"
+        sequence:
+          - service: logbook.log
+            data:
+              name: "Adaptive Shades"
+              message: "Skipped: presence requirement not met. (v{{ blueprint_version }})"
+              domain: cover
+  - variables:
+      current_position: "{{ state_attr(cover_target, 'current_position') }}"
+      current_tilt: "{{ state_attr(cover_target, 'current_tilt_position') if cover_supports_tilt else none }}"
+      target_position: "{{ desired_position }}"
+      target_tilt: >-
+        {% if cover_supports_tilt and shading_mode == 'slat' and target_position is not none %}
+          {{ target_position | int }}
+        {% else %}
+          {{ none }}
+        {% endif %}
+  - condition: template
+    value_template: "{{ target_position is not none }}"
+  - condition: template
+    value_template: >-
+      {% if cover_supports_tilt and shading_mode == 'slat' %}
+        {{ target_tilt is not none and (current_tilt is none or (current_tilt - target_tilt) | abs >= 3) }}
+      {% else %}
+        {{ current_position is none or (current_position - target_position) | abs >= 3 }}
+      {% endif %}
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ is_state(cover_target, 'unavailable') or is_state(cover_target, 'unknown') }}"
+        sequence:
+          - service: logbook.log
+            data:
+              name: "Adaptive Shades"
+              message: "Cover unavailable; no movement. (v{{ blueprint_version }})"
+              domain: cover
+      - conditions: []
+        sequence:
+          - choose:
+              - conditions: "{{ cover_supports_tilt and shading_mode == 'slat' }}"
+                sequence:
+                  - service: cover.set_cover_tilt_position
+                    target:
+                      entity_id: "{{ cover_target }}"
+                    data:
+                      tilt_position: "{{ target_tilt | int }}"
+              - conditions: []
+                sequence:
+                  - service: cover.set_cover_position
+                    target:
+                      entity_id: "{{ cover_target }}"
+                    data:
+                      position: "{{ target_position | int }}"
+          - service: logbook.log
+            data:
+              name: "Adaptive Shades"
+              message: >-
+                Set shade to {{ target_position | int }}% (sun_on_window={{ sun_on_window }},
+                heating_needed={{ heating_needed }}, cooling_needed={{ cooling_needed }},
+                glare={{ glare_detected }}, az={{ sun_azimuth | round(1) }}°, el={{ sun_elevation | round(1) }}°). (v{{ blueprint_version }})
+              domain: cover
+
+mode: restart
+max_exceeded: silent
