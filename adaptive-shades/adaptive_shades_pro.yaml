@@ -208,13 +208,19 @@ blueprint:
               step: 5
         quiet_hours_start:
           name: (Optional) Quiet hours start
-          description: Time-of-day to stop moving shades (keeps last position). Leave empty for no quiet hours.
+          description: >-
+            Optional extra time-of-day window to stop moving shades (keeps last position), regardless of
+            sunrise/sunset. Night behavior is already controlled by the sun entity; use quiet hours only
+            if you want an additional "do not move" window. Leave empty to disable quiet hours.
           default: ""
           selector:
             time: {}
         quiet_hours_end:
           name: (Optional) Quiet hours end
-          description: Time-of-day to resume movement after quiet hours. Leave empty for no quiet hours.
+          description: >-
+            Time-of-day to resume movement after the optional quiet hours window. This is independent of
+            sunrise/sunset; leave empty (along with quiet_hours_start) to let the shade follow only the
+            sun-based and comfort logic.
           default: ""
           selector:
             time: {}
