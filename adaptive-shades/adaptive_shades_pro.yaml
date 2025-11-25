@@ -355,9 +355,9 @@ blueprint:
           selector:
             select:
               options:
-                - off
-                - basic
-                - verbose
+                - "off"
+                - "basic"
+                - "verbose"
 
 variables:
   blueprint_version: "1.5.6"
