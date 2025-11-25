@@ -689,14 +689,16 @@ condition: []
 
 action:
   # Unconditional debug entry – should fire on every run (manual or triggered)
-  - service: logbook.log
+  - service: persistent_notification.create
     data:
-      name: "Adaptive Shades"
+      title: "Adaptive Shades Debug"
       message: >-
-        ENTER action: debug_level={{ debug_level }}, shading_mode={{ shading_mode }},
-        sun_on_window={{ sun_on_window }}, direct_sun={{ direct_sun_detected }},
-        desired_position={{ desired_position }}. (v{{ blueprint_version }})
-      domain: cover
+        Automation ran at {{ now() }}.
+        debug_level={{ debug_level }},
+        shading_mode={{ shading_mode }},
+        sun_on_window={{ sun_on_window }},
+        direct_sun={{ direct_sun_detected }},
+        desired_position={{ desired_position }}.
 
   - choose:
       - conditions: "{{ manual_override_active }}"
@@ -819,4 +821,3 @@ action:
               domain: cover
 
 mode: restart
-max_exceeded: silent
