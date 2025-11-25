@@ -1,5 +1,5 @@
 blueprint:
-  name: "Adaptive Shades Pro v1.6.0"
+  name: "Adaptive Shades Pro v1.7.0"
   description: >-
     Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
     Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
@@ -100,6 +100,14 @@ blueprint:
               options:
                 - slat
                 - zebra
+        inverted_shades:
+          name: Inverted shades
+          description: >-
+            Enable if your shade reports 0% as fully closed and 100% as fully open. This inverts
+            the admit/dim/block positions so they map correctly to the device.
+          default: false
+          selector:
+            boolean: {}
 
     sensors_and_targets:
       name: Comfort & Sensor Inputs
@@ -364,7 +372,7 @@ blueprint:
                   value: "verbose"
 
 variables:
-  blueprint_version: "1.6.0"
+  blueprint_version: "1.7.0"
   cover_target: !input cover_target
   base_cover: >-
     {% if cover_target is string %}
@@ -380,6 +388,7 @@ variables:
   dim_position_pct: !input dim_position_pct
   block_position_pct: !input block_position_pct
   shading_mode: !input shading_mode
+  inverted_shades: !input inverted_shades
   sun_entity: !input sun_entity
   climate_entity: !input climate_entity
   room_profile: !input room_profile
@@ -681,13 +690,21 @@ variables:
         {% endif %}
       {% endif %}
     {% endif %}
-  desired_position: >-
+  desired_position_raw: >-
     {% if shading_mode == 'slat' %}
       {{ slat_target_position }}
     {% elif shading_mode == 'zebra' %}
       {{ zebra_target_position }}
     {% else %}
       {{ none }}
+    {% endif %}
+  desired_position: >-
+    {% if desired_position_raw is none %}
+      {{ none }}
+    {% elif inverted_shades %}
+      {{ 100 - (desired_position_raw | int) }}
+    {% else %}
+      {{ desired_position_raw }}
     {% endif %}
 
 trigger:

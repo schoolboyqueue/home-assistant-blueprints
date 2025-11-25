@@ -1,5 +1,11 @@
 # Adaptive Shades Pro - Changelog
 
+## [1.7.0] - 2025-11-25
+
+### Added
+
+- Inverted shades option to flip open/block percentages for devices that report 0% as fully closed and 100% as fully open.
+
 ## [1.6.0] - 2025-11-25
 
 ### Added
