@@ -18,6 +18,12 @@
 
 - Replaced unsupported Jinja `exp` filter in clear-sky irradiance calculation with explicit exponent math (uses `e_const ** exponent`).
 
+## [1.5.4] - 2025-11-25
+
+### Added
+
+- Diagnostics input with `debug_level` (off/basic/verbose) and gated logbook logging, including verbose no-movement traces for troubleshooting.
+
 ## [1.5.2] - 2025-11-25
 
 ### Fixed

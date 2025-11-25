@@ -1,5 +1,5 @@
 blueprint:
-  name: "Adaptive Shades Pro v1.5.3"
+  name: "Adaptive Shades Pro v1.5.4"
   description: >-
     Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
     Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
@@ -341,8 +341,26 @@ blueprint:
               max: 180
               step: 1
 
+    diagnostics:
+      name: Diagnostics & Logging
+      icon: mdi:bug
+      description: Control logbook verbosity for this automation.
+      input:
+        debug_level:
+          name: Debug level
+          description: >-
+            off = no logbook messages; basic = only key decisions (pause and movements);
+            verbose = includes "no-move" cycles to help with tuning and debugging.
+          default: basic
+          selector:
+            select:
+              options:
+                - off
+                - basic
+                - verbose
+
 variables:
-  blueprint_version: "1.5.3"
+  blueprint_version: "1.5.4"
   cover_target: !input cover_target
   window_orientation_deg: !input window_orientation_deg
   sun_tolerance_deg: !input sun_tolerance_deg
@@ -374,6 +392,9 @@ variables:
   diffuse_glare_threshold: !input diffuse_glare_threshold
   slat_gap_ratio: !input slat_gap_ratio
   max_tilt_angle: !input max_tilt_angle
+  debug_level: !input debug_level
+  debug_basic: "{{ debug_level in ['basic', 'verbose'] }}"
+  debug_verbose: "{{ debug_level == 'verbose' }}"
   pi: 3.141592653589793
   e_const: 2.718281828459045
   deg_to_rad: 0.017453292519943295
@@ -667,6 +688,8 @@ action:
   - choose:
       - conditions: "{{ manual_override_active }}"
         sequence:
+          - condition: template
+            value_template: "{{ debug_basic }}"
           - service: logbook.log
             data:
               name: "Adaptive Shades"
@@ -674,6 +697,8 @@ action:
               domain: cover
       - conditions: "{{ in_quiet_hours }}"
         sequence:
+          - condition: template
+            value_template: "{{ debug_basic }}"
           - service: logbook.log
             data:
               name: "Adaptive Shades"
@@ -681,6 +706,8 @@ action:
               domain: cover
       - conditions: "{{ not presence_ok }}"
         sequence:
+          - condition: template
+            value_template: "{{ debug_basic }}"
           - service: logbook.log
             data:
               name: "Adaptive Shades"
@@ -696,6 +723,41 @@ action:
         {% else %}
           {{ none }}
         {% endif %}
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ debug_verbose }}"
+          - condition: template
+            value_template: "{{ target_position is none }}"
+        sequence:
+          - service: logbook.log
+            data:
+              name: "Adaptive Shades"
+              message: >-
+                No movement: target_position is none
+                (sun_on_window={{ sun_on_window }},
+                direct_sun={{ direct_sun_detected }},
+                mode_temp={{ mode_temp }}). (v{{ blueprint_version }})
+              domain: cover
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ debug_verbose }}"
+          - condition: template
+            value_template: >-
+              {% if cover_supports_tilt and shading_mode == 'slat' %}
+                {{ target_tilt is not none and current_tilt is not none and (current_tilt - target_tilt) | abs < 3 }}
+              {% else %}
+                {{ current_position is not none and target_position is not none and (current_position - target_position) | abs < 3 }}
+              {% endif %}
+        sequence:
+          - service: logbook.log
+            data:
+              name: "Adaptive Shades"
+              message: >-
+                No movement: change below hysteresis
+                (current={{ current_position }}, target={{ target_position }}). (v{{ blueprint_version }})
+              domain: cover
   - condition: template
     value_template: "{{ target_position is not none }}"
   - condition: template
@@ -732,6 +794,8 @@ action:
                       entity_id: "{{ cover_target }}"
                     data:
                       position: "{{ target_position | int }}"
+          - condition: template
+            value_template: "{{ debug_basic }}"
           - service: logbook.log
             data:
               name: "Adaptive Shades"
