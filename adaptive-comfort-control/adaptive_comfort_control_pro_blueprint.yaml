@@ -349,6 +349,13 @@ blueprint:
                             max: 5.0
                             step: 0.1
 
+                vent_requires_occupancy:
+                    name: "Only Prefer Ventilation When Occupied"
+                    description: "If enabled, natural ventilation is only used when occupancy is detected."
+                    default: true
+                    selector:
+                        boolean: {}
+
                 energy_save_mode:
                     name: "Energy Save Mode"
                     description: "Allows slightly more aggressive setpoints when unoccupied (setback when away)."
@@ -928,6 +935,7 @@ variables:
     category: !input comfort_category
     energy_save: !input energy_save_mode
     nat_vent_enable: !input natural_ventilation_enable
+    vent_requires_occupancy: !input vent_requires_occupancy
     dv_sys_in: !input natural_ventilation_threshold
     setback_sys: !input setback_temperature_offset
     min_sys_c_pref: !input min_comfort_temp_c
@@ -1559,7 +1567,7 @@ variables:
               {% if s|float(none) is not none %}
                 {{ (s | float(0)) > 0 }}
               {% else %}
-                {{ s not in ['unknown','unavailable',''] }}
+                false
               {% endif %}
             {% endif %}
           {% endif %}
@@ -1685,12 +1693,18 @@ variables:
     dv_c: "{{ (dv_sys|float * 5/9) if is_imperial else (dv_sys|float) }}"
     t_adapt_base_c: "{{ (18.9 + 0.255 * t_out_c) | round(2) }}"
     out_valid: "{{ t_out_c >= 10 and t_out_c <= 40 }}"
+    humid_offset_c: >
+        {% if (precision or humid_enable) %}
+          {% if rh_in|float(50) > 60 %}-0.3
+          {% elif rh_in|float(50) < 30 %}0.3
+          {% else %}0.0{% endif %}
+        {% else %}0.0{% endif %}
     t_adapt_c_raw: >
-        {% set base = t_adapt_base_c + season_bias_c + co2_bias_c_eff + sleep_bias_c_eff + learned_offset_c %}
+        {% set base = t_adapt_base_c + humid_offset_c + season_bias_c + co2_bias_c_eff + sleep_bias_c_eff + learned_offset_c %}
         {% if out_valid %}
           {% if precision %}{{ (base + 0 + 0) | round(2) }}
           {% else %}{{ base | round(2) }}{% endif %}
-        {% else %}{{ (22.0 + season_bias_c + co2_bias_c_eff + sleep_bias_c_eff + learned_offset_c) | round(2) }}{% endif %}
+        {% else %}{{ (22.0 + humid_offset_c + season_bias_c + co2_bias_c_eff + sleep_bias_c_eff + learned_offset_c) | round(2) }}{% endif %}
     t_adapt_c: "{{ (t_adapt_c_raw) | round(2) }}"
     # Guard: keep adaptive target within [min_c+tol+setback, max_c-tol-setback] so band doesn't collapse to the edges
     t_adapt_c_guard: "{{ [ [ t_adapt_c, (max_c - tol_c - setback_apply_c) ] | min , (min_c + tol_c + setback_apply_c) ] | max | round(2) }}"
@@ -2010,25 +2024,48 @@ action:
   - variables:
       _manual_trigger: >
         {{ trigger.id in ['climate_manual_change', 'climate_manual_change_low', 'climate_manual_change_high'] }}
+      _nat_vent_active: false
       _manual_change_detected: >
-        {% if not _manual_trigger %} false
+        {% if not _manual_trigger %}
+          false
         {% else %}
-          {# Check if change exceeds tolerance threshold #}
-          {% set tol = manual_override_tolerance | float(1.0) %}
+          {% set tol_cli = manual_override_tolerance | float(1.0) %}
+          {% set tol_c = ((tol_cli - 32) * 5/9) if climate_is_imperial else tol_cli %}
+
           {% if trigger.id == 'climate_manual_change' %}
-            {% set old = trigger.from_state.attributes.temperature | float(0) if trigger.from_state.attributes.temperature is not none else 0 %}
-            {% set new = trigger.to_state.attributes.temperature | float(0) if trigger.to_state.attributes.temperature is not none else 0 %}
-            {{ (new - old) | abs >= tol }}
-          {% elif trigger.id == 'climate_manual_change_low' %}
-            {% set old = trigger.from_state.attributes.target_temp_low | float(0) if trigger.from_state.attributes.target_temp_low is not none else 0 %}
-            {% set new = trigger.to_state.attributes.target_temp_low | float(0) if trigger.to_state.attributes.target_temp_low is not none else 0 %}
-            {{ (new - old) | abs >= tol }}
-          {% elif trigger.id == 'climate_manual_change_high' %}
-            {% set old = trigger.from_state.attributes.target_temp_high | float(0) if trigger.from_state.attributes.target_temp_high is not none else 0 %}
-            {% set new = trigger.to_state.attributes.target_temp_high | float(0) if trigger.to_state.attributes.target_temp_high is not none else 0 %}
-            {{ (new - old) | abs >= tol }}
-          {% else %} false {% endif %}
+            {% set manual_cli = trigger.to_state.attributes.temperature | float(0) %}
+          {% elif trigger.id in ['climate_manual_change_low','climate_manual_change_high'] %}
+            {% set low = trigger.to_state.attributes.target_temp_low  | float(0) %}
+            {% set high = trigger.to_state.attributes.target_temp_high | float(0) %}
+            {% set manual_cli = (low + high) / 2 %}
+          {% else %}
+            {% set manual_cli = 0 %}
+          {% endif %}
+
+          {% set manual_c = ((manual_cli - 32) * 5/9) if climate_is_imperial else manual_cli %}
+          {% set predicted_c = t_adapt_c_guard %}
+          {{ (manual_c - predicted_c) | abs >= tol_c }}
         {% endif %}
+
+  - variables:
+      _t_in_valid: "{{ t_in_c is number and t_in_c > -40 and t_in_c < 60 }}"
+      _t_out_valid: "{{ t_out_c is number and t_out_c > -60 and t_out_c < 60 }}"
+
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ not _t_in_valid or not _t_out_valid }}"
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ dbg in ['basic','verbose'] }}"
+                sequence:
+                  - service: logbook.log
+                    data:
+                      name: "HVAC Pro"
+                      message: "Sensor invalid (Tin={{ t_in_c }}, Tout={{ t_out_c }}). Skipping control run."
+          - stop: "Sensor invalid - aborting run"
 
   # If manual override detected, pause and exit
   - choose:
@@ -2260,6 +2297,7 @@ action:
                   - condition: template
                     value_template: >
                       {{ nat_vent_enable
+                         and (not vent_requires_occupancy or occ_now | bool)
                          and ( (t_out_c is number) and (t_in_c is number) )
                          and ( (t_out_c - t_in_c)|abs <= dv_c|float(1.0) )
                          and (
@@ -2278,6 +2316,8 @@ action:
                       entity_id: !input climate_entity
                     data:
                       hvac_mode: "off"
+                  - variables:
+                      _nat_vent_active: true
                   - choose:
                       - conditions:
                           - condition: template
@@ -2384,7 +2424,7 @@ action:
           - choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ hvac_mode_now != 'off' or safety_reenable_needed }}"
+                    value_template: "{{ (hvac_mode_now != 'off' or safety_reenable_needed) and not _nat_vent_active }}"
                 sequence:
                   - service: climate.turn_on
                     target:
