@@ -1,3 +1,13 @@
+## [4.20.0] — 2025-11-25
+### Added
+- **Precision/velocity offsets:** New humidity and air-velocity offsets in precision comfort mode to nudge targets when RH is high/low and air movement is above 0.3 m/s in warm conditions.
+- **Adaptive fan control:** Computes temperature error vs. adaptive target and sets fan mode (auto/low/medium/high) when available.
+- **HVAC mode cooldown:** Respects `mode_cooldown_min` before switching to `heat_cool` (safety re-enables unaffected).
+
+### Changed
+- **Humidity offset rework:** Unified humidity offset handling for precision and humidity comfort paths using `humid_offset_c`.
+- **Occupancy/ventilation resilience:** Natural ventilation keeps HVAC off via `_nat_vent_active`, and occupancy fallbacks stay false on unknown states.
+
 ## [4.19.0] — 2025-11-25
 ### Added
 - **Precision/Humidity offset:** Small humidity-driven offset applied when Precision Comfort or Humidity Comfort is enabled, cooling slightly when RH > 60% and warming when RH < 30%.
