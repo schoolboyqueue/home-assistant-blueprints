@@ -688,6 +688,16 @@ trigger:
 condition: []
 
 action:
+  # Unconditional debug entry – should fire on every run (manual or triggered)
+  - service: logbook.log
+    data:
+      name: "Adaptive Shades"
+      message: >-
+        ENTER action: debug_level={{ debug_level }}, shading_mode={{ shading_mode }},
+        sun_on_window={{ sun_on_window }}, direct_sun={{ direct_sun_detected }},
+        desired_position={{ desired_position }}. (v{{ blueprint_version }})
+      domain: cover
+
   - choose:
       - conditions: "{{ manual_override_active }}"
         sequence:
