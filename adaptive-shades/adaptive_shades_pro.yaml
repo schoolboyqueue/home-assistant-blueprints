@@ -1,6 +1,7 @@
 ---
+---
 blueprint:
-  name: "Adaptive Shades Pro v1.3.1"
+  name: "Adaptive Shades Pro v1.4.0"
   description: >-
     Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
     Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
@@ -33,6 +34,15 @@ blueprint:
               max: 359
               unit_of_measurement: "°"
               step: 1
+        sun_entity:
+          name: Sun entity
+          description: >-
+            Sun entity to use for elevation/azimuth and sunrise/sunset.
+            Normally this should be 'sun.sun'.
+          default: sun.sun
+          selector:
+            entity:
+              domain: sun
         sun_tolerance_deg:
           name: Sun azimuth tolerance (degrees)
           description: How wide the acceptance cone is around the window azimuth to consider the sun "on this window".
@@ -76,8 +86,9 @@ blueprint:
         shading_mode:
           name: Shading mode
           description: >-
-            Select 'slat' for venetian/vertical-louver style control using solar geometry,
-            or 'zebra' for banded zebra shades (handled in a later step). For now, leave on 'slat'.
+            Select 'slat' for venetian/vertical-louver shades that support tilt, or 'zebra' for
+            banded zebra/roller shades that use position only. If unsure, choose 'zebra' for
+            typical fabric roller blinds and 'slat' only for tilt-capable venetian-style covers.
           default: slat
           selector:
             select:
@@ -111,9 +122,20 @@ blueprint:
           selector:
             entity:
               domain: sensor
+        weather_entity:
+          name: (Optional) Weather entity
+          description: >-
+            Weather entity (e.g. weather.home) used to bias shading on cloudy or rainy days.
+            Leave empty to ignore weather and rely on irradiance and sun position only.
+          default: ""
+          selector:
+            entity:
+              domain: weather
         cooling_setpoint:
           name: Cooling comfort upper bound
-          description: Temperature at which shades should bias toward blocking heat. Use the same units as your sensors.
+          description: >-
+            Temperature (°C or °F) at which shades should bias toward blocking heat.
+            Use the same units as your indoor temperature sensor.
           default: 25
           selector:
             number:
@@ -122,7 +144,9 @@ blueprint:
               step: 0.5
         heating_setpoint:
           name: Heating comfort lower bound
-          description: Temperature at which shades should bias toward admitting solar gain.
+          description: >-
+            Temperature (°C or °F) at which shades should bias toward admitting solar gain.
+            Use the same units as your indoor temperature sensor.
           default: 20
           selector:
             number:
@@ -171,6 +195,17 @@ blueprint:
           selector:
             entity:
               domain: input_boolean
+        manual_timeout_minutes:
+          name: Manual adjustment timeout (minutes)
+          description: >-
+            When the shade is manually adjusted, pause automatic movement for this many minutes.
+            Set to 0 to disable automatic manual override detection.
+          default: 60
+          selector:
+            number:
+              min: 0
+              max: 240
+              step: 5
         quiet_hours_start:
           name: (Optional) Quiet hours start
           description: Time-of-day to stop moving shades (keeps last position). Leave empty for no quiet hours.
@@ -185,9 +220,11 @@ blueprint:
             time: {}
 
     irradiance:
-      name: Solar Irradiance (Optional)
+      name: Solar Irradiance (Optional, Advanced)
       icon: mdi:white-balance-sunny
-      description: Optional vertical-plane irradiance to detect direct sun per the paper. Leave empty to fall back to sun position only.
+      description: >-
+        Advanced: vertical-plane irradiance to detect direct sun per the paper. Leave all fields at their defaults
+        (or the whole section empty) unless you have a dedicated solarimeter and want to tune the clear-sky model.
       input:
         vertical_irradiance_sensor:
           name: (Optional) Vertical irradiance sensor
@@ -216,7 +253,9 @@ blueprint:
               step: 0.01
         direct_ratio_threshold:
           name: Direct sun detection ratio
-          description: Measured / theoretical direct irradiance ratio to classify direct sun. Lower is more permissive.
+          description: >-
+            Advanced: measured/theoretical direct irradiance ratio to classify direct sun. Lower is more permissive.
+            The default (0.35) suits most locations; you usually do not need to change this.
           default: 0.35
           selector:
             number:
@@ -243,9 +282,11 @@ blueprint:
               step: 10
 
     slat_geometry:
-      name: Slat Geometry (Optional)
+      name: Slat Geometry (Optional, Advanced)
       icon: mdi:angle-acute
-      description: Used for the glare-limiting angle (Equation 8). Defaults suit typical zebra/venetian proportions.
+      description: >-
+        Advanced: used for the glare-limiting angle (Equation 8) in slat mode. The default ratio (~0.9) matches
+        typical venetian slats. You normally do not need to measure or change these values.
       input:
         slat_gap_ratio:
           name: Slat gap to width ratio (d/L)
@@ -267,7 +308,7 @@ blueprint:
               step: 1
 
 variables:
-  blueprint_version: "1.3.1"
+  blueprint_version: "1.4.0"
   cover_target: !input cover_target
   window_orientation_deg: !input window_orientation_deg
   sun_tolerance_deg: !input sun_tolerance_deg
@@ -275,6 +316,8 @@ variables:
   dim_position_pct: !input dim_position_pct
   block_position_pct: !input block_position_pct
   shading_mode: !input shading_mode
+  sun_entity: !input sun_entity
+  weather_entity: !input weather_entity
   indoor_temp_sensor: !input indoor_temp_sensor
   outdoor_temp_sensor: !input outdoor_temp_sensor
   indoor_lux_sensor: !input indoor_lux_sensor
@@ -284,6 +327,7 @@ variables:
   glare_lux_threshold: !input glare_lux_threshold
   presence_entity: !input presence_entity
   manual_override: !input manual_override
+  manual_timeout_minutes: !input manual_timeout_minutes
   quiet_hours_start: !input quiet_hours_start
   quiet_hours_end: !input quiet_hours_end
   vertical_irradiance_sensor: !input vertical_irradiance_sensor
@@ -295,15 +339,23 @@ variables:
   slat_gap_ratio: !input slat_gap_ratio
   max_tilt_angle: !input max_tilt_angle
   pi: 3.141592653589793
-  sun_above_horizon: "{{ is_state('sun.sun', 'above_horizon') }}"
+  sun_above_horizon: "{{ is_state(sun_entity, 'above_horizon') }}"
   min_sun_elevation: "{{ 1 if sun_above_horizon else 90 }}"
   night_block_angle_deg: >-
     {# At night, aim for the configured block position, expressed as an angle out of 180°. #}
     {{ (block_position_pct | float(85) / 100.0) * 180.0 }}
   cover_supported_features: "{{ state_attr(cover_target, 'supported_features') | int(0) }}"
   cover_supports_tilt: "{{ (cover_supported_features & 16) > 0 }}"
-  sun_azimuth: "{{ state_attr('sun.sun', 'azimuth') | float(0) }}"
-  sun_elevation: "{{ state_attr('sun.sun', 'elevation') | float(-90) }}"
+  sun_azimuth: "{{ state_attr(sun_entity, 'azimuth') | float(0) }}"
+  sun_elevation: "{{ state_attr(sun_entity, 'elevation') | float(-90) }}"
+  weather_state: "{{ states(weather_entity) if weather_entity else none }}"
+  weather_is_overcast: >-
+    {% if not weather_state %}
+      false
+    {% else %}
+      {% set s = weather_state %}
+      {{ s in ['cloudy', 'overcast', 'rainy', 'pouring', 'snowy', 'hail', 'partlycloudy'] }}
+    {% endif %}
   # Normalize azimuth delta to [-180, 180] then take absolute value to test if the sun is hitting the window.
   sun_on_window: >-
     {% set delta = (((sun_azimuth - window_orientation_deg + 540) % 360) - 180) | abs %}
@@ -318,6 +370,14 @@ variables:
       {{ is_state(presence_entity, 'on') or is_state(presence_entity, 'home') }}
     {% endif %}
   manual_override_active: "{{ manual_override and is_state(manual_override, 'on') }}"
+  cover_last_changed: "{{ states[cover_target].last_changed }}"
+  auto_override_active: >-
+    {% if manual_timeout_minutes | int(0) <= 0 or not cover_last_changed %}
+      false
+    {% else %}
+      {% set delta = (now() - cover_last_changed).total_seconds() / 60 %}
+      {{ delta < (manual_timeout_minutes | float) }}
+    {% endif %}
   in_quiet_hours: >-
     {% if not quiet_hours_start or not quiet_hours_end %}
       false
@@ -361,7 +421,8 @@ variables:
     {% if measured_irradiance is not none and direct_vertical_component > direct_irradiance_floor %}
       {{ measured_irradiance >= (direct_ratio_threshold * direct_vertical_component) }}
     {% else %}
-      {{ sun_on_window }}
+      {# Fall back to sun geometry, but suppress "direct sun" when weather is clearly overcast #}
+      {{ sun_on_window and not weather_is_overcast }}
     {% endif %}
   glare_detected: >-
     {% if indoor_lux is not none %}
@@ -391,9 +452,9 @@ variables:
   mode_temp: >-
     {% if indoor_temp is none %}
       unknown
-    {% elif indoor_temp < 21 %}
+    {% elif indoor_temp <= (heating_setpoint + comfort_margin) %}
       winter
-    {% elif indoor_temp > 25 %}
+    {% elif indoor_temp >= (cooling_setpoint - comfort_margin) %}
       summer
     {% else %}
       intermediate
@@ -401,7 +462,7 @@ variables:
   occupied: "{{ presence_ok }}"
   target_angle_deg: >-
     {# Pause paths #}
-    {% if manual_override_active or in_quiet_hours or not presence_ok %}
+    {% if manual_override_active or auto_override_active or in_quiet_hours or not presence_ok %}
       {{ none }}
     {% elif not sun_above_horizon %}
       {# Sun is below horizon: fully close to night block position. #}
@@ -509,7 +570,7 @@ trigger:
   - platform: time_pattern
     minutes: "/5"
   - platform: state
-    entity_id: sun.sun
+    entity_id: !input sun_entity
   - platform: homeassistant
     event: start
 
