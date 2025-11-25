@@ -1,5 +1,17 @@
 # Adaptive Shades Pro - Changelog
 
+## [1.5.0] - 2025-11-25
+
+### Added
+
+- Optional climate entity to bias heating/cooling classification and reflect HVAC state in shading decisions.
+- Room profile (living/office/bedroom) that adjusts glare sensitivity; effective glare threshold derived from profile.
+
+### Changed
+
+- Comfort mode detection now prefers active HVAC state when provided, falling back to setpoints.
+- Glare detection uses the profile-adjusted threshold; documentation updated for clarity.
+
 ## [1.4.0] - 2025-11-25
 
 ### Added

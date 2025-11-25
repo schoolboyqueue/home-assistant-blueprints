@@ -1,7 +1,7 @@
 ---
 ---
 blueprint:
-  name: "Adaptive Shades Pro v1.4.0"
+  name: "Adaptive Shades Pro v1.5.0"
   description: >-
     Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
     Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
@@ -128,6 +128,15 @@ blueprint:
           selector:
             entity:
               domain: sensor
+        climate_entity:
+          name: (Optional) Climate entity
+          description: >-
+            HVAC climate entity for this room (e.g. climate.living_room). When set, the shade will
+            bias behavior based on whether the system is actively heating or cooling.
+          default: ""
+          selector:
+            entity:
+              domain: climate
         weather_entity:
           name: (Optional) Weather entity
           description: >-
@@ -170,13 +179,28 @@ blueprint:
               step: 0.1
         glare_lux_threshold:
           name: Glare illuminance threshold (lux)
-          description: If indoor illuminance rises above this, shades move to the block position (when sun is on the window).
+          description: >-
+            Base glare threshold. If indoor illuminance rises above this (adjusted by the room profile),
+            shades move toward the block/dim position when the sun is on the window.
           default: 1200
           selector:
             number:
               min: 100
               max: 40000
               step: 100
+        room_profile:
+          name: Room profile
+          description: >-
+            High-level behavior preset for this room. 'office' is more sensitive to glare on screens,
+            'bedroom' tolerates a bit more light before reacting, and 'living' is balanced. You can
+            still fine-tune the glare threshold below.
+          default: living
+          selector:
+            select:
+              options:
+                - living
+                - office
+                - bedroom
 
     scheduling_and_overrides:
       name: Scheduling & Overrides
@@ -320,7 +344,7 @@ blueprint:
               step: 1
 
 variables:
-  blueprint_version: "1.4.0"
+  blueprint_version: "1.5.0"
   cover_target: !input cover_target
   window_orientation_deg: !input window_orientation_deg
   sun_tolerance_deg: !input sun_tolerance_deg
@@ -329,6 +353,8 @@ variables:
   block_position_pct: !input block_position_pct
   shading_mode: !input shading_mode
   sun_entity: !input sun_entity
+  climate_entity: !input climate_entity
+  room_profile: !input room_profile
   weather_entity: !input weather_entity
   indoor_temp_sensor: !input indoor_temp_sensor
   outdoor_temp_sensor: !input outdoor_temp_sensor
@@ -356,6 +382,20 @@ variables:
   night_block_angle_deg: >-
     {# At night, aim for the configured block position, expressed as an angle out of 180°. #}
     {{ (block_position_pct | float(85) / 100.0) * 180.0 }}
+  climate_hvac_mode: "{{ state_attr(climate_entity, 'hvac_mode') if climate_entity else none }}"
+  climate_hvac_action: "{{ state_attr(climate_entity, 'hvac_action') if climate_entity else none }}"
+  climate_heating: >-
+    {% if not climate_entity %}
+      false
+    {% else %}
+      {{ climate_hvac_action in ['heating'] or climate_hvac_mode in ['heat'] }}
+    {% endif %}
+  climate_cooling: >-
+    {% if not climate_entity %}
+      false
+    {% else %}
+      {{ climate_hvac_action in ['cooling'] or climate_hvac_mode in ['cool'] }}
+    {% endif %}
   cover_supported_features: "{{ state_attr(cover_target, 'supported_features') | int(0) }}"
   cover_supports_tilt: "{{ (cover_supported_features & 16) > 0 }}"
   sun_azimuth: "{{ state_attr(sun_entity, 'azimuth') | float(0) }}"
@@ -405,13 +445,17 @@ variables:
     {% endif %}
   cooling_needed: >-
     {% if indoor_temp is not none %}
-      {{ indoor_temp >= (cooling_setpoint - comfort_margin) }}
+      {{ indoor_temp >= (cooling_setpoint - comfort_margin) or climate_cooling }}
+    {% elif climate_cooling %}
+      true
     {% else %}
       false
     {% endif %}
   heating_needed: >-
     {% if indoor_temp is not none %}
-      {{ indoor_temp <= (heating_setpoint + comfort_margin) }}
+      {{ indoor_temp <= (heating_setpoint + comfort_margin) or climate_heating }}
+    {% elif climate_heating %}
+      true
     {% else %}
       false
     {% endif %}
@@ -436,9 +480,17 @@ variables:
       {# Fall back to sun geometry, but suppress "direct sun" when weather is clearly overcast #}
       {{ sun_on_window and not weather_is_overcast }}
     {% endif %}
+  effective_glare_lux_threshold: >-
+    {% if room_profile == 'office' %}
+      {{ (glare_lux_threshold * 0.8) | round(0) }}
+    {% elif room_profile == 'bedroom' %}
+      {{ (glare_lux_threshold * 1.2) | round(0) }}
+    {% else %}
+      {{ glare_lux_threshold }}
+    {% endif %}
   glare_detected: >-
     {% if indoor_lux is not none %}
-      {{ indoor_lux >= glare_lux_threshold }}
+      {{ indoor_lux >= effective_glare_lux_threshold }}
     {% else %}
       false
     {% endif %}
@@ -462,14 +514,35 @@ variables:
       {{ 2 * (num / denom) | atan * 180 / pi }}
     {% endif %}
   mode_temp: >-
-    {% if indoor_temp is none %}
+    {% set t = indoor_temp %}
+    {% set heat_sp = heating_setpoint %}
+    {% set cool_sp = cooling_setpoint %}
+    {% if t is none and not climate_entity %}
       unknown
-    {% elif indoor_temp <= (heating_setpoint + comfort_margin) %}
-      winter
-    {% elif indoor_temp >= (cooling_setpoint - comfort_margin) %}
-      summer
+    {% elif climate_entity %}
+      {# Climate mode takes precedence when clearly heating or cooling #}
+      {% if climate_heating %}
+        winter
+      {% elif climate_cooling %}
+        summer
+      {% elif t is none %}
+        unknown
+      {% elif t <= (heat_sp + comfort_margin) %}
+        winter
+      {% elif t >= (cool_sp - comfort_margin) %}
+        summer
+      {% else %}
+        intermediate
+      {% endif %}
     {% else %}
-      intermediate
+      {# No climate entity: derive purely from temperature and setpoints #}
+      {% if t <= (heat_sp + comfort_margin) %}
+        winter
+      {% elif t >= (cool_sp - comfort_margin) %}
+        summer
+      {% else %}
+        intermediate
+      {% endif %}
     {% endif %}
   occupied: "{{ presence_ok }}"
   target_angle_deg: >-

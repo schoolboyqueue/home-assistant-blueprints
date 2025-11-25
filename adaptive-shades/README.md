@@ -1,6 +1,6 @@
 # Adaptive Shades Pro
 
-**Version:** 1.4.0  
+**Version:** 1.5.0  
 **Author:** Jeremy Carter  
 **Home Assistant Blueprint for Solar-Adaptive Shade Control**
 
@@ -30,7 +30,7 @@ Adaptive Shades Pro automates vertical blackout or zebra shades using the solar-
    - **Shade cover:** Your vertical shade (cover entity).  
    - **Shading mode:** `slat` for venetian/tilt-style; `zebra` for banded shades using calibrated admit/dim/block positions.  
    - **Window orientation:** Degrees the window faces (0° = North, 90° = East, 180° = South, 270° = West).  
-   - (Optional) Indoor temp, outdoor temp, indoor lux, weather entity, irradiance sensor, presence, quiet hours, manual override helper.
+   - (Optional) Indoor temp, outdoor temp, indoor lux, weather entity, climate entity, room profile, irradiance sensor, presence, quiet hours, manual override helper.
 4) **Save and enable.** The blueprint will adjust every 5 minutes, at HA startup, and whenever the sun entity updates.
 
 ---
@@ -53,12 +53,12 @@ Adaptive Shades Pro automates vertical blackout or zebra shades using the solar-
 ## Control Logic (Summary)
 
 - Classify direct vs diffuse sun: compares a vertical irradiance sensor (if provided) to a clear-sky model (ASHRAE A/B), else falls back to sun azimuth/elevation and window orientation.
-- Temperature bands driven by your heating/cooling setpoints (with comfort margin) instead of fixed °C thresholds.
+- Temperature bands driven by your heating/cooling setpoints (with comfort margin) and climate mode if provided (heat/cool).
   - **Occupied:** winter uses glare-limiting slat angle (Eq. 8); intermediate uses Eq. 8 when direct, 80° when diffuse; summer tilts to 45° for minimum daylight.  
   - **Unoccupied:** winter aligns to sun (β+90°) or diffuse empirical law (120 − 0.66·α) and uses G < 300 W/m² threshold; intermediate 80°; summer closes.
 - Maps computed slat angle (0° open, 180° closed) to cover position and caps at `max_tilt_angle`; if the cover supports tilt, uses `cover.set_cover_tilt_position`, otherwise falls back to position. Zebra mode maps to admit/dim/block positions based on sun/glare/temp/occupancy.
 - Night behavior: closes to the block position after sunset and resumes adaptive control after sunrise (respects manual override and quiet hours).
-- Optional weather bias suppresses direct-sun classification on cloudy/rainy states when no irradiance sensor is present; optional manual timeout pauses automation after manual shade moves.
+- Optional weather bias suppresses direct-sun classification on cloudy/rainy states when no irradiance sensor is present; optional manual timeout pauses automation after manual shade moves; optional climate entity biases heating/cooling and room profiles adjust glare sensitivity.
 
 ---
 
