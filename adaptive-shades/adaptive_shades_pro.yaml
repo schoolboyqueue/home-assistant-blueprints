@@ -66,7 +66,7 @@ blueprint:
             number:
               min: 0
               max: 100
-              step: 5
+              step: 1
               unit_of_measurement: "%"
         dim_position_pct:
           name: Preferred dimmed position (%)
@@ -76,7 +76,7 @@ blueprint:
             number:
               min: 0
               max: 100
-              step: 5
+              step: 1
               unit_of_measurement: "%"
         block_position_pct:
           name: Preferred block position (%)
@@ -86,7 +86,7 @@ blueprint:
             number:
               min: 0
               max: 100
-              step: 5
+              step: 1
               unit_of_measurement: "%"
         shading_mode:
           name: Shading mode

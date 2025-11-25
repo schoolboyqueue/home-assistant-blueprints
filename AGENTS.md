@@ -18,6 +18,7 @@
 - Home Assistant’s Jinja environment is restricted. Do not assume arbitrary Jinja extensions or Python are available.
 - HA selectors: when using `selector.select`, `options` should be either quoted strings (e.g., `- "off"`) **or** full `label`/`value` pairs (both quoted). Avoid mixing styles or leaving values unquoted; malformed options will cause import errors.
 - When computing time deltas, convert datetimes to timestamps with `as_timestamp()` before subtraction (e.g., `(as_timestamp(now()) - as_timestamp(state.last_changed)) / 60`) to avoid type errors.
+- When an input allows multiple entities, derive a single representative (e.g., the first entity) before calling `state_attr`, `is_state`, or accessing `last_changed`; `!input` may return a list and direct state calls will fail.
 
 ## Home Assistant Jinja2 Compliance
 
