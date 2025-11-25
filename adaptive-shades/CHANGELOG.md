@@ -18,6 +18,12 @@
 
 - Replaced unsupported Jinja `exp` filter in clear-sky irradiance calculation with explicit exponent math (uses `e_const ** exponent`).
 
+## [1.5.7] - 2025-11-25
+
+### Fixed
+
+- Clear-sky irradiance calculation now uses Jinja `| max` on a list (replacing Python `.max()`), preventing template errors in Home Assistant.
+
 ## [1.5.6] - 2025-11-25
 
 ### Fixed
