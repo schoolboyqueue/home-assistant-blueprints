@@ -79,6 +79,18 @@ A single automation that adapts to Zooz/Inovelli Central Scene switches or Lutro
 
 ---
 
+### 4) Adaptive Shades Pro
+Solar-aware shade control for venetian/vertical slats or zebra shades with direct vs diffuse detection, temperature bands, presence/quiet hours, glare handling, and night close/resume behavior.
+
+<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/adaptive-shades/adaptive_shades_pro.yaml"><img alt="Import Adaptive Shades" src="https://img.shields.io/badge/Import-Home%20Assistant-2D9BF0?logo=homeassistant&logoColor=white"></a>
+
+**Quick Links:**
+<a href="https://raw.githubusercontent.com/schoolboyqueue/home-assistant-blueprints/main/adaptive-shades/adaptive_shades_pro.yaml">Raw</a> •
+<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/adaptive-shades/README.md">Docs</a> •
+<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/adaptive-shades/CHANGELOG.md">Changelog</a>
+
+---
+
 ---
 
 ## Quick Start
@@ -103,6 +115,10 @@ A single automation that adapts to Zooz/Inovelli Central Scene switches or Lutro
 .
 ├── adaptive-comfort-control/
 │   ├── adaptive_comfort_control_pro_blueprint.yaml
+│   ├── CHANGELOG.md
+│   └── README.md
+├── adaptive-shades/
+│   ├── adaptive_shades_pro.yaml
 │   ├── CHANGELOG.md
 │   └── README.md
 ├── bathroom-light-fan-control/
