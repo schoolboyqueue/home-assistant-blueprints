@@ -18,6 +18,12 @@
 
 - Replaced unsupported Jinja `exp` filter in clear-sky irradiance calculation with explicit exponent math (uses `e_const ** exponent`).
 
+## [1.5.6] - 2025-11-25
+
+### Fixed
+
+- Adjusted debug level selector to use simple string options for Home Assistant compatibility and aligned version metadata.
+
 ## [1.5.4] - 2025-11-25
 
 ### Added
