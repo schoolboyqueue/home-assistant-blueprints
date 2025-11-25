@@ -1,5 +1,11 @@
 # Adaptive Shades Pro - Changelog
 
+## [1.3.1] - 2025-11-25
+
+### Added
+
+- Sunset/sunrise night mode: closes to block position when the sun is below the horizon and resumes adaptive control after sunrise, honoring manual override and quiet hours.
+
 ## [1.3.0] - 2025-11-25
 
 ### Added
