@@ -1,5 +1,5 @@
 blueprint:
-  name: "Adaptive Shades Pro v1.5.1"
+  name: "Adaptive Shades Pro v1.5.2"
   description: >-
     Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
     Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
@@ -342,7 +342,7 @@ blueprint:
               step: 1
 
 variables:
-  blueprint_version: "1.5.1"
+  blueprint_version: "1.5.2"
   cover_target: !input cover_target
   window_orientation_deg: !input window_orientation_deg
   sun_tolerance_deg: !input sun_tolerance_deg
@@ -375,6 +375,7 @@ variables:
   slat_gap_ratio: !input slat_gap_ratio
   max_tilt_angle: !input max_tilt_angle
   pi: 3.141592653589793
+  deg_to_rad: 0.017453292519943295
   sun_above_horizon: "{{ is_state(sun_entity, 'above_horizon') }}"
   min_sun_elevation: "{{ 1 if sun_above_horizon else 90 }}"
   night_block_angle_deg: >-
@@ -458,9 +459,9 @@ variables:
       false
     {% endif %}
   measured_irradiance: "{{ states(vertical_irradiance_sensor) | float(none) if vertical_irradiance_sensor else none }}"
-  cos_az_offset: "{{ (sun_azimuth - window_orientation_deg) | float | radians | cos }}"
-  sin_elevation: "{{ sun_elevation | float | radians | sin }}"
-  cos_elevation: "{{ sun_elevation | float | radians | cos }}"
+  cos_az_offset: "{{ ((sun_azimuth - window_orientation_deg) | float * deg_to_rad) | cos }}"
+  sin_elevation: "{{ (sun_elevation | float * deg_to_rad) | sin }}"
+  cos_elevation: "{{ (sun_elevation | float * deg_to_rad) | cos }}"
   clear_sky_direct_normal: >-
     {% set sin_el = [sin_elevation, 0.017].max() %}
     {{ clear_sky_A * ((-clear_sky_B / sin_el) | exp) }}
@@ -496,12 +497,13 @@ variables:
     {% if cos_az_offset == 0 %}
       90
     {% else %}
-      {{ (((sun_elevation | float | radians) | tan) / cos_az_offset) | atan * 180 / pi }}
+      {% set tan_elev = (sun_elevation | float * deg_to_rad) | tan %}
+      {{ (tan_elev / cos_az_offset) | atan * 180 / pi }}
     {% endif %}
   beta_plus_90: "{{ beta_deg + 90 }}"
   diffuse_empirical_angle: "{{ 120 - (0.66 * sun_elevation) }}"
   slat_star_deg: >-
-    {% set tan_beta = (beta_deg | radians) | tan %}
+    {% set tan_beta = (beta_deg | float * deg_to_rad) | tan %}
     {% set ratio = slat_gap_ratio | float(0.9) %}
     {% set radicand = tan_beta*tan_beta - (ratio*ratio) + 1 %}
     {% if radicand <= 0 %}

@@ -12,6 +12,12 @@
 - Comfort mode detection now prefers active HVAC state when provided, falling back to setpoints.
 - Glare detection uses the profile-adjusted threshold; documentation updated for clarity.
 
+## [1.5.2] - 2025-11-25
+
+### Fixed
+
+- Replaced unsupported Jinja `radians` filter with explicit degree-to-radian conversion for tilt and sun geometry math to prevent template parse errors.
+
 ## [1.5.1] - 2025-11-25
 
 ### Fixed
