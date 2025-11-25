@@ -265,244 +265,244 @@ blueprint:
               max: 180
               step: 1
 
-  variables:
-    blueprint_version: "1.3.1"
-    cover_target: !input cover_target
-    window_orientation_deg: !input window_orientation_deg
-    sun_tolerance_deg: !input sun_tolerance_deg
-    admit_position_pct: !input admit_position_pct
-    dim_position_pct: !input dim_position_pct
-    block_position_pct: !input block_position_pct
-    shading_mode: !input shading_mode
-    indoor_temp_sensor: !input indoor_temp_sensor
-    outdoor_temp_sensor: !input outdoor_temp_sensor
-    indoor_lux_sensor: !input indoor_lux_sensor
-    cooling_setpoint: !input cooling_setpoint
-    heating_setpoint: !input heating_setpoint
-    comfort_margin: !input comfort_margin
-    glare_lux_threshold: !input glare_lux_threshold
-    presence_entity: !input presence_entity
-    manual_override: !input manual_override
-    quiet_hours_start: !input quiet_hours_start
-    quiet_hours_end: !input quiet_hours_end
-    vertical_irradiance_sensor: !input vertical_irradiance_sensor
-    clear_sky_A: !input clear_sky_A
-    clear_sky_B: !input clear_sky_B
-    direct_ratio_threshold: !input direct_ratio_threshold
-    direct_irradiance_floor: !input direct_irradiance_floor
-    diffuse_glare_threshold: !input diffuse_glare_threshold
-    slat_gap_ratio: !input slat_gap_ratio
-    max_tilt_angle: !input max_tilt_angle
-    pi: 3.141592653589793
-    sun_above_horizon: "{{ is_state('sun.sun', 'above_horizon') }}"
-    min_sun_elevation: "{{ 1 if sun_above_horizon else 90 }}"
-    night_block_angle_deg: >-
-      {# At night, aim for the configured block position, expressed as an angle out of 180°. #}
-      {{ (block_position_pct | float(85) / 100.0) * 180.0 }}
-    cover_supported_features: "{{ state_attr(cover_target, 'supported_features') | int(0) }}"
-    cover_supports_tilt: "{{ (cover_supported_features & 16) > 0 }}"
-    sun_azimuth: "{{ state_attr('sun.sun', 'azimuth') | float(0) }}"
-    sun_elevation: "{{ state_attr('sun.sun', 'elevation') | float(-90) }}"
-    # Normalize azimuth delta to [-180, 180] then take absolute value to test if the sun is hitting the window.
-    sun_on_window: >-
-      {% set delta = (((sun_azimuth - window_orientation_deg + 540) % 360) - 180) | abs %}
-      {{ sun_elevation >= min_sun_elevation and delta <= sun_tolerance_deg }}
-    indoor_temp: "{{ states(indoor_temp_sensor) | float(none) if indoor_temp_sensor else none }}"
-    outdoor_temp: "{{ states(outdoor_temp_sensor) | float(none) if outdoor_temp_sensor else none }}"
-    indoor_lux: "{{ states(indoor_lux_sensor) | float(none) if indoor_lux_sensor else none }}"
-    presence_ok: >-
-      {% if not presence_entity %}
-        true
+variables:
+  blueprint_version: "1.3.1"
+  cover_target: !input cover_target
+  window_orientation_deg: !input window_orientation_deg
+  sun_tolerance_deg: !input sun_tolerance_deg
+  admit_position_pct: !input admit_position_pct
+  dim_position_pct: !input dim_position_pct
+  block_position_pct: !input block_position_pct
+  shading_mode: !input shading_mode
+  indoor_temp_sensor: !input indoor_temp_sensor
+  outdoor_temp_sensor: !input outdoor_temp_sensor
+  indoor_lux_sensor: !input indoor_lux_sensor
+  cooling_setpoint: !input cooling_setpoint
+  heating_setpoint: !input heating_setpoint
+  comfort_margin: !input comfort_margin
+  glare_lux_threshold: !input glare_lux_threshold
+  presence_entity: !input presence_entity
+  manual_override: !input manual_override
+  quiet_hours_start: !input quiet_hours_start
+  quiet_hours_end: !input quiet_hours_end
+  vertical_irradiance_sensor: !input vertical_irradiance_sensor
+  clear_sky_A: !input clear_sky_A
+  clear_sky_B: !input clear_sky_B
+  direct_ratio_threshold: !input direct_ratio_threshold
+  direct_irradiance_floor: !input direct_irradiance_floor
+  diffuse_glare_threshold: !input diffuse_glare_threshold
+  slat_gap_ratio: !input slat_gap_ratio
+  max_tilt_angle: !input max_tilt_angle
+  pi: 3.141592653589793
+  sun_above_horizon: "{{ is_state('sun.sun', 'above_horizon') }}"
+  min_sun_elevation: "{{ 1 if sun_above_horizon else 90 }}"
+  night_block_angle_deg: >-
+    {# At night, aim for the configured block position, expressed as an angle out of 180°. #}
+    {{ (block_position_pct | float(85) / 100.0) * 180.0 }}
+  cover_supported_features: "{{ state_attr(cover_target, 'supported_features') | int(0) }}"
+  cover_supports_tilt: "{{ (cover_supported_features & 16) > 0 }}"
+  sun_azimuth: "{{ state_attr('sun.sun', 'azimuth') | float(0) }}"
+  sun_elevation: "{{ state_attr('sun.sun', 'elevation') | float(-90) }}"
+  # Normalize azimuth delta to [-180, 180] then take absolute value to test if the sun is hitting the window.
+  sun_on_window: >-
+    {% set delta = (((sun_azimuth - window_orientation_deg + 540) % 360) - 180) | abs %}
+    {{ sun_elevation >= min_sun_elevation and delta <= sun_tolerance_deg }}
+  indoor_temp: "{{ states(indoor_temp_sensor) | float(none) if indoor_temp_sensor else none }}"
+  outdoor_temp: "{{ states(outdoor_temp_sensor) | float(none) if outdoor_temp_sensor else none }}"
+  indoor_lux: "{{ states(indoor_lux_sensor) | float(none) if indoor_lux_sensor else none }}"
+  presence_ok: >-
+    {% if not presence_entity %}
+      true
+    {% else %}
+      {{ is_state(presence_entity, 'on') or is_state(presence_entity, 'home') }}
+    {% endif %}
+  manual_override_active: "{{ manual_override and is_state(manual_override, 'on') }}"
+  in_quiet_hours: >-
+    {% if not quiet_hours_start or not quiet_hours_end %}
+      false
+    {% else %}
+      {% set now_time = now().time() %}
+      {% set start = strptime(quiet_hours_start, '%H:%M:%S').time() %}
+      {% set end = strptime(quiet_hours_end, '%H:%M:%S').time() %}
+      {% if start < end %}
+        {{ start <= now_time < end }}
       {% else %}
-        {{ is_state(presence_entity, 'on') or is_state(presence_entity, 'home') }}
+        {{ now_time >= start or now_time < end }}
       {% endif %}
-    manual_override_active: "{{ manual_override and is_state(manual_override, 'on') }}"
-    in_quiet_hours: >-
-      {% if not quiet_hours_start or not quiet_hours_end %}
-        false
-      {% else %}
-        {% set now_time = now().time() %}
-        {% set start = strptime(quiet_hours_start, '%H:%M:%S').time() %}
-        {% set end = strptime(quiet_hours_end, '%H:%M:%S').time() %}
-        {% if start < end %}
-          {{ start <= now_time < end }}
-        {% else %}
-          {{ now_time >= start or now_time < end }}
-        {% endif %}
-      {% endif %}
-    cooling_needed: >-
-      {% if indoor_temp is not none %}
-        {{ indoor_temp >= (cooling_setpoint - comfort_margin) }}
-      {% else %}
-        false
-      {% endif %}
-    heating_needed: >-
-      {% if indoor_temp is not none %}
-        {{ indoor_temp <= (heating_setpoint + comfort_margin) }}
-      {% else %}
-        false
-      {% endif %}
-    measured_irradiance: "{{ states(vertical_irradiance_sensor) | float(none) if vertical_irradiance_sensor else none }}"
-    cos_az_offset: "{{ (sun_azimuth - window_orientation_deg) | float | radians | cos }}"
-    sin_elevation: "{{ sun_elevation | float | radians | sin }}"
-    cos_elevation: "{{ sun_elevation | float | radians | cos }}"
-    clear_sky_direct_normal: >-
-      {% set sin_el = [sin_elevation, 0.017].max() %}
-      {{ clear_sky_A * ((-clear_sky_B / sin_el) | exp) }}
-    direct_incidence_cos: "{{ cos_az_offset * cos_elevation }}"
-    direct_vertical_component: >-
-      {% if direct_incidence_cos > 0 %}
-        {{ clear_sky_direct_normal * direct_incidence_cos }}
-      {% else %}
-        0
-      {% endif %}
-    direct_sun_detected: >-
-      {% if measured_irradiance is not none and direct_vertical_component > direct_irradiance_floor %}
-        {{ measured_irradiance >= (direct_ratio_threshold * direct_vertical_component) }}
-      {% else %}
-        {{ sun_on_window }}
-      {% endif %}
-    glare_detected: >-
-      {% if indoor_lux is not none %}
-        {{ indoor_lux >= glare_lux_threshold }}
-      {% else %}
-        false
-      {% endif %}
-    beta_deg: >-
-      {% if cos_az_offset == 0 %}
-        90
-      {% else %}
-        {{ (((sun_elevation | float | radians) | tan) / cos_az_offset) | atan * 180 / pi }}
-      {% endif %}
-    beta_plus_90: "{{ beta_deg + 90 }}"
-    diffuse_empirical_angle: "{{ 120 - (0.66 * sun_elevation) }}"
-    slat_star_deg: >-
-      {% set tan_beta = (beta_deg | radians) | tan %}
-      {% set ratio = slat_gap_ratio | float(0.9) %}
-      {% set radicand = tan_beta*tan_beta - (ratio*ratio) + 1 %}
-      {% if radicand <= 0 %}
-        {{ beta_plus_90 }}
-      {% else %}
-        {% set num = tan_beta + (radicand | sqrt) %}
-        {% set denom = 1 + ratio %}
-        {{ 2 * (num / denom) | atan * 180 / pi }}
-      {% endif %}
-    mode_temp: >-
-      {% if indoor_temp is none %}
-        unknown
-      {% elif indoor_temp < 21 %}
-        winter
-      {% elif indoor_temp > 25 %}
-        summer
-      {% else %}
-        intermediate
-      {% endif %}
-    occupied: "{{ presence_ok }}"
-    target_angle_deg: >-
-      {# Pause paths #}
-      {% if manual_override_active or in_quiet_hours or not presence_ok %}
-        {{ none }}
-      {% elif not sun_above_horizon %}
-        {# Sun is below horizon: fully close to night block position. #}
-        {{ night_block_angle_deg }}
-      {% elif not direct_sun_detected and not sun_on_window %}
-        {{ admit_position_pct / 100 * 180 }}
-      {% else %}
-        {% set G = measured_irradiance %}
-        {% set angle = none %}
-        {% if not occupied %}
-          {% if mode_temp == 'winter' %}
-            {% if not direct_sun_detected %}
-              {% set angle = 110 %}
+    {% endif %}
+  cooling_needed: >-
+    {% if indoor_temp is not none %}
+      {{ indoor_temp >= (cooling_setpoint - comfort_margin) }}
+    {% else %}
+      false
+    {% endif %}
+  heating_needed: >-
+    {% if indoor_temp is not none %}
+      {{ indoor_temp <= (heating_setpoint + comfort_margin) }}
+    {% else %}
+      false
+    {% endif %}
+  measured_irradiance: "{{ states(vertical_irradiance_sensor) | float(none) if vertical_irradiance_sensor else none }}"
+  cos_az_offset: "{{ (sun_azimuth - window_orientation_deg) | float | radians | cos }}"
+  sin_elevation: "{{ sun_elevation | float | radians | sin }}"
+  cos_elevation: "{{ sun_elevation | float | radians | cos }}"
+  clear_sky_direct_normal: >-
+    {% set sin_el = [sin_elevation, 0.017].max() %}
+    {{ clear_sky_A * ((-clear_sky_B / sin_el) | exp) }}
+  direct_incidence_cos: "{{ cos_az_offset * cos_elevation }}"
+  direct_vertical_component: >-
+    {% if direct_incidence_cos > 0 %}
+      {{ clear_sky_direct_normal * direct_incidence_cos }}
+    {% else %}
+      0
+    {% endif %}
+  direct_sun_detected: >-
+    {% if measured_irradiance is not none and direct_vertical_component > direct_irradiance_floor %}
+      {{ measured_irradiance >= (direct_ratio_threshold * direct_vertical_component) }}
+    {% else %}
+      {{ sun_on_window }}
+    {% endif %}
+  glare_detected: >-
+    {% if indoor_lux is not none %}
+      {{ indoor_lux >= glare_lux_threshold }}
+    {% else %}
+      false
+    {% endif %}
+  beta_deg: >-
+    {% if cos_az_offset == 0 %}
+      90
+    {% else %}
+      {{ (((sun_elevation | float | radians) | tan) / cos_az_offset) | atan * 180 / pi }}
+    {% endif %}
+  beta_plus_90: "{{ beta_deg + 90 }}"
+  diffuse_empirical_angle: "{{ 120 - (0.66 * sun_elevation) }}"
+  slat_star_deg: >-
+    {% set tan_beta = (beta_deg | radians) | tan %}
+    {% set ratio = slat_gap_ratio | float(0.9) %}
+    {% set radicand = tan_beta*tan_beta - (ratio*ratio) + 1 %}
+    {% if radicand <= 0 %}
+      {{ beta_plus_90 }}
+    {% else %}
+      {% set num = tan_beta + (radicand | sqrt) %}
+      {% set denom = 1 + ratio %}
+      {{ 2 * (num / denom) | atan * 180 / pi }}
+    {% endif %}
+  mode_temp: >-
+    {% if indoor_temp is none %}
+      unknown
+    {% elif indoor_temp < 21 %}
+      winter
+    {% elif indoor_temp > 25 %}
+      summer
+    {% else %}
+      intermediate
+    {% endif %}
+  occupied: "{{ presence_ok }}"
+  target_angle_deg: >-
+    {# Pause paths #}
+    {% if manual_override_active or in_quiet_hours or not presence_ok %}
+      {{ none }}
+    {% elif not sun_above_horizon %}
+      {# Sun is below horizon: fully close to night block position. #}
+      {{ night_block_angle_deg }}
+    {% elif not direct_sun_detected and not sun_on_window %}
+      {{ admit_position_pct / 100 * 180 }}
+    {% else %}
+      {% set G = measured_irradiance %}
+      {% set angle = none %}
+      {% if not occupied %}
+        {% if mode_temp == 'winter' %}
+          {% if not direct_sun_detected %}
+            {% set angle = 110 %}
+          {% else %}
+            {% if beta_deg < 65 %}
+              {% set angle = beta_plus_90 %}
+            {% elif G is not none and G > diffuse_glare_threshold %}
+              {% set angle = beta_plus_90 %}
             {% else %}
-              {% if beta_deg < 65 %}
-                {% set angle = beta_plus_90 %}
-              {% elif G is not none and G > diffuse_glare_threshold %}
-                {% set angle = beta_plus_90 %}
-              {% else %}
-                {% set angle = diffuse_empirical_angle %}
-              {% endif %}
+              {% set angle = diffuse_empirical_angle %}
             {% endif %}
-          {% elif mode_temp == 'summer' %}
-            {% set angle = max_tilt_angle %}
-          {% elif mode_temp == 'intermediate' %}
+          {% endif %}
+        {% elif mode_temp == 'summer' %}
+          {% set angle = max_tilt_angle %}
+        {% elif mode_temp == 'intermediate' %}
+          {% set angle = 80 %}
+        {% else %}
+          {% set angle = block_position_pct / 100 * 180 %}
+        {% endif %}
+      {% else %}
+        {% if mode_temp == 'winter' %}
+          {% if not direct_sun_detected %}
+            {% set angle = 110 %}
+          {% else %}
+            {% set angle = slat_star_deg %}
+          {% endif %}
+        {% elif mode_temp == 'summer' %}
+          {% set angle = 45 %}
+        {% elif mode_temp == 'intermediate' %}
+          {% if not direct_sun_detected %}
             {% set angle = 80 %}
           {% else %}
-            {% set angle = block_position_pct / 100 * 180 %}
+            {% set angle = slat_star_deg %}
           {% endif %}
         {% else %}
-          {% if mode_temp == 'winter' %}
-            {% if not direct_sun_detected %}
-              {% set angle = 110 %}
-            {% else %}
-              {% set angle = slat_star_deg %}
-            {% endif %}
-          {% elif mode_temp == 'summer' %}
-            {% set angle = 45 %}
-          {% elif mode_temp == 'intermediate' %}
-            {% if not direct_sun_detected %}
-              {% set angle = 80 %}
-            {% else %}
-              {% set angle = slat_star_deg %}
-            {% endif %}
-          {% else %}
-            {% set angle = block_position_pct / 100 * 180 %}
-          {% endif %}
-        {% endif %}
-        {% if angle is none %}
-          {{ none }}
-        {% else %}
-          {{ [0, [angle, max_tilt_angle].min()].max() }}
+          {% set angle = block_position_pct / 100 * 180 %}
         {% endif %}
       {% endif %}
-    slat_target_position: >-
-      {% if shading_mode != 'slat' %}
+      {% if angle is none %}
         {{ none }}
       {% else %}
-        {% if target_angle_deg is none %}
-          {{ none }}
-        {% else %}
-          {{ (target_angle_deg / 180 * 100) | round(0) }}
-        {% endif %}
+        {{ [0, [angle, max_tilt_angle].min()].max() }}
       {% endif %}
-    zebra_target_position: >-
-      {% if shading_mode != 'zebra' %}
+    {% endif %}
+  slat_target_position: >-
+    {% if shading_mode != 'slat' %}
+      {{ none }}
+    {% else %}
+      {% if target_angle_deg is none %}
         {{ none }}
       {% else %}
-        {% set frontlit = direct_sun_detected or sun_on_window %}
-        {% set mode = mode_temp %}
-        {% set glare = glare_detected %}
-        {% set occ = presence_ok %}
-        {% if not occ %}
-          {% if mode == 'summer' and frontlit %}
+        {{ (target_angle_deg / 180 * 100) | round(0) }}
+      {% endif %}
+    {% endif %}
+  zebra_target_position: >-
+    {% if shading_mode != 'zebra' %}
+      {{ none }}
+    {% else %}
+      {% set frontlit = direct_sun_detected or sun_on_window %}
+      {% set mode = mode_temp %}
+      {% set glare = glare_detected %}
+      {% set occ = presence_ok %}
+      {% if not occ %}
+        {% if mode == 'summer' and frontlit %}
+          {{ block_position_pct }}
+        {% elif mode == 'winter' and not frontlit %}
+          {{ admit_position_pct }}
+        {% else %}
+          {{ dim_position_pct }}
+        {% endif %}
+      {% else %}
+        {% if frontlit %}
+          {% if glare %}
             {{ block_position_pct }}
-          {% elif mode == 'winter' and not frontlit %}
-            {{ admit_position_pct }}
+          {% elif mode == 'summer' %}
+            {{ [dim_position_pct, block_position_pct] | max }}
           {% else %}
             {{ dim_position_pct }}
           {% endif %}
         {% else %}
-          {% if frontlit %}
-            {% if glare %}
-              {{ block_position_pct }}
-            {% elif mode == 'summer' %}
-              {{ [dim_position_pct, block_position_pct] | max }}
-            {% else %}
-              {{ dim_position_pct }}
-            {% endif %}
-          {% else %}
-            {{ admit_position_pct }}
-          {% endif %}
+          {{ admit_position_pct }}
         {% endif %}
       {% endif %}
-    desired_position: >-
-      {% if shading_mode == 'slat' %}
-        {{ slat_target_position }}
-      {% elif shading_mode == 'zebra' %}
-        {{ zebra_target_position }}
-      {% else %}
-        {{ none }}
-      {% endif %}
+    {% endif %}
+  desired_position: >-
+    {% if shading_mode == 'slat' %}
+      {{ slat_target_position }}
+    {% elif shading_mode == 'zebra' %}
+      {{ zebra_target_position }}
+    {% else %}
+      {{ none }}
+    {% endif %}
 
 trigger:
   - platform: time_pattern
