@@ -1,6 +1,6 @@
 # Adaptive Comfort Control Pro
 
-**Version:** 4.18.6  
+**Version:** 4.19.0  
 **Author:** Jeremy Carter  
 **Home Assistant Blueprint for Intelligent HVAC Automation**
 
@@ -515,6 +515,10 @@ See [LEARNING_SETUP.md](LEARNING_SETUP.md) for detailed setup guide.
 When indoor temp exceeds comfort band AND outdoor conditions are favorable, turns off HVAC and suggests opening windows.
 
 **Threshold:** Degrees above comfort band to trigger (default: 2.0°C / 3.6°F)
+
+**Only Prefer Ventilation When Occupied:** When enabled (default), natural ventilation only runs if occupancy is detected. Disable to allow ventilation even when away.
+
+**HVAC Stay-Off Guarantee:** When natural ventilation is active, final `climate.turn_on` is skipped to avoid re-enabling HVAC during a ventilation run.
 
 **Psychrometric Guards** (see [Math Section](#4-natural-ventilation-decision-logic)):
 - **Max Outdoor Dew Point**: Block if outdoor air is too humid (default: 16-19°C depending on region)

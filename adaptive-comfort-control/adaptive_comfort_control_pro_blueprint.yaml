@@ -1,5 +1,5 @@
 blueprint:
-    name: "Adaptive Comfort Control Pro v4.18.6"
+    name: "Adaptive Comfort Control Pro v4.19.0"
     description: >
         Adaptive comfort control + HVAC pause with unit awareness (°C/°F), seasonal bias,
         built-in psychrometrics (dew point, absolute humidity, enthalpy), optional RMOT,
@@ -918,7 +918,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.18.6"
+    blueprint_version: "4.19.0"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor

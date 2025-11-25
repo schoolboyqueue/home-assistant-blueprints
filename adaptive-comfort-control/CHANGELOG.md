@@ -1,3 +1,14 @@
+## [4.19.0] — 2025-11-25
+### Added
+- **Precision/Humidity offset:** Small humidity-driven offset applied when Precision Comfort or Humidity Comfort is enabled, cooling slightly when RH > 60% and warming when RH < 30%.
+- **Occupancy-gated ventilation:** New `Only Prefer Ventilation When Occupied` toggle (default: on) blocks natural ventilation when no occupancy is detected.
+- **Sensor validity guard:** Aborts runs when indoor/outdoor temps are invalid/out of range and logs when debug is enabled.
+
+### Changed
+- **Natural ventilation safety:** Tracks an internal `_nat_vent_active` flag so the final `climate.turn_on` is skipped after a ventilation decision, avoiding HVAC re-enables while windows are preferred.
+- **Manual override detection:** Uses prediction-error vs. adaptive target (unit-aware tolerance) instead of raw delta to detect manual overrides.
+- **Occupancy fallback:** Unknown/unavailable occupancy states now resolve to `false` rather than truthy, preventing unintended occupied behavior.
+
 ## [4.18.6] — 2025-11-15
 ### Changed
 - **Directional safety re-enable:** When freeze-protect is enabled and indoor temperature approaches the freeze guard, the blueprint will re-enable HVAC from a manual off state in heat-only mode and hold the safety minimum. When overheat-protect is enabled and indoor temperature approaches the overheat guard, it will re-enable HVAC in cool-only mode and hold the safety maximum. Manual off is still respected when guards are disabled or risk is low.
