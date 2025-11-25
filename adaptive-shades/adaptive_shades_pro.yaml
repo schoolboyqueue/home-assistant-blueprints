@@ -1,5 +1,5 @@
 blueprint:
-  name: "Adaptive Shades Pro v1.9.0"
+  name: "Adaptive Shades Pro v1.9.1"
   description: >-
     Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
     Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
@@ -392,7 +392,7 @@ blueprint:
                   value: "verbose"
 
 variables:
-  blueprint_version: "1.9.0"
+  blueprint_version: "1.9.1"
   cover_target: !input cover_target
   base_cover: >-
     {% set ct = cover_target | default('') %}
@@ -851,6 +851,18 @@ action:
             this_current_position: "{{ state_attr(this_cover, 'current_position') }}"
             this_current_tilt: "{{ state_attr(this_cover, 'current_tilt_position') if cover_supports_tilt else none }}"
             this_target_base: "{{ desired_position_room }}"
+            this_auto_override_active: >-
+              {% if manual_timeout_minutes | int(0) <= 0 %}
+                false
+              {% else %}
+                {% set s = states[this_cover] %}
+                {% if s is none or s.last_changed is none %}
+                  false
+                {% else %}
+                  {% set delta = (as_timestamp(now()) - as_timestamp(s.last_changed)) / 60 %}
+                  {{ delta < (manual_timeout_minutes | float) }}
+                {% endif %}
+              {% endif %}
             this_target_position: >-
               {% if this_target_base is none %}
                 {{ none }}
@@ -871,6 +883,23 @@ action:
               {% else %}
                 {{ none }}
               {% endif %}
+
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ this_auto_override_active }}"
+              sequence:
+                - choose:
+                    - conditions:
+                        - condition: template
+                          value_template: "{{ debug_basic }}"
+                      sequence:
+                        - service: logbook.log
+                          data:
+                            name: "Adaptive Shades"
+                            message: "Paused for manual adjustment timeout on {{ this_cover }}. (v{{ blueprint_version }})"
+                            domain: cover
+                - stop: true
 
         - choose:
             - conditions:

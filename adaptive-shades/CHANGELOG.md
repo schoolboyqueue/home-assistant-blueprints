@@ -32,6 +32,12 @@
 - Per-cover loop for movement, hysteresis, and logging; honors inverted shades per cover.
 - Presence/sun/comfort logic remains shared at room level.
 
+## [1.9.1] - 2025-11-25
+
+### Fixed
+
+- Manual adjustment timeout is now evaluated per cover inside the repeat loop, so manual moves on any shade pause automation for that shade.
+
 ## [Unreleased]
 
 ### Changed
