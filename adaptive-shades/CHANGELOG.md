@@ -12,6 +12,12 @@
 - Comfort mode detection now prefers active HVAC state when provided, falling back to setpoints.
 - Glare detection uses the profile-adjusted threshold; documentation updated for clarity.
 
+## [1.5.1] - 2025-11-25
+
+### Fixed
+
+- Corrected tilt capability detection template to avoid template parse errors in Home Assistant (bitwise detection now uses `bitwise_and`).
+
 ## [1.4.0] - 2025-11-25
 
 ### Added
