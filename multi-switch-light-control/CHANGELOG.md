@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.0 - 2025-11-26
+### Changed
+- Single tap up now always sets brightness to 100% instead of restoring previous brightness
+
 ## 1.5.9 - 2025-11-27
 ### Added
 - Optional state-sync toggle that mirrors the selected switch/light entity with the target lights (any light >0% → switch on, all lights off → switch off). Includes auto-detection of a suitable entity with an override input.
