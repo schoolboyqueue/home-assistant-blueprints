@@ -1,5 +1,5 @@
 blueprint:
-  name: "Multi Switch Light Control Pro v1.9.1"
+  name: "Multi Switch Light Control Pro v1.9.2"
   description: >
     Turn a supported switch or remote into a smart light controller. Supports Inovelli
     Zigbee switches (via Zigbee2MQTT or ZHA), Zooz/Inovelli Z-Wave switches, and Lutron
@@ -286,7 +286,7 @@ blueprint:
                 - "basic"
                 - "verbose"
 variables:
-  blueprint_version: "1.9.1"
+  blueprint_version: "1.9.2"
 
   switch_device: !input switch_device
   zigbee_action_sensor_input: !input zigbee_action_sensor
@@ -1372,9 +1372,11 @@ action:
               entity_id: "{{ hold_release_helper_input }}"
       - condition: template
         value_template: "{{ states(light_entity) not in ['unknown','unavailable',''] }}"
+      - variables:
+          was_off_initially: "{{ is_state(light_entity, 'off') }}"
       - if:
           - condition: template
-            value_template: "{{ is_state(light_entity, 'off') }}"
+            value_template: "{{ was_off_initially }}"
         then:
           - if:
               - condition: template
@@ -1412,9 +1414,14 @@ action:
               value_template: "{{ states(light_entity) not in ['off','unknown','unavailable'] }}"
             - variables:
                 current_brightness: "{{ state_attr(light_entity,'brightness') | int(min_on_abs_brightness) }}"
+                is_first_iteration: "{{ was_off_initially and repeat.index == 1 }}"
                 target_brightness: >
-                  {% set proposed = current_brightness + step_abs_value %}
-                  {{ [proposed, max_abs_brightness] | min }}
+                  {% if was_off_initially and repeat.index == 1 %}
+                    {{ min_on_abs_brightness | int }}
+                  {% else %}
+                    {% set proposed = current_brightness + step_abs_value %}
+                    {{ [proposed, max_abs_brightness] | min }}
+                  {% endif %}
             - if:
                 - condition: template
                   value_template: "{{ hold_release_helper_enabled and is_state(hold_release_helper_input, 'on') }}"
@@ -1431,7 +1438,7 @@ action:
                 - stop: "Button released"
             - if:
                 - condition: template
-                  value_template: "{{ target_brightness > current_brightness }}"
+                  value_template: "{{ target_brightness > current_brightness and not is_first_iteration }}"
               then:
                 - if:
                     - condition: template

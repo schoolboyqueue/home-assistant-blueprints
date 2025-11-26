@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.2 - 2025-11-26
+### Fixed
+- Fixed initial brightness jump when starting hold-to-dim from fully off state. Root cause: after turning light on to minimum brightness, the first loop iteration would immediately calculate a higher target and send another brightness command before the light state settled. Now the first iteration after turning on from off state skips sending brightness commands, allowing the light to stabilize at minimum before stepping up.
+
 ## 1.9.1 - 2025-11-26
 ### Fixed
 - Fixed initial brightness jump when starting hold-to-dim from off state. Root cause: brightness variables were pre-calculated before the loop, causing the first iteration to use stale/cached values before the light state fully updated. Now variables are calculated fresh at the start of each loop iteration, ensuring accurate brightness tracking from the very first step.
