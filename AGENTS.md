@@ -7,18 +7,42 @@
 
 ## Build, Test, and Development Commands
 - There is no build step; edit YAML directly.
+- **REQUIRED validation before commit:** `python3 scripts/validate-blueprint.py <blueprint.yaml>` or `python3 scripts/validate-blueprint.py --all`
+  - The validator catches 90%+ of structural errors locally before pushing
+  - Checks: YAML syntax, required keys, `variables` placement, `data:` blocks, template syntax, selector types, indentation
+  - See [scripts/README.md](scripts/README.md) for full documentation
 - Manual sanity check: `git diff --stat` to verify touched files are limited to the intended blueprint.
-- Optional lint if available locally: `yamllint adaptive-comfort-control/adaptive_comfort_control_pro_blueprint.yaml` (or the file you edited).
 - Manual runtime test happens in Home Assistant: import the Raw YAML URL, create an automation, and review Traces/Logs.
 
 ## Home Assistant Blueprint Schema Pitfalls
-- `variables:` must be at the root of the YAML (same level as `blueprint`, `trigger`, `action`), not nested under `blueprint:`—otherwise import fails with “extra keys not allowed @ data['blueprint']['variables']”.
+
+**Critical Structural Errors (caught by validator):**
+- `variables:` must be at the root of the YAML (same level as `blueprint`, `trigger`, `action`), not nested under `blueprint:`—otherwise import fails with "extra keys not allowed @ data['blueprint']['variables']".
+- Empty or None `data:` blocks in service calls cause "template value is None for dictionary value" errors. Example:
+  ```yaml
+  # ❌ WRONG - indentation error
+  - service: system_log.write
+    data:
+  level: info      # Not indented under data
+
+  # ✅ CORRECT
+  - service: system_log.write
+    data:
+      level: info  # Properly nested under data
+  ```
+- Missing required root keys (`blueprint`, `trigger`, `action`) will prevent import.
+- `!input` tags must not be embedded inside `{{ ... }}` blocks—bind them to variables first, then use the variables in templates.
+- Unbalanced template braces (`{{` without matching `}}`) cause template parse errors.
+
+**Other Common Pitfalls:**
 - Avoid raw bitwise operators in Jinja (`&`), which can trigger template parse errors in Home Assistant. Use filters like `bitwise_and` instead (e.g., `{{ (supported_features | int(0) | bitwise_and(16)) > 0 }}`) when checking feature flags.
 - YAML must contain a **single document**. Do not include more than one `---` document separator in blueprint files.
-- Home Assistant’s Jinja environment is restricted. Do not assume arbitrary Jinja extensions or Python are available.
+- Home Assistant's Jinja environment is restricted. Do not assume arbitrary Jinja extensions or Python are available.
 - HA selectors: when using `selector.select`, `options` should be either quoted strings (e.g., `- "off"`) **or** full `label`/`value` pairs (both quoted). Avoid mixing styles or leaving values unquoted; malformed options will cause import errors.
 - When computing time deltas, convert datetimes to timestamps with `as_timestamp()` before subtraction (e.g., `(as_timestamp(now()) - as_timestamp(state.last_changed)) / 60`) to avoid type errors.
 - When an input allows multiple entities, derive a single representative (e.g., the first entity) before calling `state_attr`, `is_state`, or accessing `last_changed`; `!input` may return a list and direct state calls will fail.
+
+**Use the validator to catch these before pushing:** `python3 scripts/validate-blueprint.py --all`
 
 ## Home Assistant Jinja2 Compliance
 

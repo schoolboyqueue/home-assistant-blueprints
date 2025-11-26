@@ -42,12 +42,12 @@ This repository contains **Home Assistant Blueprints** — reusable automation t
    - Features: humidity delta control, rate-of-rise/fall detection, night mode, manual override, presence-based activation
    - Supports mixed light entity and area control, fan or switch domains
 
-3. **Zooz Z-Wave Light Switch Control Pro** (`zooz-zwave-light-switch-control/`)
-   - Z-Wave switch light dimming using Central Scene events (ZEN71/72/76/77)
-   - Features: single press on/off, hold-to-dim with release detection, area targeting
+3. **Multi Switch Light Control Pro** (`multi-switch-light-control/`)
+   - Universal light control for Zooz/Inovelli Z-Wave switches and Lutron Pico remotes
+   - Features: auto-detection of switch type, single press on/off, hold-to-dim, Central Scene actions (1x-5x taps), Lutron favorite button
    - Supports both zwave_js_event and zwave_js_value_notification event types
-   - Configurable dimming parameters (step size, interval, brightness thresholds)
-   - Note: Double/triple tap triggers fire but don't execute actions (use separate automations if needed)
+   - Multi-entity targeting with first entity used for brightness reads
+   - Configurable dimming parameters (step size, interval, brightness thresholds, transitions)
 
 4. **Adaptive Shades Pro** (`adaptive-shades/`)
    - Automated shade positioning (slat and zebra/roller) using solar geometry and comfort signals
@@ -65,14 +65,20 @@ This repository contains **Home Assistant Blueprints** — reusable automation t
 │   ├── bathroom_light_fan_control_pro.yaml          # Main blueprint
 │   ├── CHANGELOG.md
 │   └── README.md
-├── zooz-zwave-light-switch-control/
-│   ├── zooz_zwave_light_switch_control_pro.yaml     # Main blueprint
+├── multi-switch-light-control/
+│   ├── multi_switch_light_control_pro.yaml          # Main blueprint
 │   ├── CHANGELOG.md
 │   └── README.md
 ├── adaptive-shades/
 │   ├── adaptive_shades_pro.yaml                     # Main blueprint
 │   ├── CHANGELOG.md
 │   └── README.md
+├── scripts/
+│   ├── validate-blueprint.py                        # Blueprint validator
+│   └── README.md                                    # Validation documentation
+├── CLAUDE.md                                        # Claude Code guidance
+├── WARP.md                                          # WARP agent guidance
+├── AGENTS.md                                        # Repository structure
 └── .gitignore
 ```
 
@@ -82,8 +88,32 @@ This repository contains **Home Assistant Blueprints** — reusable automation t
 
 This repository contains **no build tools, test frameworks, or CI/CD**. Development consists of:
 - Editing YAML blueprints directly
+- **Validating locally using the blueprint validator** (REQUIRED before commit)
 - Testing by importing into Home Assistant and creating automations
 - Manual validation of Jinja2 template logic
+
+**Blueprint Validation (REQUIRED):**
+
+Before committing any blueprint changes, always run:
+```bash
+# Validate single blueprint after editing
+python3 scripts/validate-blueprint.py <path/to/blueprint.yaml>
+
+# Validate ALL blueprints before committing
+python3 scripts/validate-blueprint.py --all
+```
+
+The validator catches structural errors locally:
+- YAML syntax errors
+- Missing required keys (`blueprint`, `trigger`, `action`)
+- `variables` nested under `blueprint` (common error that breaks imports)
+- Empty/None `data:` blocks in service calls
+- `!input` tags inside `{{ }}` templates
+- Unbalanced template braces
+- Invalid selector types
+- Improper indentation in `if`/`then`/`else` blocks
+
+See [scripts/README.md](scripts/README.md) for complete validation documentation.
 
 ### Version Control
 
@@ -98,9 +128,10 @@ git log --oneline -20
   2. Update `blueprint_version` and `blueprint.name` to the new version.
   3. Update the corresponding `CHANGELOG.md` with a dated entry summarizing the change.
   4. Update the blueprint `README.md` version header to match.
-  5. Run a basic YAML syntax check (optional but preferred).
-  6. Stage the relevant files, create a conventional commit, and push to the default branch.
-- This should happen automatically as part of the agent’s workflow without needing an explicit user request.
+  5. **Run the blueprint validator** (REQUIRED): `python3 scripts/validate-blueprint.py <blueprint.yaml>`
+  6. Fix any validation errors before proceeding.
+  7. Stage the relevant files, create a conventional commit, and push to the default branch.
+- This should happen automatically as part of the agent's workflow without needing an explicit user request.
 
 **Semantic Versioning:**
 
@@ -305,9 +336,13 @@ awk '/^blueprint:/{p=1} /^variables:/{p=0} p' adaptive-comfort-control/adaptive_
 awk '/^variables:/{p=1} /^trigger:/{p=0} p' adaptive-comfort-control/adaptive_comfort_control_pro_blueprint.yaml
 ```
 
-**Validate YAML syntax (optional):**
+**Validate blueprint (REQUIRED):**
 ```bash
-python3 -c 'import sys, yaml; yaml.safe_load(open(sys.argv[1]))' adaptive-comfort-control/adaptive_comfort_control_pro_blueprint.yaml
+# Validate specific blueprint
+python3 scripts/validate-blueprint.py adaptive-comfort-control/adaptive_comfort_control_pro_blueprint.yaml
+
+# Validate all blueprints
+python3 scripts/validate-blueprint.py --all
 ```
 
 **Bump version (macOS sed):**
