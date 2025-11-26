@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.3 - 2025-11-27
+### Fixed
+- Use Lutron Caseta button events with explicit button numbers (2-6) instead of device triggers so Pico automations validate and log actions correctly across integrations.
+
 ## 1.5.2 - 2025-11-27
 ### Fixed
 - Switch Lutron Pico triggers back to event-based listeners so non-Lutron devices no longer error with "Device has no config entry from domain 'lutron_caseta'" during blueprint validation/import.
