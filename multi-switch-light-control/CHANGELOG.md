@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.1 - 2025-11-26
+### Fixed
+- Fixed initial brightness jump when starting hold-to-dim from off state. Root cause: brightness variables were pre-calculated before the loop, causing the first iteration to use stale/cached values before the light state fully updated. Now variables are calculated fresh at the start of each loop iteration, ensuring accurate brightness tracking from the very first step.
+
 ## 1.9.0 - 2025-11-26
 ### Added
 - **Optional release detection for Z-Wave switches**: Added `hold_release_helper` input to enable immediate stop when releasing button during hold-to-dim. Create an input_boolean helper (Settings → Devices & Services → Helpers → Toggle) and assign it to this input. When configured, the helper acts as a shared state signal between the release trigger and hold loop, allowing the dim loop to detect button releases instantly instead of running until brightness limits. Leave at placeholder for Zigbee/Lutron switches (they have native release detection).

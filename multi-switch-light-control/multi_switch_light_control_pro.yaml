@@ -1,5 +1,5 @@
 blueprint:
-  name: "Multi Switch Light Control Pro v1.9.0"
+  name: "Multi Switch Light Control Pro v1.9.1"
   description: >
     Turn a supported switch or remote into a smart light controller. Supports Inovelli
     Zigbee switches (via Zigbee2MQTT or ZHA), Zooz/Inovelli Z-Wave switches, and Lutron
@@ -286,7 +286,7 @@ blueprint:
                 - "basic"
                 - "verbose"
 variables:
-  blueprint_version: "1.9.0"
+  blueprint_version: "1.9.1"
 
   switch_device: !input switch_device
   zigbee_action_sensor_input: !input zigbee_action_sensor
@@ -1406,15 +1406,15 @@ action:
                         brightness: "{{ min_on_abs_brightness | int }}"
           - delay:
               milliseconds: 100
-      - variables:
-          current_brightness: "{{ state_attr(light_entity,'brightness') | int(min_on_abs_brightness) }}"
-          target_brightness: >
-            {% set proposed = current_brightness + step_abs_value %}
-            {{ [proposed, max_abs_brightness] | min }}
       - repeat:
           sequence:
             - condition: template
               value_template: "{{ states(light_entity) not in ['off','unknown','unavailable'] }}"
+            - variables:
+                current_brightness: "{{ state_attr(light_entity,'brightness') | int(min_on_abs_brightness) }}"
+                target_brightness: >
+                  {% set proposed = current_brightness + step_abs_value %}
+                  {{ [proposed, max_abs_brightness] | min }}
             - if:
                 - condition: template
                   value_template: "{{ hold_release_helper_enabled and is_state(hold_release_helper_input, 'on') }}"
@@ -1464,11 +1464,6 @@ action:
                       cap={{ max_abs_brightness }}
             - delay:
                 milliseconds: "{{ interval_ms }}"
-            - variables:
-                current_brightness: "{{ state_attr(light_entity,'brightness') | int(0) }}"
-                target_brightness: >
-                  {% set proposed = current_brightness + step_abs_value %}
-                  {{ [proposed, max_abs_brightness] | min }}
           until:
             - condition: template
               value_template: >
@@ -1494,13 +1489,13 @@ action:
           - service: input_boolean.turn_off
             target:
               entity_id: "{{ hold_release_helper_input }}"
-      - variables:
-          current_brightness: "{{ state_attr(light_entity,'brightness') | int(0) }}"
-          target_brightness: >
-            {% set proposed = current_brightness - step_abs_value %}
-            {{ [proposed, 0] | max }}
       - repeat:
           sequence:
+            - variables:
+                current_brightness: "{{ state_attr(light_entity,'brightness') | int(0) }}"
+                target_brightness: >
+                  {% set proposed = current_brightness - step_abs_value %}
+                  {{ [proposed, 0] | max }}
             - if:
                 - condition: template
                   value_template: "{{ hold_release_helper_enabled and is_state(hold_release_helper_input, 'on') }}"
@@ -1580,11 +1575,6 @@ action:
                 - stop: "Dim hold reached minimum; turning off"
             - delay:
                 milliseconds: "{{ interval_ms }}"
-            - variables:
-                current_brightness: "{{ state_attr(light_entity,'brightness') | int(0) }}"
-                target_brightness: >
-                  {% set proposed = current_brightness - step_abs_value %}
-                  {{ [proposed, 0] | max }}
           until:
             - condition: template
               value_template: >
