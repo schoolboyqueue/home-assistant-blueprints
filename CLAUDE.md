@@ -80,7 +80,9 @@ All blueprints follow **Semantic Versioning** (MAJOR.MINOR.PATCH):
    - `### Removed` — Removed features (breaking change)
    - `### Fixed` — Bug fixes
    - `### Security` — Security fixes
-4. Update blueprint's `README.md` if the version is referenced there
+4. **Update blueprint's `README.md` version header** (REQUIRED):
+   - Change `**Version:** X.Y.Z` to match new version
+   - This ensures documentation stays in sync with blueprint
 5. Commit with conventional commit format:
    - `feat(component): description` for MINOR
    - `fix(component): description` for PATCH

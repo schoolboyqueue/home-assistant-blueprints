@@ -68,6 +68,7 @@ class BlueprintValidator:
         self._validate_triggers()
         self._validate_actions()
         self._validate_templates()
+        self._check_readme_sync()
 
         return self._report_results()
 
@@ -297,6 +298,46 @@ class BlueprintValidator:
                 self.warnings.append(
                     f"Possible use of unsupported function/filter matching pattern: {pattern}"
                 )
+
+    def _check_readme_sync(self):
+        """Check if README.md version matches blueprint version."""
+        # Get blueprint version
+        blueprint_version = None
+        if 'variables' in self.data and isinstance(self.data['variables'], dict):
+            blueprint_version = self.data['variables'].get('blueprint_version')
+            if blueprint_version:
+                blueprint_version = str(blueprint_version).strip('"\'')
+
+        if not blueprint_version:
+            # Can't check if no version in blueprint
+            return
+
+        # Check for README.md in same directory
+        readme_path = self.file_path.parent / 'README.md'
+        if not readme_path.exists():
+            self.warnings.append(
+                f"No README.md found in {self.file_path.parent.name}/ directory"
+            )
+            return
+
+        # Read README and check version
+        try:
+            readme_content = readme_path.read_text()
+            # Look for **Version:** X.Y.Z pattern
+            version_match = re.search(r'\*\*Version:\*\*\s+(\d+\.\d+\.\d+)', readme_content)
+            if version_match:
+                readme_version = version_match.group(1)
+                if readme_version != blueprint_version:
+                    self.warnings.append(
+                        f"README.md version ({readme_version}) does not match "
+                        f"blueprint version ({blueprint_version})"
+                    )
+            else:
+                self.warnings.append(
+                    "README.md does not contain **Version:** header"
+                )
+        except Exception as e:
+            self.warnings.append(f"Could not read README.md: {e}")
 
     def _report_results(self) -> bool:
         """Print validation results and return success status."""
