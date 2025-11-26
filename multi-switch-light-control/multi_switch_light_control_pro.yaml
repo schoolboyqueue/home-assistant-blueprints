@@ -1,5 +1,5 @@
 blueprint:
-  name: "Multi Switch Light Control Pro v1.5.7"
+  name: "Multi Switch Light Control Pro v1.5.8"
   description: >
     Turn a supported switch or remote into a smart light controller. Supports Inovelli
     Zigbee switches (via Zigbee2MQTT or ZHA), Zooz/Inovelli Z-Wave switches, and Lutron
@@ -247,7 +247,7 @@ blueprint:
                 - "basic"
                 - "verbose"
 variables:
-  blueprint_version: "1.5.7"
+  blueprint_version: "1.5.8"
 
   switch_device: !input switch_device
   zigbee_action_sensor_input: !input zigbee_action_sensor
@@ -607,49 +607,49 @@ trigger:
     event_data:
       device_id: !input switch_device
       action: "press"
-      button_number: 2
+      button_type: "on"
     id: lutron_on
   - platform: event
     event_type: lutron_caseta_button_event
     event_data:
       device_id: !input switch_device
       action: "press"
-      button_number: 3
+      button_type: "raise"
     id: lutron_raise
   - platform: event
     event_type: lutron_caseta_button_event
     event_data:
       device_id: !input switch_device
       action: "press"
-      button_number: 4
+      button_type: "stop"
     id: lutron_stop
   - platform: event
     event_type: lutron_caseta_button_event
     event_data:
       device_id: !input switch_device
       action: "press"
-      button_number: 5
+      button_type: "lower"
     id: lutron_lower
   - platform: event
     event_type: lutron_caseta_button_event
     event_data:
       device_id: !input switch_device
       action: "press"
-      button_number: 6
+      button_type: "off"
     id: lutron_off
   - platform: event
     event_type: lutron_caseta_button_event
     event_data:
       device_id: !input switch_device
       action: "release"
-      button_number: 3
+      button_type: "raise"
     id: lutron_raise_release
   - platform: event
     event_type: lutron_caseta_button_event
     event_data:
       device_id: !input switch_device
       action: "release"
-      button_number: 5
+      button_type: "lower"
     id: lutron_lower_release
   # Zigbee2MQTT Device Actions (MQTT integration)
   - trigger: device
@@ -919,7 +919,7 @@ action:
                   event_data:
                     device_id: !input switch_device
                     action: "release"
-                    button_number: 3
+                    button_type: "raise"
               timeout:
                 milliseconds: "{{ interval_ms }}"
               continue_on_timeout: true
@@ -1030,7 +1030,7 @@ action:
                   event_data:
                     device_id: !input switch_device
                     action: "release"
-                    button_number: 5
+                    button_type: "lower"
               timeout:
                 milliseconds: "{{ interval_ms }}"
               continue_on_timeout: true

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.8 - 2025-11-27
+### Fixed
+- Match Lutron Pico button presses by `button_type` (on/raise/stop/lower/off) instead of vendor-specific button numbers so every remote reports the correct action mappings regardless of serial numbering.
+- Update raise/lower release listeners to the same `button_type` filters, restoring hold-to-dim behavior for Pico remotes.
+
 ## 1.5.7 - 2025-11-27
 ### Fixed
 - Clean up Zigbee action sensor detection so empty placeholders produce true empty strings (not quoted `""`), keeping Pico remotes in the Lutron branch.
