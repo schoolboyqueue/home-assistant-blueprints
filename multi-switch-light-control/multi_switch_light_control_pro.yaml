@@ -40,10 +40,11 @@ blueprint:
         hold_release_helper:
           name: "Hold release helper (optional)"
           description: >
-            OPTIONAL. For Z-Wave switches: Create an input_boolean helper entity to enable
-            release detection during hold-to-dim. Without this, dim loops run until brightness
+            OPTIONAL. For Z-Wave switches: Create a UNIQUE input_boolean helper for THIS automation
+            to enable release detection during hold-to-dim. Without this, dim loops run until brightness
             limits. With this helper, releasing the button stops dimming immediately.
-            Create via Settings → Devices & Services → Helpers → Toggle.
+            Create via Settings → Devices & Services → Helpers → Toggle (e.g., input_boolean.kitchen_dimming_release).
+            IMPORTANT: Each automation instance needs its own dedicated helper - do not share helpers across rooms.
             Leave at placeholder for Zigbee/Lutron (they have native release detection).
           default: input_boolean.placeholder_hold_release
           selector:
