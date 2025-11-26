@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.1 - 2025-11-26
+### Fixed
+- Fixed hold-to-dim behavior: added missing delay between brightness steps so loop respects `interval_ms` setting (default 200ms) instead of running at maximum speed
+- Fixed initial brightness jump when starting hold from off state: added 100ms delay after turn_on to allow state to update before calculating next brightness step
+- Used `min_on_abs_brightness` as fallback when reading brightness from freshly turned on lights
+
 ## 1.7.0 - 2025-11-26
 ### Fixed
 - Fixed endless dim loop bug where hold-to-dim would continue indefinitely even after releasing button or turning lights off. Reordered repeat logic to execute brightness changes first, then wait for release event with `continue_on_timeout`, and properly exit when button released or brightness limits reached.
