@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.4 - 2025-11-27
+### Fixed
+- Add verbose trigger/event logging to help diagnose Lutron Pico inputs and confirm trigger IDs/platforms at runtime.
+
 ## 1.5.3 - 2025-11-27
 ### Fixed
 - Use Lutron Caseta button events with explicit button numbers (2-6) instead of device triggers so Pico automations validate and log actions correctly across integrations.
