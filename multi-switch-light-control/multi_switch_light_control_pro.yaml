@@ -1,5 +1,5 @@
 blueprint:
-  name: "Multi Switch Light Control Pro v1.4.0"
+  name: "Multi Switch Light Control Pro v1.4.1"
   description: >
     Turn a supported switch or remote into a smart light controller. Supports Inovelli
     Zigbee switches (via Zigbee2MQTT or ZHA), Zooz/Inovelli Z-Wave switches, and Lutron
@@ -246,19 +246,19 @@ blueprint:
                 - "basic"
                 - "verbose"
 variables:
-  blueprint_version: "1.4.0"
+  blueprint_version: "1.4.1"
 
   switch_device: !input switch_device
   zigbee_action_sensor_input: !input zigbee_action_sensor
   light_targets: !input light_target
-  light_targets_csv: >-
+  light_target_sequence: >-
     {% set lt = light_targets | default('') %}
-    {% if lt is string %}
-      {{ lt }}
+    {% if lt is string and lt | length > 0 %}
+      [lt]
     {% elif lt is sequence and (lt | length > 0) %}
-      {{ lt | join(', ') }}
+      {{ lt }}
     {% else %}
-      ""
+      []
     {% endif %}
   light_entity: >-
     {% set lt = light_targets | default('') %}
@@ -706,12 +706,15 @@ action:
               brightness_pct: 100
               transition: "{{ lutron_on_transition_s }}"
         else:
-          - service: light.turn_on
-            target:
-              entity_id: "{{ light_targets_csv }}"
-            data:
-              brightness_pct: 100
-              transition: "{{ lutron_on_transition_s }}"
+          - repeat:
+              for_each: "{{ light_target_sequence }}"
+              sequence:
+                - service: light.turn_on
+                  target:
+                    entity_id: "{{ repeat.item }}"
+                  data:
+                    brightness_pct: 100
+                    transition: "{{ lutron_on_transition_s }}"
   - if:
       - condition: template
         value_template: >
@@ -739,12 +742,15 @@ action:
                     brightness_step_pct: "{{ step_pct }}"
                   continue_on_error: true
               else:
-                - service: light.turn_on
-                  target:
-                    entity_id: "{{ light_targets_csv }}"
-                  data:
-                    brightness_step_pct: "{{ step_pct }}"
-                  continue_on_error: true
+                - repeat:
+                    for_each: "{{ light_target_sequence }}"
+                    sequence:
+                      - service: light.turn_on
+                        target:
+                          entity_id: "{{ repeat.item }}"
+                        data:
+                          brightness_step_pct: "{{ step_pct }}"
+                        continue_on_error: true
             - wait_for_trigger:
                 - platform: event
                   event_type: lutron_caseta_button_event
@@ -809,13 +815,16 @@ action:
                   kelvin: "{{ lutron_middle_button_kelvin }}"
                   transition: "{{ lutron_middle_button_transition_s }}"
             else:
-              - service: light.turn_on
-                target:
-                  entity_id: "{{ light_targets_csv }}"
-                data:
-                  brightness_pct: "{{ lutron_middle_button_brightness_pct }}"
-                  kelvin: "{{ lutron_middle_button_kelvin }}"
-                  transition: "{{ lutron_middle_button_transition_s }}"
+              - repeat:
+                  for_each: "{{ light_target_sequence }}"
+                  sequence:
+                    - service: light.turn_on
+                      target:
+                        entity_id: "{{ repeat.item }}"
+                      data:
+                        brightness_pct: "{{ lutron_middle_button_brightness_pct }}"
+                        kelvin: "{{ lutron_middle_button_kelvin }}"
+                        transition: "{{ lutron_middle_button_transition_s }}"
   - if:
       - condition: template
         value_template: >
@@ -843,12 +852,15 @@ action:
                     brightness_step_pct: "{{ step_pct * -1 }}"
                   continue_on_error: true
               else:
-                - service: light.turn_on
-                  target:
-                    entity_id: "{{ light_targets_csv }}"
-                  data:
-                    brightness_step_pct: "{{ step_pct * -1 }}"
-                  continue_on_error: true
+                - repeat:
+                    for_each: "{{ light_target_sequence }}"
+                    sequence:
+                      - service: light.turn_on
+                        target:
+                          entity_id: "{{ repeat.item }}"
+                        data:
+                          brightness_step_pct: "{{ step_pct * -1 }}"
+                        continue_on_error: true
             - wait_for_trigger:
                 - platform: event
                   event_type: lutron_caseta_button_event
@@ -900,11 +912,14 @@ action:
             data:
               transition: "{{ lutron_off_transition_s }}"
         else:
-          - service: light.turn_off
-            target:
-              entity_id: "{{ light_targets_csv }}"
-            data:
-              transition: "{{ lutron_off_transition_s }}"
+          - repeat:
+              for_each: "{{ light_target_sequence }}"
+              sequence:
+                - service: light.turn_off
+                  target:
+                    entity_id: "{{ repeat.item }}"
+                  data:
+                    transition: "{{ lutron_off_transition_s }}"
   - if:
       - condition: template
         value_template: >
@@ -944,11 +959,14 @@ action:
                 data:
                   transition: "{{ lutron_on_transition_s }}"
             else:
-              - service: light.turn_on
-                target:
-                  entity_id: "{{ light_targets_csv }}"
-                data:
-                  transition: "{{ lutron_on_transition_s }}"
+              - repeat:
+                  for_each: "{{ light_target_sequence }}"
+                  sequence:
+                    - service: light.turn_on
+                      target:
+                        entity_id: "{{ repeat.item }}"
+                      data:
+                        transition: "{{ lutron_on_transition_s }}"
   - if:
       - condition: template
         value_template: >
@@ -988,11 +1006,14 @@ action:
                 data:
                   transition: "{{ lutron_off_transition_s }}"
             else:
-              - service: light.turn_off
-                target:
-                  entity_id: "{{ light_targets_csv }}"
-                data:
-                  transition: "{{ lutron_off_transition_s }}"
+              - repeat:
+                  for_each: "{{ light_target_sequence }}"
+                  sequence:
+                    - service: light.turn_off
+                      target:
+                        entity_id: "{{ repeat.item }}"
+                      data:
+                        transition: "{{ lutron_off_transition_s }}"
   - if:
       - condition: template
         value_template: >
@@ -1033,11 +1054,14 @@ action:
                 data:
                   brightness: "{{ min_on_abs_brightness | int }}"
             else:
-                - service: light.turn_on
-                  target:
-                    entity_id: "{{ light_targets_csv }}"
-                  data:
-                    brightness: "{{ min_on_abs_brightness | int }}"
+              - repeat:
+                  for_each: "{{ light_target_sequence }}"
+                  sequence:
+                    - service: light.turn_on
+                      target:
+                        entity_id: "{{ repeat.item }}"
+                      data:
+                        brightness: "{{ min_on_abs_brightness | int }}"
       - repeat:
           sequence:
             - wait_for_trigger:
@@ -1107,11 +1131,14 @@ action:
                       data:
                         brightness: "{{ target_brightness | int }}"
                   else:
-                    - service: light.turn_on
-                      target:
-                        entity_id: "{{ light_targets_csv }}"
-                      data:
-                        brightness: "{{ target_brightness | int }}"
+                    - repeat:
+                        for_each: "{{ light_target_sequence }}"
+                        sequence:
+                          - service: light.turn_on
+                            target:
+                              entity_id: "{{ repeat.item }}"
+                            data:
+                              brightness: "{{ target_brightness | int }}"
           until:
             - condition: template
               value_template: >
@@ -1211,9 +1238,12 @@ action:
                           target:
                             area_id: "{{ light_area_in }}"
                       else:
-                        - service: light.turn_off
-                          target:
-                            entity_id: "{{ light_targets_csv }}"
+                        - repeat:
+                            for_each: "{{ light_target_sequence }}"
+                            sequence:
+                              - service: light.turn_off
+                                target:
+                                  entity_id: "{{ repeat.item }}"
                     - stop: "Dim hold reached minimum; turning off"
                   else:
                     - if:
@@ -1230,11 +1260,14 @@ action:
                               data:
                                 brightness: "{{ target_brightness | int }}"
                           else:
-                            - service: light.turn_on
-                              target:
-                                entity_id: "{{ light_targets_csv }}"
-                              data:
-                                brightness: "{{ target_brightness | int }}"
+                            - repeat:
+                                for_each: "{{ light_target_sequence }}"
+                                sequence:
+                                  - service: light.turn_on
+                                    target:
+                                      entity_id: "{{ repeat.item }}"
+                                    data:
+                                      brightness: "{{ target_brightness | int }}"
           until:
             - condition: template
               value_template: >

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.1 - 2025-11-26
+### Fixed
+- Execute light service calls per entity when an area target is not provided, preventing "Entity is neither a valid entity ID nor a valid UUID" errors when multiple lights are selected.
+
 ## 1.4.0 - 2025-11-26
 ### Added
 - Zigbee2MQTT and ZHA support for Inovelli Zigbee switches

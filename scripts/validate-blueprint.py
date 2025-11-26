@@ -18,7 +18,7 @@ import sys
 import yaml
 import re
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Set
 
 
 class HomeAssistantLoader(yaml.SafeLoader):
@@ -53,6 +53,7 @@ class BlueprintValidator:
         self.errors: List[str] = []
         self.warnings: List[str] = []
         self.data: Optional[Dict] = None
+        self.join_variables: Set[str] = set()
 
     def validate(self) -> bool:
         """Run all validation checks. Returns True if valid."""
@@ -193,6 +194,12 @@ class BlueprintValidator:
             self.errors.append("'variables' must be a dictionary")
             return
 
+        # Record variables that appear to build comma-joined strings
+        for name, value in variables.items():
+            if isinstance(value, str):
+                if re.search(r'\|\s*join\b', value) or re.search(r'\bjoin\s*\(', value):
+                    self.join_variables.add(name)
+
         # Check for blueprint_version
         if 'blueprint_version' not in variables:
             self.warnings.append("No 'blueprint_version' variable defined")
@@ -207,6 +214,11 @@ class BlueprintValidator:
             self.errors.append("'trigger' must be a list")
             return
 
+        # Get list of variable names for template trigger validation
+        variable_names = set()
+        if 'variables' in self.data and isinstance(self.data['variables'], dict):
+            variable_names = set(self.data['variables'].keys())
+
         for i, trigger in enumerate(triggers):
             if not isinstance(trigger, dict):
                 self.errors.append(f"trigger[{i}]: Must be a dictionary")
@@ -215,6 +227,21 @@ class BlueprintValidator:
             # Check for platform or trigger type
             if 'platform' not in trigger and 'trigger' not in trigger:
                 self.errors.append(f"trigger[{i}]: Missing 'platform' or 'trigger' key")
+
+            # Check template triggers for automation variable references
+            if trigger.get('platform') == 'template':
+                value_template = trigger.get('value_template', '')
+                if isinstance(value_template, str):
+                    # Check if template references any automation variables
+                    for var_name in variable_names:
+                        # Look for variable references: {{ var_name or {{var_name or {{ var_name| etc.
+                        # Pattern matches: word boundary + var_name + (space/pipe/paren/end)
+                        pattern = rf'\{{\{{\s*{re.escape(var_name)}(?:\s|[\|\(\)\[\]\.,]|$)'
+                        if re.search(pattern, value_template):
+                            self.errors.append(
+                                f"trigger[{i}]: Template trigger references automation variable '{var_name}'. "
+                                f"Template triggers cannot access automation variables - use state triggers instead."
+                            )
 
     def _validate_actions(self):
         """Validate action definitions."""
@@ -245,6 +272,13 @@ class BlueprintValidator:
                 elif not isinstance(data, dict):
                     self.errors.append(f"{path}.data: Must be a dictionary")
 
+            target = action.get('target')
+            if isinstance(target, dict):
+                self._check_entity_id_value(target.get('entity_id'), f"{path}.target.entity_id")
+
+            if 'entity_id' in action:
+                self._check_entity_id_value(action.get('entity_id'), f"{path}.entity_id")
+
         # Check if/then/else structures
         if 'if' in action:
             if 'then' in action:
@@ -266,6 +300,13 @@ class BlueprintValidator:
                 if isinstance(seq, list):
                     for j, seq_action in enumerate(seq):
                         self._validate_action_item(seq_action, f"{path}.repeat.sequence[{j}]")
+
+            if 'for_each' in action['repeat']:
+                fe = action['repeat']['for_each']
+                if isinstance(fe, str) and 'join' in fe:
+                    self.warnings.append(
+                        f"{path}.repeat.for_each: uses 'join' which may not produce a valid list; ensure it returns a sequence"
+                    )
 
     def _validate_templates(self):
         """Validate Jinja2 template syntax."""
@@ -298,6 +339,43 @@ class BlueprintValidator:
                 self.warnings.append(
                     f"Possible use of unsupported function/filter matching pattern: {pattern}"
                 )
+
+    def _check_entity_id_value(self, value: Any, path: str):
+        """Validate entity_id fields for multi-entity pitfalls."""
+        if value is None:
+            return
+
+        if isinstance(value, list):
+            for idx, item in enumerate(value):
+                if not isinstance(item, str):
+                    self.errors.append(f"{path}[{idx}]: entity_id entries must be strings")
+            return
+
+        if not isinstance(value, str):
+            return
+
+        stripped = value.strip()
+        if not stripped:
+            return
+
+        if ',' in stripped and '{{' not in stripped and not stripped.startswith('['):
+            self.errors.append(
+                f"{path}: Multiple entity IDs must be provided as a YAML list or loop, not a comma-separated string"
+            )
+
+        if '{{' in stripped and '}}' in stripped:
+            if re.search(r'\bjoin\b', stripped):
+                self.errors.append(
+                    f"{path}: entity_id template uses 'join', which produces an invalid comma-separated string; iterate over entities instead"
+                )
+
+            match = re.match(r'^\{\{\s*([\w\.]+)', stripped)
+            if match:
+                var_name = match.group(1)
+                if var_name in self.join_variables:
+                    self.errors.append(
+                        f"{path}: References variable '{var_name}' built with join(); entity_id templates cannot combine multiple entities"
+                    )
 
     def _check_readme_sync(self):
         """Check if README.md version matches blueprint version."""

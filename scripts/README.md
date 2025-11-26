@@ -24,6 +24,10 @@ A comprehensive Python-based validator that checks blueprint files for common is
 - ✓ `variables` at root level (not nested under `blueprint`)
 - ✓ Blueprint metadata (`name`, `description`, `domain`, `input`)
 
+**Triggers:**
+- ✓ Trigger platform/type presence
+- ✓ Template triggers cannot reference automation variables (prevents runtime errors)
+
 **Inputs & Selectors:**
 - ✓ Input definitions and grouping
 - ✓ Valid selector types
