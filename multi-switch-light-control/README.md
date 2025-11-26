@@ -1,6 +1,6 @@
 # Multi Switch Light Control Pro
 
-**Version:** 1.5.8
+**Version:** 1.5.9
 **Author:** Jeremy Carter
 **Home Assistant blueprint that supports Inovelli Zigbee switches (Zigbee2MQTT/ZHA), Zooz/Inovelli Z-Wave switches, and Lutron Pico remotes.**
 
@@ -17,6 +17,7 @@ Supported behaviors:
 - **Inovelli Zigbee (Zigbee2MQTT/ZHA):** Auto-detects action sensor entity, supports single tap on/off, hold-to-dim/brighten with release detection, double/triple/quad/quint tap for custom actions.
 - **Z-Wave Central Scene (Zooz/Inovelli):** Single press on/off, hold-to-dim/up, double/triple/quad/quint tap logging for custom actions, optional area targeting, and configurable step/interval/clamp values.
 - **Lutron Pico:** On/Raise/Lower/Off/Stop (favorite) button sequences with hold-to-dim pacing, favorite button brightness/color defaults, and optional actions for the middle button.
+- **Switch state sync (optional):** Keep the physical switch/light entity mirrored with the target lights so other automations stay reflected in your switch state.
 - **Protocol detection:** When debug level is `basic` or `verbose`, the automation writes the detected vendor/model/protocol to the system log so you can verify the auto-detection.
 
 ## Quick Start

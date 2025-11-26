@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.9 - 2025-11-27
+### Added
+- Optional state-sync toggle that mirrors the selected switch/light entity with the target lights (any light >0% → switch on, all lights off → switch off). Includes auto-detection of a suitable entity with an override input.
+### Changed
+- Automation now runs in `parallel` mode so light state sync triggers don't interrupt button-driven hold loops.
+
 ## 1.5.8 - 2025-11-27
 ### Fixed
 - Match Lutron Pico button presses by `button_type` (on/raise/stop/lower/off) instead of vendor-specific button numbers so every remote reports the correct action mappings regardless of serial numbering.

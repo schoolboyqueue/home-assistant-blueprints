@@ -1,5 +1,5 @@
 blueprint:
-  name: "Multi Switch Light Control Pro v1.5.8"
+  name: "Multi Switch Light Control Pro v1.5.9"
   description: >
     Turn a supported switch or remote into a smart light controller. Supports Inovelli
     Zigbee switches (via Zigbee2MQTT or ZHA), Zooz/Inovelli Z-Wave switches, and Lutron
@@ -231,6 +231,32 @@ blueprint:
               max: 10
               unit_of_measurement: seconds
 
+    state_sync:
+      name: Switch state sync
+      icon: mdi:toggle-switch
+      input:
+        enable_state_sync:
+          name: "Mirror switch state with lights"
+          description: >
+            When enabled, the blueprint watches the target lights and keeps the selected switch/light entity in
+            sync (lights > 0% → switch on, all lights off → switch off). Useful when the physical switch controls
+            smart lights via automations instead of a direct load.
+          default: false
+          selector:
+            boolean: {}
+        state_sync_switch_entity:
+          name: "Switch entity override"
+          description: >
+            Optional override for the switch/light entity that should mirror the target lights. Leave blank to
+            auto-detect the first `switch.` or `light.` entity that belongs to the selected device.
+          default: switch.placeholder_state_sync
+          selector:
+            entity:
+              multiple: false
+              filter:
+                - domain: switch
+                - domain: light
+
     diagnostics:
       name: Diagnostics
       icon: mdi:bug-outline
@@ -247,7 +273,7 @@ blueprint:
                 - "basic"
                 - "verbose"
 variables:
-  blueprint_version: "1.5.8"
+  blueprint_version: "1.5.9"
 
   switch_device: !input switch_device
   zigbee_action_sensor_input: !input zigbee_action_sensor
@@ -293,6 +319,27 @@ variables:
   lutron_on_transition_s_in: !input lutron_on_transition_s
   lutron_off_transition_s_in: !input lutron_off_transition_s
   debug_level_v: !input debug_level
+
+  state_sync_enabled_input: !input enable_state_sync
+  state_sync_switch_entity_input: !input state_sync_switch_entity
+  state_sync_placeholder_entity: "switch.placeholder_state_sync"
+  state_sync_autodetect_entity: >-
+    {% if state_sync_switch_entity_input != state_sync_placeholder_entity %}
+      {{ state_sync_switch_entity_input }}
+    {% else %}
+      {% set entities = device_entities(switch_device) %}
+      {% set light_entities = entities | select('match', '^light\\.') | list %}
+      {% set switch_entities = entities | select('match', '^switch\\.') | list %}
+      {% if light_entities | length > 0 %}
+        {{ light_entities[0] }}
+      {% elif switch_entities | length > 0 %}
+        {{ switch_entities[0] }}
+      {% else %}
+        ""
+      {% endif %}
+    {% endif %}
+  state_sync_switch_entity: "{{ state_sync_autodetect_entity | default('', true) }}"
+  state_sync_enabled: "{{ state_sync_enabled_input and (state_sync_switch_entity | length > 0) }}"
 
   step_pct: "{{ step_pct_in | float(5) }}"
   interval_ms: "{{ interval_ms_in | int(200) }}"
@@ -383,7 +430,24 @@ variables:
 
   debug_enabled: "{{ debug_level_v in ['basic','verbose'] }}"
   debug_verbose: "{{ debug_level_v == 'verbose' }}"
-mode: restart
+  state_sync_any_light_on: >-
+    {% set targets = light_target_sequence %}
+    {% if targets | length == 0 %}
+      false
+    {% else %}
+      {% set ns = namespace(on=false) %}
+      {% for ent in targets %}
+        {% set ent_state = states(ent) %}
+        {% if ent_state == 'on' %}
+          {% set brightness = state_attr(ent, 'brightness') %}
+          {% if brightness is none or (brightness | int(0)) > 0 %}
+            {% set ns.on = true %}
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+      {{ ns.on }}
+    {% endif %}
+mode: parallel
 max_exceeded: silent
 trigger:
   - platform: event
@@ -794,6 +858,14 @@ trigger:
     entity_id: !input zigbee_action_sensor
     to: "down_quintuple"
     id: down_quint_z2m
+  - platform: state
+    entity_id: !input light_target
+    to: "on"
+    id: state_sync_light_on
+  - platform: state
+    entity_id: !input light_target
+    to: "off"
+    id: state_sync_light_off
 condition: []
 action:
   - if:
@@ -817,6 +889,33 @@ action:
             [Multi Switch Light Pro] Trigger fired: id={{ trigger.id | default('unknown') }}
             | platform={{ trigger.platform | default('unknown') }}
             | switch_type={{ switch_type }}
+  - if:
+      - condition: template
+        value_template: >
+          {{ state_sync_enabled and trigger.id in ['state_sync_light_on','state_sync_light_off'] }}
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ state_sync_any_light_on }}"
+        then:
+          - service: homeassistant.turn_on
+            target:
+              entity_id: "{{ state_sync_switch_entity }}"
+        else:
+          - service: homeassistant.turn_off
+            target:
+              entity_id: "{{ state_sync_switch_entity }}"
+      - if:
+          - condition: template
+            value_template: "{{ debug_enabled }}"
+        then:
+          - service: system_log.write
+            data:
+              level: info
+              message: >
+                [Multi Switch Light Pro] State sync → switch {{ state_sync_switch_entity }}
+                set to {{ 'on' if state_sync_any_light_on else 'off' }}
+      - stop: "state sync completed"
   - if:
       - condition: template
         value_template: >
