@@ -1,5 +1,5 @@
 blueprint:
-  name: "Multi Switch Light Control Pro v1.5.0"
+  name: "Multi Switch Light Control Pro v1.5.1"
   description: >
     Turn a supported switch or remote into a smart light controller. Supports Inovelli
     Zigbee switches (via Zigbee2MQTT or ZHA), Zooz/Inovelli Z-Wave switches, and Lutron
@@ -247,7 +247,7 @@ blueprint:
                 - "basic"
                 - "verbose"
 variables:
-  blueprint_version: "1.5.0"
+  blueprint_version: "1.5.1"
 
   switch_device: !input switch_device
   zigbee_action_sensor_input: !input zigbee_action_sensor
@@ -599,47 +599,47 @@ trigger:
       property: "scene"
       property_key: "002"
       value: "KeyPressed5x"
-  - platform: event
-    event_type: lutron_caseta_button_event
-    event_data:
-      device_id: !input switch_device
-      action: "on"
+  - trigger: device
+    device_id: !input switch_device
+    domain: lutron_caseta
+    type: press
+    subtype: on
     id: lutron_on
-  - platform: event
-    event_type: lutron_caseta_button_event
-    event_data:
-      device_id: !input switch_device
-      action: "raise"
+  - trigger: device
+    device_id: !input switch_device
+    domain: lutron_caseta
+    type: press
+    subtype: raise
     id: lutron_raise
-  - platform: event
-    event_type: lutron_caseta_button_event
-    event_data:
-      device_id: !input switch_device
-      action: "stop"
+  - trigger: device
+    device_id: !input switch_device
+    domain: lutron_caseta
+    type: press
+    subtype: stop
     id: lutron_stop
-  - platform: event
-    event_type: lutron_caseta_button_event
-    event_data:
-      device_id: !input switch_device
-      action: "lower"
+  - trigger: device
+    device_id: !input switch_device
+    domain: lutron_caseta
+    type: press
+    subtype: lower
     id: lutron_lower
-  - platform: event
-    event_type: lutron_caseta_button_event
-    event_data:
-      device_id: !input switch_device
-      action: "off"
+  - trigger: device
+    device_id: !input switch_device
+    domain: lutron_caseta
+    type: press
+    subtype: "off"
     id: lutron_off
-  - platform: event
-    event_type: lutron_caseta_button_event
-    event_data:
-      device_id: !input switch_device
-      action: "release_raise"
+  - trigger: device
+    device_id: !input switch_device
+    domain: lutron_caseta
+    type: release
+    subtype: raise
     id: lutron_raise_release
-  - platform: event
-    event_type: lutron_caseta_button_event
-    event_data:
-      device_id: !input switch_device
-      action: "release_lower"
+  - trigger: device
+    device_id: !input switch_device
+    domain: lutron_caseta
+    type: release
+    subtype: lower
     id: lutron_lower_release
   # Zigbee2MQTT Device Actions (MQTT integration)
   - trigger: device

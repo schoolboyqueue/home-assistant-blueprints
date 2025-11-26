@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.1 - 2025-11-27
+### Fixed
+- Restore device-based Lutron Pico press/release triggers so Pico remotes fire button actions again.
+
 ## 1.5.0 - 2025-11-27
 ### Added
 - Add Zigbee2MQTT device action triggers so button events run without relying on the action sensor entity, including hold/release detection inside the dimming loops.
