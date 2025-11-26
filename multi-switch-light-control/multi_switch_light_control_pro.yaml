@@ -26,6 +26,16 @@ blueprint:
           selector:
             device:
               multiple: false
+        zigbee_action_sensor:
+          name: "Zigbee action sensor (auto-detected)"
+          description: >
+            OPTIONAL. For Zigbee switches only. The blueprint tries to auto-detect this,
+            but if auto-detection fails, manually select the action sensor entity
+            (e.g., sensor.switch_name_action). Leave blank for Z-Wave/Lutron devices.
+          default: ""
+          selector:
+            entity:
+              domain: sensor
         light_target:
           name: "Light entities"
           description: "Select one or more target lights. The first entry is used for brightness reads."
@@ -239,6 +249,7 @@ variables:
   blueprint_version: "1.4.0"
 
   switch_device: !input switch_device
+  zigbee_action_sensor_input: !input zigbee_action_sensor
   light_targets: !input light_target
   light_targets_csv: >-
     {% set lt = light_targets | default('') %}
@@ -305,11 +316,15 @@ variables:
   detected_label: >
     {{ detected_name }} | {{ detected_manufacturer }} {{ detected_model }}
 
-  # Auto-detect Zigbee2MQTT/ZHA action sensor entity
+  # Auto-detect or use manual Zigbee2MQTT/ZHA action sensor entity
   action_sensor_entity: >
-    {% set entities = device_entities(switch_device) %}
-    {% set action_sensors = entities | select('match', '.*_action$') | list %}
-    {{ action_sensors[0] if action_sensors | length > 0 else '' }}
+    {% if zigbee_action_sensor_input | length > 0 %}
+      {{ zigbee_action_sensor_input }}
+    {% else %}
+      {% set entities = device_entities(switch_device) %}
+      {% set action_sensors = entities | select('match', '.*_action$') | list %}
+      {{ action_sensors[0] if action_sensors | length > 0 else '' }}
+    {% endif %}
 
   has_action_sensor: "{{ action_sensor_entity | length > 0 }}"
 
@@ -596,48 +611,63 @@ trigger:
       device_id: !input switch_device
       action: "release_lower"
     id: lutron_lower_release
-  # Zigbee2MQTT/ZHA template triggers (fire when action sensor state changes)
-  - platform: template
-    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'up_single') }}"
+  # Zigbee2MQTT/ZHA state triggers (fire when action sensor state changes)
+  # Uses !input directly since template triggers can't access automation variables
+  - platform: state
+    entity_id: !input zigbee_action_sensor
+    to: "up_single"
     id: up_single_z2m
-  - platform: template
-    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'down_single') }}"
+  - platform: state
+    entity_id: !input zigbee_action_sensor
+    to: "down_single"
     id: down_single_z2m
-  - platform: template
-    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'up_held') }}"
+  - platform: state
+    entity_id: !input zigbee_action_sensor
+    to: "up_held"
     id: up_held_z2m
-  - platform: template
-    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'down_held') }}"
+  - platform: state
+    entity_id: !input zigbee_action_sensor
+    to: "down_held"
     id: down_held_z2m
-  - platform: template
-    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'up_release') }}"
+  - platform: state
+    entity_id: !input zigbee_action_sensor
+    to: "up_release"
     id: up_release_z2m
-  - platform: template
-    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'down_release') }}"
+  - platform: state
+    entity_id: !input zigbee_action_sensor
+    to: "down_release"
     id: down_release_z2m
-  - platform: template
-    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'up_double') }}"
+  - platform: state
+    entity_id: !input zigbee_action_sensor
+    to: "up_double"
     id: up_double_z2m
-  - platform: template
-    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'down_double') }}"
+  - platform: state
+    entity_id: !input zigbee_action_sensor
+    to: "down_double"
     id: down_double_z2m
-  - platform: template
-    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'up_triple') }}"
+  - platform: state
+    entity_id: !input zigbee_action_sensor
+    to: "up_triple"
     id: up_triple_z2m
-  - platform: template
-    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'down_triple') }}"
+  - platform: state
+    entity_id: !input zigbee_action_sensor
+    to: "down_triple"
     id: down_triple_z2m
-  - platform: template
-    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'up_quadruple') }}"
+  - platform: state
+    entity_id: !input zigbee_action_sensor
+    to: "up_quadruple"
     id: up_quad_z2m
-  - platform: template
-    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'down_quadruple') }}"
+  - platform: state
+    entity_id: !input zigbee_action_sensor
+    to: "down_quadruple"
     id: down_quad_z2m
-  - platform: template
-    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'up_quintuple') }}"
+  - platform: state
+    entity_id: !input zigbee_action_sensor
+    to: "up_quintuple"
     id: up_quint_z2m
-  - platform: template
-    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'down_quintuple') }}"
+  - platform: state
+    entity_id: !input zigbee_action_sensor
+    to: "down_quintuple"
     id: down_quint_z2m
 condition: []
 action:
@@ -1027,8 +1057,9 @@ action:
                     property: "scene"
                     property_key: "001"
                     value: "KeyReleased"
-                - platform: template
-                  value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'up_release') }}"
+                - platform: state
+                  entity_id: !input zigbee_action_sensor
+                  to: "up_release"
               timeout:
                 milliseconds: "{{ interval_ms }}"
             - if:
@@ -1118,8 +1149,9 @@ action:
                     property: "scene"
                     property_key: "002"
                     value: "KeyReleased"
-                - platform: template
-                  value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'down_release') }}"
+                - platform: state
+                  entity_id: !input zigbee_action_sensor
+                  to: "down_release"
               timeout:
                 milliseconds: "{{ interval_ms }}"
             - if:

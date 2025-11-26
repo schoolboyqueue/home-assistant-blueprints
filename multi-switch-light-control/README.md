@@ -39,7 +39,7 @@ Supported behaviors:
 ## Debug & Troubleshooting
 
 - Enable **basic** or **verbose** debug to see `[Multi Switch Light Pro] Detected switch ... | type=...` showing the detected protocol (zigbee2mqtt, zwave, lutron, etc.).
-- **Zigbee switches:** The blueprint auto-detects the action sensor entity (e.g., `sensor.kitchen_switch_action`). If events aren't firing, check that Zigbee2MQTT is publishing action values correctly.
+- **Zigbee switches:** The blueprint auto-detects the action sensor entity (e.g., `sensor.kitchen_switch_action`). If auto-detection fails or events aren't firing, manually select your action sensor in the "Zigbee action sensor" input. Verify Zigbee2MQTT is publishing action values correctly.
 - **Z-Wave switches:** Confirm the device sends Central Scene events. Check Developer Tools → Events for `zwave_js_event` or `zwave_js_value_notification`.
 - **Lutron Pico:** Verify `lutron_caseta_button_event` events appear when pressing buttons.
 - For hold loops, the blueprint waits for release events (`up_release`, `down_release` for Zigbee; `KeyReleased` for Z-Wave; `release_raise`/`release_lower` for Lutron). If releases are dropped, loops stop when the light hits min/max clamps.

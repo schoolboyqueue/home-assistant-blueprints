@@ -2,9 +2,10 @@
 
 ## 1.4.0 - 2025-11-26
 ### Added
-- Zigbee2MQTT and ZHA support for Inovelli Zigbee switches via automatic action sensor entity detection
-- Auto-detect action sensor entities (e.g., `sensor.*_action`) from device registry and use template triggers for Zigbee2MQTT/ZHA events
-- Template triggers for all Zigbee button actions: `up_single`, `down_single`, `up_held`, `down_held`, `up_release`, `down_release`, `up_double`, `down_double`, `up_triple`, `down_triple`, `up_quadruple`, `down_quadruple`, `up_quintuple`, `down_quintuple`
+- Zigbee2MQTT and ZHA support for Inovelli Zigbee switches
+- Optional `zigbee_action_sensor` input for Zigbee switches (auto-detected if left blank, manual selection available)
+- State triggers for all Zigbee button actions: `up_single`, `down_single`, `up_held`, `down_held`, `up_release`, `down_release`, `up_double`, `down_double`, `up_triple`, `down_triple`, `up_quadruple`, `down_quadruple`, `up_quintuple`, `down_quintuple`
+- Auto-detect action sensor entities (e.g., `sensor.*_action`) from device registry with fallback to manual input
 - Enhanced protocol detection in `switch_type` variable to identify Zigbee vs Z-Wave vs Lutron based on presence of action sensor entity
 - Zigbee release detection in hold-to-dim loops using `up_release` and `down_release` state changes
 - Updated all trigger ID checks to support both Z-Wave and Zigbee2MQTT trigger IDs (e.g., `up_single` and `up_single_z2m`)
@@ -12,6 +13,10 @@
 ### Changed
 - Updated blueprint description to include Inovelli Zigbee switches (Zigbee2MQTT/ZHA) alongside Z-Wave and Lutron devices
 - README updated with Zigbee support documentation, protocol detection details, and troubleshooting for Zigbee2MQTT
+
+### Fixed
+- Replace template triggers with state triggers to avoid "undefined variable" warnings in Home Assistant logs
+- State triggers use `!input zigbee_action_sensor` directly since template triggers cannot access automation variables
 
 ## 1.3.3 - 2025-11-26
 ### Fixed
