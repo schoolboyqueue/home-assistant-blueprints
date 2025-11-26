@@ -863,8 +863,8 @@ action:
               - service: light.turn_on
                 target:
                   entity_id: "{{ light_targets_csv }}"
-            data:
-              transition: "{{ lutron_on_transition_s }}"
+                data:
+                  transition: "{{ lutron_on_transition_s }}"
   - if:
       - condition: template
         value_template: >
@@ -952,8 +952,8 @@ action:
                 - service: light.turn_on
                   target:
                     entity_id: "{{ light_targets_csv }}"
-                data:
-                  brightness: "{{ min_on_abs_brightness | int }}"
+                  data:
+                    brightness: "{{ min_on_abs_brightness | int }}"
       - repeat:
           sequence:
             - wait_for_trigger:
