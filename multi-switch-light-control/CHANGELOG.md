@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.0 - 2025-11-26
+### Changed
+- **BREAKING CHANGE**: Simplified hold-to-dim behavior for Z-Wave switches. Removed polling-based button release detection that was causing timing issues. The dim loop now continues until brightness reaches configured min/max limits. This eliminates event timing bugs where release events were missed, preventing endless loops and delayed responses. Users should hold button until desired brightness is reached - the loop will stop automatically at brightness limits.
+
 ## 1.7.2 - 2025-11-26
 ### Fixed
 - Improved button release detection responsiveness: reduced wait_for_trigger timeout from 200ms to 100ms, checking twice as frequently for release events. This cuts the maximum delay between button release and loop exit from 200ms to 100ms, making the dimming feel more responsive.

@@ -1,5 +1,5 @@
 blueprint:
-  name: "Multi Switch Light Control Pro v1.7.2"
+  name: "Multi Switch Light Control Pro v1.8.0"
   description: >
     Turn a supported switch or remote into a smart light controller. Supports Inovelli
     Zigbee switches (via Zigbee2MQTT or ZHA), Zooz/Inovelli Z-Wave switches, and Lutron
@@ -273,7 +273,7 @@ blueprint:
                 - "basic"
                 - "verbose"
 variables:
-  blueprint_version: "1.7.2"
+  blueprint_version: "1.8.0"
 
   switch_device: !input switch_device
   zigbee_action_sensor_input: !input zigbee_action_sensor
@@ -1371,51 +1371,8 @@ action:
                       [Multi Switch Light Pro] brighten step to
                       {{ target_brightness }}/255 | current={{ current_brightness }}/255
                       cap={{ max_abs_brightness }}
-            - wait_for_trigger:
-                - platform: event
-                  event_type: zwave_js_event
-                  event_data:
-                    device_id: !input switch_device
-                    command_class_name: "Central Scene"
-                    property: "scene"
-                    property_key: "001"
-                    value: 1
-                - platform: event
-                  event_type: zwave_js_value_notification
-                  event_data:
-                    device_id: !input switch_device
-                    command_class_name: "Central Scene"
-                    property: "scene"
-                    property_key: "001"
-                    value: "KeyReleased"
-                - platform: state
-                  entity_id: !input zigbee_action_sensor
-                  to: "up_release"
-                - trigger: device
-                  device_id: !input switch_device
-                  domain: mqtt
-                  type: action
-                  subtype: up_release
-              timeout:
-                milliseconds: 100
-              continue_on_timeout: true
-            - if:
-                - condition: template
-                  value_template: >
-                    {{ wait is defined and wait.completed }}
-              then:
-                - if:
-                    - condition: template
-                      value_template: "{{ debug_enabled }}"
-                  then:
-                    - service: system_log.write
-                      data:
-                        level: info
-                        message: >
-                          [Multi Switch Light Pro] up_release → stop brighten
-                - stop:
             - delay:
-                milliseconds: "{{ (interval_ms - 100) if not (wait is defined and wait.completed) else 0 }}"
+                milliseconds: "{{ interval_ms }}"
             - variables:
                 current_brightness: "{{ state_attr(light_entity,'brightness') | int(0) }}"
                 target_brightness: >
@@ -1424,7 +1381,7 @@ action:
           until:
             - condition: template
               value_template: >
-                {{ (wait is defined and wait.completed) or (target_brightness >= max_abs_brightness) }}
+                {{ target_brightness >= max_abs_brightness }}
   - if:
       - condition: template
         value_template: >
@@ -1509,51 +1466,8 @@ action:
                             target:
                               entity_id: "{{ repeat.item }}"
                 - stop: "Dim hold reached minimum; turning off"
-            - wait_for_trigger:
-                - platform: event
-                  event_type: zwave_js_event
-                  event_data:
-                    device_id: !input switch_device
-                    command_class_name: "Central Scene"
-                    property: "scene"
-                    property_key: "002"
-                    value: 1
-                - platform: event
-                  event_type: zwave_js_value_notification
-                  event_data:
-                    device_id: !input switch_device
-                    command_class_name: "Central Scene"
-                    property: "scene"
-                    property_key: "002"
-                    value: "KeyReleased"
-                - platform: state
-                  entity_id: !input zigbee_action_sensor
-                  to: "down_release"
-                - trigger: device
-                  device_id: !input switch_device
-                  domain: mqtt
-                  type: action
-                  subtype: down_release
-              timeout:
-                milliseconds: 100
-              continue_on_timeout: true
-            - if:
-                - condition: template
-                  value_template: >
-                    {{ wait is defined and wait.completed }}
-              then:
-                - if:
-                    - condition: template
-                      value_template: "{{ debug_enabled }}"
-                  then:
-                    - service: system_log.write
-                      data:
-                        level: info
-                        message: >
-                          [Multi Switch Light Pro] down_release → stop dim
-                - stop:
             - delay:
-                milliseconds: "{{ (interval_ms - 100) if not (wait is defined and wait.completed) else 0 }}"
+                milliseconds: "{{ interval_ms }}"
             - variables:
                 current_brightness: "{{ state_attr(light_entity,'brightness') | int(0) }}"
                 target_brightness: >
@@ -1562,7 +1476,7 @@ action:
           until:
             - condition: template
               value_template: >
-                {{ (wait is defined and wait.completed) or (target_brightness <= min_abs_brightness) }}
+                {{ target_brightness <= min_abs_brightness }}
   - if:
       - condition: template
         value_template: >
