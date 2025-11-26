@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.5.0 - 2025-11-27
+### Added
+- Add Zigbee2MQTT device action triggers so button events run without relying on the action sensor entity, including hold/release detection inside the dimming loops.
+
+### Fixed
+- Auto-select the detected Zigbee action sensor when available and keep `entity_id` references static, logging a hint if we discover a candidate but the input remains at the placeholder.
+
+## 1.4.4 - 2025-11-27
+### Fixed
+- Require the Zigbee action sensor input to reference a concrete entity and remove templated `entity_id` fields, preventing "Entity is neither a valid entity ID" errors when the action sensor is unconfigured. Added a placeholder default plus debug hints when an auto-detected sensor exists but is not selected.
+
 ## 1.4.3 - 2025-11-27
 ### Fixed
 - Improve Zigbee action sensor auto-detection to only select `sensor.*_action` entities and prefer matches containing the switch name, prompting users to pick an input when multiple candidates remain.

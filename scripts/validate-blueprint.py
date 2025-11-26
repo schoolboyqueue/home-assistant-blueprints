@@ -54,7 +54,6 @@ class BlueprintValidator:
         self.warnings: List[str] = []
         self.data: Optional[Dict] = None
         self.join_variables: Set[str] = set()
-        self.optional_string_inputs: Set[str] = set()
 
     def validate(self) -> bool:
         """Run all validation checks. Returns True if valid."""
@@ -184,11 +183,6 @@ class BlueprintValidator:
                     f"{path}.selector: Unknown selector type '{selector_type}'"
                 )
 
-        # Track inputs that default to empty strings (optional entity selectors)
-        default_value = input_def.get('default')
-        if isinstance(default_value, str) and default_value.strip() == '':
-            self.optional_string_inputs.add(input_name)
-
     def _validate_variables(self):
         """Validate variables section."""
         if 'variables' not in self.data:
@@ -233,6 +227,9 @@ class BlueprintValidator:
             # Check for platform or trigger type
             if 'platform' not in trigger and 'trigger' not in trigger:
                 self.errors.append(f"trigger[{i}]: Missing 'platform' or 'trigger' key")
+
+            if 'entity_id' in trigger:
+                self._check_trigger_entity_id(trigger['entity_id'], f"trigger[{i}].entity_id")
 
             # Check template triggers for automation variable references
             if trigger.get('platform') == 'template':
@@ -314,6 +311,29 @@ class BlueprintValidator:
                         f"{path}.repeat.for_each: uses 'join' which may not produce a valid list; ensure it returns a sequence"
                     )
 
+    def _check_trigger_entity_id(self, value: Any, path: str):
+        """Ensure trigger entity_id fields are static strings."""
+        if value is None:
+            return
+
+        if isinstance(value, list):
+            for idx, item in enumerate(value):
+                self._check_trigger_entity_id(item, f"{path}[{idx}]")
+            return
+
+        if not isinstance(value, str):
+            return
+
+        stripped = value.strip()
+        if not stripped:
+            self.errors.append(f"{path}: entity_id cannot be empty")
+            return
+
+        if '{{' in stripped or '}}' in stripped:
+            self.errors.append(
+                f"{path}: entity_id cannot use templates; provide a concrete entity reference or !input value"
+            )
+
     def _validate_templates(self):
         """Validate Jinja2 template syntax."""
         content = self.file_path.read_text()
@@ -383,12 +403,6 @@ class BlueprintValidator:
                         f"{path}: References variable '{var_name}' built with join(); entity_id templates cannot combine multiple entities"
                     )
 
-        if stripped.startswith('!input '):
-            input_name = stripped.split(' ', 1)[1].strip()
-            if input_name in self.optional_string_inputs:
-                self.errors.append(
-                    f"{path}: references optional input '{input_name}' that defaults to an empty string; bind it to a variable and provide a fallback"
-                )
 
     def _check_readme_sync(self):
         """Check if README.md version matches blueprint version."""

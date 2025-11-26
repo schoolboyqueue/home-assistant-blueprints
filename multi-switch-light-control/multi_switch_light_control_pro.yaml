@@ -1,5 +1,5 @@
 blueprint:
-  name: "Multi Switch Light Control Pro v1.4.3"
+  name: "Multi Switch Light Control Pro v1.5.0"
   description: >
     Turn a supported switch or remote into a smart light controller. Supports Inovelli
     Zigbee switches (via Zigbee2MQTT or ZHA), Zooz/Inovelli Z-Wave switches, and Lutron
@@ -31,8 +31,9 @@ blueprint:
           description: >
             OPTIONAL. For Zigbee switches only. The blueprint tries to auto-detect this,
             but if auto-detection fails, manually select the action sensor entity
-            (e.g., sensor.switch_name_action). Leave blank for Z-Wave/Lutron devices.
-          default: ""
+            (e.g., sensor.switch_name_action). Leave at the placeholder value for
+            Z-Wave/Lutron devices.
+          default: sensor.placeholder_action_sensor
           selector:
             entity:
               domain: sensor
@@ -246,7 +247,7 @@ blueprint:
                 - "basic"
                 - "verbose"
 variables:
-  blueprint_version: "1.4.3"
+  blueprint_version: "1.5.0"
 
   switch_device: !input switch_device
   zigbee_action_sensor_input: !input zigbee_action_sensor
@@ -317,41 +318,44 @@ variables:
     {{ detected_name }} | {{ detected_manufacturer }} {{ detected_model }}
 
   # Auto-detect or use manual Zigbee2MQTT/ZHA action sensor entity
-  action_sensor_entity: >
-    {% if zigbee_action_sensor_input | length > 0 %}
-      {{ zigbee_action_sensor_input }}
-    {% else %}
-      {% set entities = device_entities(switch_device) %}
-      {% set action_sensors = entities | select('match', '^sensor\\..*_action$') | list %}
-      {% if action_sensors | length == 1 %}
-        {{ action_sensors[0] }}
-      {% elif action_sensors | length > 1 %}
-        {% set slug = detected_name | default('') | lower | replace(' ', '_') %}
-        {% set narrowed = namespace(items=[]) %}
-        {% for sensor in action_sensors %}
-          {% set sensor_l = sensor | lower %}
-          {% if slug | length > 0 and (slug in sensor_l) %}
-            {% set narrowed.items = narrowed.items + [sensor] %}
-          {% endif %}
-        {% endfor %}
-        {% if narrowed.items | length == 1 %}
-          {{ narrowed.items[0] }}
-        {% else %}
-          ""
+  action_sensor_placeholder: "sensor.placeholder_action_sensor"
+  action_sensor_detection: >
+    {% set entities = device_entities(switch_device) %}
+    {% set action_sensors = entities | select('match', '^sensor\\..*_action$') | list %}
+    {% if action_sensors | length == 1 %}
+      {{ action_sensors[0] }}
+    {% elif action_sensors | length > 1 %}
+      {% set slug = detected_name | default('') | lower | replace(' ', '_') %}
+      {% set narrowed = namespace(items=[]) %}
+      {% for sensor in action_sensors %}
+        {% set sensor_l = sensor | lower %}
+        {% if slug | length > 0 and (slug in sensor_l) %}
+          {% set narrowed.items = narrowed.items + [sensor] %}
         {% endif %}
+      {% endfor %}
+      {% if narrowed.items | length == 1 %}
+        {{ narrowed.items[0] }}
       {% else %}
         ""
       {% endif %}
-    {% endif %}
-
-  has_action_sensor: "{{ action_sensor_entity | length > 0 }}"
-
-  action_sensor_entity_safe: >
-    {% set ent = action_sensor_entity | default('') %}
-    {% if ent | length > 0 %}
-      {{ ent }}
     {% else %}
-      sensor.placeholder_action_sensor
+      ""
+    {% endif %}
+  action_sensor_entity: >
+    {% set provided = zigbee_action_sensor_input | default(action_sensor_placeholder) %}
+    {% if provided != action_sensor_placeholder %}
+      {{ provided }}
+    {% elif action_sensor_detection | length > 0 %}
+      {{ action_sensor_detection }}
+    {% else %}
+      ""
+    {% endif %}
+  has_action_sensor: "{{ action_sensor_entity | length > 0 }}"
+  action_sensor_hint: >
+    {% if not has_action_sensor and action_sensor_detection | length > 0 %}
+      {{ action_sensor_detection }}
+    {% else %}
+      ""
     {% endif %}
 
   # Enhanced protocol detection: Zigbee2MQTT/ZHA, Z-Wave, or Lutron
@@ -637,62 +641,147 @@ trigger:
       device_id: !input switch_device
       action: "release_lower"
     id: lutron_lower_release
-  # Zigbee2MQTT/ZHA state triggers (fire when action sensor state changes)
-  # Use sanitized action sensor entity so empty inputs don't break entity_id validation
+  # Zigbee2MQTT Device Actions (MQTT integration)
+  - trigger: device
+    device_id: !input switch_device
+    domain: mqtt
+    type: action
+    subtype: up_single
+    id: up_single_z2m
+  - trigger: device
+    device_id: !input switch_device
+    domain: mqtt
+    type: action
+    subtype: down_single
+    id: down_single_z2m
+  - trigger: device
+    device_id: !input switch_device
+    domain: mqtt
+    type: action
+    subtype: up_double
+    id: up_double_z2m
+  - trigger: device
+    device_id: !input switch_device
+    domain: mqtt
+    type: action
+    subtype: down_double
+    id: down_double_z2m
+  - trigger: device
+    device_id: !input switch_device
+    domain: mqtt
+    type: action
+    subtype: up_triple
+    id: up_triple_z2m
+  - trigger: device
+    device_id: !input switch_device
+    domain: mqtt
+    type: action
+    subtype: down_triple
+    id: down_triple_z2m
+  - trigger: device
+    device_id: !input switch_device
+    domain: mqtt
+    type: action
+    subtype: up_quadruple
+    id: up_quad_z2m
+  - trigger: device
+    device_id: !input switch_device
+    domain: mqtt
+    type: action
+    subtype: down_quadruple
+    id: down_quad_z2m
+  - trigger: device
+    device_id: !input switch_device
+    domain: mqtt
+    type: action
+    subtype: up_quintuple
+    id: up_quint_z2m
+  - trigger: device
+    device_id: !input switch_device
+    domain: mqtt
+    type: action
+    subtype: down_quintuple
+    id: down_quint_z2m
+  - trigger: device
+    device_id: !input switch_device
+    domain: mqtt
+    type: action
+    subtype: up_held
+    id: up_held_z2m
+  - trigger: device
+    device_id: !input switch_device
+    domain: mqtt
+    type: action
+    subtype: down_held
+    id: down_held_z2m
+  - trigger: device
+    device_id: !input switch_device
+    domain: mqtt
+    type: action
+    subtype: up_release
+    id: up_release_z2m
+  - trigger: device
+    device_id: !input switch_device
+    domain: mqtt
+    type: action
+    subtype: down_release
+    id: down_release_z2m
+  # Zigbee2MQTT/ZHA state triggers (fire when the configured action sensor updates)
+  # Defaults to a placeholder value so non-Zigbee setups remain valid
   - platform: state
-    entity_id: "{{ action_sensor_entity_safe }}"
+    entity_id: !input zigbee_action_sensor
     to: "up_single"
     id: up_single_z2m
   - platform: state
-    entity_id: "{{ action_sensor_entity_safe }}"
+    entity_id: !input zigbee_action_sensor
     to: "down_single"
     id: down_single_z2m
   - platform: state
-    entity_id: "{{ action_sensor_entity_safe }}"
+    entity_id: !input zigbee_action_sensor
     to: "up_held"
     id: up_held_z2m
   - platform: state
-    entity_id: "{{ action_sensor_entity_safe }}"
+    entity_id: !input zigbee_action_sensor
     to: "down_held"
     id: down_held_z2m
   - platform: state
-    entity_id: "{{ action_sensor_entity_safe }}"
+    entity_id: !input zigbee_action_sensor
     to: "up_release"
     id: up_release_z2m
   - platform: state
-    entity_id: "{{ action_sensor_entity_safe }}"
+    entity_id: !input zigbee_action_sensor
     to: "down_release"
     id: down_release_z2m
   - platform: state
-    entity_id: "{{ action_sensor_entity_safe }}"
+    entity_id: !input zigbee_action_sensor
     to: "up_double"
     id: up_double_z2m
   - platform: state
-    entity_id: "{{ action_sensor_entity_safe }}"
+    entity_id: !input zigbee_action_sensor
     to: "down_double"
     id: down_double_z2m
   - platform: state
-    entity_id: "{{ action_sensor_entity_safe }}"
+    entity_id: !input zigbee_action_sensor
     to: "up_triple"
     id: up_triple_z2m
   - platform: state
-    entity_id: "{{ action_sensor_entity_safe }}"
+    entity_id: !input zigbee_action_sensor
     to: "down_triple"
     id: down_triple_z2m
   - platform: state
-    entity_id: "{{ action_sensor_entity_safe }}"
+    entity_id: !input zigbee_action_sensor
     to: "up_quadruple"
     id: up_quad_z2m
   - platform: state
-    entity_id: "{{ action_sensor_entity_safe }}"
+    entity_id: !input zigbee_action_sensor
     to: "down_quadruple"
     id: down_quad_z2m
   - platform: state
-    entity_id: "{{ action_sensor_entity_safe }}"
+    entity_id: !input zigbee_action_sensor
     to: "up_quintuple"
     id: up_quint_z2m
   - platform: state
-    entity_id: "{{ action_sensor_entity_safe }}"
+    entity_id: !input zigbee_action_sensor
     to: "down_quintuple"
     id: down_quint_z2m
 condition: []
@@ -707,6 +796,17 @@ action:
           message: >
             [Multi Switch Light Pro] Detected switch {{ detected_label }}
             | type={{ switch_type }}
+  - if:
+      - condition: template
+        value_template: >
+          {{ debug_enabled and (not has_action_sensor) and (action_sensor_hint | length > 0) }}
+    then:
+      - service: system_log.write
+        data:
+          level: warning
+          message: >
+            [Multi Switch Light Pro] Detected Zigbee action sensor candidate {{ action_sensor_hint }}.
+            Set the "Zigbee action sensor" input so Zigbee triggers can run.
   - if:
       - condition: template
         value_template: >
@@ -1108,8 +1208,13 @@ action:
                     property_key: "001"
                     value: "KeyReleased"
                 - platform: state
-                  entity_id: "{{ action_sensor_entity_safe }}"
+                  entity_id: !input zigbee_action_sensor
                   to: "up_release"
+                - trigger: device
+                  device_id: !input switch_device
+                  domain: mqtt
+                  type: action
+                  subtype: up_release
               timeout:
                 milliseconds: "{{ interval_ms }}"
             - if:
@@ -1203,8 +1308,13 @@ action:
                     property_key: "002"
                     value: "KeyReleased"
                 - platform: state
-                  entity_id: "{{ action_sensor_entity_safe }}"
+                  entity_id: !input zigbee_action_sensor
                   to: "down_release"
+                - trigger: device
+                  device_id: !input switch_device
+                  domain: mqtt
+                  type: action
+                  subtype: down_release
               timeout:
                 milliseconds: "{{ interval_ms }}"
             - if:
