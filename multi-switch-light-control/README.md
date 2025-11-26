@@ -1,8 +1,8 @@
 # Multi Switch Light Control Pro
 
-**Version:** 1.3.3
+**Version:** 1.4.0
 **Author:** Jeremy Carter
-**Home Assistant blueprint that supports Zooz/Inovelli Z-Wave switches plus Lutron Pico remotes.**
+**Home Assistant blueprint that supports Inovelli Zigbee switches (Zigbee2MQTT/ZHA), Zooz/Inovelli Z-Wave switches, and Lutron Pico remotes.**
 
 [![Import Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fschoolboyqueue%2Fhome-assistant-blueprints%2Fblob%2Fmain%2Fmulti-switch-light-control%2Fmulti_switch_light_control_pro.yaml)
 
@@ -10,13 +10,14 @@
 
 ## Overview
 
-This blueprint inspects the selected device's registry entry, prints the detected name/model/type when debugging, and automatically switches between Z-Wave Central Scene logic (Zooz/Inovelli) and Lutron Pico button handling. That means the same automation can control your Zooz paddle switch, an Inovelli scene-capable switch, or a Lutron Pico remote without copy/pasting different blueprints.
+This blueprint inspects the selected device's registry entry, auto-detects the protocol (Zigbee2MQTT, ZHA, Z-Wave, or Lutron), and automatically adapts its triggers and logic. That means the same automation can control your Inovelli Zigbee switch, Zooz Z-Wave paddle, or Lutron Pico remote without copy/pasting different blueprints.
 
 Supported behaviors:
 
-- **Central scene devices (Zooz/Inovelli):** single press on/off, hold-to-dim/up, double/triple tap logging for custom actions, optional area targeting, and configurable step/interval/clamp values.
+- **Inovelli Zigbee (Zigbee2MQTT/ZHA):** Auto-detects action sensor entity, supports single tap on/off, hold-to-dim/brighten with release detection, double/triple/quad/quint tap for custom actions.
+- **Z-Wave Central Scene (Zooz/Inovelli):** Single press on/off, hold-to-dim/up, double/triple/quad/quint tap logging for custom actions, optional area targeting, and configurable step/interval/clamp values.
 - **Lutron Pico:** On/Raise/Lower/Off/Stop (favorite) button sequences with hold-to-dim pacing, favorite button brightness/color defaults, and optional actions for the middle button.
-- **Device info logging:** When debug level is `basic` or `verbose`, the automation writes the detected vendor/model/type to the system log so you can verify the auto-detection.
+- **Protocol detection:** When debug level is `basic` or `verbose`, the automation writes the detected vendor/model/protocol to the system log so you can verify the auto-detection.
 
 ## Quick Start
 
@@ -28,19 +29,21 @@ Supported behaviors:
 
 ## Inputs at a Glance
 
-- **Switch device:** Pick any Zooz/Inovelli Z-Wave JS switch, or a Lutron Pico remote. No need to duplicate the automation for each vendor.
+- **Switch device:** Pick any Inovelli Zigbee switch (Zigbee2MQTT/ZHA), Zooz/Inovelli Z-Wave switch, or Lutron Pico remote. The blueprint auto-detects protocol - no need to duplicate the automation for each vendor.
 - **Light entity/area:** The blueprint always reads brightness from the chosen light entity, even when commands target an area.
-- **Dimming parameters:** Adjust brightness step, interval, and min/max clamps. These values drive both Z-Wave and Lutron hold loops.
+- **Dimming parameters:** Adjust brightness step, interval, and min/max clamps. These values drive Zigbee, Z-Wave, and Lutron hold loops.
 - **Lutron tuning:** Configure the favorite button defaults, transition speeds, and hold step delay specific to Pico remotes.
-- **Central Scene actions:** Optional custom sequences for up/down presses (1x-5x) let you wire multi-tap gestures to other automations while still running the default turn on/off/dim behavior when left blank.
-- **Diagnostics:** `basic`/`verbose` logging prints both central scene transitions and brightness calculations as the automation runs.
+- **Multi-tap actions:** Optional custom sequences for up/down presses (1x-5x) let you wire multi-tap gestures to other automations while still running the default turn on/off/dim behavior when left blank. Works with both Zigbee and Z-Wave switches.
+- **Diagnostics:** `basic`/`verbose` logging prints protocol detection, button events, and brightness calculations as the automation runs.
 
 ## Debug & Troubleshooting
 
-- Enable **basic** or **verbose** debug to see `[Multi Switch Light Pro] Detected switch ...` and follow the action logs for each button.
-- If the automation fires but nothing happens, confirm the selected device actually sends the expected events (Central Scene for Z-Wave, Lutrons for Pico).
-- For hold loops, the blueprint respects the `dim_interval_ms`/`lutron_step_delay_ms` until a release event is received. If releases are dropped, the loop stops once the light hits the configured clamp.
-- Favorite button custom actions are optional. If none are provided the blueprint sets the configured brightness/kelvin/transition.
+- Enable **basic** or **verbose** debug to see `[Multi Switch Light Pro] Detected switch ... | type=...` showing the detected protocol (zigbee2mqtt, zwave, lutron, etc.).
+- **Zigbee switches:** The blueprint auto-detects the action sensor entity (e.g., `sensor.kitchen_switch_action`). If events aren't firing, check that Zigbee2MQTT is publishing action values correctly.
+- **Z-Wave switches:** Confirm the device sends Central Scene events. Check Developer Tools → Events for `zwave_js_event` or `zwave_js_value_notification`.
+- **Lutron Pico:** Verify `lutron_caseta_button_event` events appear when pressing buttons.
+- For hold loops, the blueprint waits for release events (`up_release`, `down_release` for Zigbee; `KeyReleased` for Z-Wave; `release_raise`/`release_lower` for Lutron). If releases are dropped, loops stop when the light hits min/max clamps.
+- Favorite button custom actions (Lutron) and multi-tap actions (Zigbee/Z-Wave) are optional. If none are provided, the blueprint runs default on/off/dim behavior.
 
 ## Changelog
 

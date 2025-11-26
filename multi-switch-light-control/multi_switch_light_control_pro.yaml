@@ -1,10 +1,11 @@
 blueprint:
-  name: "Multi Switch Light Control Pro v1.3.3"
+  name: "Multi Switch Light Control Pro v1.4.0"
   description: >
-    Turn a supported Zooz or Inovelli Z-Wave switch, or a Lutron Pico remote, into
-    a smart light controller. The blueprint inspects the selected device at runtime,
-    logs the detected manufacturer/model/type when diagnostics are enabled, and
-    automatically adapts triggers + logic for Zooz, Inovelli, or Lutron hardware.
+    Turn a supported switch or remote into a smart light controller. Supports Inovelli
+    Zigbee switches (via Zigbee2MQTT or ZHA), Zooz/Inovelli Z-Wave switches, and Lutron
+    Pico remotes. The blueprint auto-detects the device protocol at runtime and adapts
+    triggers + logic accordingly. Logs detected manufacturer/model/type when diagnostics
+    are enabled.
   domain: automation
   author: "Jeremy Carter"
   source_url: >
@@ -19,9 +20,9 @@ blueprint:
         switch_device:
           name: "Switch or remote device"
           description: >
-            REQUIRED. Select any Zooz/Inovelli Z-Wave JS switch or a Lutron Pico remote.
-            The blueprint auto-detects the device's vendor/model and adapts the
-            trigger grammar that follows so the automation uses the correct events.
+            REQUIRED. Select any Inovelli Zigbee switch (Zigbee2MQTT/ZHA), Zooz/Inovelli
+            Z-Wave switch, or Lutron Pico remote. The blueprint auto-detects the protocol
+            (Zigbee/Z-Wave/Lutron) and adapts triggers accordingly.
           selector:
             device:
               multiple: false
@@ -235,7 +236,7 @@ blueprint:
                 - "basic"
                 - "verbose"
 variables:
-  blueprint_version: "1.3.3"
+  blueprint_version: "1.4.0"
 
   switch_device: !input switch_device
   light_targets: !input light_target
@@ -303,16 +304,30 @@ variables:
   detected_model: "{{ device_attr(switch_device, 'model') | default('Unknown model') }}"
   detected_label: >
     {{ detected_name }} | {{ detected_manufacturer }} {{ detected_model }}
+
+  # Auto-detect Zigbee2MQTT/ZHA action sensor entity
+  action_sensor_entity: >
+    {% set entities = device_entities(switch_device) %}
+    {% set action_sensors = entities | select('match', '.*_action$') | list %}
+    {{ action_sensors[0] if action_sensors | length > 0 else '' }}
+
+  has_action_sensor: "{{ action_sensor_entity | length > 0 }}"
+
+  # Enhanced protocol detection: Zigbee2MQTT/ZHA, Z-Wave, or Lutron
   switch_type: >
-    {% set manufacturer = detected_manufacturer | lower %}
-    {% if 'lutron' in manufacturer %}
-      lutron
-    {% elif 'inovelli' in manufacturer %}
-      inovelli
-    {% elif 'zooz' in manufacturer %}
-      zooz
+    {% if has_action_sensor %}
+      zigbee2mqtt
     {% else %}
-      generic
+      {% set manufacturer = detected_manufacturer | lower %}
+      {% if 'lutron' in manufacturer %}
+        lutron
+      {% elif 'inovelli' in manufacturer %}
+        inovelli
+      {% elif 'zooz' in manufacturer %}
+        zooz
+      {% else %}
+        generic
+      {% endif %}
     {% endif %}
   area_set: >
     {% set a = light_area_in %}
@@ -581,6 +596,49 @@ trigger:
       device_id: !input switch_device
       action: "release_lower"
     id: lutron_lower_release
+  # Zigbee2MQTT/ZHA template triggers (fire when action sensor state changes)
+  - platform: template
+    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'up_single') }}"
+    id: up_single_z2m
+  - platform: template
+    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'down_single') }}"
+    id: down_single_z2m
+  - platform: template
+    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'up_held') }}"
+    id: up_held_z2m
+  - platform: template
+    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'down_held') }}"
+    id: down_held_z2m
+  - platform: template
+    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'up_release') }}"
+    id: up_release_z2m
+  - platform: template
+    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'down_release') }}"
+    id: down_release_z2m
+  - platform: template
+    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'up_double') }}"
+    id: up_double_z2m
+  - platform: template
+    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'down_double') }}"
+    id: down_double_z2m
+  - platform: template
+    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'up_triple') }}"
+    id: up_triple_z2m
+  - platform: template
+    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'down_triple') }}"
+    id: down_triple_z2m
+  - platform: template
+    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'up_quadruple') }}"
+    id: up_quad_z2m
+  - platform: template
+    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'down_quadruple') }}"
+    id: down_quad_z2m
+  - platform: template
+    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'up_quintuple') }}"
+    id: up_quint_z2m
+  - platform: template
+    value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'down_quintuple') }}"
+    id: down_quint_z2m
 condition: []
 action:
   - if:
@@ -820,7 +878,7 @@ action:
   - if:
       - condition: template
         value_template: >
-          {{ switch_type != 'lutron' and trigger.id == 'up_single' }}
+          {{ switch_type != 'lutron' and trigger.id in ['up_single', 'up_single_z2m'] }}
     then:
       - if:
           - condition: template
@@ -864,7 +922,7 @@ action:
   - if:
       - condition: template
         value_template: >
-          {{ switch_type != 'lutron' and trigger.id == 'down_single' }}
+          {{ switch_type != 'lutron' and trigger.id in ['down_single', 'down_single_z2m'] }}
     then:
       - if:
           - condition: template
@@ -908,7 +966,7 @@ action:
   - if:
       - condition: template
         value_template: >
-          {{ switch_type != 'lutron' and trigger.id == 'up_hold_start' }}
+          {{ switch_type != 'lutron' and trigger.id in ['up_hold_start', 'up_held_z2m'] }}
     then:
       - if:
           - condition: template
@@ -969,6 +1027,8 @@ action:
                     property: "scene"
                     property_key: "001"
                     value: "KeyReleased"
+                - platform: template
+                  value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'up_release') }}"
               timeout:
                 milliseconds: "{{ interval_ms }}"
             - if:
@@ -1028,7 +1088,7 @@ action:
   - if:
       - condition: template
         value_template: >
-          {{ switch_type != 'lutron' and trigger.id == 'down_hold_start' }}
+          {{ switch_type != 'lutron' and trigger.id in ['down_hold_start', 'down_held_z2m'] }}
     then:
       - if:
           - condition: template
@@ -1058,6 +1118,8 @@ action:
                     property: "scene"
                     property_key: "002"
                     value: "KeyReleased"
+                - platform: template
+                  value_template: "{{ has_action_sensor and is_state(action_sensor_entity, 'down_release') }}"
               timeout:
                 milliseconds: "{{ interval_ms }}"
             - if:
@@ -1148,7 +1210,7 @@ action:
   - if:
       - condition: template
         value_template: >
-          {{ switch_type != 'lutron' and trigger.id == 'up_double' }}
+          {{ switch_type != 'lutron' and trigger.id in ['up_double', 'up_double_z2m'] }}
     then:
       - if:
           - condition: template
@@ -1177,7 +1239,7 @@ action:
   - if:
       - condition: template
         value_template: >
-          {{ switch_type != 'lutron' and trigger.id == 'down_double' }}
+          {{ switch_type != 'lutron' and trigger.id in ['down_double', 'down_double_z2m'] }}
     then:
       - if:
           - condition: template
@@ -1206,7 +1268,7 @@ action:
   - if:
       - condition: template
         value_template: >
-          {{ switch_type != 'lutron' and trigger.id == 'up_triple' }}
+          {{ switch_type != 'lutron' and trigger.id in ['up_triple', 'up_triple_z2m'] }}
     then:
       - if:
           - condition: template
@@ -1235,7 +1297,7 @@ action:
   - if:
       - condition: template
         value_template: >
-          {{ switch_type != 'lutron' and trigger.id == 'down_triple' }}
+          {{ switch_type != 'lutron' and trigger.id in ['down_triple', 'down_triple_z2m'] }}
     then:
       - if:
           - condition: template
@@ -1264,7 +1326,7 @@ action:
   - if:
       - condition: template
         value_template: >
-          {{ switch_type != 'lutron' and trigger.id == 'up_quad' }}
+          {{ switch_type != 'lutron' and trigger.id in ['up_quad', 'up_quad_z2m'] }}
     then:
       - if:
           - condition: template
@@ -1293,7 +1355,7 @@ action:
   - if:
       - condition: template
         value_template: >
-          {{ switch_type != 'lutron' and trigger.id == 'down_quad' }}
+          {{ switch_type != 'lutron' and trigger.id in ['down_quad', 'down_quad_z2m'] }}
     then:
       - if:
           - condition: template
@@ -1322,7 +1384,7 @@ action:
   - if:
       - condition: template
         value_template: >
-          {{ switch_type != 'lutron' and trigger.id == 'up_quint' }}
+          {{ switch_type != 'lutron' and trigger.id in ['up_quint', 'up_quint_z2m'] }}
     then:
       - if:
           - condition: template
@@ -1351,7 +1413,7 @@ action:
   - if:
       - condition: template
         value_template: >
-          {{ switch_type != 'lutron' and trigger.id == 'down_quint' }}
+          {{ switch_type != 'lutron' and trigger.id in ['down_quint', 'down_quint_z2m'] }}
     then:
       - if:
           - condition: template
