@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.7.0 - 2025-11-26
+### Fixed
+- Fixed endless dim loop bug where hold-to-dim would continue indefinitely even after releasing button or turning lights off. Reordered repeat logic to execute brightness changes first, then wait for release event with `continue_on_timeout`, and properly exit when button released or brightness limits reached.
+
 ## 1.6.0 - 2025-11-26
 ### Changed
 - Single tap up now always sets brightness to 100% instead of restoring previous brightness
