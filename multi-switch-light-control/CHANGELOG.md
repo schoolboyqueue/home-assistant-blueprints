@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.5 - 2025-11-27
+### Fixed
+- Guard Lutron Pico event filters with defaults so missing `serial_number` attributes no longer raise template warnings when upgrading from older blueprint versions.
+
 ## 1.5.4 - 2025-11-27
 ### Fixed
 - Add verbose trigger/event logging to help diagnose Lutron Pico inputs and confirm trigger IDs/platforms at runtime.

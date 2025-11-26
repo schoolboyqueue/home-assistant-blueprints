@@ -1,6 +1,6 @@
 # Multi Switch Light Control Pro
 
-**Version:** 1.5.4
+**Version:** 1.5.5
 **Author:** Jeremy Carter
 **Home Assistant blueprint that supports Inovelli Zigbee switches (Zigbee2MQTT/ZHA), Zooz/Inovelli Z-Wave switches, and Lutron Pico remotes.**
 

@@ -1,5 +1,5 @@
 blueprint:
-  name: "Multi Switch Light Control Pro v1.5.4"
+  name: "Multi Switch Light Control Pro v1.5.5"
   description: >
     Turn a supported switch or remote into a smart light controller. Supports Inovelli
     Zigbee switches (via Zigbee2MQTT or ZHA), Zooz/Inovelli Z-Wave switches, and Lutron
@@ -247,7 +247,7 @@ blueprint:
                 - "basic"
                 - "verbose"
 variables:
-  blueprint_version: "1.5.4"
+  blueprint_version: "1.5.5"
 
   switch_device: !input switch_device
   zigbee_action_sensor_input: !input zigbee_action_sensor
@@ -603,49 +603,49 @@ trigger:
   - platform: event
     event_type: lutron_caseta_button_event
     event_data:
-      serial: "{{ lutron_serial }}"
+      serial: "{{ lutron_serial | default('') }}"
       type: press
       button_number: 2
     id: lutron_on
   - platform: event
     event_type: lutron_caseta_button_event
     event_data:
-      serial: "{{ lutron_serial }}"
+      serial: "{{ lutron_serial | default('') }}"
       type: press
       button_number: 3
     id: lutron_raise
   - platform: event
     event_type: lutron_caseta_button_event
     event_data:
-      serial: "{{ lutron_serial }}"
+      serial: "{{ lutron_serial | default('') }}"
       type: press
       button_number: 4
     id: lutron_stop
   - platform: event
     event_type: lutron_caseta_button_event
     event_data:
-      serial: "{{ lutron_serial }}"
+      serial: "{{ lutron_serial | default('') }}"
       type: press
       button_number: 5
     id: lutron_lower
   - platform: event
     event_type: lutron_caseta_button_event
     event_data:
-      serial: "{{ lutron_serial }}"
+      serial: "{{ lutron_serial | default('') }}"
       type: press
       button_number: 6
     id: lutron_off
   - platform: event
     event_type: lutron_caseta_button_event
     event_data:
-      serial: "{{ lutron_serial }}"
+      serial: "{{ lutron_serial | default('') }}"
       type: release
       button_number: 3
     id: lutron_raise_release
   - platform: event
     event_type: lutron_caseta_button_event
     event_data:
-      serial: "{{ lutron_serial }}"
+      serial: "{{ lutron_serial | default('') }}"
       type: release
       button_number: 5
     id: lutron_lower_release
