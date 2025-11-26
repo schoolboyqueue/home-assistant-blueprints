@@ -54,6 +54,7 @@ class BlueprintValidator:
         self.warnings: List[str] = []
         self.data: Optional[Dict] = None
         self.join_variables: Set[str] = set()
+        self.optional_string_inputs: Set[str] = set()
 
     def validate(self) -> bool:
         """Run all validation checks. Returns True if valid."""
@@ -162,9 +163,9 @@ class BlueprintValidator:
                     self._validate_input_dict(value['input'], current_path)
             else:
                 # This is an actual input definition
-                self._validate_single_input(value, current_path)
+                self._validate_single_input(key, value, current_path)
 
-    def _validate_single_input(self, input_def: Dict, path: str):
+    def _validate_single_input(self, input_name: str, input_def: Dict, path: str):
         """Validate a single input definition."""
         # Check for selector
         if 'selector' not in input_def:
@@ -182,6 +183,11 @@ class BlueprintValidator:
                 self.warnings.append(
                     f"{path}.selector: Unknown selector type '{selector_type}'"
                 )
+
+        # Track inputs that default to empty strings (optional entity selectors)
+        default_value = input_def.get('default')
+        if isinstance(default_value, str) and default_value.strip() == '':
+            self.optional_string_inputs.add(input_name)
 
     def _validate_variables(self):
         """Validate variables section."""
@@ -376,6 +382,13 @@ class BlueprintValidator:
                     self.errors.append(
                         f"{path}: References variable '{var_name}' built with join(); entity_id templates cannot combine multiple entities"
                     )
+
+        if stripped.startswith('!input '):
+            input_name = stripped.split(' ', 1)[1].strip()
+            if input_name in self.optional_string_inputs:
+                self.errors.append(
+                    f"{path}: references optional input '{input_name}' that defaults to an empty string; bind it to a variable and provide a fallback"
+                )
 
     def _check_readme_sync(self):
         """Check if README.md version matches blueprint version."""

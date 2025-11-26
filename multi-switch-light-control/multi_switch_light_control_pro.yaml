@@ -1,5 +1,5 @@
 blueprint:
-  name: "Multi Switch Light Control Pro v1.4.1"
+  name: "Multi Switch Light Control Pro v1.4.3"
   description: >
     Turn a supported switch or remote into a smart light controller. Supports Inovelli
     Zigbee switches (via Zigbee2MQTT or ZHA), Zooz/Inovelli Z-Wave switches, and Lutron
@@ -246,7 +246,7 @@ blueprint:
                 - "basic"
                 - "verbose"
 variables:
-  blueprint_version: "1.4.1"
+  blueprint_version: "1.4.3"
 
   switch_device: !input switch_device
   zigbee_action_sensor_input: !input zigbee_action_sensor
@@ -322,11 +322,37 @@ variables:
       {{ zigbee_action_sensor_input }}
     {% else %}
       {% set entities = device_entities(switch_device) %}
-      {% set action_sensors = entities | select('match', '.*_action$') | list %}
-      {{ action_sensors[0] if action_sensors | length > 0 else '' }}
+      {% set action_sensors = entities | select('match', '^sensor\\..*_action$') | list %}
+      {% if action_sensors | length == 1 %}
+        {{ action_sensors[0] }}
+      {% elif action_sensors | length > 1 %}
+        {% set slug = detected_name | default('') | lower | replace(' ', '_') %}
+        {% set narrowed = namespace(items=[]) %}
+        {% for sensor in action_sensors %}
+          {% set sensor_l = sensor | lower %}
+          {% if slug | length > 0 and (slug in sensor_l) %}
+            {% set narrowed.items = narrowed.items + [sensor] %}
+          {% endif %}
+        {% endfor %}
+        {% if narrowed.items | length == 1 %}
+          {{ narrowed.items[0] }}
+        {% else %}
+          ""
+        {% endif %}
+      {% else %}
+        ""
+      {% endif %}
     {% endif %}
 
   has_action_sensor: "{{ action_sensor_entity | length > 0 }}"
+
+  action_sensor_entity_safe: >
+    {% set ent = action_sensor_entity | default('') %}
+    {% if ent | length > 0 %}
+      {{ ent }}
+    {% else %}
+      sensor.placeholder_action_sensor
+    {% endif %}
 
   # Enhanced protocol detection: Zigbee2MQTT/ZHA, Z-Wave, or Lutron
   switch_type: >
@@ -612,61 +638,61 @@ trigger:
       action: "release_lower"
     id: lutron_lower_release
   # Zigbee2MQTT/ZHA state triggers (fire when action sensor state changes)
-  # Uses !input directly since template triggers can't access automation variables
+  # Use sanitized action sensor entity so empty inputs don't break entity_id validation
   - platform: state
-    entity_id: !input zigbee_action_sensor
+    entity_id: "{{ action_sensor_entity_safe }}"
     to: "up_single"
     id: up_single_z2m
   - platform: state
-    entity_id: !input zigbee_action_sensor
+    entity_id: "{{ action_sensor_entity_safe }}"
     to: "down_single"
     id: down_single_z2m
   - platform: state
-    entity_id: !input zigbee_action_sensor
+    entity_id: "{{ action_sensor_entity_safe }}"
     to: "up_held"
     id: up_held_z2m
   - platform: state
-    entity_id: !input zigbee_action_sensor
+    entity_id: "{{ action_sensor_entity_safe }}"
     to: "down_held"
     id: down_held_z2m
   - platform: state
-    entity_id: !input zigbee_action_sensor
+    entity_id: "{{ action_sensor_entity_safe }}"
     to: "up_release"
     id: up_release_z2m
   - platform: state
-    entity_id: !input zigbee_action_sensor
+    entity_id: "{{ action_sensor_entity_safe }}"
     to: "down_release"
     id: down_release_z2m
   - platform: state
-    entity_id: !input zigbee_action_sensor
+    entity_id: "{{ action_sensor_entity_safe }}"
     to: "up_double"
     id: up_double_z2m
   - platform: state
-    entity_id: !input zigbee_action_sensor
+    entity_id: "{{ action_sensor_entity_safe }}"
     to: "down_double"
     id: down_double_z2m
   - platform: state
-    entity_id: !input zigbee_action_sensor
+    entity_id: "{{ action_sensor_entity_safe }}"
     to: "up_triple"
     id: up_triple_z2m
   - platform: state
-    entity_id: !input zigbee_action_sensor
+    entity_id: "{{ action_sensor_entity_safe }}"
     to: "down_triple"
     id: down_triple_z2m
   - platform: state
-    entity_id: !input zigbee_action_sensor
+    entity_id: "{{ action_sensor_entity_safe }}"
     to: "up_quadruple"
     id: up_quad_z2m
   - platform: state
-    entity_id: !input zigbee_action_sensor
+    entity_id: "{{ action_sensor_entity_safe }}"
     to: "down_quadruple"
     id: down_quad_z2m
   - platform: state
-    entity_id: !input zigbee_action_sensor
+    entity_id: "{{ action_sensor_entity_safe }}"
     to: "up_quintuple"
     id: up_quint_z2m
   - platform: state
-    entity_id: !input zigbee_action_sensor
+    entity_id: "{{ action_sensor_entity_safe }}"
     to: "down_quintuple"
     id: down_quint_z2m
 condition: []
@@ -1082,7 +1108,7 @@ action:
                     property_key: "001"
                     value: "KeyReleased"
                 - platform: state
-                  entity_id: !input zigbee_action_sensor
+                  entity_id: "{{ action_sensor_entity_safe }}"
                   to: "up_release"
               timeout:
                 milliseconds: "{{ interval_ms }}"
@@ -1177,7 +1203,7 @@ action:
                     property_key: "002"
                     value: "KeyReleased"
                 - platform: state
-                  entity_id: !input zigbee_action_sensor
+                  entity_id: "{{ action_sensor_entity_safe }}"
                   to: "down_release"
               timeout:
                 milliseconds: "{{ interval_ms }}"

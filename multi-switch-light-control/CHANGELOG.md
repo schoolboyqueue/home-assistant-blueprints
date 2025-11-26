@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.3 - 2025-11-27
+### Fixed
+- Improve Zigbee action sensor auto-detection to only select `sensor.*_action` entities and prefer matches containing the switch name, prompting users to pick an input when multiple candidates remain.
+
+## 1.4.2 - 2025-11-27
+### Fixed
+- Sanitize Zigbee action sensor triggers/wait loops so empty inputs no longer create invalid entity IDs, preventing "Entity is neither a valid entity ID nor a valid UUID" import errors when no Zigbee action sensor is configured.
+
 ## 1.4.1 - 2025-11-26
 ### Fixed
 - Execute light service calls per entity when an area target is not provided, preventing "Entity is neither a valid entity ID nor a valid UUID" errors when multiple lights are selected.
