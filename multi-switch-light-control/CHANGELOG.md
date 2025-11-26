@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.7 - 2025-11-27
+### Fixed
+- Clean up Zigbee action sensor detection so empty placeholders produce true empty strings (not quoted `""`), keeping Pico remotes in the Lutron branch.
+
+## 1.5.6 - 2025-11-27
+### Changed
+- Revert Pico triggers to filtered `lutron_caseta_button_event` listeners (device_id + button number) so the correct branch executes without requiring Lutron config entries.
+
 ## 1.5.5 - 2025-11-27
 ### Fixed
 - Guard Lutron Pico event filters with defaults so missing `serial_number` attributes no longer raise template warnings when upgrading from older blueprint versions.

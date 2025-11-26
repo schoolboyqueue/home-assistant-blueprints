@@ -1,5 +1,5 @@
 blueprint:
-  name: "Multi Switch Light Control Pro v1.5.5"
+  name: "Multi Switch Light Control Pro v1.5.7"
   description: >
     Turn a supported switch or remote into a smart light controller. Supports Inovelli
     Zigbee switches (via Zigbee2MQTT or ZHA), Zooz/Inovelli Z-Wave switches, and Lutron
@@ -247,7 +247,7 @@ blueprint:
                 - "basic"
                 - "verbose"
 variables:
-  blueprint_version: "1.5.5"
+  blueprint_version: "1.5.7"
 
   switch_device: !input switch_device
   zigbee_action_sensor_input: !input zigbee_action_sensor
@@ -320,7 +320,7 @@ variables:
 
   # Auto-detect or use manual Zigbee2MQTT/ZHA action sensor entity
   action_sensor_placeholder: "sensor.placeholder_action_sensor"
-  action_sensor_detection: >
+  action_sensor_detection: >-
     {% set entities = device_entities(switch_device) %}
     {% set action_sensors = entities | select('match', '^sensor\\..*_action$') | list %}
     {% if action_sensors | length == 1 %}
@@ -337,21 +337,23 @@ variables:
       {% if narrowed.items | length == 1 %}
         {{ narrowed.items[0] }}
       {% else %}
-        ""
+        {{ '' }}
       {% endif %}
     {% else %}
-      ""
+      {{ '' }}
     {% endif %}
-  action_sensor_entity: >
+  action_sensor_entity: >-
     {% set provided = zigbee_action_sensor_input | default(action_sensor_placeholder) %}
     {% if provided != action_sensor_placeholder %}
       {{ provided }}
-    {% elif action_sensor_detection | length > 0 %}
+    {% elif action_sensor_detection is string and (action_sensor_detection | length > 0) %}
       {{ action_sensor_detection }}
     {% else %}
-      ""
+      {{ '' }}
     {% endif %}
-  has_action_sensor: "{{ action_sensor_entity | length > 0 }}"
+  has_action_sensor: >-
+    {% set ent = action_sensor_entity %}
+    {{ ent is string and ent | length > 0 }}
   action_sensor_hint: >
     {% if not has_action_sensor and action_sensor_detection | length > 0 %}
       {{ action_sensor_detection }}
@@ -603,50 +605,50 @@ trigger:
   - platform: event
     event_type: lutron_caseta_button_event
     event_data:
-      serial: "{{ lutron_serial | default('') }}"
-      type: press
+      device_id: !input switch_device
+      action: "press"
       button_number: 2
     id: lutron_on
   - platform: event
     event_type: lutron_caseta_button_event
     event_data:
-      serial: "{{ lutron_serial | default('') }}"
-      type: press
+      device_id: !input switch_device
+      action: "press"
       button_number: 3
     id: lutron_raise
   - platform: event
     event_type: lutron_caseta_button_event
     event_data:
-      serial: "{{ lutron_serial | default('') }}"
-      type: press
+      device_id: !input switch_device
+      action: "press"
       button_number: 4
     id: lutron_stop
   - platform: event
     event_type: lutron_caseta_button_event
     event_data:
-      serial: "{{ lutron_serial | default('') }}"
-      type: press
+      device_id: !input switch_device
+      action: "press"
       button_number: 5
     id: lutron_lower
   - platform: event
     event_type: lutron_caseta_button_event
     event_data:
-      serial: "{{ lutron_serial | default('') }}"
-      type: press
+      device_id: !input switch_device
+      action: "press"
       button_number: 6
     id: lutron_off
   - platform: event
     event_type: lutron_caseta_button_event
     event_data:
-      serial: "{{ lutron_serial | default('') }}"
-      type: release
+      device_id: !input switch_device
+      action: "release"
       button_number: 3
     id: lutron_raise_release
   - platform: event
     event_type: lutron_caseta_button_event
     event_data:
-      serial: "{{ lutron_serial | default('') }}"
-      type: release
+      device_id: !input switch_device
+      action: "release"
       button_number: 5
     id: lutron_lower_release
   # Zigbee2MQTT Device Actions (MQTT integration)
@@ -916,7 +918,8 @@ action:
                   event_type: lutron_caseta_button_event
                   event_data:
                     device_id: !input switch_device
-                    action: "release_raise"
+                    action: "release"
+                    button_number: 3
               timeout:
                 milliseconds: "{{ interval_ms }}"
               continue_on_timeout: true
@@ -1026,7 +1029,8 @@ action:
                   event_type: lutron_caseta_button_event
                   event_data:
                     device_id: !input switch_device
-                    action: "release_lower"
+                    action: "release"
+                    button_number: 5
               timeout:
                 milliseconds: "{{ interval_ms }}"
               continue_on_timeout: true
