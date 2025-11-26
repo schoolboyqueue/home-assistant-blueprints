@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.0 - 2025-11-26
+### Added
+- Allow the light target input to select multiple entities, applying commands to every selected light while using the first one for brightness/state reads.
+
 ## 1.2.0 - 2025-11-24
 ### Added
 - Custom Central Scene actions for up/down presses (1x through 5x) so each tap count can run a user-defined automation, including full logging and quadruple/quintuple event support.
