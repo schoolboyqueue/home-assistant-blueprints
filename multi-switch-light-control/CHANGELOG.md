@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.7.2 - 2025-11-26
+### Fixed
+- Improved button release detection responsiveness: reduced wait_for_trigger timeout from 200ms to 100ms, checking twice as frequently for release events. This cuts the maximum delay between button release and loop exit from 200ms to 100ms, making the dimming feel more responsive.
+
 ## 1.7.1 - 2025-11-26
 ### Fixed
 - Fixed hold-to-dim behavior: added missing delay between brightness steps so loop respects `interval_ms` setting (default 200ms) instead of running at maximum speed
