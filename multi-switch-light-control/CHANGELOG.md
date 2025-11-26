@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.3 - 2025-11-26
+### Fixed
+- Replace Lutron Caseta device triggers with event-based triggers to fix "Device has no config entry from domain 'lutron_caseta'" error when using Z-Wave or Inovelli switches
+- Convert all Lutron triggers to use `lutron_caseta_button_event` platform events instead of device-specific triggers, allowing the blueprint to work with any device type without requiring Lutron integration
+
 ## 1.3.2 - 2025-11-26
 ### Fixed
 - Fix malformed YAML indentation in down_triple debug logging that caused blueprint import error ("template value is None for dictionary value @ data['actions'][13]['then'][0]['else'][0]['then'][0]['data']")

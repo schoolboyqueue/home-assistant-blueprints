@@ -1,5 +1,5 @@
 blueprint:
-  name: "Multi Switch Light Control Pro v1.3.2"
+  name: "Multi Switch Light Control Pro v1.3.3"
   description: >
     Turn a supported Zooz or Inovelli Z-Wave switch, or a Lutron Pico remote, into
     a smart light controller. The blueprint inspects the selected device at runtime,
@@ -235,7 +235,7 @@ blueprint:
                 - "basic"
                 - "verbose"
 variables:
-  blueprint_version: "1.3.2"
+  blueprint_version: "1.3.3"
 
   switch_device: !input switch_device
   light_targets: !input light_target
@@ -539,47 +539,47 @@ trigger:
       property: "scene"
       property_key: "002"
       value: "KeyPressed5x"
-  - trigger: device
-    device_id: !input switch_device
-    domain: lutron_caseta
-    type: press
-    subtype: on
+  - platform: event
+    event_type: lutron_caseta_button_event
+    event_data:
+      device_id: !input switch_device
+      action: "on"
     id: lutron_on
-  - trigger: device
-    device_id: !input switch_device
-    domain: lutron_caseta
-    type: press
-    subtype: raise
+  - platform: event
+    event_type: lutron_caseta_button_event
+    event_data:
+      device_id: !input switch_device
+      action: "raise"
     id: lutron_raise
-  - trigger: device
-    device_id: !input switch_device
-    domain: lutron_caseta
-    type: press
-    subtype: stop
+  - platform: event
+    event_type: lutron_caseta_button_event
+    event_data:
+      device_id: !input switch_device
+      action: "stop"
     id: lutron_stop
-  - trigger: device
-    device_id: !input switch_device
-    domain: lutron_caseta
-    type: press
-    subtype: lower
+  - platform: event
+    event_type: lutron_caseta_button_event
+    event_data:
+      device_id: !input switch_device
+      action: "lower"
     id: lutron_lower
-  - trigger: device
-    device_id: !input switch_device
-    domain: lutron_caseta
-    type: press
-    subtype: "off"
+  - platform: event
+    event_type: lutron_caseta_button_event
+    event_data:
+      device_id: !input switch_device
+      action: "off"
     id: lutron_off
-  - trigger: device
-    device_id: !input switch_device
-    domain: lutron_caseta
-    type: release
-    subtype: raise
+  - platform: event
+    event_type: lutron_caseta_button_event
+    event_data:
+      device_id: !input switch_device
+      action: "release_raise"
     id: lutron_raise_release
-  - trigger: device
-    device_id: !input switch_device
-    domain: lutron_caseta
-    type: release
-    subtype: lower
+  - platform: event
+    event_type: lutron_caseta_button_event
+    event_data:
+      device_id: !input switch_device
+      action: "release_lower"
     id: lutron_lower_release
 condition: []
 action:
@@ -658,11 +658,11 @@ action:
                     brightness_step_pct: "{{ step_pct }}"
                   continue_on_error: true
             - wait_for_trigger:
-                - trigger: device
-                  device_id: !input switch_device
-                  domain: lutron_caseta
-                  type: release
-                  subtype: raise
+                - platform: event
+                  event_type: lutron_caseta_button_event
+                  event_data:
+                    device_id: !input switch_device
+                    action: "release_raise"
               timeout:
                 milliseconds: "{{ interval_ms }}"
               continue_on_timeout: true
@@ -762,11 +762,11 @@ action:
                     brightness_step_pct: "{{ step_pct * -1 }}"
                   continue_on_error: true
             - wait_for_trigger:
-                - trigger: device
-                  device_id: !input switch_device
-                  domain: lutron_caseta
-                  type: release
-                  subtype: lower
+                - platform: event
+                  event_type: lutron_caseta_button_event
+                  event_data:
+                    device_id: !input switch_device
+                    action: "release_lower"
               timeout:
                 milliseconds: "{{ interval_ms }}"
               continue_on_timeout: true
