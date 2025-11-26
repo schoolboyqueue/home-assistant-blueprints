@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.2 - 2025-11-26
+### Fixed
+- Fix malformed YAML indentation in down_triple debug logging that caused blueprint import error ("template value is None for dictionary value @ data['actions'][13]['then'][0]['else'][0]['then'][0]['data']")
+
 ## 1.3.1 - 2025-11-26
 ### Fixed
 - Replace `numeric_state` conditions with `template` conditions in Lutron raise/lower repeat loops to fix blueprint import error ("Entity {{ light_entity }} is neither a valid entity ID nor a valid UUID")

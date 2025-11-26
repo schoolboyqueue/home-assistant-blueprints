@@ -1,5 +1,5 @@
 blueprint:
-  name: "Multi Switch Light Control Pro v1.3.1"
+  name: "Multi Switch Light Control Pro v1.3.2"
   description: >
     Turn a supported Zooz or Inovelli Z-Wave switch, or a Lutron Pico remote, into
     a smart light controller. The blueprint inspects the selected device at runtime,
@@ -235,7 +235,7 @@ blueprint:
                 - "basic"
                 - "verbose"
 variables:
-  blueprint_version: "1.3.1"
+  blueprint_version: "1.3.2"
 
   switch_device: !input switch_device
   light_targets: !input light_target
@@ -1258,9 +1258,9 @@ action:
             then:
               - service: system_log.write
                 data:
-            level: info
-            message: >
-              [Multi Switch Light Pro] down_triple → run custom action
+                  level: info
+                  message: >
+                    [Multi Switch Light Pro] down_triple → run custom action
   - if:
       - condition: template
         value_template: >
