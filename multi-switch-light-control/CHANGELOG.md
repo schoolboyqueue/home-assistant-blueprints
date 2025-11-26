@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.2 - 2025-11-27
+### Fixed
+- Switch Lutron Pico triggers back to event-based listeners so non-Lutron devices no longer error with "Device has no config entry from domain 'lutron_caseta'" during blueprint validation/import.
+
 ## 1.5.1 - 2025-11-27
 ### Fixed
 - Restore device-based Lutron Pico press/release triggers so Pico remotes fire button actions again.
