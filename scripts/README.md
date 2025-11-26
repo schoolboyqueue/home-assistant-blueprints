@@ -27,6 +27,8 @@ A comprehensive Python-based validator that checks blueprint files for common is
 **Triggers:**
 - ✓ Trigger platform/type presence
 - ✓ Template triggers cannot reference automation variables (prevents runtime errors)
+- ✓ Trigger entity_id fields are static strings (no templates allowed)
+- ✓ Entity ID format validation (domain.entity_name)
 
 **Inputs & Selectors:**
 - ✓ Input definitions and grouping
@@ -35,18 +37,24 @@ A comprehensive Python-based validator that checks blueprint files for common is
 
 **Actions & Service Calls:**
 - ✓ Service call structure
+- ✓ Service format validation (domain.service_name)
 - ✓ `data:` blocks must not be None/empty
 - ✓ Proper nesting of `if`/`then`/`else` blocks
 - ✓ `repeat` sequence validation
+- ✓ Entity ID format in targets and service calls
 
 **Jinja2 Templates:**
 - ✓ No `!input` tags inside `{{ }}` blocks
-- ✓ Balanced template braces
+- ✓ Balanced Jinja2 delimiters (expressions `{{}}`, control blocks `{%%}`, comments `{##}`)
 - ✓ Detection of unsupported filters/functions
 
 **Variables:**
 - ✓ Proper dictionary structure
 - ✓ Presence of `blueprint_version`
+
+**Documentation Sync:**
+- ✓ README.md version matches blueprint version
+- ✓ README.md exists in blueprint directory
 
 ### Usage Examples
 

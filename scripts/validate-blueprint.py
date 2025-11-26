@@ -246,6 +246,26 @@ class BlueprintValidator:
                                 f"Template triggers cannot access automation variables - use state triggers instead."
                             )
 
+    def _validate_service_format(self, service: str, path: str):
+        """Validate service format (domain.service)."""
+        if not isinstance(service, str):
+            return
+
+        # Allow !input references
+        if service.startswith('!input '):
+            return
+
+        # Allow templates
+        if '{{' in service and '}}' in service:
+            return
+
+        # Check format: domain.service_name
+        if not re.match(r'^[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*$', service):
+            self.warnings.append(
+                f"{path}: Service '{service}' should be in format 'domain.service_name' "
+                f"(lowercase letters, numbers, underscores only)"
+            )
+
     def _validate_actions(self):
         """Validate action definitions."""
         if 'action' not in self.data:
@@ -267,6 +287,9 @@ class BlueprintValidator:
 
         # Check for service calls
         if 'service' in action:
+            # Validate service format
+            self._validate_service_format(action['service'], f"{path}.service")
+
             # Must have either target or entity_id (or neither for some services)
             if 'data' in action:
                 data = action['data']
@@ -311,6 +334,30 @@ class BlueprintValidator:
                         f"{path}.repeat.for_each: uses 'join' which may not produce a valid list; ensure it returns a sequence"
                     )
 
+    def _validate_entity_id_format(self, entity_id: str, path: str):
+        """Validate entity_id format (domain.entity_name)."""
+        if not isinstance(entity_id, str):
+            return
+
+        # Allow !input references
+        if entity_id.startswith('!input '):
+            return
+
+        # Allow templates
+        if '{{' in entity_id and '}}' in entity_id:
+            return
+
+        stripped = entity_id.strip()
+        if not stripped:
+            return
+
+        # Check format: domain.entity_name (lowercase, numbers, underscores)
+        if not re.match(r'^[a-z_][a-z0-9_]*\.[a-z0-9_]+$', stripped):
+            self.warnings.append(
+                f"{path}: Entity ID '{stripped}' should be in format 'domain.entity_name' "
+                f"(lowercase letters, numbers, underscores only)"
+            )
+
     def _check_trigger_entity_id(self, value: Any, path: str):
         """Ensure trigger entity_id fields are static strings."""
         if value is None:
@@ -333,6 +380,9 @@ class BlueprintValidator:
             self.errors.append(
                 f"{path}: entity_id cannot use templates; provide a concrete entity reference or !input value"
             )
+        else:
+            # Validate format if it's a static string
+            self._validate_entity_id_format(stripped, path)
 
     def _validate_templates(self):
         """Validate Jinja2 template syntax."""
@@ -342,14 +392,21 @@ class BlueprintValidator:
         if re.search(r'\{\{[^}]*!input', content):
             self.errors.append("Found !input tag inside {{ }} template - bind to variable first")
 
-        # Check for unbalanced braces
-        open_count = content.count('{{')
-        close_count = content.count('}}')
-        if open_count != close_count:
-            self.errors.append(
-                f"Unbalanced template braces: {{ appears {open_count} times, "
-                f"}} appears {close_count} times"
-            )
+        # Check for balanced Jinja2 delimiters
+        jinja_patterns = [
+            ('{{', '}}', 'Jinja expressions'),
+            ('{%', '%}', 'Jinja control blocks'),
+            ('{#', '#}', 'Jinja comments'),
+        ]
+
+        for open_tag, close_tag, name in jinja_patterns:
+            open_count = content.count(open_tag)
+            close_count = content.count(close_tag)
+            if open_count != close_count:
+                self.errors.append(
+                    f"Unbalanced {name}: {open_tag} appears {open_count} times, "
+                    f"{close_tag} appears {close_count} times"
+                )
 
         # Check for common unsupported filters/functions
         unsupported = [
