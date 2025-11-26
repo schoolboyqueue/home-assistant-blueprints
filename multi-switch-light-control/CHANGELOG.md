@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.0 - 2025-11-26
+### Added
+- **Optional release detection for Z-Wave switches**: Added `hold_release_helper` input to enable immediate stop when releasing button during hold-to-dim. Create an input_boolean helper (Settings → Devices & Services → Helpers → Toggle) and assign it to this input. When configured, the helper acts as a shared state signal between the release trigger and hold loop, allowing the dim loop to detect button releases instantly instead of running until brightness limits. Leave at placeholder for Zigbee/Lutron switches (they have native release detection).
+
 ## 1.8.0 - 2025-11-26
 ### Changed
 - **BREAKING CHANGE**: Simplified hold-to-dim behavior for Z-Wave switches. Removed polling-based button release detection that was causing timing issues. The dim loop now continues until brightness reaches configured min/max limits. This eliminates event timing bugs where release events were missed, preventing endless loops and delayed responses. Users should hold button until desired brightness is reached - the loop will stop automatically at brightness limits.

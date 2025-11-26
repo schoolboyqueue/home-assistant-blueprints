@@ -1,5 +1,5 @@
 blueprint:
-  name: "Multi Switch Light Control Pro v1.8.0"
+  name: "Multi Switch Light Control Pro v1.9.0"
   description: >
     Turn a supported switch or remote into a smart light controller. Supports Inovelli
     Zigbee switches (via Zigbee2MQTT or ZHA), Zooz/Inovelli Z-Wave switches, and Lutron
@@ -37,6 +37,18 @@ blueprint:
           selector:
             entity:
               domain: sensor
+        hold_release_helper:
+          name: "Hold release helper (optional)"
+          description: >
+            OPTIONAL. For Z-Wave switches: Create an input_boolean helper entity to enable
+            release detection during hold-to-dim. Without this, dim loops run until brightness
+            limits. With this helper, releasing the button stops dimming immediately.
+            Create via Settings → Devices & Services → Helpers → Toggle.
+            Leave at placeholder for Zigbee/Lutron (they have native release detection).
+          default: input_boolean.placeholder_hold_release
+          selector:
+            entity:
+              domain: input_boolean
         light_target:
           name: "Light entities"
           description: "Select one or more target lights. The first entry is used for brightness reads."
@@ -273,10 +285,14 @@ blueprint:
                 - "basic"
                 - "verbose"
 variables:
-  blueprint_version: "1.8.0"
+  blueprint_version: "1.9.0"
 
   switch_device: !input switch_device
   zigbee_action_sensor_input: !input zigbee_action_sensor
+  hold_release_helper_input: !input hold_release_helper
+  hold_release_placeholder: "input_boolean.placeholder_hold_release"
+  hold_release_helper_enabled: >-
+    {{ hold_release_helper_input != hold_release_placeholder }}
   light_targets: !input light_target
   light_target_sequence: >-
     {% set lt = light_targets | default('') %}
@@ -522,6 +538,42 @@ trigger:
       property: "scene"
       property_key: "002"
       value: "KeyHeldDown"
+  - platform: event
+    id: up_release
+    event_type: zwave_js_event
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "001"
+      value: 1
+  - platform: event
+    id: up_release
+    event_type: zwave_js_value_notification
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "001"
+      value: "KeyReleased"
+  - platform: event
+    id: down_release
+    event_type: zwave_js_event
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "002"
+      value: 1
+  - platform: event
+    id: down_release
+    event_type: zwave_js_value_notification
+    event_data:
+      device_id: !input switch_device
+      command_class_name: "Central Scene"
+      property: "scene"
+      property_key: "002"
+      value: "KeyReleased"
   - platform: event
     id: up_double
     event_type: zwave_js_event
@@ -889,6 +941,23 @@ action:
             [Multi Switch Light Pro] Trigger fired: id={{ trigger.id | default('unknown') }}
             | platform={{ trigger.platform | default('unknown') }}
             | switch_type={{ switch_type }}
+  - if:
+      - condition: template
+        value_template: >
+          {{ hold_release_helper_enabled and trigger.id in ['up_release','down_release','up_release_z2m','down_release_z2m'] }}
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ debug_enabled }}"
+        then:
+          - service: system_log.write
+            data:
+              level: info
+              message: >
+                [Multi Switch Light Pro] Release detected → setting {{ hold_release_helper_input }} to on
+      - service: input_boolean.turn_on
+        target:
+          entity_id: "{{ hold_release_helper_input }}"
   - if:
       - condition: template
         value_template: >
@@ -1293,6 +1362,13 @@ action:
               level: info
               message: >
                 [Multi Switch Light Pro] up_hold_start
+      - if:
+          - condition: template
+            value_template: "{{ hold_release_helper_enabled }}"
+        then:
+          - service: input_boolean.turn_off
+            target:
+              entity_id: "{{ hold_release_helper_input }}"
       - condition: template
         value_template: "{{ states(light_entity) not in ['unknown','unavailable',''] }}"
       - if:
@@ -1338,6 +1414,20 @@ action:
           sequence:
             - condition: template
               value_template: "{{ states(light_entity) not in ['off','unknown','unavailable'] }}"
+            - if:
+                - condition: template
+                  value_template: "{{ hold_release_helper_enabled and is_state(hold_release_helper_input, 'on') }}"
+              then:
+                - if:
+                    - condition: template
+                      value_template: "{{ debug_enabled }}"
+                  then:
+                    - service: system_log.write
+                      data:
+                        level: info
+                        message: >
+                          [Multi Switch Light Pro] Release helper triggered → stop brighten
+                - stop: "Button released"
             - if:
                 - condition: template
                   value_template: "{{ target_brightness > current_brightness }}"
@@ -1396,6 +1486,13 @@ action:
               level: info
               message: >
                 [Multi Switch Light Pro] down_hold_start
+      - if:
+          - condition: template
+            value_template: "{{ hold_release_helper_enabled }}"
+        then:
+          - service: input_boolean.turn_off
+            target:
+              entity_id: "{{ hold_release_helper_input }}"
       - variables:
           current_brightness: "{{ state_attr(light_entity,'brightness') | int(0) }}"
           target_brightness: >
@@ -1403,6 +1500,20 @@ action:
             {{ [proposed, 0] | max }}
       - repeat:
           sequence:
+            - if:
+                - condition: template
+                  value_template: "{{ hold_release_helper_enabled and is_state(hold_release_helper_input, 'on') }}"
+              then:
+                - if:
+                    - condition: template
+                      value_template: "{{ debug_enabled }}"
+                  then:
+                    - service: system_log.write
+                      data:
+                        level: info
+                        message: >
+                          [Multi Switch Light Pro] Release helper triggered → stop dim
+                - stop: "Button released"
             - if:
                 - condition: template
                   value_template: "{{ is_state(light_entity, 'on') and target_brightness > min_abs_brightness }}"
