@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.1 - 2025-11-26
+### Fixed
+- Replace `numeric_state` conditions with `template` conditions in Lutron raise/lower repeat loops to fix blueprint import error ("Entity {{ light_entity }} is neither a valid entity ID nor a valid UUID")
+
 ## 1.3.0 - 2025-11-26
 ### Added
 - Allow the light target input to select multiple entities, applying commands to every selected light while using the first one for brightness/state reads.

@@ -1,5 +1,5 @@
 blueprint:
-  name: "Multi Switch Light Control Pro v1.3.0"
+  name: "Multi Switch Light Control Pro v1.3.1"
   description: >
     Turn a supported Zooz or Inovelli Z-Wave switch, or a Lutron Pico remote, into
     a smart light controller. The blueprint inspects the selected device at runtime,
@@ -235,7 +235,7 @@ blueprint:
                 - "basic"
                 - "verbose"
 variables:
-  blueprint_version: "1.3.0"
+  blueprint_version: "1.3.1"
 
   switch_device: !input switch_device
   light_targets: !input light_target
@@ -683,10 +683,8 @@ action:
                           brighten
                 - stop:
           until:
-            - condition: numeric_state
-              entity_id: "{{ light_entity }}"
-              attribute: brightness
-              above: 254
+            - condition: template
+              value_template: "{{ state_attr(light_entity, 'brightness') | int(0) > 254 }}"
   - if:
       - condition: template
         value_template: >
@@ -788,10 +786,8 @@ action:
                           [Multi Switch Light Pro] lutron_lower release → stop dim
                 - stop:
           until:
-            - condition: numeric_state
-              entity_id: "{{ light_entity }}"
-              attribute: brightness
-              below: 1
+            - condition: template
+              value_template: "{{ state_attr(light_entity, 'brightness') | int(0) < 1 }}"
   - if:
       - condition: template
         value_template: >
