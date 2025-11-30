@@ -1,5 +1,5 @@
 blueprint:
-  name: "Adaptive Shades Pro v1.9.3"
+  name: "Adaptive Shades Pro v1.10.0"
   description: >-
     Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
     Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
@@ -79,13 +79,37 @@ blueprint:
               step: 1
               unit_of_measurement: "%"
         block_position_pct:
-          name: Preferred block position (%)
-          description: Position used to block glare or heat. 0 = fully open, 100 = fully closed.
+          name: Glare block position (%)
+          description: Position used to block glare or excessive heat when the sun is on the window. 0 = fully open, 100 = fully closed.
           default: 85
           selector:
             number:
               min: 0
               max: 100
+              step: 1
+              unit_of_measurement: "%"
+        night_position_pct:
+          name: Night/quiet hours position (%)
+          description: >-
+            Position used during quiet hours and after sunset. This is independent of the glare block position,
+            allowing you to set a different level for nighttime privacy vs daytime glare control. 0 = fully open, 100 = fully closed.
+          default: 85
+          selector:
+            number:
+              min: 0
+              max: 100
+              step: 1
+              unit_of_measurement: "%"
+        position_hysteresis:
+          name: Minimum position change (%)
+          description: >-
+            Minimum position change required before the shade will move. Prevents small, frequent adjustments.
+            Set higher (e.g., 5-10%) if your shades move too often; set lower (e.g., 1-2%) for more precise control.
+          default: 3
+          selector:
+            number:
+              min: 1
+              max: 15
               step: 1
               unit_of_measurement: "%"
         shading_mode:
@@ -392,7 +416,7 @@ blueprint:
                   value: "verbose"
 
 variables:
-  blueprint_version: "1.9.3"
+  blueprint_version: "1.10.0"
   cover_target: !input cover_target
   base_cover: >-
     {% set ct = cover_target | default('') %}
@@ -408,6 +432,8 @@ variables:
   admit_position_pct: !input admit_position_pct
   dim_position_pct: !input dim_position_pct
   block_position_pct: !input block_position_pct
+  night_position_pct: !input night_position_pct
+  position_hysteresis: !input position_hysteresis
   shading_mode: !input shading_mode
   inverted_shades: !input inverted_shades
   sun_entity: !input sun_entity
@@ -445,8 +471,8 @@ variables:
   sun_above_horizon: "{{ is_state(sun_entity, 'above_horizon') }}"
   min_sun_elevation: "{{ 1 if sun_above_horizon else 90 }}"
   night_block_angle_deg: >-
-    {# At night, aim for the configured block position, expressed as an angle out of 180°. #}
-    {{ (block_position_pct | float(85) / 100.0) * 180.0 }}
+    {# At night/quiet hours, use the dedicated night position, expressed as an angle out of 180°. #}
+    {{ (night_position_pct | float(85) / 100.0) * 180.0 }}
   climate_hvac_mode: "{{ state_attr(climate_entity, 'hvac_mode') if climate_entity else none }}"
   climate_hvac_action: "{{ state_attr(climate_entity, 'hvac_action') if climate_entity else none }}"
   climate_target_high: "{{ state_attr(climate_entity, 'target_temp_high') | float(none) if climate_entity else none }}"
@@ -743,7 +769,7 @@ variables:
       {{ none }}
     {% else %}
       {% if not sun_above_horizon %}
-        {{ block_position_pct }}
+        {{ night_position_pct }}
       {% else %}
       {% set frontlit = direct_sun_detected or sun_on_window %}
       {% set mode = mode_temp %}
@@ -933,9 +959,9 @@ action:
                 - condition: template
                   value_template: >-
                     {% if cover_supports_tilt and shading_mode == 'slat' %}
-                      {{ this_target_tilt is not none and this_current_tilt is not none and (this_current_tilt - this_target_tilt) | abs < 3 }}
+                      {{ this_target_tilt is not none and this_current_tilt is not none and (this_current_tilt - this_target_tilt) | abs < position_hysteresis }}
                     {% else %}
-                      {{ this_current_position is not none and this_target_position is not none and (this_current_position - this_target_position) | abs < 3 }}
+                      {{ this_current_position is not none and this_target_position is not none and (this_current_position - this_target_position) | abs < position_hysteresis }}
                     {% endif %}
               sequence:
                 - service: logbook.log
@@ -951,9 +977,9 @@ action:
         - condition: template
           value_template: >-
             {% if cover_supports_tilt and shading_mode == 'slat' %}
-              {{ this_target_tilt is not none and (this_current_tilt is none or (this_current_tilt - this_target_tilt) | abs >= 3) }}
+              {{ this_target_tilt is not none and (this_current_tilt is none or (this_current_tilt - this_target_tilt) | abs >= position_hysteresis) }}
             {% else %}
-              {{ this_current_position is none or (this_current_position - this_target_position) | abs >= 3 }}
+              {{ this_current_position is none or (this_current_position - this_target_position) | abs >= position_hysteresis }}
             {% endif %}
 
         - choose:

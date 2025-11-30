@@ -1,5 +1,17 @@
 # Adaptive Shades Pro - Changelog
 
+## [1.10.0] - 2025-11-29
+
+### Added
+
+- **Night/quiet hours position** (`night_position_pct`): New input to set a dedicated shade position for nighttime and quiet hours, independent of the glare block position. Previously, `block_position_pct` served both purposes.
+- **Minimum position change** (`position_hysteresis`): New configurable input (default 3%) to control the minimum position delta required before shades move. Set higher to reduce frequent small adjustments, or lower for more precise control.
+
+### Changed
+
+- Renamed "Preferred block position" to "Glare block position" for clarity—this position is now used exclusively for blocking direct sun/glare during daytime.
+- Night and quiet hours behavior now uses the dedicated `night_position_pct` instead of `block_position_pct`.
+
 ## [1.9.3] - 2025-11-25
 
 ### Fixed
