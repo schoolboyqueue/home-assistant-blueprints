@@ -1,6 +1,5 @@
 # Bathroom Light & Fan Control Pro
 
-**Version:** 1.10.6
 **Author:** Jeremy Carter  
 **Home Assistant Blueprint for Intelligent Bathroom Automation**
 
@@ -15,6 +14,7 @@ Bathroom Light & Fan Control Pro is a comprehensive Home Assistant automation bl
 ### Key Features
 
 #### Lighting Control
+
 - 🚪 **Wasp-in-a-Box Occupancy Detection** — Combines motion sensor + door sensor for accurate occupancy
 - 🏠 **Presence Awareness** — Optional home presence requirement
 - 🌙 **Night Mode** — Dimmed lights and warm color temperature during night hours
@@ -23,6 +23,7 @@ Bathroom Light & Fan Control Pro is a comprehensive Home Assistant automation bl
 - 📍 **Area Support** — Control single light or entire area
 
 #### Exhaust Fan Control
+
 - 💧 **Humidity Delta Control** — Based on bathroom minus baseline humidity
 - 📊 **Hysteresis** — Separate ON/OFF thresholds to prevent rapid cycling
 - ⚡ **Rate-of-Rise Boost** — Turns fan on early when humidity rises quickly
@@ -62,21 +63,24 @@ Bathroom Light & Fan Control Pro is a comprehensive Home Assistant automation bl
 - Door sensor (binary_sensor)
 - Bathroom humidity sensor (sensor)
 - Baseline/home humidity sensor (sensor)
-- Exhaust fan (fan.* or switch.*)
+- Exhaust fan (fan._or switch._)
 
 ### Installation
 
 1. **Import the blueprint:**
+
    - Click the badge above, or
    - Navigate to: Settings → Automations & Scenes → Blueprints → Import Blueprint
    - Paste URL: `https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/bathroom-light-fan-control/bathroom_light_fan_control_pro.yaml`
 
 2. **Create an automation:**
+
    - Go to: Settings → Automations & Scenes
    - Click "+ Create Automation" → "Use Blueprint"
    - Select "Bathroom Light & Fan Control (Pro)"
 
 3. **Minimum required configuration:**
+
    - **Bathroom Light(s):** Your light entity
    - **Door Sensor:** Binary sensor for door
    - **Motion Sensor:** Binary sensor for motion
@@ -295,6 +299,7 @@ Time when night schedule ends.
 Value added to ON threshold during night schedule. Negative values make fan more aggressive at night.
 
 **Example:**
+
 - Normal ON threshold: 15%
 - Night bias: -5%
 - Effective night threshold: 10% (more aggressive)
@@ -358,6 +363,7 @@ Motion sensor's own clear delay. Add buffer to prevent false positives. Set to -
 5. After 30 minutes, manual override expires → Auto-on resumes
 
 **Configuration Options:**
+
 - **No helper configured:** Simple setup. Manual override works but may occasionally trigger when automation turns off lights after vacancy.
 - **With `automation_control` helper:** Perfect behavior. Manual override only triggers on actual user manual control.
 - **Duration set to 0:** Disables manual override entirely. Lights always respond to motion/door sensors.
@@ -378,6 +384,7 @@ Motion sensor's own clear delay. Add buffer to prevent false positives. Set to -
 **Likely cause:** Motion sensor not detecting movement (sitting still)
 
 **Solutions:**
+
 1. Increase "Lights off delay after vacancy" to give more grace time
 2. Check motion sensor placement — should cover toilet, shower, vanity
 3. Consider adding second motion sensor in blind spots
@@ -386,6 +393,7 @@ Motion sensor's own clear delay. Add buffer to prevent false positives. Set to -
 ### Lights turn on when I don't want them to
 
 **Solutions:**
+
 1. Enable "Require presence to turn lights on" and configure presence entities
 2. Set up manual override with `input_datetime` helper
 3. Add illuminance sensor to prevent daytime activation
@@ -394,11 +402,13 @@ Motion sensor's own clear delay. Add buffer to prevent false positives. Set to -
 ### Fan runs too long / not long enough
 
 **Too long:**
+
 1. Lower "Fan OFF threshold" (e.g., 10% → 7%)
 2. Reduce "Minimum fan runtime" (e.g., 5 min → 3 min)
 3. Disable rate-of-fall hold if enabled
 
 **Too short:**
+
 1. Raise "Fan OFF threshold" (e.g., 10% → 12%)
 2. Increase "Minimum fan runtime" (e.g., 5 min → 8 min)
 3. Enable rate-of-fall hold to prevent shutoff during humidity drop
@@ -430,6 +440,7 @@ Motion sensor's own clear delay. Add buffer to prevent false positives. Set to -
 **Problem 1: Override not persisting across HA restarts**  
 **Cause:** No `input_datetime` helper configured  
 **Solution:**
+
 1. Create helper: Settings → Devices & Services → Helpers → Date and time
 2. Name: "Bathroom Manual Override Until"
 3. Enable "Date and time"
@@ -438,6 +449,7 @@ Motion sensor's own clear delay. Add buffer to prevent false positives. Set to -
 **Problem 2: Override triggers when automation turns off lights**  
 **Cause:** No `automation_control` helper configured  
 **Solution:**
+
 1. Create helper: Settings → Devices & Services → Helpers → Toggle
 2. Name: "Bathroom Automation Control"
 3. Select helper in blueprint's "Automation Control Helper" setting
@@ -528,6 +540,7 @@ v1.4.0 introduced significant optimizations:
 ### Memory Impact
 
 The blueprint has minimal memory footprint:
+
 - ~30 variables (mostly strings/numbers)
 - 13 triggers (event-based, not polling)
 - No persistent storage except optional helpers
@@ -537,7 +550,7 @@ The blueprint has minimal memory footprint:
 ## Contributing
 
 Issues, feature requests, and pull requests welcome at:  
-https://github.com/schoolboyqueue/home-assistant-blueprints
+<https://github.com/schoolboyqueue/home-assistant-blueprints>
 
 ---
 
