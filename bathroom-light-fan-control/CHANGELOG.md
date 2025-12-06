@@ -1,5 +1,14 @@
 # Bathroom Light & Fan Control Pro - Changelog
 
+## [1.10.7] - 2025-12-06
+
+### Fixed
+
+- Night schedule activation could fail around overnight boundaries; replaced string-based time checks with timestamp-based comparisons to reliably handle schedules that span midnight. (in_night_schedule)
+- Bumped blueprint version to `1.10.7`.
+
+---
+
 ## [1.10.6] - 2025-11-14
 
 ### Fixed
@@ -45,6 +54,7 @@
 ### Fixed
 
 **Vacancy Detection After Shower (Door Already Open):**
+
 - Fixed lights staying on when leaving bathroom with door already open after shower
 - Separated vacancy logic into three distinct cases for clarity:
   - Case A: Motion clears AND door already open/unknown → immediate vacancy (no timing gate)
@@ -54,6 +64,7 @@
 - Now when motion clears with door already open, vacancy proceeds immediately without evaluating door-close timing
 
 ### Technical Details
+
 - Restructured lines 741-786: Changed from nested OR with AND to separate choose branches
 - Case A (lines 742-758): Door open/unknown check - no timestamp comparison
 - Case B (lines 759-777): Door closed after motion - keeps existing timestamp logic
@@ -68,6 +79,7 @@
 ### Fixed
 
 **Vacancy Detection When Door Opened Before Motion Cleared:**
+
 - Removed overly restrictive timestamp comparison in `wasp_door_left_open` vacancy condition
 - Previous logic required `door.last_changed > motion.last_changed`, which failed when:
   - User opened door while motion was still active
@@ -78,6 +90,7 @@
 - Fixes lights not turning off when leaving bathroom with door opened before motion cleared
 
 ### Technical Details
+
 - Removed lines 781-783: timestamp comparison condition
 - `wasp_door_left_open` trigger now properly detects vacancy with simpler logic:
   1. Door has been open for configured delay (default 15 seconds)
@@ -91,6 +104,7 @@
 ### Fixed
 
 **Wasp-in-a-Box Concept Violation (Critical Bug):**
+
 - Removed `wasp_vacancy_with_grace` trigger that turned off lights after motion clear regardless of door state
 - Removed `wasp_door_closed` trigger that turned off lights when door closed
 - Core principle: Door closed = occupancy (even without motion detection)
@@ -119,6 +133,7 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 ### Fixed
 
 **Pitfall #10: Template in trigger `for:` duration (Best Practice):**
+
 - Removed template from `fan_max_runtime_expired` trigger `for:` parameter (line 531)
 - Changed from `{{ fan_max_runtime_min if ... else 9999 }}` to direct `!input fan_max_runtime_min`
 - Variables aren't available at trigger compile time - using templates in triggers is risky
@@ -128,6 +143,7 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 ### Changed
 
 **fan_max_runtime_min input:**
+
 - Minimum value changed from 0 to 1 minute
 - Description updated: "Use a large value (e.g., 240) to effectively disable"
 - Simplifies trigger logic and follows blueprint best practices
@@ -146,6 +162,7 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 ### Fixed
 
 **Manual Override Race Condition (Critical):**
+
 - Added 100ms delay after turning off lights before resetting `automation_control` helper
 - Previous timing: helper OFF happened simultaneously with lights OFF, causing race condition
 - `light_manual_off` trigger fired when lights turned off, checked helper state, found it OFF (already resetting), activated manual override incorrectly
@@ -166,6 +183,7 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 ### Fixed
 
 **Manual Override Timezone Bug (Critical):**
+
 - `override_ok` variable now uses `state_attr(manual_override_until, 'timestamp')` instead of `as_timestamp(states(...))`
 - Previous approach had timezone conversion issues: helper stores UTC timestamp, `states()` returns local time string, `as_timestamp()` misinterprets it
 - Caused manual override to never expire - `override_ok` always returned False even after expiration
@@ -185,6 +203,7 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 ### Fixed
 
 **Manual Override False Triggers (Critical Bug):**
+
 - Added `automation_control` helper set/reset logic to old vacancy path (wasp_motion_clear, wasp_door_closed, wasp_door_left_open)
 - v1.9.1 only fixed the new `wasp_vacancy_with_grace` trigger path
 - If lights turned off via old fallback path, helper remained OFF, causing manual override to activate incorrectly
@@ -193,6 +212,7 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 ### Changed
 
 **Manual Override Descriptions:**
+
 - Updated `manual_override_duration_min` description to mention disabling by setting to 0
 - Updated `automation_control` description with clearer explanation of three options:
   - No helper: Simple setup, may get false triggers
@@ -213,6 +233,7 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 ### Changed
 
 **Made Manual Override Helper Optional:**
+
 - `automation_control` helper is now optional (was required)
 - If not configured: Manual override works with simple behavior (may trigger when automation turns off lights)
 - If configured: Helper prevents false manual override triggers when automation turns off lights automatically
@@ -233,6 +254,7 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 ### Added
 
 **Manual Override False Trigger Prevention:**
+
 - New required input: `automation_control` (input_boolean helper)
 - Prevents manual override from activating when automation turns off lights automatically
 - Automation sets helper ON before turning off lights, then resets to OFF
@@ -241,6 +263,7 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 ### Fixed
 
 **Manual Override Logic:**
+
 - Manual override no longer triggers when automation turns off lights after vacancy
 - Only triggers when user manually turns off lights via physical switch or app
 - Prevents false override that blocked lights from turning back on
@@ -250,6 +273,7 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 **BREAKING CHANGE - Requires new helper:**
 
 1. Create an input_boolean helper:
+
    - Settings → Devices & Services → Helpers → Create Helper → Toggle
    - Name: "[Bathroom Name] Automation Control"
    - Icon: `mdi:robot` (optional)
@@ -272,6 +296,7 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 ### Fixed
 
 **Trigger-Level Delay:**
+
 - Removed unsupported template from trigger `for:` parameter
 - Changed to use `!input lights_off_delay_min` directly
 - Home Assistant doesn't support template evaluation in trigger `for:` duration
@@ -289,6 +314,7 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 ### Fixed
 
 **Lights Not Turning Off After Vacancy:**
+
 - Root cause: Humidity triggers canceled light-off delay in action sequence
 - Solution: Moved grace period delay from action to trigger using `for:` parameter
 - New trigger: `wasp_vacancy_with_grace` waits full `lights_off_delay_min` at trigger level
@@ -315,6 +341,7 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 ### Changed
 
 **Mode Changed to Queued:**
+
 - Mode changed from `restart` to `queued` with `max: 5`
 - Prevents humidity triggers from canceling light-off delay
 - Multiple sensor updates queue up instead of restarting automation
@@ -331,6 +358,7 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 ### Added
 
 **Debug Logging for Lights Not Turning Off:**
+
 - Added logs when `wasp_motion_clear` and `wasp_vacancy_with_grace` triggers fire
 - Shows motion sensor state, grace period, and whether lights are being turned off
 - Helps diagnose delay cancellation issues
@@ -342,6 +370,7 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 ### Changed
 
 **UI Reorganization - Night Settings:**
+
 - Moved all night-related settings from "Presence & Lighting" to "Night Schedule" section
 - Settings now logically grouped: schedule, force-on, brightness, color temp, fan bias
 - Improved descriptions to clarify night mode behavior
@@ -365,6 +394,7 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 ### Changed
 
 **Simplified Presence System (Breaking Change):**
+
 - Collapsed `presence_boolean`, `presence_entities`, and `require_presence` into single `presence_entities` input
 - Now accepts any combination of: person, device_tracker, binary_sensor, input_boolean, zone
 - Logic: If list is empty → lights always work. If list has entities → at least one must show 'on'/'home'
@@ -374,6 +404,7 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 ### Removed
 
 **Deprecated Inputs:**
+
 - `presence_boolean` - merge into `presence_entities` list
 - `require_presence` - now automatic (empty list = no requirement, populated list = requirement)
 
@@ -382,13 +413,16 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 **For existing automations:**
 
 1. **If you had `require_presence: false`:**
+
    - Remove or leave `presence_entities: []` (empty)
    - Behavior: lights work regardless of presence
 
 2. **If you had `presence_boolean: input_boolean.home`:**
+
    - Change to: `presence_entities: [input_boolean.home]`
 
 3. **If you had both `presence_boolean` AND `presence_entities`:**
+
    - Combine into single list: `presence_entities: [input_boolean.home, person.john, person.jane]`
 
 4. **If you had `require_presence: true` with entities:**
@@ -407,6 +441,7 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 ### Fixed
 
 **Require Presence Default:**
+
 - Changed `require_presence` default from `true` to `false`
 - Lights now turn on by default regardless of home presence system
 - Previous default prevented lights from turning on unless presence entities showed someone home
@@ -415,6 +450,7 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 ### Migration Notes
 
 **Existing automations using this blueprint:**
+
 - If you want the OLD behavior (require presence), explicitly set `require_presence: true` in your automation config
 - If you have presence entities configured but lights weren't turning on, this fixes it
 - The presence check logic itself is unchanged, only the default value
@@ -432,6 +468,7 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 ### Added
 
 **Debug Logging for Failed Light Turn-On:**
+
 - Added log message when light should turn on but conditions fail
 - Shows which condition blocked the light: `light_already_on`, `presence_ok`, `override_ok`, or `lux_ok`
 - Helps diagnose why lights don't respond to motion/door triggers
@@ -449,6 +486,7 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 ### Changed
 
 **Debug System Upgrade:**
+
 - Replaced boolean debug toggle with three-level system matching Adaptive Comfort Control Pro
 - Debug levels: `off`, `basic`, `verbose`
 - Default is now `basic` (was `false`/off)
@@ -458,12 +496,14 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 ### Added
 
 **Verbose Debug Logging:**
+
 - **Light ON (verbose)**: Adds night mode breakdown (enabled vs schedule), illuminance sensor value, area control status
 - **Light OFF (verbose)**: Adds motion and door sensor states at time of vacancy
 - **Fan ON (verbose)**: Adds bathroom/home humidity sensor raw values, night bias value, night schedule status
 - **Fan OFF (verbose)**: Adds bathroom/home humidity sensor raw values, minimum runtime setting
 
 **Basic Debug Logging (unchanged):**
+
 - All existing basic logs preserved with same format
 - Light ON/OFF, Fan ON/OFF, Manual override, ROR latch, Startup checks
 
@@ -472,6 +512,7 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 **Existing automations will automatically default to `basic` logging** (previously equivalent to `debug_enabled: true`).
 
 To restore previous behavior:
+
 - **Old `debug_enabled: false`** → Set `debug_level: off`
 - **Old `debug_enabled: true`** → Already at `basic` (default), no change needed
 - **For detailed troubleshooting** → Set `debug_level: verbose`
@@ -490,6 +531,7 @@ To restore previous behavior:
 ### Fixed
 
 **Critical Bugs:**
+
 - **Night mode area lighting**: Area lights now properly receive brightness and color temp parameters during night mode
 - **Night mode with area disabled**: Fixed missing light control path when night mode is disabled and area is set
 - **ROR variable scope**: `ror_ok` variable now properly accessible in sequence actions for debug logging
@@ -497,6 +539,7 @@ To restore previous behavior:
 - **Fan max runtime trigger**: Fixed trigger firing immediately when max runtime set to 0 (disabled)
 
 **Logic Issues:**
+
 - **Night mode schedule integration**: Night mode now automatically activates during night schedule hours (not just when explicitly enabled)
 - **States dictionary access**: Added existence checks before accessing `states[entity].last_changed` to prevent AttributeErrors
 - **as_timestamp None handling**: Added None checks for all `as_timestamp()` calls to prevent comparison errors
@@ -504,6 +547,7 @@ To restore previous behavior:
 ### Optimized
 
 **Helper Variables:**
+
 - Added `fan_domain`, `fan_is_fan`, `turn_fan_on`, `turn_fan_off` to eliminate repeated domain detection
 - Added `bath_humidity_valid`, `home_humidity_valid`, `humidity_sensors_ok`, `humidity_delta` for consistent sensor validation
 - Added `in_night_schedule` for centralized night schedule computation
@@ -511,6 +555,7 @@ To restore previous behavior:
 - Added `fan_delta_on_effective` pre-computing night bias application
 
 **Code Cleanup:**
+
 - Replaced 5 instances of fan domain string splitting with helper variable
 - Replaced 4 instances of humidity delta calculation with helper variable
 - Standardized sensor validity checks across all humidity logic
@@ -519,6 +564,7 @@ To restore previous behavior:
 ### Added
 
 **Debug Logging:**
+
 - Light ON events: Shows trigger, night mode state, presence, and lux status
 - Light OFF events: Shows trigger and vacancy grace period
 - Manual override: Separate logs for helper configured vs not configured
@@ -528,6 +574,7 @@ To restore previous behavior:
 - Startup check: Shows delta value when fan is turned off at HA start
 
 **Error Handling:**
+
 - All sensor state checks now handle `unknown`, `unavailable`, empty string, and None
 - All timestamp operations protected against None returns
 - All entity state dictionary accesses guarded with existence checks
