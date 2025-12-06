@@ -11,7 +11,6 @@ blueprint:
   source_url: https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/bathroom-light-fan-control/bathroom_light_fan_control_pro.yaml
 
   input:
-
     presence_and_lighting:
       name: Presence & Lighting
       icon: mdi:lightbulb-on-outline
@@ -269,12 +268,12 @@ blueprint:
             boolean: {}
         night_start:
           name: Night Start
-          default: '22:00:00'
+          default: "22:00:00"
           selector:
             time: {}
         night_end:
           name: Night End
-          default: '06:00:00'
+          default: "06:00:00"
           selector:
             time: {}
         night_mode_enabled:
@@ -447,9 +446,19 @@ variables:
     {% if not night_enabled %}
       false
     {% else %}
-      {% set t = now().strftime('%H:%M:%S') %}
-      {% set overnight = night_start > night_end %}
-      {{ (t >= night_start or t < night_end) if overnight else (t >= night_start and t < night_end) }}
+      {% set fmt = '%H:%M:%S' %}
+      {% set start_ts = as_timestamp(strptime(night_start, fmt)) %}
+      {% set end_ts = as_timestamp(strptime(night_end, fmt)) %}
+      {% set now_ts = as_timestamp(now()) %}
+      {% if start_ts is none or end_ts is none or now_ts is none %}
+        false
+      {% else %}
+        {% if start_ts <= end_ts %}
+          {{ now_ts >= start_ts and now_ts < end_ts }}
+        {% else %}
+          {{ now_ts >= start_ts or now_ts < end_ts }}
+        {% endif %}
+      {% endif %}
     {% endif %}
 
   # Night mode should activate during night schedule OR when explicitly enabled
