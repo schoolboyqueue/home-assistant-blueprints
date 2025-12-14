@@ -19,23 +19,27 @@ A comprehensive Python-based validator that checks blueprint files for common is
 ### What It Checks
 
 **YAML & Structure:**
+
 - ✓ Valid YAML syntax
 - ✓ Required root-level keys (`blueprint`, `trigger`, `action`)
 - ✓ `variables` at root level (not nested under `blueprint`)
 - ✓ Blueprint metadata (`name`, `description`, `domain`, `input`)
 
 **Triggers:**
+
 - ✓ Trigger platform/type presence
 - ✓ Template triggers cannot reference automation variables (prevents runtime errors)
 - ✓ Trigger entity_id fields are static strings (no templates allowed)
 - ✓ Entity ID format validation (domain.entity_name)
 
 **Inputs & Selectors:**
+
 - ✓ Input definitions and grouping
 - ✓ Valid selector types
 - ✓ Proper input nesting
 
 **Actions & Service Calls:**
+
 - ✓ Service call structure
 - ✓ Service format validation (domain.service_name)
 - ✓ `data:` blocks must not be None/empty
@@ -44,27 +48,32 @@ A comprehensive Python-based validator that checks blueprint files for common is
 - ✓ Entity ID format in targets and service calls
 
 **Jinja2 Templates:**
+
 - ✓ No `!input` tags inside `{{ }}` blocks
 - ✓ Balanced Jinja2 delimiters (expressions `{{}}`, control blocks `{%%}`, comments `{##}`)
 - ✓ Detection of unsupported filters/functions
 
 **Variables:**
+
 - ✓ Proper dictionary structure
 - ✓ Presence of `blueprint_version`
 
 **Documentation Sync:**
+
 - ✓ README.md version matches blueprint version
 - ✓ README.md exists in blueprint directory
 
 ### Usage Examples
 
 **Validate during development:**
+
 ```bash
 # After editing a blueprint
 python3 scripts/validate-blueprint.py adaptive-comfort-control/adaptive_comfort_control_pro_blueprint.yaml
 ```
 
 **Validate before commit:**
+
 ```bash
 # Check all blueprints
 python3 scripts/validate-blueprint.py --all
@@ -74,6 +83,7 @@ python3 scripts/validate-blueprint.py --all && git commit -m "..."
 ```
 
 **Add to pre-commit hook:**
+
 ```bash
 # .git/hooks/pre-commit
 #!/bin/bash
@@ -88,14 +98,16 @@ python3 scripts/validate-blueprint.py --all || exit 1
 ### Output Format
 
 **Success:**
-```
+
+```text
 Validating: multi-switch-light-control/multi_switch_light_control_pro.yaml
 
 ✅ Blueprint is valid!
 ```
 
 **Errors:**
-```
+
+```text
 Validating: example/blueprint.yaml
 
 ❌ ERRORS:
@@ -106,7 +118,8 @@ Validating: example/blueprint.yaml
 ```
 
 **Warnings:**
-```
+
+```text
 Validating: example/blueprint.yaml
 
 ⚠️  WARNINGS:
@@ -119,6 +132,7 @@ Validating: example/blueprint.yaml
 ### Common Errors Detected
 
 **1. Data block with None value**
+
 ```yaml
 # ❌ WRONG
 - service: system_log.write
@@ -132,6 +146,7 @@ level: info  # Not indented under data
 ```
 
 **2. Variables nested under blueprint**
+
 ```yaml
 # ❌ WRONG
 blueprint:
@@ -146,6 +161,7 @@ variables:
 ```
 
 **3. !input inside templates**
+
 ```yaml
 # ❌ WRONG
 value_template: "{{ !input my_sensor }}"
@@ -169,6 +185,7 @@ variables:
 ### VS Code Integration (Optional)
 
 Add to `.vscode/tasks.json`:
+
 ```json
 {
   "version": "2.0.0",
@@ -210,6 +227,7 @@ Then press `Cmd/Ctrl+Shift+P` → "Tasks: Run Task" → "Validate Blueprint"
 ## Why This Validator?
 
 **Problem:** Home Assistant's import process only shows errors after you:
+
 1. Push to GitHub
 2. Copy the raw URL
 3. Go to Home Assistant
@@ -220,6 +238,7 @@ Then press `Cmd/Ctrl+Shift+P` → "Tasks: Run Task" → "Validate Blueprint"
 **Solution:** This validator catches 90%+ of structural issues **locally** before you push, saving time and iterations.
 
 **Note:** This validator checks structure and syntax. It cannot validate:
+
 - Entity existence (entities must exist in your HA instance)
 - Runtime logic (requires actual execution)
 - Device-specific behavior (requires physical devices)
@@ -229,6 +248,7 @@ For those, you still need to test the imported blueprint in your Home Assistant 
 ## Future Enhancements
 
 Potential improvements:
+
 - [ ] Check for deprecated service calls
 - [ ] Validate entity domain matches (e.g., `light.` entities with `light.turn_on`)
 - [ ] Detect circular variable dependencies
@@ -246,6 +266,7 @@ This is expected when using generic YAML parsers. The validator handles `!input`
 **"No blueprints found in repository"**
 
 Make sure your blueprint files match the naming pattern:
+
 - `*_pro.yaml`
 - `*_pro_blueprint.yaml`
 - `blueprint.yaml`
@@ -253,6 +274,7 @@ Make sure your blueprint files match the naming pattern:
 **Script fails with Python errors**
 
 Ensure you have Python 3.8+ and PyYAML:
+
 ```bash
 python3 --version  # Should be 3.8+
 pip3 install pyyaml

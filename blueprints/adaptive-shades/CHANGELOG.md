@@ -137,6 +137,7 @@
 
 - Comfort mode detection now derives from heating/cooling setpoints (with comfort margin) instead of fixed 21/25°C thresholds.
 - Shading mode description clarified; irradiance and slat-geometry sections marked as advanced/leave-defaults to reduce setup friction.
+
 ## [1.3.1] - 2025-11-25
 
 ### Added

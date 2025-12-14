@@ -3,7 +3,7 @@
 **Author:** Jeremy Carter  
 **Home Assistant Blueprint for Intelligent Bathroom Automation**
 
-[![Import Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/bathroom-light-fan-control/bathroom_light_fan_control_pro.yaml)
+[![Import Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/bathroom-light-fan-control/bathroom_light_fan_control_pro.yaml)
 
 ---
 
@@ -71,7 +71,7 @@ Bathroom Light & Fan Control Pro is a comprehensive Home Assistant automation bl
 
    - Click the badge above, or
    - Navigate to: Settings → Automations & Scenes → Blueprints → Import Blueprint
-   - Paste URL: `https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/bathroom-light-fan-control/bathroom_light_fan_control_pro.yaml`
+   - Paste URL: `https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/bathroom-light-fan-control/bathroom_light_fan_control_pro.yaml`
 
 2. **Create an automation:**
 
@@ -100,7 +100,7 @@ The blueprint uses a dual-sensor approach to determine bathroom occupancy, nickn
 
 **Occupancy Detection:**
 
-```
+```text
 Motion Detected → Lights ON
 Door Opened → Lights ON
 
@@ -132,7 +132,7 @@ On a naturally humid day (80% RH everywhere), you still need the fan during a sh
 
 **Hysteresis prevents chattering:**
 
-```
+```text
 Fan ON:  Δ%RH > 15% (default)
 Fan OFF: Δ%RH < 10% (default)
 
@@ -141,7 +141,7 @@ Creates "dead band" (10-15%) preventing rapid on/off cycles
 
 **Example:**
 
-```
+```text
 Home:     55% RH
 Bathroom: 72% RH
 Delta:    17% → Fan ON (above 15% threshold)
@@ -158,7 +158,7 @@ Delta:    9% → Fan OFF (below 10% threshold)
 
 Turns fan on **early** when humidity is rising quickly, even if delta threshold not yet met.
 
-```
+```text
 If humidity rises ≥7% in ≤3 minutes → Fan ON immediately
 ```
 
@@ -168,7 +168,7 @@ Catches showers early for better moisture control.
 
 Prevents fan from turning off while humidity is dropping quickly.
 
-```
+```text
 If humidity falling ≥5% in ≤3 minutes → Block fan OFF
 ```
 
@@ -566,4 +566,4 @@ MIT License — See repository for details.
 
 ---
 
-**Enjoy intelligent bathroom automation! 🚿💡**
+**Enjoy intelligent bathroom automation!**

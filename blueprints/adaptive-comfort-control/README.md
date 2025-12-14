@@ -3,7 +3,7 @@
 **Author:** Jeremy Carter  
 **Home Assistant Blueprint for Intelligent HVAC Automation**
 
-[![Import Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/adaptive-comfort-control/adaptive_comfort_control_pro_blueprint.yaml)
+[![Import Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/adaptive-comfort-control/adaptive_comfort_control_pro_blueprint.yaml)
 
 ---
 
@@ -27,70 +27,6 @@ Adaptive Comfort Control Pro is an advanced Home Assistant automation blueprint 
 
 ---
 
-## Table of Contents
-
-- [Adaptive Comfort Control Pro](#adaptive-comfort-control-pro)
-  - [Overview](#overview)
-    - [Key Features](#key-features)
-  - [Table of Contents](#table-of-contents)
-  - [Quick Start](#quick-start)
-    - [Prerequisites](#prerequisites)
-    - [Installation](#installation)
-  - [Mathematical Foundation](#mathematical-foundation)
-    - [1. ASHRAE-55 Adaptive Comfort Model](#1-ashrae-55-adaptive-comfort-model)
-      - [Base Comfort Temperature](#base-comfort-temperature)
-      - [Comfort Band (Tolerance Categories)](#comfort-band-tolerance-categories)
-      - [Enhanced Comfort Model (with biases)](#enhanced-comfort-model-with-biases)
-    - [2. Psychrometric Calculations](#2-psychrometric-calculations)
-      - [Magnus Formula (Saturation Vapor Pressure)](#magnus-formula-saturation-vapor-pressure)
-      - [Actual Vapor Pressure](#actual-vapor-pressure)
-      - [Dew Point Temperature](#dew-point-temperature)
-      - [Absolute Humidity](#absolute-humidity)
-      - [Humidity Ratio (Mixing Ratio)](#humidity-ratio-mixing-ratio)
-      - [Specific Enthalpy (Moist Air Energy Content)](#specific-enthalpy-moist-air-energy-content)
-    - [3. Adaptive Learning Algorithm](#3-adaptive-learning-algorithm)
-      - [Learning Formula](#learning-formula)
-      - [Convergence Timeline (α = 0.15)](#convergence-timeline-α--015)
-      - [Learning Rate Selection](#learning-rate-selection)
-    - [4. Natural Ventilation Decision Logic](#4-natural-ventilation-decision-logic)
-      - [Four-Part Guard Condition](#four-part-guard-condition)
-    - [5. Risk Acceleration Math](#5-risk-acceleration-math)
-      - [Risk Calculation](#risk-calculation)
-      - [Accelerated Delay](#accelerated-delay)
-    - [6. Barometric Pressure Estimation](#6-barometric-pressure-estimation)
-      - [Standard Atmosphere Model](#standard-atmosphere-model)
-      - [Elevation Lookup Table](#elevation-lookup-table)
-  - [Configuration Guide](#configuration-guide)
-    - [Core Settings](#core-settings)
-    - [Comfort \& Units](#comfort--units)
-    - [Seasonal Bias \& Regional Presets](#seasonal-bias--regional-presets)
-    - [Sleep Mode](#sleep-mode)
-    - [Manual Override \& Learning](#manual-override--learning)
-    - [Natural Ventilation](#natural-ventilation)
-    - [HVAC Pause](#hvac-pause)
-    - [Safety Features](#safety-features)
-  - [Regional Climate Presets](#regional-climate-presets)
-    - [Preset Parameters by Region](#preset-parameters-by-region)
-  - [Thermostat Vendor Profiles](#thermostat-vendor-profiles)
-    - [Supported Vendors](#supported-vendors)
-  - [Troubleshooting](#troubleshooting)
-    - [Common Issues](#common-issues)
-  - [Advanced Topics](#advanced-topics)
-    - [Unit Conversion Strategy](#unit-conversion-strategy)
-    - [Variable Ordering](#variable-ordering)
-    - [Psychrometrics Performance](#psychrometrics-performance)
-    - [Trigger Debouncing](#trigger-debouncing)
-    - [Separation Enforcement](#separation-enforcement)
-  - [References](#references)
-    - [Scientific Standards](#scientific-standards)
-    - [Home Assistant Documentation](#home-assistant-documentation)
-    - [Adaptive Comfort Resources](#adaptive-comfort-resources)
-  - [Contributing](#contributing)
-  - [Changelog](#changelog)
-  - [License](#license)
-
----
-
 ## Quick Start
 
 ### Prerequisites
@@ -106,7 +42,7 @@ Adaptive Comfort Control Pro is an advanced Home Assistant automation blueprint 
 
    - Click the badge above, or
    - Navigate to: Settings → Automations & Scenes → Blueprints → Import Blueprint
-   - Paste URL: `https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/adaptive-comfort-control/adaptive_comfort_control_pro_blueprint.yaml`
+   - Paste URL: `https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/adaptive-comfort-control/adaptive_comfort_control_pro_blueprint.yaml`
 
 2. **Create an automation:**
 
@@ -134,7 +70,7 @@ The core of this blueprint is the **ASHRAE-55-2020 adaptive comfort model**, whi
 
 #### Base Comfort Temperature
 
-```
+```text
 T_comfort = 18.9 + 0.255 × T_outdoor
 ```
 
@@ -157,7 +93,7 @@ ASHRAE-55 defines three acceptability categories based on occupant satisfaction:
 
 **Comfort band calculation:**
 
-```
+```text
 T_min = T_comfort - tolerance
 T_max = T_comfort + tolerance
 ```
@@ -166,7 +102,7 @@ T_max = T_comfort + tolerance
 
 This blueprint extends the base model with multiple adaptive layers:
 
-```
+```text
 T_adapt = T_base + B_seasonal + B_sleep + B_CO₂ + B_learned + B_setback
 ```
 
@@ -187,7 +123,7 @@ The blueprint computes psychrometric properties to evaluate natural ventilation 
 
 #### Magnus Formula (Saturation Vapor Pressure)
 
-```
+```text
 P_sat = 0.61078 × exp((17.2694 × T) / (T + 237.3))
 ```
 
@@ -199,7 +135,7 @@ Where:
 
 #### Actual Vapor Pressure
 
-```
+```text
 P_v = (RH / 100) × P_sat
 ```
 
@@ -212,7 +148,7 @@ Where:
 
 Inverse Magnus formula:
 
-```
+```text
 ln(P_v / 0.61078) = (17.2694 × T_dp) / (T_dp + 237.3)
 
 Solving for T_dp:
@@ -227,7 +163,7 @@ Where:
 
 #### Absolute Humidity
 
-```
+```text
 AH = (2167.4 × P_v) / (T + 273.15)
 ```
 
@@ -239,7 +175,7 @@ Where:
 
 #### Humidity Ratio (Mixing Ratio)
 
-```
+```text
 w = 0.62198 × (P_v / (P_total - P_v))
 ```
 
@@ -252,7 +188,7 @@ Where:
 
 #### Specific Enthalpy (Moist Air Energy Content)
 
-```
+```text
 h = 1.006 × T + w × (2501 + 1.86 × T)
 ```
 
@@ -275,7 +211,7 @@ The blueprint learns your temperature preferences from manual thermostat adjustm
 
 When you manually adjust the thermostat:
 
-```
+```text
 Error = T_manual - T_predicted
 
 B_learned_new = (1 - α) × B_learned_old + α × Error
@@ -299,7 +235,7 @@ Where:
 
 **Mathematical basis:** Each new observation is weighted by α, while all previous history retains weight (1 - α). This creates exponential decay of older observations:
 
-```
+```text
 B_learned(n) = α × Σ(i=0 to n) [(1-α)^i × Error(n-i)]
 ```
 
@@ -325,7 +261,7 @@ Natural ventilation is **blocked** if any of these conditions are true:
 
 **1. Outdoor dew point exceeds threshold:**
 
-```
+```text
 T_dp_outdoor > T_dp_max
 ```
 
@@ -333,7 +269,7 @@ Typical: 16-19°C (61-66°F) depending on climate zone
 
 **2. Outdoor dew point exceeds indoor (muggy delta):**
 
-```
+```text
 T_dp_outdoor > (T_dp_indoor + ΔT_dp)
 ```
 
@@ -341,7 +277,7 @@ Typical: ΔT_dp = 1.5°C (prevents introducing more humid air)
 
 **3. Outdoor absolute humidity exceeds indoor (economizer delta):**
 
-```
+```text
 AH_outdoor > (AH_indoor + ΔAH)
 ```
 
@@ -349,7 +285,7 @@ Typical: ΔAH = 1.5-3.0 g/m³
 
 **4. Outdoor enthalpy exceeds indoor (energy content):**
 
-```
+```text
 h_outdoor > (h_indoor + Δh)
 ```
 
@@ -357,7 +293,7 @@ Typical: Δh = 2.5-4.0 kJ/kg
 
 **Combined logic:**
 
-```
+```text
 Block_ventilation = (T_dp_out > T_dp_max) OR
                     (T_dp_out > T_dp_in + ΔT_dp) OR
                     (AH_out > AH_in + ΔAH) OR
@@ -372,7 +308,7 @@ When HVAC is paused (due to open doors/windows), the blueprint monitors indoor t
 
 #### Risk Calculation
 
-```
+```text
 Risk_cold = max(0, T_freeze_guard - T_indoor) / T_warn_band
 Risk_hot = max(0, T_indoor - T_overheat_guard) / T_warn_band
 
@@ -388,7 +324,7 @@ Where:
 
 #### Accelerated Delay
 
-```
+```text
 Delay_resume_effective = Delay_base × (1 - S_accel × Risk_total)
 
 Constrained to: Delay_resume_effective ≥ Delay_min
@@ -402,7 +338,7 @@ Where:
 
 **Example:** With Delay_base = 120s, Risk = 0.6, S_accel = 1.0:
 
-```
+```text
 Delay_effective = 120 × (1 - 1.0 × 0.6) = 48 seconds
 ```
 
@@ -419,7 +355,7 @@ Psychrometric calculations require barometric pressure. The blueprint supports:
 
 #### Standard Atmosphere Model
 
-```
+```text
 P(h) = 101.325 × (1 - 2.25577 × 10^-5 × h)^5.25588
 ```
 
@@ -749,7 +685,7 @@ The `variables:` section is a **dependency-ordered pipeline**. Later variables c
 
 **Example dependency chain:**
 
-```
+```text
 t_out_c → t_adapt_base_c → t_adapt_c_raw → t_adapt_c_guard → band_min_c → band_min_cli
 ```
 
@@ -840,4 +776,4 @@ MIT License — See repository for details.
 
 ---
 
-**Enjoy adaptive comfort! 🌡️**
+**Enjoy adaptive comfort!**

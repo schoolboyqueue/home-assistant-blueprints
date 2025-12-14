@@ -4,7 +4,7 @@
 **Author:** Jeremy Carter
 **Home Assistant blueprint that supports Inovelli Zigbee switches (Zigbee2MQTT/ZHA), Zooz/Inovelli Z-Wave switches, and Lutron Pico remotes.**
 
-[![Import Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fschoolboyqueue%2Fhome-assistant-blueprints%2Fblob%2Fmain%2Fmulti-switch-light-control%2Fmulti_switch_light_control_pro.yaml)
+[![Import Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fschoolboyqueue%2Fhome-assistant-blueprints%2Fblob%2Fmain%2Fblueprints%2Fmulti-switch-light-control%2Fmulti_switch_light_control_pro.yaml)
 
 ---
 
@@ -23,7 +23,7 @@ Supported behaviors:
 ## Quick Start
 
 1. Import the blueprint via the badge or by using this URL:
-   `https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/multi-switch-light-control/multi_switch_light_control_pro.yaml`
+   `https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/multi-switch-light-control/multi_switch_light_control_pro.yaml`
 2. Create an automation and select a supported switch device. The blueprint adapts its trigger set automatically.
 3. Configure the light entity (and optionally an area) and adjust dimming/Lutron tuning inputs as needed.
 4. Enable `basic` debug to confirm the detected device in Settings → System → Logs (`[Multi Switch Light Pro] Detected switch ...`).

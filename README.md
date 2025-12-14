@@ -31,6 +31,7 @@
 ## Overview
 
 This repository hosts polished, production‑ready Home Assistant Blueprints that solve real household needs. Each blueprint is:
+
 - **Robust:** battle‑tested logic with clear input validation and sane defaults
 - **Efficient:** avoids unnecessary service calls, respects device limits, and reduces chatter
 - **Configurable:** sensible presets with advanced controls when you want them
@@ -44,52 +45,54 @@ Blueprints use YAML with Jinja2 templating and follow Semantic Versioning.
 Quickly explore and import blueprints. "Import" buttons link to the YAML on GitHub (blob). For direct import in Home Assistant, use the **Raw** link in Quick Links.
 
 ### 1) Adaptive Comfort Control Pro
+
 Advanced HVAC automation implementing ASHRAE‑55 adaptive comfort with built‑in psychrometrics (dew point, absolute humidity, enthalpy), vendor auto‑profiles, seasonal bias, CO₂‑aware ventilation, and smart pause acceleration.
 
-<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/adaptive-comfort-control/adaptive_comfort_control_pro_blueprint.yaml"><img alt="Import Adaptive Comfort" src="https://img.shields.io/badge/Import-Home%20Assistant-2D9BF0?logo=homeassistant&logoColor=white"></a>
+<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/adaptive-comfort-control/adaptive_comfort_control_pro_blueprint.yaml"><img alt="Import Adaptive Comfort" src="https://img.shields.io/badge/Import-Home%20Assistant-2D9BF0?logo=homeassistant&logoColor=white"></a>
 
 **Quick Links:**
-<a href="https://raw.githubusercontent.com/schoolboyqueue/home-assistant-blueprints/main/adaptive-comfort-control/adaptive_comfort_control_pro_blueprint.yaml">Raw</a> •
-<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/adaptive-comfort-control/README.md">Docs</a> •
-<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/adaptive-comfort-control/CHANGELOG.md">Changelog</a>
+<a href="https://raw.githubusercontent.com/schoolboyqueue/home-assistant-blueprints/main/blueprints/adaptive-comfort-control/adaptive_comfort_control_pro_blueprint.yaml">Raw</a> •
+<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/adaptive-comfort-control/README.md">Docs</a> •
+<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/adaptive-comfort-control/CHANGELOG.md">Changelog</a>
 
 ---
 
 ### 2) Bathroom Light Fan Control Pro
+
 Coordinated bathroom light and fan automation with occupancy ("Wasp-in-a-Box"), humidity delta and rate-of-change detection, night mode, and manual override.
 
-<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/bathroom-light-fan-control/bathroom_light_fan_control_pro.yaml"><img alt="Import Bathroom Light & Fan" src="https://img.shields.io/badge/Import-Home%20Assistant-2D9BF0?logo=homeassistant&logoColor=white"></a>
+<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/bathroom-light-fan-control/bathroom_light_fan_control_pro.yaml"><img alt="Import Bathroom Light & Fan" src="https://img.shields.io/badge/Import-Home%20Assistant-2D9BF0?logo=homeassistant&logoColor=white"></a>
 
 **Quick Links:**
-<a href="https://raw.githubusercontent.com/schoolboyqueue/home-assistant-blueprints/main/bathroom-light-fan-control/bathroom_light_fan_control_pro.yaml">Raw</a> •
-<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/bathroom-light-fan-control/README.md">Docs</a> •
-<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/bathroom-light-fan-control/CHANGELOG.md">Changelog</a>
+<a href="https://raw.githubusercontent.com/schoolboyqueue/home-assistant-blueprints/main/blueprints/bathroom-light-fan-control/bathroom_light_fan_control_pro.yaml">Raw</a> •
+<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/bathroom-light-fan-control/README.md">Docs</a> •
+<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/bathroom-light-fan-control/CHANGELOG.md">Changelog</a>
 
 ---
 
 ### 3) Multi Switch Light Control Pro
+
 A single automation that adapts to Zooz/Inovelli Central Scene switches or Lutron Pico remotes, auto-detects the selected hardware, and unifies dimming/transition tuning across every trigger.
 
-<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/multi-switch-light-control/multi_switch_light_control_pro.yaml"><img alt="Import Multi Switch Light Control" src="https://img.shields.io/badge/Import-Home%20Assistant-2D9BF0?logo=homeassistant&logoColor=white"></a>
+<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/multi-switch-light-control/multi_switch_light_control_pro.yaml"><img alt="Import Multi Switch Light Control" src="https://img.shields.io/badge/Import-Home%20Assistant-2D9BF0?logo=homeassistant&logoColor=white"></a>
 
 **Quick Links:**
-<a href="https://raw.githubusercontent.com/schoolboyqueue/home-assistant-blueprints/main/multi-switch-light-control/multi_switch_light_control_pro.yaml">Raw</a> •
-<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/multi-switch-light-control/README.md">Docs</a> •
-<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/multi-switch-light-control/CHANGELOG.md">Changelog</a>
+<a href="https://raw.githubusercontent.com/schoolboyqueue/home-assistant-blueprints/main/blueprints/multi-switch-light-control/multi_switch_light_control_pro.yaml">Raw</a> •
+<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/multi-switch-light-control/README.md">Docs</a> •
+<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/multi-switch-light-control/CHANGELOG.md">Changelog</a>
 
 ---
 
 ### 4) Adaptive Shades Pro
+
 Solar-aware shade control for venetian/vertical slats or zebra shades with direct vs diffuse detection, temperature bands, presence/quiet hours, glare handling, and night close/resume behavior.
 
-<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/adaptive-shades/adaptive_shades_pro.yaml"><img alt="Import Adaptive Shades" src="https://img.shields.io/badge/Import-Home%20Assistant-2D9BF0?logo=homeassistant&logoColor=white"></a>
+<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/adaptive-shades/adaptive_shades_pro.yaml"><img alt="Import Adaptive Shades" src="https://img.shields.io/badge/Import-Home%20Assistant-2D9BF0?logo=homeassistant&logoColor=white"></a>
 
 **Quick Links:**
-<a href="https://raw.githubusercontent.com/schoolboyqueue/home-assistant-blueprints/main/adaptive-shades/adaptive_shades_pro.yaml">Raw</a> •
-<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/adaptive-shades/README.md">Docs</a> •
-<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/adaptive-shades/CHANGELOG.md">Changelog</a>
-
----
+<a href="https://raw.githubusercontent.com/schoolboyqueue/home-assistant-blueprints/main/blueprints/adaptive-shades/adaptive_shades_pro.yaml">Raw</a> •
+<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/adaptive-shades/README.md">Docs</a> •
+<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/adaptive-shades/CHANGELOG.md">Changelog</a>
 
 ---
 
@@ -111,25 +114,29 @@ Solar-aware shade control for venetian/vertical slats or zebra shades with direc
 
 ## Repository Structure
 
-```
+```text
 .
-├── adaptive-comfort-control/
-│   ├── adaptive_comfort_control_pro_blueprint.yaml
-│   ├── CHANGELOG.md
+├── blueprints/
+│   ├── adaptive-comfort-control/
+│   │   ├── adaptive_comfort_control_pro_blueprint.yaml
+│   │   ├── CHANGELOG.md
+│   │   ├── LEARNING_SETUP.md
+│   │   └── README.md
+│   ├── adaptive-shades/
+│   │   ├── adaptive_shades_pro.yaml
+│   │   ├── CHANGELOG.md
+│   │   └── README.md
+│   ├── bathroom-light-fan-control/
+│   │   ├── bathroom_light_fan_control_pro.yaml
+│   │   ├── CHANGELOG.md
+│   │   └── README.md
+│   └── multi-switch-light-control/
+│       ├── multi_switch_light_control_pro.yaml
+│       ├── CHANGELOG.md
+│       └── README.md
+├── scripts/
+│   ├── validate-blueprint.py
 │   └── README.md
-├── adaptive-shades/
-│   ├── adaptive_shades_pro.yaml
-│   ├── CHANGELOG.md
-│   └── README.md
-├── bathroom-light-fan-control/
-│   ├── bathroom_light_fan_control_pro.yaml
-│   ├── CHANGELOG.md
-│   └── README.md
-├── multi-switch-light-control/
-│   ├── multi_switch_light_control_pro_blueprint.yaml
-│   ├── CHANGELOG.md
-│   └── README.md
-├── WARP.md
 └── README.md (this file)
 ```
 
@@ -141,18 +148,18 @@ Solar-aware shade control for venetian/vertical slats or zebra shades with direc
 - **State/trigger race conditions:** add small delays (e.g., 100ms) if a change should settle before the next action.
 - Use **entity selectors** (not target selectors) for triggers; use `!input` directly in trigger `for:` durations.
 
-For deeper guidance, see [WARP.md](WARP.md).
-
 ## Contributing
 
 Contributions are welcome!
 
 **Conventional Commits required** (examples):
+
 - `docs(readme): clarify quick start`
 - `feat(bathroom): add night mode brightness floor`
 - `fix(adaptive-comfort): correct °F step quantization`
 
 **Semantic Versioning per blueprint:**
+
 - **MAJOR:** breaking changes
 - **MINOR:** new features
 - **PATCH:** bug fixes
@@ -166,7 +173,8 @@ MIT — see the [LICENSE](LICENSE) file. You can use these blueprints in persona
 ## Support
 
 If these blueprints help you, consider supporting:
-- ☕ **Buy Me A Coffee:** https://buymeacoffee.com/schoolboyqueue
+
+- ☕ **Buy Me A Coffee:** <https://buymeacoffee.com/schoolboyqueue>
 
 ---
 
