@@ -1,5 +1,5 @@
 blueprint:
-  name: "Adaptive Shades Pro v1.10.0"
+  name: "Adaptive Shades Pro v1.11.0"
   description: >-
     Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
     Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
@@ -416,7 +416,7 @@ blueprint:
                   value: "verbose"
 
 variables:
-  blueprint_version: "1.10.0"
+  blueprint_version: "1.11.0"
   cover_target: !input cover_target
   base_cover: >-
     {% set ct = cover_target | default('') %}
@@ -465,6 +465,21 @@ variables:
   debug_level: !input debug_level
   debug_basic: "{{ debug_level in ['basic', 'verbose'] }}"
   debug_verbose: "{{ debug_level == 'verbose' }}"
+  triggered_by_cover: "{{ trigger.id == 'cover_changed' if trigger is defined and trigger.id is defined else false }}"
+  triggered_cover_entity: "{{ trigger.entity_id if triggered_by_cover else none }}"
+  manual_change_detected: >-
+    {% if not triggered_by_cover %}
+      false
+    {% else %}
+      {% set ctx = trigger.to_state.context if trigger.to_state is defined else none %}
+      {% if ctx is none %}
+        false
+      {% else %}
+        {# Changes from automations/scripts have a parent_id; manual/external changes don't #}
+        {% set parent_id = ctx.parent_id | default(none) %}
+        {{ parent_id is none or parent_id == '' }}
+      {% endif %}
+    {% endif %}
   pi: 3.141592653589793
   e_const: 2.718281828459045
   deg_to_rad: 0.017453292519943295
@@ -568,6 +583,8 @@ variables:
     {% set mo = manual_override | default('') %}
     {{ mo != '' and is_state(mo, 'on') }}
   auto_override_active: >-
+    {# This is checked per-cover in the repeat loop using this_auto_override_active #}
+    {# Kept for backward compatibility but primary detection is now trigger-based #}
     {% if manual_timeout_minutes | int(0) <= 0 or not base_cover %}
       false
     {% else %}
@@ -576,9 +593,11 @@ variables:
         false
       {% else %}
         {% set delta = (as_timestamp(now()) - as_timestamp(s.last_changed)) / 60 %}
-        {% set user_id = s.context.user_id if s.context is defined else '' %}
-        {% set has_user = user_id is string and (user_id | length > 0) %}
-        {{ has_user and (delta < (manual_timeout_minutes | float)) }}
+        {% set ctx = s.context if s.context is defined else none %}
+        {% set parent_id = ctx.parent_id | default(none) if ctx else none %}
+        {# Manual changes have no parent_id (not triggered by automation/script) #}
+        {% set is_manual = parent_id is none or parent_id == '' %}
+        {{ is_manual and (delta < (manual_timeout_minutes | float)) }}
       {% endif %}
     {% endif %}
   in_quiet_hours: >-
@@ -832,6 +851,9 @@ trigger:
     minutes: "/5"
   - platform: state
     entity_id: !input sun_entity
+  - platform: state
+    entity_id: !input cover_target
+    id: cover_changed
   - platform: homeassistant
     event: start
 
@@ -839,6 +861,18 @@ condition: []
 
 action:
   - choose:
+      - conditions: "{{ triggered_by_cover and manual_change_detected }}"
+        sequence:
+          - condition: template
+            value_template: "{{ debug_basic }}"
+          - service: logbook.log
+            data:
+              name: "Adaptive Shades"
+              message: >-
+                Manual adjustment detected on {{ triggered_cover_entity }}.
+                Pausing automation for {{ manual_timeout_minutes }} minutes. (v{{ blueprint_version }})
+              domain: cover
+          - stop: "Manual change detected, pausing automation"
       - conditions: "{{ manual_override_active }}"
         sequence:
           - condition: template
@@ -892,9 +926,11 @@ action:
                   false
                 {% else %}
                   {% set delta = (as_timestamp(now()) - as_timestamp(s.last_changed)) / 60 %}
-                  {% set user_id = s.context.user_id if s.context is defined else '' %}
-                  {% set has_user = user_id is string and (user_id | length > 0) %}
-                  {{ has_user and (delta < (manual_timeout_minutes | float)) }}
+                  {% set ctx = s.context if s.context is defined else none %}
+                  {% set parent_id = ctx.parent_id | default(none) if ctx else none %}
+                  {# Manual/external changes have no parent_id (not triggered by automation/script) #}
+                  {% set is_manual = parent_id is none or parent_id == '' %}
+                  {{ is_manual and (delta < (manual_timeout_minutes | float)) }}
                 {% endif %}
               {% endif %}
             this_target_position: >-
