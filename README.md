@@ -96,6 +96,19 @@ Solar-aware shade control for venetian/vertical slats or zebra shades with direc
 
 ---
 
+### 5) Ceiling Fan Climate Control Pro
+
+HVAC-aware ceiling fan automation with EN 16798 adaptive comfort model, heat index calculation, deviation-based speed control, occupancy awareness, and optional direction control for seasonal optimization.
+
+<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/adaptive-fan-control/adaptive_fan_control_pro_blueprint.yaml"><img alt="Import Ceiling Fan Climate Control" src="https://img.shields.io/badge/Import-Home%20Assistant-2D9BF0?logo=homeassistant&logoColor=white"></a>
+
+**Quick Links:**
+<a href="https://raw.githubusercontent.com/schoolboyqueue/home-assistant-blueprints/main/blueprints/adaptive-fan-control/adaptive_fan_control_pro_blueprint.yaml">Raw</a> •
+<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/adaptive-fan-control/README.md">Docs</a> •
+<a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/adaptive-fan-control/CHANGELOG.md">Changelog</a>
+
+---
+
 ## Quick Start
 
 1. Click an **Import** badge above to view the blueprint YAML on GitHub.
@@ -121,6 +134,10 @@ Solar-aware shade control for venetian/vertical slats or zebra shades with direc
 │   │   ├── adaptive_comfort_control_pro_blueprint.yaml
 │   │   ├── CHANGELOG.md
 │   │   ├── LEARNING_SETUP.md
+│   │   └── README.md
+│   ├── adaptive-fan-control/
+│   │   ├── adaptive_fan_control_pro_blueprint.yaml
+│   │   ├── CHANGELOG.md
 │   │   └── README.md
 │   ├── adaptive-shades/
 │   │   ├── adaptive_shades_pro.yaml

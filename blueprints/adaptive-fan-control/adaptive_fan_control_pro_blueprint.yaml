@@ -1,0 +1,829 @@
+blueprint:
+  name: Ceiling Fan Climate Control Pro v2.0.0
+  description: >
+    HVAC-aware ceiling fan automation with adaptive comfort control. Uses the
+    EN 16798 / ASHRAE 55 adaptive comfort model to dynamically adjust fan behavior
+    based on outdoor temperature, indoor humidity, and occupancy. Coordinates with
+    your thermostat to optimize comfort: turns fans off during heating (to avoid
+    drafts), runs them during cooling (to distribute cool air), and uses adaptive
+    comfort bands when HVAC is idle. Supports fans with variable speed and optional
+    direction control.
+  domain: automation
+  author: Jeremy Carter
+  source_url: https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/adaptive-fan-control/adaptive_fan_control_pro_blueprint.yaml
+  input:
+    core:
+      name: Fan & Sensors
+      icon: mdi:fan
+      input:
+        fan_entity:
+          name: Ceiling fan
+          description: >
+            REQUIRED. Select the ceiling fan entity to control.
+          selector:
+            entity:
+              domain:
+                - fan
+              multiple: false
+        temp_sensor:
+          name: Indoor temperature sensor
+          description: >
+            REQUIRED. Select the temperature sensor for this room. Used to
+            determine when to turn the fan on/off and at what speed.
+          selector:
+            entity:
+              domain:
+                - sensor
+              device_class: temperature
+              multiple: false
+        humidity_sensor:
+          name: Indoor humidity sensor
+          description: >
+            Optional. Select a humidity sensor for this room. When provided,
+            humidity is factored into comfort calculations using heat index.
+            Leave empty to use temperature only.
+          default: {}
+          selector:
+            entity:
+              domain:
+                - sensor
+              device_class: humidity
+              multiple: false
+        outdoor_temp_sensor:
+          name: Outdoor temperature sensor
+          description: >
+            Optional. Select an outdoor temperature sensor or weather entity.
+            When provided, enables adaptive comfort mode where the comfort band
+            shifts based on outdoor conditions (EN 16798 / ASHRAE 55). Leave
+            empty to use fixed thresholds.
+          default: {}
+          selector:
+            entity:
+              domain:
+                - sensor
+                - weather
+              multiple: false
+        presence_sensor:
+          name: Presence/occupancy sensor
+          description: >
+            REQUIRED. Select a binary sensor that indicates room occupancy.
+            Fan will only run when the room is occupied.
+          selector:
+            entity:
+              domain:
+                - binary_sensor
+              multiple: false
+        climate_entity:
+          name: Climate/thermostat entity
+          description: >
+            REQUIRED. Select your thermostat. The blueprint monitors hvac_action
+            to coordinate fan behavior with heating/cooling cycles.
+          selector:
+            entity:
+              domain:
+                - climate
+              multiple: false
+    fan_capabilities:
+      name: Fan Capabilities
+      icon: mdi:cog
+      input:
+        supports_direction:
+          name: Fan supports direction control
+          description: >
+            Enable if your fan supports direction/reverse mode (e.g., Bond,
+            some smart fans). When enabled, direction will be set based on
+            season or HVAC mode.
+          default: false
+          selector:
+            boolean: {}
+        reverse_when_heating:
+          name: Run in reverse when heating
+          description: >
+            When enabled AND the fan supports direction, the fan will run in
+            REVERSE at low speed during heating to push warm air down from
+            the ceiling. When disabled, fan turns off during heating.
+          default: false
+          selector:
+            boolean: {}
+        heating_speed_pct:
+          name: Fan speed when heating (%)
+          description: >
+            Speed to run the fan when HVAC is heating (only applies if
+            "Run in reverse when heating" is enabled). Lower speeds are
+            recommended to gently circulate warm air without creating drafts.
+          default: 25
+          selector:
+            number:
+              min: 10
+              max: 50
+              step: 5
+              unit_of_measurement: "%"
+              mode: slider
+    comfort:
+      name: Comfort Settings
+      icon: mdi:thermometer-lines
+      input:
+        comfort_mode:
+          name: Comfort mode
+          description: >
+            Fixed: Uses static temperature thresholds (legacy behavior).
+            Adaptive: Uses EN 16798 adaptive comfort model where the comfort
+            band shifts based on outdoor temperature. Warmer outdoor temps
+            = higher acceptable indoor temps.
+          default: adaptive
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - label: "Fixed thresholds"
+                  value: "fixed"
+                - label: "Adaptive comfort (EN 16798)"
+                  value: "adaptive"
+              sort: false
+              multiple: false
+              custom_value: false
+        comfort_category:
+          name: Comfort category
+          description: >
+            Controls how strict the comfort band is (adaptive mode only).
+            Category I (±2°C): Strict - for sensitive occupants.
+            Category II (±3°C): Normal - typical residential.
+            Category III (±4°C): Relaxed - maximum energy savings.
+          default: "II"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - label: "I - Strict (±2°C / ±3.6°F)"
+                  value: "I"
+                - label: "II - Normal (±3°C / ±5.4°F)"
+                  value: "II"
+                - label: "III - Relaxed (±4°C / ±7.2°F)"
+                  value: "III"
+              sort: false
+              multiple: false
+              custom_value: false
+        units:
+          name: Temperature units
+          description: >
+            Select your preferred temperature units. Auto will detect from
+            your indoor sensor's unit_of_measurement attribute.
+          default: "auto"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - label: "Auto-detect"
+                  value: "auto"
+                - label: "Fahrenheit (°F)"
+                  value: "f"
+                - label: "Celsius (°C)"
+                  value: "c"
+              sort: false
+              multiple: false
+              custom_value: false
+    temperature:
+      name: Fixed Thresholds (when not using adaptive mode)
+      icon: mdi:thermometer
+      input:
+        temp_on_threshold:
+          name: Turn on temperature
+          description: >
+            Fan turns on when room temperature exceeds this value (fixed mode
+            only, or as absolute maximum in adaptive mode). Set in your
+            preferred units.
+          default: 74
+          selector:
+            number:
+              min: 60
+              max: 90
+              step: 1
+              unit_of_measurement: "°"
+              mode: slider
+        temp_off_threshold:
+          name: Turn off temperature
+          description: >
+            Fan turns off when room temperature drops below this value (fixed
+            mode only, or as absolute minimum in adaptive mode). Should be
+            lower than the "on" threshold to prevent rapid cycling.
+          default: 72
+          selector:
+            number:
+              min: 55
+              max: 85
+              step: 1
+              unit_of_measurement: "°"
+              mode: slider
+    speed_tiers:
+      name: Speed Tiers
+      icon: mdi:speedometer
+      input:
+        speed_mode:
+          name: Speed calculation mode
+          description: >
+            Fixed thresholds: Uses static temperature values for speed tiers.
+            Comfort deviation: Calculates speed based on how far above the
+            comfort band the temperature is (more intelligent).
+          default: "deviation"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - label: "Fixed temperature thresholds"
+                  value: "fixed"
+                - label: "Comfort band deviation"
+                  value: "deviation"
+              sort: false
+              multiple: false
+              custom_value: false
+        speed_tier_1_threshold:
+          name: Medium speed threshold
+          description: >
+            Fixed mode: Temperature above which fan runs at medium speed.
+            Deviation mode: Degrees above comfort band for medium speed.
+          default: 2
+          selector:
+            number:
+              min: 1
+              max: 10
+              step: 0.5
+              unit_of_measurement: "°"
+              mode: slider
+        speed_tier_2_threshold:
+          name: High speed threshold
+          description: >
+            Fixed mode: Temperature above which fan runs at high speed.
+            Deviation mode: Degrees above comfort band for high speed.
+          default: 4
+          selector:
+            number:
+              min: 2
+              max: 15
+              step: 0.5
+              unit_of_measurement: "°"
+              mode: slider
+        speed_low_pct:
+          name: Low speed (%)
+          description: Fan speed percentage for temperatures just above comfort.
+          default: 33
+          selector:
+            number:
+              min: 15
+              max: 50
+              step: 1
+              unit_of_measurement: "%"
+              mode: slider
+        speed_medium_pct:
+          name: Medium speed (%)
+          description: Fan speed percentage for moderate discomfort.
+          default: 66
+          selector:
+            number:
+              min: 40
+              max: 80
+              step: 1
+              unit_of_measurement: "%"
+              mode: slider
+        speed_high_pct:
+          name: High speed (%)
+          description: Fan speed percentage for high discomfort.
+          default: 100
+          selector:
+            number:
+              min: 70
+              max: 100
+              step: 1
+              unit_of_measurement: "%"
+              mode: slider
+    presence:
+      name: Presence Settings
+      icon: mdi:account
+      input:
+        presence_off_delay_min:
+          name: Presence off delay (minutes)
+          description: >
+            How long to wait after presence clears before turning off the fan.
+            Prevents the fan from turning off during brief absences.
+          default: 30
+          selector:
+            number:
+              min: 5
+              max: 120
+              step: 5
+              unit_of_measurement: "min"
+              mode: slider
+    diagnostics:
+      name: Diagnostics
+      icon: mdi:bug-outline
+      input:
+        debug_level:
+          name: Debug level
+          description: "off: no logging, basic: state changes only, verbose: all decisions and calculations."
+          default: "off"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - "off"
+                - basic
+                - verbose
+              sort: false
+              multiple: false
+              custom_value: false
+
+variables:
+  blueprint_version: "2.0.0"
+  fan_entity: !input fan_entity
+  temp_sensor: !input temp_sensor
+  humidity_sensor_input: !input humidity_sensor
+  outdoor_temp_sensor_input: !input outdoor_temp_sensor
+  presence_sensor: !input presence_sensor
+  climate_entity: !input climate_entity
+  supports_direction_input: !input supports_direction
+  reverse_when_heating_input: !input reverse_when_heating
+  heating_speed_pct_input: !input heating_speed_pct
+  comfort_mode_input: !input comfort_mode
+  comfort_category_input: !input comfort_category
+  units_input: !input units
+  temp_on_threshold_input: !input temp_on_threshold
+  temp_off_threshold_input: !input temp_off_threshold
+  speed_mode_input: !input speed_mode
+  speed_tier_1_threshold_input: !input speed_tier_1_threshold
+  speed_tier_2_threshold_input: !input speed_tier_2_threshold
+  speed_low_pct_input: !input speed_low_pct
+  speed_medium_pct_input: !input speed_medium_pct
+  speed_high_pct_input: !input speed_high_pct
+  presence_off_delay_min_input: !input presence_off_delay_min
+  debug_level_v: !input debug_level
+
+  # Resolve optional sensors
+  humidity_sensor: "{{ humidity_sensor_input if humidity_sensor_input else none }}"
+  outdoor_temp_sensor: "{{ outdoor_temp_sensor_input if outdoor_temp_sensor_input else none }}"
+  has_humidity: "{{ humidity_sensor is not none and humidity_sensor != '' }}"
+  has_outdoor_temp: "{{ outdoor_temp_sensor is not none and outdoor_temp_sensor != '' }}"
+
+  # Basic settings
+  supports_direction: "{{ supports_direction_input | default(false) }}"
+  reverse_when_heating: "{{ reverse_when_heating_input | default(false) }}"
+  heating_speed_pct: "{{ heating_speed_pct_input | int(25) }}"
+  comfort_mode: "{{ comfort_mode_input | default('adaptive') }}"
+  comfort_category: "{{ comfort_category_input | default('II') }}"
+  speed_mode: "{{ speed_mode_input | default('deviation') }}"
+  speed_tier_1: "{{ speed_tier_1_threshold_input | float(2) }}"
+  speed_tier_2: "{{ speed_tier_2_threshold_input | float(4) }}"
+  speed_low_pct: "{{ speed_low_pct_input | int(33) }}"
+  speed_medium_pct: "{{ speed_medium_pct_input | int(66) }}"
+  speed_high_pct: "{{ speed_high_pct_input | int(100) }}"
+  presence_off_delay_min: "{{ presence_off_delay_min_input | int(30) }}"
+  debug_enabled: "{{ debug_level_v in ['basic', 'verbose'] }}"
+  debug_verbose: "{{ debug_level_v == 'verbose' }}"
+
+  # Unit detection and conversion
+  _sensor_unit: "{{ state_attr(temp_sensor, 'unit_of_measurement') | default('°F', true) | string }}"
+  is_imperial: >
+    {% if units_input == 'f' %}
+      true
+    {% elif units_input == 'c' %}
+      false
+    {% else %}
+      {{ _sensor_unit | lower in ['°f', 'f', 'fahrenheit'] }}
+    {% endif %}
+
+  # Temperature tolerance based on comfort category (in Celsius)
+  tol_c: "{% if comfort_category == 'I' %}2.0{% elif comfort_category == 'II' %}3.0{% else %}4.0{% endif %}"
+  tol_sys: "{{ (tol_c | float * 9/5) if is_imperial else tol_c | float }}"
+
+  # Fixed thresholds (convert to system units if needed)
+  temp_on_threshold: "{{ temp_on_threshold_input | float(74 if is_imperial else 23.3) }}"
+  temp_off_threshold: "{{ temp_off_threshold_input | float(72 if is_imperial else 22.2) }}"
+
+  # Get indoor temperature in system units
+  t_in_raw: "{{ states(temp_sensor) | float(70 if is_imperial else 21) }}"
+  _t_in_unit: "{{ state_attr(temp_sensor, 'unit_of_measurement') | default('', true) | string }}"
+  t_in_sys: >
+    {% set v = t_in_raw %}
+    {% set u = _t_in_unit | lower %}
+    {% if is_imperial and u in ['°c', 'c', 'celsius'] %}
+      {{ v * 9/5 + 32 }}
+    {% elif not is_imperial and u in ['°f', 'f', 'fahrenheit'] %}
+      {{ (v - 32) * 5/9 }}
+    {% else %}
+      {{ v }}
+    {% endif %}
+  t_in_c: "{{ ((t_in_sys - 32) * 5/9) if is_imperial else t_in_sys }}"
+
+  # Get indoor humidity
+  rh_in: >
+    {% if has_humidity %}
+      {{ states(humidity_sensor) | float(50) }}
+    {% else %}
+      50
+    {% endif %}
+
+  # Get outdoor temperature (supports weather entities)
+  _is_weather_out: "{{ outdoor_temp_sensor and outdoor_temp_sensor.startswith('weather.') }}"
+  t_out_raw: >
+    {% if has_outdoor_temp %}
+      {% if _is_weather_out %}
+        {{ state_attr(outdoor_temp_sensor, 'temperature') | float(65 if is_imperial else 18) }}
+      {% else %}
+        {{ states(outdoor_temp_sensor) | float(65 if is_imperial else 18) }}
+      {% endif %}
+    {% else %}
+      {{ 65 if is_imperial else 18 }}
+    {% endif %}
+  _t_out_unit: >
+    {% if has_outdoor_temp %}
+      {% if _is_weather_out %}
+        {{ state_attr(outdoor_temp_sensor, 'temperature_unit') | default('', true) | string }}
+      {% else %}
+        {{ state_attr(outdoor_temp_sensor, 'unit_of_measurement') | default('', true) | string }}
+      {% endif %}
+    {% else %}
+      {{ '' }}
+    {% endif %}
+  t_out_c: >
+    {% set v = t_out_raw | float %}
+    {% set u = _t_out_unit | lower %}
+    {% if u in ['°f', 'f', 'fahrenheit'] or (u == '' and is_imperial) %}
+      {{ (v - 32) * 5/9 }}
+    {% else %}
+      {{ v }}
+    {% endif %}
+
+  # Heat index calculation (Rothfusz regression, simplified)
+  # Only calculated when humidity sensor is available
+  heat_index_c: >
+    {% if has_humidity %}
+      {% set T = t_in_c | float %}
+      {% set R = rh_in | float %}
+      {% if T < 20 or R < 40 %}
+        {{ T }}
+      {% else %}
+        {% set c1 = -8.78469475556 %}
+        {% set c2 = 1.61139411 %}
+        {% set c3 = 2.33854883889 %}
+        {% set c4 = -0.14611605 %}
+        {% set c5 = -0.012308094 %}
+        {% set c6 = -0.0164248277778 %}
+        {% set c7 = 0.002211732 %}
+        {% set c8 = 0.00072546 %}
+        {% set c9 = -0.000003582 %}
+        {% set HI = c1 + c2*T + c3*R + c4*T*R + c5*T*T + c6*R*R + c7*T*T*R + c8*T*R*R + c9*T*T*R*R %}
+        {{ HI }}
+      {% endif %}
+    {% else %}
+      {{ t_in_c }}
+    {% endif %}
+
+  # Effective indoor temperature (uses heat index when humidity available)
+  t_effective_c: "{{ heat_index_c | float }}"
+  t_effective_sys: "{{ (t_effective_c * 9/5 + 32) if is_imperial else t_effective_c }}"
+
+  # EN 16798 Adaptive comfort model
+  # Comfort temperature = 0.33 * T_rm + 18.8 (in Celsius)
+  # Where T_rm is running mean outdoor temperature (simplified to current outdoor)
+  # Clamp outdoor temp to 10-30°C range per standard
+  t_rm_c: "{{ [[t_out_c | float, 10] | max, 30] | min }}"
+  comfort_temp_c: "{{ 0.33 * t_rm_c + 18.8 }}"
+  comfort_temp_sys: "{{ (comfort_temp_c * 9/5 + 32) if is_imperial else comfort_temp_c }}"
+
+  # Comfort band (upper and lower limits)
+  comfort_upper_c: "{{ comfort_temp_c + tol_c | float }}"
+  comfort_lower_c: "{{ comfort_temp_c - tol_c | float }}"
+  comfort_upper_sys: "{{ (comfort_upper_c * 9/5 + 32) if is_imperial else comfort_upper_c }}"
+  comfort_lower_sys: "{{ (comfort_lower_c * 9/5 + 32) if is_imperial else comfort_lower_c }}"
+
+  # Apply absolute limits from fixed thresholds
+  effective_upper_sys: >
+    {% if comfort_mode == 'adaptive' and has_outdoor_temp %}
+      {{ [comfort_upper_sys | float, temp_on_threshold | float] | min }}
+    {% else %}
+      {{ temp_on_threshold | float }}
+    {% endif %}
+  effective_lower_sys: >
+    {% if comfort_mode == 'adaptive' and has_outdoor_temp %}
+      {{ [comfort_lower_sys | float, temp_off_threshold | float] | max }}
+    {% else %}
+      {{ temp_off_threshold | float }}
+    {% endif %}
+
+  # Comfort state determination
+  is_above_comfort: "{{ t_effective_sys | float > effective_upper_sys | float }}"
+  is_below_comfort: "{{ t_effective_sys | float < effective_lower_sys | float }}"
+  comfort_deviation: "{{ (t_effective_sys | float - effective_upper_sys | float) | round(1) }}"
+
+  # HVAC state
+  hvac_action: "{{ state_attr(climate_entity, 'hvac_action') | default('idle') }}"
+  is_heating: "{{ hvac_action == 'heating' }}"
+  is_cooling: "{{ hvac_action == 'cooling' }}"
+  is_occupied: "{{ is_state(presence_sensor, 'on') }}"
+
+  # Season
+  current_season: "{{ states('sensor.season') | default('summer') }}"
+  is_winter: "{{ current_season == 'winter' }}"
+
+  # Speed calculation
+  calculated_speed: >
+    {% if speed_mode == 'deviation' %}
+      {% set dev = comfort_deviation | float %}
+      {% if dev > speed_tier_2 %}
+        {{ speed_high_pct }}
+      {% elif dev > speed_tier_1 %}
+        {{ speed_medium_pct }}
+      {% else %}
+        {{ speed_low_pct }}
+      {% endif %}
+    {% else %}
+      {% set temp = t_effective_sys | float %}
+      {% set tier1 = effective_upper_sys | float + speed_tier_1 | float %}
+      {% set tier2 = effective_upper_sys | float + speed_tier_2 | float %}
+      {% if temp > tier2 %}
+        {{ speed_high_pct }}
+      {% elif temp > tier1 %}
+        {{ speed_medium_pct }}
+      {% else %}
+        {{ speed_low_pct }}
+      {% endif %}
+    {% endif %}
+
+  # Direction calculation
+  calculated_direction: >
+    {% if is_heating and reverse_when_heating %}
+      reverse
+    {% elif is_winter and not is_cooling %}
+      reverse
+    {% else %}
+      forward
+    {% endif %}
+
+mode: single
+max_exceeded: silent
+
+trigger:
+  - platform: state
+    entity_id: !input temp_sensor
+    id: temp_changed
+  - platform: state
+    entity_id: !input presence_sensor
+    to: "off"
+    for:
+      minutes: !input presence_off_delay_min
+    id: presence_cleared
+  - platform: state
+    entity_id: !input presence_sensor
+    to: "on"
+    id: presence_detected
+  - platform: state
+    entity_id: !input climate_entity
+    attribute: hvac_action
+    id: hvac_changed
+  - platform: state
+    entity_id: sensor.season
+    id: season_changed
+  - platform: time_pattern
+    minutes: "/5"
+    id: periodic
+
+condition: []
+
+action:
+  - if:
+      - condition: template
+        value_template: "{{ debug_verbose }}"
+    then:
+      - service: system_log.write
+        data:
+          level: info
+          message: >
+            [Fan Climate Pro v2] Trigger: {{ trigger.id | default('unknown') }} |
+            Indoor: {{ t_in_sys | round(1) }}° (effective: {{ t_effective_sys | round(1) }}°) |
+            RH: {{ rh_in | round(0) }}% |
+            Outdoor: {{ t_out_c | round(1) }}°C |
+            Comfort band: {{ effective_lower_sys | round(1) }}° - {{ effective_upper_sys | round(1) }}° |
+            Above comfort: {{ is_above_comfort }} (dev: {{ comfort_deviation }}°) |
+            HVAC: {{ hvac_action }} | Occupied: {{ is_occupied }}
+
+  - choose:
+      # HVAC is heating
+      - conditions:
+          - condition: template
+            value_template: "{{ is_heating }}"
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ reverse_when_heating and supports_direction and is_occupied }}"
+            then:
+              - if:
+                  - condition: template
+                    value_template: "{{ debug_enabled }}"
+                then:
+                  - service: system_log.write
+                    data:
+                      level: info
+                      message: "[Fan Climate Pro] HVAC heating + occupied → fan REVERSE at {{ heating_speed_pct }}%"
+              - service: fan.set_direction
+                target:
+                  entity_id: "{{ fan_entity }}"
+                data:
+                  direction: reverse
+              - service: fan.turn_on
+                target:
+                  entity_id: "{{ fan_entity }}"
+                data:
+                  percentage: "{{ heating_speed_pct }}"
+            else:
+              - if:
+                  - condition: template
+                    value_template: "{{ debug_enabled }}"
+                then:
+                  - service: system_log.write
+                    data:
+                      level: info
+                      message: "[Fan Climate Pro] HVAC heating → fan OFF (no drafts)"
+              - service: fan.turn_off
+                target:
+                  entity_id: "{{ fan_entity }}"
+
+      # HVAC is cooling - run fan to distribute cool air
+      - conditions:
+          - condition: template
+            value_template: "{{ is_cooling and is_occupied }}"
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+                  level: info
+                  message: "[Fan Climate Pro] HVAC cooling + occupied → fan FORWARD at {{ calculated_speed }}%"
+          - if:
+              - condition: template
+                value_template: "{{ supports_direction }}"
+            then:
+              - service: fan.set_direction
+                target:
+                  entity_id: "{{ fan_entity }}"
+                data:
+                  direction: forward
+          - service: fan.turn_on
+            target:
+              entity_id: "{{ fan_entity }}"
+            data:
+              percentage: "{{ calculated_speed }}"
+
+      # Season changed while fan is on - update direction
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'season_changed' }}"
+          - condition: template
+            value_template: "{{ supports_direction }}"
+          - condition: state
+            entity_id: !input fan_entity
+            state: "on"
+          - condition: template
+            value_template: "{{ not is_heating and not is_cooling }}"
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+                  level: info
+                  message: "[Fan Climate Pro] Season changed to {{ current_season }} → direction {{ calculated_direction }}"
+          - service: fan.set_direction
+            target:
+              entity_id: "{{ fan_entity }}"
+            data:
+              direction: "{{ calculated_direction }}"
+
+      # Above comfort band - turn on fan
+      - conditions:
+          - condition: template
+            value_template: "{{ not is_heating }}"
+          - condition: template
+            value_template: "{{ is_occupied }}"
+          - condition: template
+            value_template: "{{ is_above_comfort }}"
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+                  level: info
+                  message: >
+                    [Fan Climate Pro] Above comfort ({{ t_effective_sys | round(1) }}° > {{ effective_upper_sys | round(1) }}°) →
+                    fan at {{ calculated_speed }}% {{ calculated_direction }}
+          - if:
+              - condition: template
+                value_template: "{{ supports_direction }}"
+            then:
+              - service: fan.set_direction
+                target:
+                  entity_id: "{{ fan_entity }}"
+                data:
+                  direction: "{{ calculated_direction }}"
+          - service: fan.turn_on
+            target:
+              entity_id: "{{ fan_entity }}"
+            data:
+              percentage: "{{ calculated_speed }}"
+
+      # Below comfort band or unoccupied - turn off fan
+      - conditions:
+          - condition: or
+            conditions:
+              - condition: template
+                value_template: "{{ is_below_comfort }}"
+              - condition: template
+                value_template: "{{ trigger.id == 'presence_cleared' }}"
+          - condition: template
+            value_template: "{{ not (is_heating and reverse_when_heating and supports_direction) }}"
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+                  level: info
+                  message: >
+                    [Fan Climate Pro] {{ 'Below comfort (' ~ (t_effective_sys | round(1)) ~ '° < ' ~ (effective_lower_sys | round(1)) ~ '°)' if is_below_comfort else 'Unoccupied' }} → fan OFF
+          - service: fan.turn_off
+            target:
+              entity_id: "{{ fan_entity }}"
+
+      # Within comfort band and fan is on - check if we should turn it off
+      - conditions:
+          - condition: template
+            value_template: "{{ not is_above_comfort and not is_below_comfort }}"
+          - condition: state
+            entity_id: !input fan_entity
+            state: "on"
+          - condition: template
+            value_template: "{{ not is_cooling }}"
+          - condition: template
+            value_template: "{{ not (is_heating and reverse_when_heating) }}"
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ debug_enabled }}"
+            then:
+              - service: system_log.write
+                data:
+                  level: info
+                  message: >
+                    [Fan Climate Pro] Within comfort band ({{ effective_lower_sys | round(1) }}° - {{ effective_upper_sys | round(1) }}°) → fan OFF
+          - service: fan.turn_off
+            target:
+              entity_id: "{{ fan_entity }}"
+
+      # HVAC stopped - re-evaluate
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'hvac_changed' }}"
+          - condition: template
+            value_template: "{{ not is_heating and not is_cooling }}"
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ is_above_comfort and is_occupied }}"
+            then:
+              - if:
+                  - condition: template
+                    value_template: "{{ debug_enabled }}"
+                then:
+                  - service: system_log.write
+                    data:
+                      level: info
+                      message: "[Fan Climate Pro] HVAC stopped → still above comfort, fan at {{ calculated_speed }}% {{ calculated_direction }}"
+              - if:
+                  - condition: template
+                    value_template: "{{ supports_direction }}"
+                then:
+                  - service: fan.set_direction
+                    target:
+                      entity_id: "{{ fan_entity }}"
+                    data:
+                      direction: "{{ calculated_direction }}"
+              - service: fan.turn_on
+                target:
+                  entity_id: "{{ fan_entity }}"
+                data:
+                  percentage: "{{ calculated_speed }}"
+            else:
+              - if:
+                  - condition: template
+                    value_template: "{{ debug_enabled }}"
+                then:
+                  - service: system_log.write
+                    data:
+                      level: info
+                      message: "[Fan Climate Pro] HVAC stopped → within/below comfort or unoccupied, fan OFF"
+              - service: fan.turn_off
+                target:
+                  entity_id: "{{ fan_entity }}"
