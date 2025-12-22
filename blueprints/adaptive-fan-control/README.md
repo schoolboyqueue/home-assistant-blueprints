@@ -5,7 +5,7 @@
 
 [![Import Blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/adaptive-fan-control/adaptive_fan_control_pro_blueprint.yaml)
 
-**Version:** 2.0.1
+**Version:** 2.0.2
 
 ---
 

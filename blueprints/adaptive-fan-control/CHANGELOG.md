@@ -1,5 +1,11 @@
 # Ceiling Fan Climate Control Pro - Changelog
 
+## [2.0.2] - 2025-12-21
+
+### Fixed
+
+- Fixed debug logging not working - now uses direct input reference in templates instead of pre-computed boolean variable (matches pattern used in other blueprints)
+
 ## [2.0.1] - 2025-12-21
 
 ### Fixed

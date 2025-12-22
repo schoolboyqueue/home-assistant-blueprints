@@ -1,5 +1,5 @@
 blueprint:
-  name: Ceiling Fan Climate Control Pro v2.0.1
+  name: Ceiling Fan Climate Control Pro v2.0.2
   description: >
     HVAC-aware ceiling fan automation with adaptive comfort control. Uses the
     EN 16798 / ASHRAE 55 adaptive comfort model to dynamically adjust fan behavior
@@ -332,7 +332,7 @@ blueprint:
               custom_value: false
 
 variables:
-  blueprint_version: "2.0.1"
+  blueprint_version: "2.0.2"
   fan_entity: !input fan_entity
   temp_sensor: !input temp_sensor
   humidity_sensor_input: !input humidity_sensor
@@ -375,8 +375,6 @@ variables:
   speed_medium_pct: "{{ speed_medium_pct_input | int(66) }}"
   speed_high_pct: "{{ speed_high_pct_input | int(100) }}"
   presence_off_delay_min: "{{ presence_off_delay_min_input | int(30) }}"
-  debug_enabled: "{{ debug_level_v in ['basic', 'verbose'] }}"
-  debug_verbose: "{{ debug_level_v == 'verbose' }}"
 
   # Unit detection and conversion
   _sensor_unit: "{{ state_attr(temp_sensor, 'unit_of_measurement') | default('°F', true) | string }}"
@@ -591,7 +589,7 @@ action:
   # Always log on basic or verbose
   - if:
       - condition: template
-        value_template: "{{ debug_enabled }}"
+        value_template: "{{ debug_level_v in ['basic', 'verbose'] }}"
     then:
       - service: system_log.write
         data:
@@ -617,7 +615,7 @@ action:
             then:
               - if:
                   - condition: template
-                    value_template: "{{ debug_enabled }}"
+                    value_template: "{{ debug_level_v in ['basic', 'verbose'] }}"
                 then:
                   - service: system_log.write
                     data:
@@ -636,7 +634,7 @@ action:
             else:
               - if:
                   - condition: template
-                    value_template: "{{ debug_enabled }}"
+                    value_template: "{{ debug_level_v in ['basic', 'verbose'] }}"
                 then:
                   - service: system_log.write
                     data:
@@ -653,7 +651,7 @@ action:
         sequence:
           - if:
               - condition: template
-                value_template: "{{ debug_enabled }}"
+                value_template: "{{ debug_level_v in ['basic', 'verbose'] }}"
             then:
               - service: system_log.write
                 data:
@@ -688,7 +686,7 @@ action:
         sequence:
           - if:
               - condition: template
-                value_template: "{{ debug_enabled }}"
+                value_template: "{{ debug_level_v in ['basic', 'verbose'] }}"
             then:
               - service: system_log.write
                 data:
@@ -711,7 +709,7 @@ action:
         sequence:
           - if:
               - condition: template
-                value_template: "{{ debug_enabled }}"
+                value_template: "{{ debug_level_v in ['basic', 'verbose'] }}"
             then:
               - service: system_log.write
                 data:
@@ -747,7 +745,7 @@ action:
         sequence:
           - if:
               - condition: template
-                value_template: "{{ debug_enabled }}"
+                value_template: "{{ debug_level_v in ['basic', 'verbose'] }}"
             then:
               - service: system_log.write
                 data:
@@ -772,7 +770,7 @@ action:
         sequence:
           - if:
               - condition: template
-                value_template: "{{ debug_enabled }}"
+                value_template: "{{ debug_level_v in ['basic', 'verbose'] }}"
             then:
               - service: system_log.write
                 data:
@@ -796,7 +794,7 @@ action:
             then:
               - if:
                   - condition: template
-                    value_template: "{{ debug_enabled }}"
+                    value_template: "{{ debug_level_v in ['basic', 'verbose'] }}"
                 then:
                   - service: system_log.write
                     data:
@@ -819,7 +817,7 @@ action:
             else:
               - if:
                   - condition: template
-                    value_template: "{{ debug_enabled }}"
+                    value_template: "{{ debug_level_v in ['basic', 'verbose'] }}"
                 then:
                   - service: system_log.write
                     data:
@@ -833,7 +831,7 @@ action:
     default:
       - if:
           - condition: template
-            value_template: "{{ debug_enabled }}"
+            value_template: "{{ debug_level_v in ['basic', 'verbose'] }}"
         then:
           - service: system_log.write
             data:
