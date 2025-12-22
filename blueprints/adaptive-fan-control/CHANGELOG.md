@@ -1,5 +1,15 @@
 # Ceiling Fan Climate Control Pro - Changelog
 
+## [2.1.0] - 2025-12-21
+
+### Changed
+
+- **Adaptive mode now uses pure EN 16798 comfort calculation**: Fixed thresholds no longer cap the adaptive comfort band. In adaptive mode, the comfort band is determined entirely by outdoor temperature and comfort category (e.g., Category III at 6°C outdoor → 64.6°F - 79.0°F band). Fixed thresholds only apply in "Fixed thresholds" mode.
+
+### Fixed
+
+- Fan no longer turns on unnecessarily in winter when indoor temp is within adaptive comfort band (e.g., 78°F at low humidity with cold outdoor temps)
+
 ## [2.0.3] - 2025-12-21
 
 ### Fixed

@@ -1,5 +1,5 @@
 blueprint:
-  name: Ceiling Fan Climate Control Pro v2.0.3
+  name: Ceiling Fan Climate Control Pro v2.1.0
   description: >
     HVAC-aware ceiling fan automation with adaptive comfort control. Uses the
     EN 16798 / ASHRAE 55 adaptive comfort model to dynamically adjust fan behavior
@@ -332,7 +332,7 @@ blueprint:
               custom_value: false
 
 variables:
-  blueprint_version: "2.0.3"
+  blueprint_version: "2.1.0"
   fan_entity: !input fan_entity
   temp_sensor: !input temp_sensor
   humidity_sensor_input: !input humidity_sensor
@@ -492,16 +492,18 @@ variables:
   comfort_upper_sys: "{{ (comfort_upper_c * 9/5 + 32) if is_imperial else comfort_upper_c }}"
   comfort_lower_sys: "{{ (comfort_lower_c * 9/5 + 32) if is_imperial else comfort_lower_c }}"
 
-  # Apply absolute limits from fixed thresholds
+  # Effective comfort band limits
+  # In adaptive mode: use pure EN 16798 calculation (no fixed threshold caps)
+  # In fixed mode: use user-defined fixed thresholds
   effective_upper_sys: >
     {% if comfort_mode == 'adaptive' and has_outdoor_temp %}
-      {{ [comfort_upper_sys | float, temp_on_threshold | float] | min }}
+      {{ comfort_upper_sys | float }}
     {% else %}
       {{ temp_on_threshold | float }}
     {% endif %}
   effective_lower_sys: >
     {% if comfort_mode == 'adaptive' and has_outdoor_temp %}
-      {{ [comfort_lower_sys | float, temp_off_threshold | float] | max }}
+      {{ comfort_lower_sys | float }}
     {% else %}
       {{ temp_off_threshold | float }}
     {% endif %}
