@@ -1,5 +1,11 @@
 # Ceiling Fan Climate Control Pro - Changelog
 
+## [2.0.3] - 2025-12-21
+
+### Fixed
+
+- Switched debug logging from `system_log.write` to `logbook.log` for better visibility in Home Assistant's Logbook UI
+
 ## [2.0.2] - 2025-12-21
 
 ### Fixed

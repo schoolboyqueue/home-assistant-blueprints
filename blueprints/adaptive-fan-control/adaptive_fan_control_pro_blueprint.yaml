@@ -1,5 +1,5 @@
 blueprint:
-  name: Ceiling Fan Climate Control Pro v2.0.2
+  name: Ceiling Fan Climate Control Pro v2.0.3
   description: >
     HVAC-aware ceiling fan automation with adaptive comfort control. Uses the
     EN 16798 / ASHRAE 55 adaptive comfort model to dynamically adjust fan behavior
@@ -332,7 +332,7 @@ blueprint:
               custom_value: false
 
 variables:
-  blueprint_version: "2.0.2"
+  blueprint_version: "2.0.3"
   fan_entity: !input fan_entity
   temp_sensor: !input temp_sensor
   humidity_sensor_input: !input humidity_sensor
@@ -586,17 +586,17 @@ trigger:
 condition: []
 
 action:
-  # Always log on basic or verbose
+  # Always log on basic or verbose - use logbook for visibility
   - if:
       - condition: template
         value_template: "{{ debug_level_v in ['basic', 'verbose'] }}"
     then:
-      - service: system_log.write
+      - service: logbook.log
         data:
-          level: info
+          name: "Fan Climate Pro"
+          entity_id: "{{ fan_entity }}"
           message: >
-            [Fan Climate Pro] Trigger: {{ trigger.id | default('unknown') }} |
-            Fan: {{ fan_entity }} |
+            Trigger: {{ trigger.id | default('unknown') }} |
             Indoor: {{ t_in_sys | round(1) }}° {% if has_humidity %}(HI: {{ t_effective_sys | round(1) }}°, RH: {{ rh_in | round(0) }}%){% endif %} |
             {% if has_outdoor_temp %}Outdoor: {{ t_out_c | round(1) }}°C | {% endif %}
             Comfort: {{ effective_lower_sys | round(1) }}° - {{ effective_upper_sys | round(1) }}° |
@@ -617,10 +617,11 @@ action:
                   - condition: template
                     value_template: "{{ debug_level_v in ['basic', 'verbose'] }}"
                 then:
-                  - service: system_log.write
+                  - service: logbook.log
                     data:
-                      level: info
-                      message: "[Fan Climate Pro] HVAC heating + occupied → fan REVERSE at {{ heating_speed_pct }}%"
+                      name: "Fan Climate Pro"
+                      entity_id: "{{ fan_entity }}"
+                      message: "HVAC heating + occupied → fan REVERSE at {{ heating_speed_pct }}%"
               - service: fan.set_direction
                 target:
                   entity_id: "{{ fan_entity }}"
@@ -636,10 +637,11 @@ action:
                   - condition: template
                     value_template: "{{ debug_level_v in ['basic', 'verbose'] }}"
                 then:
-                  - service: system_log.write
+                  - service: logbook.log
                     data:
-                      level: info
-                      message: "[Fan Climate Pro] HVAC heating → fan OFF (no drafts)"
+                      name: "Fan Climate Pro"
+                      entity_id: "{{ fan_entity }}"
+                      message: "HVAC heating → fan OFF (no drafts)"
               - service: fan.turn_off
                 target:
                   entity_id: "{{ fan_entity }}"
@@ -653,10 +655,11 @@ action:
               - condition: template
                 value_template: "{{ debug_level_v in ['basic', 'verbose'] }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: "[Fan Climate Pro] HVAC cooling + occupied → fan FORWARD at {{ calculated_speed }}%"
+                  name: "Fan Climate Pro"
+                  entity_id: "{{ fan_entity }}"
+                  message: "HVAC cooling + occupied → fan FORWARD at {{ calculated_speed }}%"
           - if:
               - condition: template
                 value_template: "{{ supports_direction }}"
@@ -688,10 +691,11 @@ action:
               - condition: template
                 value_template: "{{ debug_level_v in ['basic', 'verbose'] }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: "[Fan Climate Pro] Season changed to {{ current_season }} → direction {{ calculated_direction }}"
+                  name: "Fan Climate Pro"
+                  entity_id: "{{ fan_entity }}"
+                  message: "Season changed to {{ current_season }} → direction {{ calculated_direction }}"
           - service: fan.set_direction
             target:
               entity_id: "{{ fan_entity }}"
@@ -711,12 +715,11 @@ action:
               - condition: template
                 value_template: "{{ debug_level_v in ['basic', 'verbose'] }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: >
-                    [Fan Climate Pro] Above comfort ({{ t_effective_sys | round(1) }}° > {{ effective_upper_sys | round(1) }}°) →
-                    fan at {{ calculated_speed }}% {{ calculated_direction }}
+                  name: "Fan Climate Pro"
+                  entity_id: "{{ fan_entity }}"
+                  message: "Above comfort ({{ t_effective_sys | round(1) }}° > {{ effective_upper_sys | round(1) }}°) → fan at {{ calculated_speed }}% {{ calculated_direction }}"
           - if:
               - condition: template
                 value_template: "{{ supports_direction }}"
@@ -747,11 +750,11 @@ action:
               - condition: template
                 value_template: "{{ debug_level_v in ['basic', 'verbose'] }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: >
-                    [Fan Climate Pro] {{ 'Below comfort (' ~ (t_effective_sys | round(1)) ~ '° < ' ~ (effective_lower_sys | round(1)) ~ '°)' if is_below_comfort else 'Unoccupied' }} → fan OFF
+                  name: "Fan Climate Pro"
+                  entity_id: "{{ fan_entity }}"
+                  message: "{{ 'Below comfort (' ~ (t_effective_sys | round(1)) ~ '° < ' ~ (effective_lower_sys | round(1)) ~ '°)' if is_below_comfort else 'Unoccupied' }} → fan OFF"
           - service: fan.turn_off
             target:
               entity_id: "{{ fan_entity }}"
@@ -772,11 +775,11 @@ action:
               - condition: template
                 value_template: "{{ debug_level_v in ['basic', 'verbose'] }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: >
-                    [Fan Climate Pro] Within comfort band ({{ effective_lower_sys | round(1) }}° - {{ effective_upper_sys | round(1) }}°) → fan OFF
+                  name: "Fan Climate Pro"
+                  entity_id: "{{ fan_entity }}"
+                  message: "Within comfort band ({{ effective_lower_sys | round(1) }}° - {{ effective_upper_sys | round(1) }}°) → fan OFF"
           - service: fan.turn_off
             target:
               entity_id: "{{ fan_entity }}"
@@ -796,10 +799,11 @@ action:
                   - condition: template
                     value_template: "{{ debug_level_v in ['basic', 'verbose'] }}"
                 then:
-                  - service: system_log.write
+                  - service: logbook.log
                     data:
-                      level: info
-                      message: "[Fan Climate Pro] HVAC stopped → still above comfort, fan at {{ calculated_speed }}% {{ calculated_direction }}"
+                      name: "Fan Climate Pro"
+                      entity_id: "{{ fan_entity }}"
+                      message: "HVAC stopped → still above comfort, fan at {{ calculated_speed }}% {{ calculated_direction }}"
               - if:
                   - condition: template
                     value_template: "{{ supports_direction }}"
@@ -819,10 +823,11 @@ action:
                   - condition: template
                     value_template: "{{ debug_level_v in ['basic', 'verbose'] }}"
                 then:
-                  - service: system_log.write
+                  - service: logbook.log
                     data:
-                      level: info
-                      message: "[Fan Climate Pro] HVAC stopped → within/below comfort or unoccupied, fan OFF"
+                      name: "Fan Climate Pro"
+                      entity_id: "{{ fan_entity }}"
+                      message: "HVAC stopped → within/below comfort or unoccupied, fan OFF"
               - service: fan.turn_off
                 target:
                   entity_id: "{{ fan_entity }}"
@@ -833,10 +838,8 @@ action:
           - condition: template
             value_template: "{{ debug_level_v in ['basic', 'verbose'] }}"
         then:
-          - service: system_log.write
+          - service: logbook.log
             data:
-              level: info
-              message: >
-                [Fan Climate Pro] No action taken - current state: fan {{ states(fan_entity) }},
-                comfort {{ 'above' if is_above_comfort else ('below' if is_below_comfort else 'within') }},
-                HVAC {{ hvac_action }}, occupied {{ is_occupied }}
+              name: "Fan Climate Pro"
+              entity_id: "{{ fan_entity }}"
+              message: "No action taken - fan {{ states(fan_entity) }}, comfort {{ 'above' if is_above_comfort else ('below' if is_below_comfort else 'within') }}, HVAC {{ hvac_action }}, occupied {{ is_occupied }}"
