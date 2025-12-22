@@ -1,5 +1,13 @@
 # Ceiling Fan Climate Control Pro - Changelog
 
+## [2.0.1] - 2025-12-21
+
+### Fixed
+
+- Debug logging now fires on both "basic" and "verbose" levels (was only verbose)
+- Added default case logging when no action is taken
+- Improved log message format with conditional humidity/outdoor temp display
+
 ## [2.0.0] - 2025-12-21
 
 ### Added

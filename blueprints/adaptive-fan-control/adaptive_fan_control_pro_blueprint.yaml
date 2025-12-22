@@ -1,5 +1,5 @@
 blueprint:
-  name: Ceiling Fan Climate Control Pro v2.0.0
+  name: Ceiling Fan Climate Control Pro v2.0.1
   description: >
     HVAC-aware ceiling fan automation with adaptive comfort control. Uses the
     EN 16798 / ASHRAE 55 adaptive comfort model to dynamically adjust fan behavior
@@ -332,7 +332,7 @@ blueprint:
               custom_value: false
 
 variables:
-  blueprint_version: "2.0.0"
+  blueprint_version: "2.0.1"
   fan_entity: !input fan_entity
   temp_sensor: !input temp_sensor
   humidity_sensor_input: !input humidity_sensor
@@ -588,20 +588,21 @@ trigger:
 condition: []
 
 action:
+  # Always log on basic or verbose
   - if:
       - condition: template
-        value_template: "{{ debug_verbose }}"
+        value_template: "{{ debug_enabled }}"
     then:
       - service: system_log.write
         data:
           level: info
           message: >
-            [Fan Climate Pro v2] Trigger: {{ trigger.id | default('unknown') }} |
-            Indoor: {{ t_in_sys | round(1) }}° (effective: {{ t_effective_sys | round(1) }}°) |
-            RH: {{ rh_in | round(0) }}% |
-            Outdoor: {{ t_out_c | round(1) }}°C |
-            Comfort band: {{ effective_lower_sys | round(1) }}° - {{ effective_upper_sys | round(1) }}° |
-            Above comfort: {{ is_above_comfort }} (dev: {{ comfort_deviation }}°) |
+            [Fan Climate Pro] Trigger: {{ trigger.id | default('unknown') }} |
+            Fan: {{ fan_entity }} |
+            Indoor: {{ t_in_sys | round(1) }}° {% if has_humidity %}(HI: {{ t_effective_sys | round(1) }}°, RH: {{ rh_in | round(0) }}%){% endif %} |
+            {% if has_outdoor_temp %}Outdoor: {{ t_out_c | round(1) }}°C | {% endif %}
+            Comfort: {{ effective_lower_sys | round(1) }}° - {{ effective_upper_sys | round(1) }}° |
+            Above: {{ is_above_comfort }} | Below: {{ is_below_comfort }} | Dev: {{ comfort_deviation }}° |
             HVAC: {{ hvac_action }} | Occupied: {{ is_occupied }}
 
   - choose:
@@ -827,3 +828,17 @@ action:
               - service: fan.turn_off
                 target:
                   entity_id: "{{ fan_entity }}"
+
+    # Default case - no action taken
+    default:
+      - if:
+          - condition: template
+            value_template: "{{ debug_enabled }}"
+        then:
+          - service: system_log.write
+            data:
+              level: info
+              message: >
+                [Fan Climate Pro] No action taken - current state: fan {{ states(fan_entity) }},
+                comfort {{ 'above' if is_above_comfort else ('below' if is_below_comfort else 'within') }},
+                HVAC {{ hvac_action }}, occupied {{ is_occupied }}
