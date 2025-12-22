@@ -1,5 +1,5 @@
 blueprint:
-  name: "Multi Switch Light Control Pro v1.9.2"
+  name: "Multi Switch Light Control Pro v1.9.3"
   description: >
     Turn a supported switch or remote into a smart light controller. Supports Inovelli
     Zigbee switches (via Zigbee2MQTT or ZHA), Zooz/Inovelli Z-Wave switches, and Lutron
@@ -286,7 +286,7 @@ blueprint:
                 - "basic"
                 - "verbose"
 variables:
-  blueprint_version: "1.9.2"
+  blueprint_version: "1.9.3"
 
   switch_device: !input switch_device
   zigbee_action_sensor_input: !input zigbee_action_sensor
@@ -925,21 +925,23 @@ action:
       - condition: template
         value_template: "{{ debug_enabled }}"
     then:
-      - service: system_log.write
+      - service: logbook.log
         data:
-          level: info
+          name: "Multi Switch Light Pro"
+          entity_id: "{{ light_entity }}"
           message: >
-            [Multi Switch Light Pro] Detected switch {{ detected_label }}
+            Detected switch {{ detected_label }}
             | type={{ switch_type }}
   - if:
       - condition: template
         value_template: "{{ debug_enabled }}"
     then:
-      - service: system_log.write
+      - service: logbook.log
         data:
-          level: info
+          name: "Multi Switch Light Pro"
+          entity_id: "{{ light_entity }}"
           message: >
-            [Multi Switch Light Pro] Trigger fired: id={{ trigger.id | default('unknown') }}
+            Trigger fired: id={{ trigger.id | default('unknown') }}
             | platform={{ trigger.platform | default('unknown') }}
             | switch_type={{ switch_type }}
   - if:
@@ -951,11 +953,12 @@ action:
           - condition: template
             value_template: "{{ debug_enabled }}"
         then:
-          - service: system_log.write
+          - service: logbook.log
             data:
-              level: info
+              name: "Multi Switch Light Pro"
+              entity_id: "{{ light_entity }}"
               message: >
-                [Multi Switch Light Pro] Release detected → setting {{ hold_release_helper_input }} to on
+                Release detected → setting {{ hold_release_helper_input }} to on
       - service: input_boolean.turn_on
         target:
           entity_id: "{{ hold_release_helper_input }}"
@@ -979,11 +982,12 @@ action:
           - condition: template
             value_template: "{{ debug_enabled }}"
         then:
-          - service: system_log.write
+          - service: logbook.log
             data:
-              level: info
+              name: "Multi Switch Light Pro"
+              entity_id: "{{ light_entity }}"
               message: >
-                [Multi Switch Light Pro] State sync → switch {{ state_sync_switch_entity }}
+                State sync → switch {{ state_sync_switch_entity }}
                 set to {{ 'on' if state_sync_any_light_on else 'off' }}
       - stop: "state sync completed"
   - if:
@@ -996,21 +1000,23 @@ action:
             trigger.event is defined
           }}
     then:
-      - service: system_log.write
+      - service: logbook.log
         data:
-          level: debug
+          name: "Multi Switch Light Pro"
+          entity_id: "{{ light_entity }}"
           message: >
-            [Multi Switch Light Pro] Event data: {{ trigger.event.data | tojson }}
+            Event data: {{ trigger.event.data | tojson }}
   - if:
       - condition: template
         value_template: >
           {{ debug_enabled and (not has_action_sensor) and (action_sensor_hint | length > 0) }}
     then:
-      - service: system_log.write
+      - service: logbook.log
         data:
-          level: warning
+          name: "Multi Switch Light Pro"
+          entity_id: "{{ light_entity }}"
           message: >
-            [Multi Switch Light Pro] Detected Zigbee action sensor candidate {{ action_sensor_hint }}.
+            WARNING: Detected Zigbee action sensor candidate {{ action_sensor_hint }}.
             Set the "Zigbee action sensor" input so Zigbee triggers can run.
   - if:
       - condition: template
@@ -1021,11 +1027,11 @@ action:
           - condition: template
             value_template: "{{ debug_enabled }}"
         then:
-          - service: system_log.write
+          - service: logbook.log
             data:
-              level: info
-              message: >
-                [Multi Switch Light Pro] lutron_on → light.turn_on
+              name: "Multi Switch Light Pro"
+              entity_id: "{{ light_entity }}"
+              message: "lutron_on → light.turn_on"
       - if:
           - condition: template
             value_template: "{{ area_set }}"
@@ -1055,11 +1061,11 @@ action:
           - condition: template
             value_template: "{{ debug_enabled }}"
         then:
-          - service: system_log.write
+          - service: logbook.log
             data:
-              level: info
-              message: >
-                [Multi Switch Light Pro] lutron_raise → hold brighten
+              name: "Multi Switch Light Pro"
+              entity_id: "{{ light_entity }}"
+              message: "lutron_raise → hold brighten"
       - repeat:
           sequence:
             - if:
@@ -1101,12 +1107,11 @@ action:
                     - condition: template
                       value_template: "{{ debug_enabled }}"
                   then:
-                    - service: system_log.write
+                    - service: logbook.log
                       data:
-                        level: info
-                        message: >
-                          [Multi Switch Light Pro] lutron_raise release → stop
-                          brighten
+                        name: "Multi Switch Light Pro"
+                        entity_id: "{{ light_entity }}"
+                        message: "lutron_raise release → stop brighten"
                 - stop:
           until:
             - condition: template
@@ -1120,11 +1125,11 @@ action:
           - condition: template
             value_template: "{{ debug_enabled }}"
         then:
-          - service: system_log.write
+          - service: logbook.log
             data:
-              level: info
-              message: >
-                [Multi Switch Light Pro] lutron_stop → favorite button
+              name: "Multi Switch Light Pro"
+              entity_id: "{{ light_entity }}"
+              message: "lutron_stop → favorite button"
       - if:
           - condition: template
             value_template: >
@@ -1166,11 +1171,11 @@ action:
           - condition: template
             value_template: "{{ debug_enabled }}"
         then:
-          - service: system_log.write
+          - service: logbook.log
             data:
-              level: info
-              message: >
-                [Multi Switch Light Pro] lutron_lower → hold dim
+              name: "Multi Switch Light Pro"
+              entity_id: "{{ light_entity }}"
+              message: "lutron_lower → hold dim"
       - repeat:
           sequence:
             - if:
@@ -1212,11 +1217,11 @@ action:
                     - condition: template
                       value_template: "{{ debug_enabled }}"
                   then:
-                    - service: system_log.write
+                    - service: logbook.log
                       data:
-                        level: info
-                        message: >
-                          [Multi Switch Light Pro] lutron_lower release → stop dim
+                        name: "Multi Switch Light Pro"
+                        entity_id: "{{ light_entity }}"
+                        message: "lutron_lower release → stop dim"
                 - stop:
           until:
             - condition: template
@@ -1230,11 +1235,11 @@ action:
           - condition: template
             value_template: "{{ debug_enabled }}"
         then:
-          - service: system_log.write
+          - service: logbook.log
             data:
-              level: info
-              message: >
-                [Multi Switch Light Pro] lutron_off → light.turn_off
+              name: "Multi Switch Light Pro"
+              entity_id: "{{ light_entity }}"
+              message: "lutron_off → light.turn_off"
       - if:
           - condition: template
             value_template: "{{ area_set }}"
@@ -1266,22 +1271,22 @@ action:
               - condition: template
                 value_template: "{{ debug_enabled }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: >
-                    [Multi Switch Light Pro] up_single → custom action
+                  name: "Multi Switch Light Pro"
+                  entity_id: "{{ light_entity }}"
+                  message: "up_single → custom action"
           - sequence: !input up_press_1_action
         else:
           - if:
               - condition: template
                 value_template: "{{ debug_enabled }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: >
-                    [Multi Switch Light Pro] up_single → light.turn_on (100% brightness)
+                  name: "Multi Switch Light Pro"
+                  entity_id: "{{ light_entity }}"
+                  message: "up_single → light.turn_on (100% brightness)"
           - if:
               - condition: template
                 value_template: "{{ area_set }}"
@@ -1315,22 +1320,22 @@ action:
               - condition: template
                 value_template: "{{ debug_enabled }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: >
-                    [Multi Switch Light Pro] down_single → custom action
+                  name: "Multi Switch Light Pro"
+                  entity_id: "{{ light_entity }}"
+                  message: "down_single → custom action"
           - sequence: !input down_press_1_action
         else:
           - if:
               - condition: template
                 value_template: "{{ debug_enabled }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: >
-                    [Multi Switch Light Pro] down_single → light.turn_off
+                  name: "Multi Switch Light Pro"
+                  entity_id: "{{ light_entity }}"
+                  message: "down_single → light.turn_off"
           - if:
               - condition: template
                 value_template: "{{ area_set }}"
@@ -1358,11 +1363,11 @@ action:
           - condition: template
             value_template: "{{ debug_enabled }}"
         then:
-          - service: system_log.write
+          - service: logbook.log
             data:
-              level: info
-              message: >
-                [Multi Switch Light Pro] up_hold_start
+              name: "Multi Switch Light Pro"
+              entity_id: "{{ light_entity }}"
+              message: "up_hold_start"
       - if:
           - condition: template
             value_template: "{{ hold_release_helper_enabled }}"
@@ -1382,12 +1387,11 @@ action:
               - condition: template
                 value_template: "{{ debug_enabled }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: >
-                    [Multi Switch Light Pro] Light is off → turn_on to
-                    min_on_brightness_pct={{ min_on_brightness_pct_v | int }}%
+                  name: "Multi Switch Light Pro"
+                  entity_id: "{{ light_entity }}"
+                  message: "Light is off → turn_on to min_on_brightness_pct={{ min_on_brightness_pct_v | int }}%"
           - if:
               - condition: template
                 value_template: "{{ area_set }}"
@@ -1430,11 +1434,11 @@ action:
                     - condition: template
                       value_template: "{{ debug_enabled }}"
                   then:
-                    - service: system_log.write
+                    - service: logbook.log
                       data:
-                        level: info
-                        message: >
-                          [Multi Switch Light Pro] Release helper triggered → stop brighten
+                        name: "Multi Switch Light Pro"
+                        entity_id: "{{ light_entity }}"
+                        message: "Release helper triggered → stop brighten"
                 - stop: "Button released"
             - if:
                 - condition: template
@@ -1462,13 +1466,11 @@ action:
                 - condition: template
                   value_template: "{{ debug_verbose }}"
               then:
-                - service: system_log.write
+                - service: logbook.log
                   data:
-                    level: debug
-                    message: >
-                      [Multi Switch Light Pro] brighten step to
-                      {{ target_brightness }}/255 | current={{ current_brightness }}/255
-                      cap={{ max_abs_brightness }}
+                    name: "Multi Switch Light Pro"
+                    entity_id: "{{ light_entity }}"
+                    message: "brighten step to {{ target_brightness }}/255 | current={{ current_brightness }}/255 cap={{ max_abs_brightness }}"
             - delay:
                 milliseconds: "{{ interval_ms }}"
           until:
@@ -1484,11 +1486,11 @@ action:
           - condition: template
             value_template: "{{ debug_enabled }}"
         then:
-          - service: system_log.write
+          - service: logbook.log
             data:
-              level: info
-              message: >
-                [Multi Switch Light Pro] down_hold_start
+              name: "Multi Switch Light Pro"
+              entity_id: "{{ light_entity }}"
+              message: "down_hold_start"
       - if:
           - condition: template
             value_template: "{{ hold_release_helper_enabled }}"
@@ -1511,11 +1513,11 @@ action:
                     - condition: template
                       value_template: "{{ debug_enabled }}"
                   then:
-                    - service: system_log.write
+                    - service: logbook.log
                       data:
-                        level: info
-                        message: >
-                          [Multi Switch Light Pro] Release helper triggered → stop dim
+                        name: "Multi Switch Light Pro"
+                        entity_id: "{{ light_entity }}"
+                        message: "Release helper triggered → stop dim"
                 - stop: "Button released"
             - if:
                 - condition: template
@@ -1547,24 +1549,21 @@ action:
                     - condition: template
                       value_template: "{{ debug_verbose }}"
                   then:
-                    - service: system_log.write
+                    - service: logbook.log
                       data:
-                        level: debug
-                        message: >
-                          [Multi Switch Light Pro] dim step to
-                          {{ target_brightness }}/255 | current={{ current_brightness }}/255
-                          min={{ min_abs_brightness }}
+                        name: "Multi Switch Light Pro"
+                        entity_id: "{{ light_entity }}"
+                        message: "dim step to {{ target_brightness }}/255 | current={{ current_brightness }}/255 min={{ min_abs_brightness }}"
               else:
                 - if:
                     - condition: template
                       value_template: "{{ debug_enabled }}"
                   then:
-                    - service: system_log.write
+                    - service: logbook.log
                       data:
-                        level: info
-                        message: >
-                          [Multi Switch Light Pro] brightness <= min clamp →
-                          light.turn_off
+                        name: "Multi Switch Light Pro"
+                        entity_id: "{{ light_entity }}"
+                        message: "brightness <= min clamp → light.turn_off"
                 - if:
                     - condition: template
                       value_template: "{{ area_set }}"
@@ -1599,22 +1598,22 @@ action:
               - condition: template
                 value_template: "{{ debug_enabled }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: >
-                    [Multi Switch Light Pro] up_double → custom action
+                  name: "Multi Switch Light Pro"
+                  entity_id: "{{ light_entity }}"
+                  message: "up_double → custom action"
           - sequence: !input up_press_2_action
         else:
           - if:
               - condition: template
                 value_template: "{{ debug_enabled }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: >
-                    [Multi Switch Light Pro] up_double → run custom action
+                  name: "Multi Switch Light Pro"
+                  entity_id: "{{ light_entity }}"
+                  message: "up_double → run custom action"
   - if:
       - condition: template
         value_template: >
@@ -1628,22 +1627,22 @@ action:
               - condition: template
                 value_template: "{{ debug_enabled }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: >
-                    [Multi Switch Light Pro] down_double → custom action
+                  name: "Multi Switch Light Pro"
+                  entity_id: "{{ light_entity }}"
+                  message: "down_double → custom action"
           - sequence: !input down_press_2_action
         else:
           - if:
               - condition: template
                 value_template: "{{ debug_enabled }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: >
-                    [Multi Switch Light Pro] down_double → run custom action
+                  name: "Multi Switch Light Pro"
+                  entity_id: "{{ light_entity }}"
+                  message: "down_double → run custom action"
   - if:
       - condition: template
         value_template: >
@@ -1657,22 +1656,22 @@ action:
               - condition: template
                 value_template: "{{ debug_enabled }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: >
-                    [Multi Switch Light Pro] up_triple → custom action
+                  name: "Multi Switch Light Pro"
+                  entity_id: "{{ light_entity }}"
+                  message: "up_triple → custom action"
           - sequence: !input up_press_3_action
         else:
           - if:
               - condition: template
                 value_template: "{{ debug_enabled }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: >
-                    [Multi Switch Light Pro] up_triple → run custom action
+                  name: "Multi Switch Light Pro"
+                  entity_id: "{{ light_entity }}"
+                  message: "up_triple → run custom action"
   - if:
       - condition: template
         value_template: >
@@ -1686,22 +1685,22 @@ action:
               - condition: template
                 value_template: "{{ debug_enabled }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: >
-                    [Multi Switch Light Pro] down_triple → custom action
+                  name: "Multi Switch Light Pro"
+                  entity_id: "{{ light_entity }}"
+                  message: "down_triple → custom action"
           - sequence: !input down_press_3_action
         else:
           - if:
               - condition: template
                 value_template: "{{ debug_enabled }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: >
-                    [Multi Switch Light Pro] down_triple → run custom action
+                  name: "Multi Switch Light Pro"
+                  entity_id: "{{ light_entity }}"
+                  message: "down_triple → run custom action"
   - if:
       - condition: template
         value_template: >
@@ -1715,22 +1714,22 @@ action:
               - condition: template
                 value_template: "{{ debug_enabled }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: >
-                    [Multi Switch Light Pro] up_quad → custom action
+                  name: "Multi Switch Light Pro"
+                  entity_id: "{{ light_entity }}"
+                  message: "up_quad → custom action"
           - sequence: !input up_press_4_action
         else:
           - if:
               - condition: template
                 value_template: "{{ debug_enabled }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: >
-                    [Multi Switch Light Pro] up_quad → no action defined
+                  name: "Multi Switch Light Pro"
+                  entity_id: "{{ light_entity }}"
+                  message: "up_quad → no action defined"
   - if:
       - condition: template
         value_template: >
@@ -1744,22 +1743,22 @@ action:
               - condition: template
                 value_template: "{{ debug_enabled }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: >
-                    [Multi Switch Light Pro] down_quad → custom action
+                  name: "Multi Switch Light Pro"
+                  entity_id: "{{ light_entity }}"
+                  message: "down_quad → custom action"
           - sequence: !input down_press_4_action
         else:
           - if:
               - condition: template
                 value_template: "{{ debug_enabled }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: >
-                    [Multi Switch Light Pro] down_quad → no action defined
+                  name: "Multi Switch Light Pro"
+                  entity_id: "{{ light_entity }}"
+                  message: "down_quad → no action defined"
   - if:
       - condition: template
         value_template: >
@@ -1773,22 +1772,22 @@ action:
               - condition: template
                 value_template: "{{ debug_enabled }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: >
-                    [Multi Switch Light Pro] up_quint → custom action
+                  name: "Multi Switch Light Pro"
+                  entity_id: "{{ light_entity }}"
+                  message: "up_quint → custom action"
           - sequence: !input up_press_5_action
         else:
           - if:
               - condition: template
                 value_template: "{{ debug_enabled }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: >
-                    [Multi Switch Light Pro] up_quint → no action defined
+                  name: "Multi Switch Light Pro"
+                  entity_id: "{{ light_entity }}"
+                  message: "up_quint → no action defined"
   - if:
       - condition: template
         value_template: >
@@ -1802,19 +1801,19 @@ action:
               - condition: template
                 value_template: "{{ debug_enabled }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: >
-                    [Multi Switch Light Pro] down_quint → custom action
+                  name: "Multi Switch Light Pro"
+                  entity_id: "{{ light_entity }}"
+                  message: "down_quint → custom action"
           - sequence: !input down_press_5_action
         else:
           - if:
               - condition: template
                 value_template: "{{ debug_enabled }}"
             then:
-              - service: system_log.write
+              - service: logbook.log
                 data:
-                  level: info
-                  message: >
-                    [Multi Switch Light Pro] down_quint → no action defined
+                  name: "Multi Switch Light Pro"
+                  entity_id: "{{ light_entity }}"
+                  message: "down_quint → no action defined"

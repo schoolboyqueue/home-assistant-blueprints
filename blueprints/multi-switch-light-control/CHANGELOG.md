@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.3 - 2025-12-21
+
+### Changed
+
+- Switched debug logging from `system_log.write` to `logbook.log` for better visibility in Home Assistant's Logbook UI
+
 ## 1.9.2 - 2025-11-26
 
 ### Fixed
