@@ -1,5 +1,11 @@
 # Adaptive Shades Pro - Changelog
 
+## [1.11.0] - 2025-12-24
+
+### Added
+
+- **Window contact trigger**: Added state trigger for `window_contacts` with id `window_changed` so the automation reacts immediately when a window contact sensor changes state, rather than waiting for the next 5-minute time pattern trigger
+
 ## [1.10.0] - 2025-11-29
 
 ### Added

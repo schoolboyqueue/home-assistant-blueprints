@@ -1,5 +1,5 @@
 blueprint:
-  name: Ceiling Fan Climate Control Pro v2.2.0
+  name: Ceiling Fan Climate Control Pro v2.2.1
   description: >
     HVAC-aware ceiling fan automation with adaptive comfort control. Uses the
     EN 16798 / ASHRAE 55 adaptive comfort model to dynamically adjust fan behavior
@@ -332,7 +332,7 @@ blueprint:
               custom_value: false
 
 variables:
-  blueprint_version: "2.2.0"
+  blueprint_version: "2.2.1"
   fan_entity: !input fan_entity
   temp_sensor: !input temp_sensor
   humidity_sensor_input: !input humidity_sensor
@@ -527,7 +527,7 @@ variables:
   fan_is_on: "{{ is_state(fan_entity, 'on') }}"
   fan_is_off: "{{ not fan_is_on }}"
   fan_current_pct: "{{ state_attr(fan_entity, 'percentage') | int(0) }}"
-  fan_current_direction: "{{ state_attr(fan_entity, 'direction') | default('forward') }}"
+  fan_current_direction: "{{ state_attr(fan_entity, 'direction') | default('forward', true) | lower }}"
 
   # Speed calculation
   calculated_speed: >
@@ -562,6 +562,11 @@ variables:
     {% else %}
       forward
     {% endif %}
+
+  # Speed tolerance for comparison (avoid redundant commands for small differences)
+  speed_tolerance: 5
+  speed_matches: "{{ (fan_current_pct - calculated_speed | int) | abs <= speed_tolerance }}"
+  heating_speed_matches: "{{ (fan_current_pct - heating_speed_pct | int) | abs <= speed_tolerance }}"
 
 mode: single
 max_exceeded: silent
@@ -623,7 +628,7 @@ action:
             then:
               - if:
                   - condition: template
-                    value_template: "{{ fan_is_off or fan_current_pct != heating_speed_pct | int or fan_current_direction != 'reverse' }}"
+                    value_template: "{{ fan_is_off or not heating_speed_matches or fan_current_direction != 'reverse' }}"
                 then:
                   - if:
                       - condition: template
@@ -645,7 +650,7 @@ action:
                           direction: reverse
                   - if:
                       - condition: template
-                        value_template: "{{ fan_is_off or fan_current_pct != heating_speed_pct | int }}"
+                        value_template: "{{ fan_is_off or not heating_speed_matches }}"
                     then:
                       - service: fan.turn_on
                         target:
@@ -677,7 +682,7 @@ action:
         sequence:
           - if:
               - condition: template
-                value_template: "{{ fan_is_off or fan_current_pct != calculated_speed | int or (supports_direction and fan_current_direction != 'forward') }}"
+                value_template: "{{ fan_is_off or not speed_matches or (supports_direction and fan_current_direction != 'forward') }}"
             then:
               - if:
                   - condition: template
@@ -699,7 +704,7 @@ action:
                       direction: forward
               - if:
                   - condition: template
-                    value_template: "{{ fan_is_off or fan_current_pct != calculated_speed | int }}"
+                    value_template: "{{ fan_is_off or not speed_matches }}"
                 then:
                   - service: fan.turn_on
                     target:
@@ -749,7 +754,7 @@ action:
         sequence:
           - if:
               - condition: template
-                value_template: "{{ fan_is_off or fan_current_pct != calculated_speed | int or (supports_direction and fan_current_direction != calculated_direction) }}"
+                value_template: "{{ fan_is_off or not speed_matches or (supports_direction and fan_current_direction != calculated_direction) }}"
             then:
               - if:
                   - condition: template
@@ -771,7 +776,7 @@ action:
                       direction: "{{ calculated_direction }}"
               - if:
                   - condition: template
-                    value_template: "{{ fan_is_off or fan_current_pct != calculated_speed | int }}"
+                    value_template: "{{ fan_is_off or not speed_matches }}"
                 then:
                   - service: fan.turn_on
                     target:
@@ -845,7 +850,7 @@ action:
             then:
               - if:
                   - condition: template
-                    value_template: "{{ fan_is_off or fan_current_pct != calculated_speed | int or (supports_direction and fan_current_direction != calculated_direction) }}"
+                    value_template: "{{ fan_is_off or not speed_matches or (supports_direction and fan_current_direction != calculated_direction) }}"
                 then:
                   - if:
                       - condition: template
@@ -867,7 +872,7 @@ action:
                           direction: "{{ calculated_direction }}"
                   - if:
                       - condition: template
-                        value_template: "{{ fan_is_off or fan_current_pct != calculated_speed | int }}"
+                        value_template: "{{ fan_is_off or not speed_matches }}"
                     then:
                       - service: fan.turn_on
                         target:

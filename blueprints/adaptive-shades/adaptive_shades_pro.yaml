@@ -854,6 +854,9 @@ trigger:
   - platform: state
     entity_id: !input cover_target
     id: cover_changed
+  - platform: state
+    entity_id: !input window_contacts
+    id: window_changed
   - platform: homeassistant
     event: start
 

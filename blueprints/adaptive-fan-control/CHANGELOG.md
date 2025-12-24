@@ -1,5 +1,18 @@
 # Ceiling Fan Climate Control Pro - Changelog
 
+## [2.2.1] - 2025-12-24
+
+### Fixed
+
+- **Fan direction comparison**: Normalized `fan_current_direction` to lowercase to handle fans that report "Forward" vs "forward" inconsistently
+- **Speed tolerance for redundant commands**: Added 5% tolerance when comparing current vs target speed to avoid sending unnecessary fan commands for negligible differences. New variables `speed_tolerance`, `speed_matches`, and `heating_speed_matches` prevent wear on fan motor from constant micro-adjustments
+
+## [2.2.0] - 2025-12-21
+
+### Fixed
+
+- **Prevent redundant fan commands during HVAC mode changes**: Fan speed and direction are now only updated when they actually differ from current state, reducing unnecessary commands when HVAC transitions between heating/cooling/idle states
+
 ## [2.1.0] - 2025-12-21
 
 ### Changed
