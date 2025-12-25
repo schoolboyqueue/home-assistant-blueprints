@@ -1,5 +1,13 @@
 # Bathroom Light & Fan Control Pro - Changelog
 
+## [1.10.8] - 2025-12-25
+
+### Fixed
+
+- Night schedule not activating correctly; previous timestamp-based comparison was comparing full date-times instead of time-of-day. Now uses minutes-since-midnight for proper overnight schedule detection (e.g., 22:00-06:00).
+
+---
+
 ## [1.10.7] - 2025-12-06
 
 ### Fixed

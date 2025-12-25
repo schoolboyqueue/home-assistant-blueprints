@@ -1,5 +1,5 @@
 blueprint:
-  name: "Bathroom Light Fan Control Pro v1.10.7"
+  name: "Bathroom Light Fan Control Pro v1.10.8"
   description: >-
     Smart bathroom controller for lights and exhaust fan.
     Lights: Turns on from motion or door activity (Wasp-in-a-Box), respects presence and optional lux threshold, supports Night Mode (dim and color temperature), and shuts off after vacancy with a grace period. Includes a manual-off override window to prevent auto-on.
@@ -424,7 +424,7 @@ variables:
   ror_min_on_time_min: !input ror_min_on_time_min
   ror_latch_until: !input ror_latch_until
   light_area: !input light_area
-  blueprint_version: "1.10.7"
+  blueprint_version: "1.10.8"
   area_set: >-
     {{ light_area is not none and (light_area|string) != '' }}
 
@@ -447,16 +447,19 @@ variables:
       false
     {% else %}
       {% set fmt = '%H:%M:%S' %}
-      {% set start_ts = as_timestamp(strptime(night_start, fmt)) %}
-      {% set end_ts = as_timestamp(strptime(night_end, fmt)) %}
-      {% set now_ts = as_timestamp(now()) %}
-      {% if start_ts is none or end_ts is none or now_ts is none %}
+      {% set start_dt = strptime(night_start, fmt) %}
+      {% set end_dt = strptime(night_end, fmt) %}
+      {% set now_dt = now() %}
+      {% if start_dt is none or end_dt is none or now_dt is none %}
         false
       {% else %}
-        {% if start_ts <= end_ts %}
-          {{ now_ts >= start_ts and now_ts < end_ts }}
+        {% set start_mins = start_dt.hour * 60 + start_dt.minute %}
+        {% set end_mins = end_dt.hour * 60 + end_dt.minute %}
+        {% set now_mins = now_dt.hour * 60 + now_dt.minute %}
+        {% if start_mins <= end_mins %}
+          {{ now_mins >= start_mins and now_mins < end_mins }}
         {% else %}
-          {{ now_ts >= start_ts or now_ts < end_ts }}
+          {{ now_mins >= start_mins or now_mins < end_mins }}
         {% endif %}
       {% endif %}
     {% endif %}
