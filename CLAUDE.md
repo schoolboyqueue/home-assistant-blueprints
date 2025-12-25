@@ -18,7 +18,7 @@ python3 scripts/validate-blueprint.py <path/to/blueprint.yaml>
 python3 scripts/validate-blueprint.py --all
 ```
 
-The validator checks YAML syntax, blueprint schema, input/selector definitions, template syntax, service call structure, and README version sync.
+The validator checks YAML syntax, blueprint schema, input/selector definitions, template syntax, and service call structure.
 
 ## Architecture
 
@@ -26,7 +26,7 @@ The validator checks YAML syntax, blueprint schema, input/selector definitions, 
 
 Each blueprint lives in `blueprints/<blueprint-name>/` and contains:
 - `*.yaml` - The blueprint file (named `*_pro.yaml` or `*_pro_blueprint.yaml`)
-- `README.md` - Documentation with version badge
+- `README.md` - Documentation
 - `CHANGELOG.md` - Version history
 
 ### Blueprint YAML Structure
@@ -94,9 +94,9 @@ Uses Conventional Commits:
 Each blueprint has its own semantic version in:
 1. Blueprint `name` field: `"Blueprint Name vX.Y.Z"`
 2. `blueprint_version` variable
-3. README.md `**Version:** X.Y.Z` badge
+3. `CHANGELOG.md` - Add entry for new version
 
-All three must stay in sync (validator checks README vs blueprint).
+The blueprint name and variable must stay in sync.
 
 ### Markdown
 
