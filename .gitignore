@@ -33,5 +33,3 @@ __pycache__/
 *.DS_Store
 *.env
 *.continue/
-
-CLAUDE.md
