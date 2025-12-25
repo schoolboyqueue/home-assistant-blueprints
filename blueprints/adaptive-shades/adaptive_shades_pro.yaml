@@ -1,5 +1,5 @@
 blueprint:
-  name: "Adaptive Shades Pro v1.11.0"
+  name: "Adaptive Shades Pro v1.12.0"
   description: >-
     Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
     Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
@@ -246,6 +246,19 @@ blueprint:
                 - window
                 - door
               multiple: true
+        window_open_delay:
+          name: Window open delay (seconds)
+          description: >-
+            How long a window/door must stay open before the shade opens. Set to 0 for immediate
+            response. Use a delay (e.g., 30-60 seconds) to avoid shade movements when briefly
+            opening a window.
+          default: 0
+          selector:
+            number:
+              min: 0
+              max: 300
+              step: 5
+              unit_of_measurement: "s"
 
     scheduling_and_overrides:
       name: Scheduling & Overrides
@@ -416,7 +429,7 @@ blueprint:
                   value: "verbose"
 
 variables:
-  blueprint_version: "1.11.0"
+  blueprint_version: "1.12.0"
   cover_target: !input cover_target
   base_cover: >-
     {% set ct = cover_target | default('') %}
@@ -444,6 +457,7 @@ variables:
   outdoor_temp_sensor: !input outdoor_temp_sensor
   indoor_lux_sensor: !input indoor_lux_sensor
   window_contacts: !input window_contacts
+  window_open_delay: !input window_open_delay
   cooling_setpoint: !input cooling_setpoint
   heating_setpoint: !input heating_setpoint
   comfort_margin: !input comfort_margin
@@ -856,13 +870,27 @@ trigger:
     id: cover_changed
   - platform: state
     entity_id: !input window_contacts
-    id: window_changed
+    to: "on"
+    id: window_opened
+  - platform: state
+    entity_id: !input window_contacts
+    to: "off"
+    id: window_closed
   - platform: homeassistant
     event: start
 
 condition: []
 
 action:
+  # When a window opens and delay is configured, wait for the delay period
+  - choose:
+      - conditions: "{{ trigger.id == 'window_opened' and (window_open_delay | int(0)) > 0 }}"
+        sequence:
+          - delay:
+              seconds: "{{ window_open_delay | int(0) }}"
+          # After delay, verify the window is still open before proceeding
+          - condition: template
+            value_template: "{{ is_state(trigger.entity_id, 'on') }}"
   - choose:
       - conditions: "{{ triggered_by_cover and manual_change_detected }}"
         sequence:
@@ -916,7 +944,20 @@ action:
               {% else %}
                 ""
               {% endif %}
-            this_window_open: "{{ this_window and is_state(this_window, 'on') }}"
+            this_window_open: >-
+              {% if not this_window or not is_state(this_window, 'on') %}
+                false
+              {% elif window_open_delay | int(0) <= 0 %}
+                true
+              {% else %}
+                {% set w = states[this_window] %}
+                {% if w is none or w.last_changed is none %}
+                  false
+                {% else %}
+                  {% set open_seconds = (as_timestamp(now()) - as_timestamp(w.last_changed)) %}
+                  {{ open_seconds >= (window_open_delay | int(0)) }}
+                {% endif %}
+              {% endif %}
             this_current_position: "{{ state_attr(this_cover, 'current_position') }}"
             this_current_tilt: "{{ state_attr(this_cover, 'current_tilt_position') if cover_supports_tilt else none }}"
             this_target_base: "{{ desired_position_room }}"
