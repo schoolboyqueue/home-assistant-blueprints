@@ -18,7 +18,18 @@ python3 scripts/validate-blueprint.py <path/to/blueprint.yaml>
 python3 scripts/validate-blueprint.py --all
 ```
 
-The validator checks YAML syntax, blueprint schema, input/selector definitions, template syntax, and service call structure.
+The validator checks:
+- YAML syntax and blueprint schema
+- Input/selector definitions and !input reference validation
+- Template syntax (balanced delimiters, no !input inside {{ }})
+- Service call structure
+- Version sync (blueprint name vs blueprint_version variable)
+- Trigger validation (no templates in `for:` duration)
+- Condition structure validation
+- Mode validation (single, restart, queued, parallel)
+- Delay and wait_template/wait_for_trigger validation
+- Empty sequence detection
+- README.md and CHANGELOG.md existence
 
 ## Architecture
 

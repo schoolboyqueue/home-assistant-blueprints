@@ -7,6 +7,13 @@ This script performs comprehensive validation of Home Assistant blueprint files:
 3. Input/selector validation
 4. Template syntax checking
 5. Service call structure validation
+6. Version sync validation (name vs blueprint_version)
+7. Trigger validation (for: templates, entity_id)
+8. Condition validation
+9. Mode validation
+10. Input reference validation
+11. Delay/wait validation
+12. Choose/sequence validation
 
 Usage:
     python3 validate-blueprint.py <blueprint.yaml>
@@ -77,6 +84,26 @@ class BlueprintValidator:
         "ui_action",
         "ui_color",
     ]
+    VALID_MODES = ["single", "restart", "queued", "parallel"]
+    VALID_CONDITION_TYPES = [
+        "and",
+        "or",
+        "not",
+        "state",
+        "numeric_state",
+        "template",
+        "time",
+        "zone",
+        "trigger",
+        "sun",
+        "device",
+    ]
+    # Services that are potentially deprecated or have better alternatives
+    # Note: homeassistant.turn_on/off are valid for multi-domain support
+    DEPRECATED_SERVICES: dict[str, str] = {
+        # homeassistant.turn_on/off/toggle are intentionally not listed here
+        # as they're valid when supporting multiple entity types
+    }
 
     def __init__(self, file_path: Path) -> None:
         """Initialize the validator.
@@ -89,6 +116,8 @@ class BlueprintValidator:
         self.warnings: list[str] = []
         self.data: dict[str, Any] = {}
         self.join_variables: set[str] = set()
+        self.defined_inputs: set[str] = set()
+        self.used_inputs: set[str] = set()
 
     def validate(self) -> bool:
         """Run all validation checks.
@@ -103,12 +132,17 @@ class BlueprintValidator:
 
         self._validate_structure()
         self._validate_blueprint_section()
+        self._validate_mode()
         self._validate_inputs()
         self._validate_variables()
+        self._validate_version_sync()
         self._validate_triggers()
+        self._validate_conditions()
         self._validate_actions()
         self._validate_templates()
+        self._validate_input_references()
         self._check_readme_exists()
+        self._check_changelog_exists()
 
         return self._report_results()
 
@@ -177,6 +211,30 @@ class BlueprintValidator:
                     f"Invalid domain '{domain}', must be one of: {valid_domains}"
                 )
 
+    def _validate_mode(self) -> None:
+        """Validate automation mode."""
+        mode = self.data.get("mode")
+        if mode is None:
+            return  # Default mode is 'single', which is valid
+
+        if not isinstance(mode, str):
+            self.errors.append("'mode' must be a string")
+            return
+
+        if mode not in self.VALID_MODES:
+            self.errors.append(
+                f"Invalid mode '{mode}', must be one of: {self.VALID_MODES}"
+            )
+
+        # Check for max/max_exceeded when using queued/parallel
+        if mode in ["queued", "parallel"]:
+            max_val = self.data.get("max")
+            if max_val is not None:
+                if not isinstance(max_val, int) or max_val < 1:
+                    self.errors.append(
+                        f"'max' must be a positive integer when mode is '{mode}'"
+                    )
+
     def _validate_inputs(self) -> None:
         """Validate input definitions."""
         blueprint = self.data.get("blueprint")
@@ -216,7 +274,8 @@ class BlueprintValidator:
                 else:
                     self._validate_input_dict(nested_input, current_path)
             else:
-                # This is an actual input definition
+                # This is an actual input definition - record it
+                self.defined_inputs.add(key)
                 self._validate_single_input(value, current_path)
 
     def _validate_single_input(self, input_def: dict[str, Any], path: str) -> None:
@@ -262,9 +321,48 @@ class BlueprintValidator:
                 if re.search(r"\|\s*join\b", value) or re.search(r"\bjoin\s*\(", value):
                     self.join_variables.add(name)
 
+                # Track !input references in variables
+                self._collect_input_refs(value)
+
         # Check for blueprint_version
         if "blueprint_version" not in variables:
             self.warnings.append("No 'blueprint_version' variable defined")
+
+    def _validate_version_sync(self) -> None:
+        """Validate that blueprint_version matches version in name field."""
+        blueprint = self.data.get("blueprint")
+        if not isinstance(blueprint, dict):
+            return
+
+        name = blueprint.get("name")
+        if not isinstance(name, str):
+            return
+
+        variables = self.data.get("variables")
+        if not isinstance(variables, dict):
+            return
+
+        blueprint_version = variables.get("blueprint_version")
+        if blueprint_version is None:
+            return  # Already warned about missing version
+
+        # Handle both quoted and unquoted versions
+        version_str = str(blueprint_version).strip("\"'")
+
+        # Extract version from name (expected format: "Name vX.Y.Z" or "Name X.Y.Z")
+        version_match = re.search(r"v?(\d+\.\d+(?:\.\d+)?)\s*$", name)
+        if version_match:
+            name_version = version_match.group(1)
+            if name_version != version_str:
+                self.errors.append(
+                    f"Version mismatch: blueprint name has 'v{name_version}' "
+                    f"but blueprint_version is '{version_str}'"
+                )
+        else:
+            self.warnings.append(
+                f"Could not extract version from blueprint name: '{name}'. "
+                "Expected format: 'Blueprint Name vX.Y.Z'"
+            )
 
     def _validate_triggers(self) -> None:
         """Validate trigger definitions."""
@@ -303,6 +401,44 @@ class BlueprintValidator:
                         value_template, variable_names, f"trigger[{i}]"
                     )
 
+            # Check for templates in 'for:' duration (Common Pitfall #10)
+            self._check_trigger_for_duration(trigger, f"trigger[{i}]")
+
+            # Collect !input references
+            self._collect_input_refs_from_dict(trigger)
+
+    def _check_trigger_for_duration(self, trigger: dict[str, Any], path: str) -> None:
+        """Check for templates in trigger 'for:' duration.
+
+        Templates in trigger 'for:' durations don't work because variables
+        aren't available at trigger compile time.
+
+        Args:
+            trigger: The trigger dictionary.
+            path: Current path for error messages.
+        """
+        for_duration = trigger.get("for")
+        if for_duration is None:
+            return
+
+        # for: can be a string, dict, or template
+        if isinstance(for_duration, str):
+            if "{{" in for_duration and "}}" in for_duration:
+                self.errors.append(
+                    f"{path}.for: Templates in trigger 'for:' duration are not "
+                    "supported. Variables aren't available at trigger compile time. "
+                    "Use !input or a static value instead."
+                )
+        elif isinstance(for_duration, dict):
+            # Check each component (hours, minutes, seconds, milliseconds)
+            for key, value in for_duration.items():
+                if isinstance(value, str) and "{{" in value and "}}" in value:
+                    self.errors.append(
+                        f"{path}.for.{key}: Templates in trigger 'for:' duration are "
+                        "not supported. Variables aren't available at trigger compile "
+                        "time. Use !input or a static value instead."
+                    )
+
     def _check_template_variable_refs(
         self, template: str, variable_names: set[str], path: str
     ) -> None:
@@ -323,6 +459,75 @@ class BlueprintValidator:
                     "variables - use state triggers instead."
                 )
 
+    def _validate_conditions(self) -> None:
+        """Validate condition definitions."""
+        conditions = self.data.get("condition")
+        if conditions is None:
+            return  # condition: is optional
+
+        if not isinstance(conditions, list):
+            self.errors.append("'condition' must be a list")
+            return
+
+        for i, condition in enumerate(conditions):
+            self._validate_condition_item(condition, f"condition[{i}]")
+
+    def _validate_condition_item(self, condition: Any, path: str) -> None:
+        """Validate a single condition item.
+
+        Args:
+            condition: The condition to validate.
+            path: Current path for error messages.
+        """
+        if not isinstance(condition, dict):
+            self.errors.append(f"{path}: Condition must be a dictionary")
+            return
+
+        # Check for condition type
+        condition_type = condition.get("condition")
+        if condition_type is None:
+            # Could be a shorthand condition
+            if "conditions" in condition:
+                # Nested conditions (and/or/not shorthand)
+                nested = condition.get("conditions")
+                if isinstance(nested, list):
+                    for j, nested_cond in enumerate(nested):
+                        self._validate_condition_item(
+                            nested_cond, f"{path}.conditions[{j}]"
+                        )
+            return
+
+        if not isinstance(condition_type, str):
+            self.errors.append(f"{path}.condition: Must be a string")
+            return
+
+        if condition_type not in self.VALID_CONDITION_TYPES:
+            self.warnings.append(f"{path}: Unknown condition type '{condition_type}'")
+
+        # Validate nested conditions for and/or/not
+        if condition_type in ["and", "or", "not"]:
+            nested = condition.get("conditions")
+            if nested is None:
+                self.errors.append(
+                    f"{path}: '{condition_type}' condition requires 'conditions' key"
+                )
+            elif not isinstance(nested, list):
+                self.errors.append(f"{path}.conditions: Must be a list")
+            else:
+                for j, nested_cond in enumerate(nested):
+                    self._validate_condition_item(
+                        nested_cond, f"{path}.conditions[{j}]"
+                    )
+
+        # Check for template in state condition
+        if condition_type == "state":
+            entity_id = condition.get("entity_id")
+            if entity_id is not None:
+                self._collect_input_refs(entity_id)
+
+        # Collect !input references
+        self._collect_input_refs_from_dict(condition)
+
     def _validate_service_format(self, service: str, path: str) -> None:
         """Validate service format (domain.service).
 
@@ -332,11 +537,19 @@ class BlueprintValidator:
         """
         # Allow !input references
         if service.startswith("!input "):
+            self._record_input_use(service[7:].strip())
             return
 
         # Allow templates
         if "{{" in service and "}}" in service:
             return
+
+        # Check for deprecated services
+        if service in self.DEPRECATED_SERVICES:
+            self.warnings.append(
+                f"{path}: Service '{service}' is deprecated. "
+                f"{self.DEPRECATED_SERVICES[service]}"
+            )
 
         # Check format: domain.service_name
         if not re.match(r"^[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*$", service):
@@ -391,15 +604,42 @@ class BlueprintValidator:
             if entity_id is not None:
                 self._check_entity_id_value(entity_id, f"{path}.entity_id")
 
+        # Check delay actions
+        delay = action.get("delay")
+        if delay is not None:
+            self._validate_delay(delay, f"{path}.delay")
+
+        # Check wait_template actions
+        wait_template = action.get("wait_template")
+        if wait_template is not None:
+            self._validate_wait_template(wait_template, action, f"{path}")
+
+        # Check wait_for_trigger actions
+        wait_for_trigger = action.get("wait_for_trigger")
+        if wait_for_trigger is not None:
+            self._validate_wait_for_trigger(wait_for_trigger, action, f"{path}")
+
         # Check if/then/else structures
         if "if" in action:
+            # Validate the if conditions
+            if_conditions = action.get("if")
+            if isinstance(if_conditions, list):
+                for j, cond in enumerate(if_conditions):
+                    self._validate_condition_item(cond, f"{path}.if[{j}]")
+
             then_actions = action.get("then")
-            if isinstance(then_actions, list):
+            if then_actions is None:
+                self.errors.append(f"{path}: 'if' requires 'then' block")
+            elif isinstance(then_actions, list):
+                if len(then_actions) == 0:
+                    self.warnings.append(f"{path}.then: Empty sequence")
                 for j, then_action in enumerate(then_actions):
                     self._validate_action_item(then_action, f"{path}.then[{j}]")
 
             else_actions = action.get("else")
             if isinstance(else_actions, list):
+                if len(else_actions) == 0:
+                    self.warnings.append(f"{path}.else: Empty sequence")
                 for j, else_action in enumerate(else_actions):
                     self._validate_action_item(else_action, f"{path}.else[{j}]")
 
@@ -407,7 +647,11 @@ class BlueprintValidator:
         repeat = action.get("repeat")
         if isinstance(repeat, dict):
             seq = repeat.get("sequence")
-            if isinstance(seq, list):
+            if seq is None:
+                self.errors.append(f"{path}.repeat: Missing 'sequence' key")
+            elif isinstance(seq, list):
+                if len(seq) == 0:
+                    self.warnings.append(f"{path}.repeat.sequence: Empty sequence")
                 for j, seq_action in enumerate(seq):
                     self._validate_action_item(
                         seq_action, f"{path}.repeat.sequence[{j}]"
@@ -423,14 +667,141 @@ class BlueprintValidator:
         # Check choose structures
         choose = action.get("choose")
         if isinstance(choose, list):
+            has_conditions = False
             for j, choice in enumerate(choose):
                 if isinstance(choice, dict):
+                    # Validate conditions
+                    choice_conditions = choice.get("conditions")
+                    if choice_conditions is not None:
+                        has_conditions = True
+                        if isinstance(choice_conditions, list):
+                            for k, cond in enumerate(choice_conditions):
+                                self._validate_condition_item(
+                                    cond, f"{path}.choose[{j}].conditions[{k}]"
+                                )
+
                     choice_seq = choice.get("sequence")
-                    if isinstance(choice_seq, list):
+                    if choice_seq is None:
+                        self.errors.append(
+                            f"{path}.choose[{j}]: Missing 'sequence' key"
+                        )
+                    elif isinstance(choice_seq, list):
+                        if len(choice_seq) == 0:
+                            self.warnings.append(
+                                f"{path}.choose[{j}].sequence: Empty sequence"
+                            )
                         for k, choice_action in enumerate(choice_seq):
                             self._validate_action_item(
                                 choice_action, f"{path}.choose[{j}].sequence[{k}]"
                             )
+
+            # Check for default branch - only at top-level actions, not nested
+            # Many nested choose blocks intentionally have no default
+            default = action.get("default")
+            if isinstance(default, list):
+                if len(default) == 0:
+                    self.warnings.append(f"{path}.default: Empty sequence")
+                for j, default_action in enumerate(default):
+                    self._validate_action_item(default_action, f"{path}.default[{j}]")
+
+        # Collect !input references from this action
+        self._collect_input_refs_from_dict(action)
+
+    def _validate_delay(self, delay: Any, path: str) -> None:
+        """Validate delay action format.
+
+        Args:
+            delay: The delay value.
+            path: Current path for error messages.
+        """
+        if isinstance(delay, str):
+            # Could be a template or HH:MM:SS format
+            if "{{" in delay and "}}" in delay:
+                # Template - valid
+                return
+            # Check for HH:MM:SS format
+            if not re.match(r"^\d{1,2}:\d{2}(:\d{2})?$", delay):
+                self.warnings.append(
+                    f"{path}: Delay string '{delay}' should be in HH:MM:SS format "
+                    "or a template"
+                )
+        elif isinstance(delay, dict):
+            # Check for valid keys
+            valid_keys = {"days", "hours", "minutes", "seconds", "milliseconds"}
+            for key in delay:
+                if key not in valid_keys:
+                    self.warnings.append(
+                        f"{path}.{key}: Unknown delay key. "
+                        f"Valid keys: {', '.join(sorted(valid_keys))}"
+                    )
+        elif isinstance(delay, (int, float)):
+            # Numeric delay in seconds - valid
+            if delay < 0:
+                self.errors.append(f"{path}: Delay cannot be negative")
+
+    def _validate_wait_template(
+        self, wait_template: Any, action: dict[str, Any], path: str
+    ) -> None:
+        """Validate wait_template action.
+
+        Args:
+            wait_template: The wait_template value.
+            action: The full action dictionary.
+            path: Current path for error messages.
+        """
+        if not isinstance(wait_template, str):
+            self.errors.append(f"{path}.wait_template: Must be a string template")
+            return
+
+        if "{{" not in wait_template or "}}" not in wait_template:
+            self.warnings.append(
+                f"{path}.wait_template: Should contain a Jinja2 template expression"
+            )
+
+        # Check for timeout
+        timeout = action.get("timeout")
+        if timeout is None:
+            self.warnings.append(
+                f"{path}: wait_template without 'timeout' may wait indefinitely"
+            )
+
+    def _validate_wait_for_trigger(
+        self, wait_for_trigger: Any, action: dict[str, Any], path: str
+    ) -> None:
+        """Validate wait_for_trigger action.
+
+        Args:
+            wait_for_trigger: The wait_for_trigger value.
+            action: The full action dictionary.
+            path: Current path for error messages.
+        """
+        if not isinstance(wait_for_trigger, list):
+            self.errors.append(f"{path}.wait_for_trigger: Must be a list of triggers")
+            return
+
+        if len(wait_for_trigger) == 0:
+            self.errors.append(f"{path}.wait_for_trigger: Cannot be empty")
+            return
+
+        # Validate each trigger in the wait
+        for i, trigger in enumerate(wait_for_trigger):
+            if not isinstance(trigger, dict):
+                self.errors.append(
+                    f"{path}.wait_for_trigger[{i}]: Must be a dictionary"
+                )
+                continue
+
+            if "platform" not in trigger and "trigger" not in trigger:
+                self.errors.append(
+                    f"{path}.wait_for_trigger[{i}]: Missing 'platform' or 'trigger' key"
+                )
+
+        # Check for timeout
+        timeout = action.get("timeout")
+        if timeout is None:
+            self.warnings.append(
+                f"{path}: wait_for_trigger without 'timeout' may wait indefinitely"
+            )
 
     def _validate_entity_id_format(self, entity_id: str, path: str) -> None:
         """Validate entity_id format (domain.entity_name).
@@ -441,6 +812,7 @@ class BlueprintValidator:
         """
         # Allow !input references
         if entity_id.startswith("!input "):
+            self._record_input_use(entity_id[7:].strip())
             return
 
         # Allow templates
@@ -548,6 +920,8 @@ class BlueprintValidator:
                     self.errors.append(
                         f"{path}[{idx}]: entity_id entries must be strings"
                     )
+                else:
+                    self._collect_input_refs(item)
             return
 
         if not isinstance(value, str):
@@ -556,6 +930,8 @@ class BlueprintValidator:
         stripped = value.strip()
         if not stripped:
             return
+
+        self._collect_input_refs(stripped)
 
         if "," in stripped and "{{" not in stripped and not stripped.startswith("["):
             self.errors.append(
@@ -579,12 +955,73 @@ class BlueprintValidator:
                         "entity_id templates cannot combine multiple entities"
                     )
 
+    def _collect_input_refs(self, value: Any) -> None:
+        """Collect !input references from a value.
+
+        Args:
+            value: The value to scan for !input references.
+        """
+        if isinstance(value, str):
+            if value.startswith("!input "):
+                self._record_input_use(value[7:].strip())
+
+    def _collect_input_refs_from_dict(self, d: dict[str, Any]) -> None:
+        """Recursively collect !input references from a dictionary.
+
+        Args:
+            d: The dictionary to scan.
+        """
+        for key, value in d.items():
+            if isinstance(value, str):
+                self._collect_input_refs(value)
+            elif isinstance(value, dict):
+                self._collect_input_refs_from_dict(value)
+            elif isinstance(value, list):
+                for item in value:
+                    if isinstance(item, str):
+                        self._collect_input_refs(item)
+                    elif isinstance(item, dict):
+                        self._collect_input_refs_from_dict(item)
+
+    def _record_input_use(self, input_name: str) -> None:
+        """Record usage of an input.
+
+        Args:
+            input_name: The name of the input being used.
+        """
+        self.used_inputs.add(input_name)
+
+    def _validate_input_references(self) -> None:
+        """Validate that all !input references point to defined inputs."""
+        # Find undefined inputs
+        undefined = self.used_inputs - self.defined_inputs
+        for input_name in sorted(undefined):
+            self.errors.append(
+                f"Undefined input reference: '!input {input_name}' - "
+                "no matching input defined in blueprint.input"
+            )
+
+        # Find unused inputs (warning only)
+        unused = self.defined_inputs - self.used_inputs
+        for input_name in sorted(unused):
+            # Don't warn about inputs that might be used in ways we can't detect
+            # (e.g., dynamically constructed names, used only in descriptions)
+            pass  # Intentionally not warning - too many false positives
+
     def _check_readme_exists(self) -> None:
         """Check if README.md exists in the blueprint directory."""
         readme_path = self.file_path.parent / "README.md"
         if not readme_path.exists():
             self.warnings.append(
                 f"No README.md found in {self.file_path.parent.name}/ directory"
+            )
+
+    def _check_changelog_exists(self) -> None:
+        """Check if CHANGELOG.md exists in the blueprint directory."""
+        changelog_path = self.file_path.parent / "CHANGELOG.md"
+        if not changelog_path.exists():
+            self.warnings.append(
+                f"No CHANGELOG.md found in {self.file_path.parent.name}/ directory"
             )
 
     def _report_results(self) -> bool:
