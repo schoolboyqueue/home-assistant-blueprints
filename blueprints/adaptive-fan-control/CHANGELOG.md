@@ -1,5 +1,11 @@
 # Ceiling Fan Climate Control Pro - Changelog
 
+## [2.2.2] - 2025-12-25
+
+### Fixed
+
+- **Redundant RF commands eliminated**: Added early-exit optimization that skips the entire automation when the fan is already in the desired state. Prevents audible command sounds on RF devices (Bond, etc.) when temperature sensors update but no fan change is needed.
+
 ## [2.2.1] - 2025-12-24
 
 ### Fixed

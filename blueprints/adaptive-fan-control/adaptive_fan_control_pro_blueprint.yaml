@@ -1,5 +1,5 @@
 blueprint:
-  name: Ceiling Fan Climate Control Pro v2.2.1
+  name: Ceiling Fan Climate Control Pro v2.2.2
   description: >
     HVAC-aware ceiling fan automation with adaptive comfort control. Uses the
     EN 16798 / ASHRAE 55 adaptive comfort model to dynamically adjust fan behavior
@@ -332,7 +332,7 @@ blueprint:
               custom_value: false
 
 variables:
-  blueprint_version: "2.2.1"
+  blueprint_version: "2.2.2"
   fan_entity: !input fan_entity
   temp_sensor: !input temp_sensor
   humidity_sensor_input: !input humidity_sensor
@@ -529,6 +529,45 @@ variables:
   fan_current_pct: "{{ state_attr(fan_entity, 'percentage') | int(0) }}"
   fan_current_direction: "{{ state_attr(fan_entity, 'direction') | default('forward', true) | lower }}"
 
+  # Determine desired fan state to enable early-exit optimization
+  # This pre-calculates what the fan SHOULD be doing so we can skip entirely if no change needed
+  desired_fan_state: >
+    {% if not is_occupied and not (is_heating and reverse_when_heating and supports_direction) %}
+      off
+    {% elif is_heating %}
+      {% if reverse_when_heating and supports_direction %}
+        on
+      {% else %}
+        off
+      {% endif %}
+    {% elif is_cooling %}
+      on
+    {% elif is_above_comfort %}
+      on
+    {% else %}
+      off
+    {% endif %}
+  desired_speed: >
+    {% if desired_fan_state == 'off' %}
+      0
+    {% elif is_heating and reverse_when_heating %}
+      {{ heating_speed_pct | int }}
+    {% else %}
+      {{ calculated_speed | int }}
+    {% endif %}
+  desired_direction: >
+    {% if desired_fan_state == 'off' %}
+      {{ fan_current_direction }}
+    {% else %}
+      {{ calculated_direction }}
+    {% endif %}
+
+  # Check if any change is actually needed
+  fan_state_matches: "{{ (desired_fan_state == 'on') == fan_is_on }}"
+  fan_speed_matches: "{{ desired_fan_state == 'off' or fan_current_pct == desired_speed | int }}"
+  fan_direction_matches: "{{ not supports_direction or desired_fan_state == 'off' or fan_current_direction == desired_direction }}"
+  no_change_needed: "{{ fan_state_matches and fan_speed_matches and fan_direction_matches }}"
+
   # Speed calculation
   calculated_speed: >
     {% if speed_mode == 'deviation' %}
@@ -599,6 +638,25 @@ trigger:
 condition: []
 
 action:
+  # Early exit: Skip entirely if fan is already in the desired state
+  # This prevents redundant RF commands to devices like Bond that make audible sounds
+  - if:
+      - condition: template
+        value_template: "{{ no_change_needed and trigger.id not in ['presence_cleared', 'season_changed', 'hvac_changed'] }}"
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ debug_level_v == 'verbose' }}"
+        then:
+          - service: logbook.log
+            data:
+              name: "Fan Climate Pro"
+              entity_id: "{{ fan_entity }}"
+              message: >
+                Skipped (no change needed) | Fan: {{ 'on' if fan_is_on else 'off' }} @ {{ fan_current_pct }}% |
+                Desired: {{ desired_fan_state }} @ {{ desired_speed }}%
+      - stop: "No change needed"
+
   # Always log on basic or verbose - use logbook for visibility
   - if:
       - condition: template
