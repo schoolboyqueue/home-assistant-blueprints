@@ -1,5 +1,5 @@
 blueprint:
-  name: "Adaptive Shades Pro v1.13.1"
+  name: "Adaptive Shades Pro v1.13.2"
   description: >-
     Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
     Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
@@ -442,7 +442,7 @@ blueprint:
                   value: "verbose"
 
 variables:
-  blueprint_version: "1.13.1"
+  blueprint_version: "1.13.2"
   cover_target: !input cover_target
   base_cover: >-
     {% set ct = cover_target | default('') %}
@@ -650,22 +650,26 @@ variables:
         {% set parent_id = ctx.parent_id | default('') if ctx else '' %}
         {% set from_ui = user_id is string and (user_id | length > 0) %}
         {% set from_automation = parent_id is string and (parent_id | length > 0) %}
-        {# Check if helper is configured and has valid timestamp #}
+        {# Check if helper is configured and has a recent timestamp #}
         {% set helper_entity = last_command_helper if last_command_helper not in ['', none] else none %}
         {% set helper_ts = state_attr(helper_entity, 'timestamp') if helper_entity else none %}
-        {% set has_helper = helper_ts is number and helper_ts > 0 %}
-        {% set last_cmd_ts = helper_ts if has_helper else 0 %}
+        {% set now_ts = as_timestamp(now()) %}
         {% set cover_changed_ts = as_timestamp(s.last_changed) %}
+        {# Helper is only valid if timestamp is recent (within 2x manual timeout) #}
+        {# This handles fresh helpers that haven't been set yet #}
+        {% set max_helper_age = (manual_timeout_minutes | float) * 120 %}
+        {% set helper_age = (now_ts - helper_ts) if helper_ts is number else 999999 %}
+        {% set has_valid_helper = helper_ts is number and helper_ts > 0 and helper_age < max_helper_age %}
         {# Grace period: cover changes within 90s of our command are considered ours #}
         {% set grace_seconds = 90 %}
-        {% set seconds_since_cmd = cover_changed_ts - last_cmd_ts %}
-        {% set is_our_result = has_helper and seconds_since_cmd >= 0 and seconds_since_cmd < grace_seconds %}
+        {% set seconds_since_cmd = (cover_changed_ts - helper_ts) if has_valid_helper else 0 %}
+        {% set is_our_result = has_valid_helper and seconds_since_cmd >= 0 and seconds_since_cmd < grace_seconds %}
         {# Determine if manual #}
         {% if from_ui %}
           {% set is_manual = true %}
         {% elif from_automation %}
           {% set is_manual = false %}
-        {% elif has_helper %}
+        {% elif has_valid_helper %}
           {% set is_manual = not is_our_result %}
         {% else %}
           {% set is_manual = false %}
@@ -1040,30 +1044,34 @@ action:
                   {% set parent_id = ctx.parent_id | default('') if ctx else '' %}
                   {% set from_ui = user_id is string and (user_id | length > 0) %}
                   {% set from_automation = parent_id is string and (parent_id | length > 0) %}
-                  {# Check if helper is configured and has valid timestamp #}
+                  {# Check if helper is configured and has a recent timestamp #}
                   {% set helper_entity = last_command_helper if last_command_helper not in ['', none] else none %}
                   {% set helper_ts = state_attr(helper_entity, 'timestamp') if helper_entity else none %}
-                  {% set has_helper = helper_ts is number and helper_ts > 0 %}
-                  {% set last_cmd_ts = helper_ts if has_helper else 0 %}
+                  {% set now_ts = as_timestamp(now()) %}
+                  {# Helper is only valid if timestamp is recent (within 2x manual timeout) #}
+                  {# This handles fresh helpers that haven't been set yet #}
+                  {% set max_helper_age = (manual_timeout_minutes | float) * 120 %}
+                  {% set helper_age = (now_ts - helper_ts) if helper_ts is number else 999999 %}
+                  {% set has_valid_helper = helper_ts is number and helper_ts > 0 and helper_age < max_helper_age %}
                   {% set cover_changed_ts = as_timestamp(s.last_changed) %}
                   {# Grace period: cover changes within 90s of our command are considered ours #}
                   {% set grace_seconds = 90 %}
-                  {% set seconds_since_cmd = cover_changed_ts - last_cmd_ts %}
-                  {% set is_our_result = has_helper and seconds_since_cmd >= 0 and seconds_since_cmd < grace_seconds %}
+                  {% set seconds_since_cmd = (cover_changed_ts - helper_ts) if has_valid_helper else 0 %}
+                  {% set is_our_result = has_valid_helper and seconds_since_cmd >= 0 and seconds_since_cmd < grace_seconds %}
                   {# Determine if manual: #}
                   {# 1. UI change (user_id present) = always manual #}
                   {# 2. Automation change (parent_id present) = never manual #}
-                  {# 3. Device report with helper: manual if NOT within grace period of our command #}
-                  {# 4. Device report without helper: cannot determine, assume not manual #}
+                  {# 3. Device report with valid helper: manual if NOT within grace period #}
+                  {# 4. No valid helper: cannot determine, assume not manual #}
                   {% if from_ui %}
                     {% set is_manual = true %}
                   {% elif from_automation %}
                     {% set is_manual = false %}
-                  {% elif has_helper %}
-                    {# Helper configured: manual if change wasn't shortly after our command #}
+                  {% elif has_valid_helper %}
+                    {# Valid helper: manual if change wasn't shortly after our command #}
                     {% set is_manual = not is_our_result %}
                   {% else %}
-                    {# No helper: cannot reliably detect, assume not manual #}
+                    {# No valid helper: cannot reliably detect, assume not manual #}
                     {% set is_manual = false %}
                   {% endif %}
                   {{ is_manual and (delta_minutes < (manual_timeout_minutes | float)) }}

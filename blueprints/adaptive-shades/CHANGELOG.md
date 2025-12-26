@@ -1,5 +1,11 @@
 # Adaptive Shades Pro - Changelog
 
+## [1.13.2] - 2025-12-26
+
+### Fixed
+
+- **Fixed fresh helper causing false positives**: A newly created `input_datetime` helper with no automation-set value would cause all cover changes to be flagged as manual. Now validates that the helper timestamp is recent (within 2x the manual timeout period). If the helper hasn't been set by this automation yet, falls back to UI-only detection.
+
 ## [1.13.1] - 2025-12-26
 
 ### Fixed
