@@ -1,5 +1,5 @@
 blueprint:
-  name: "Adaptive Shades Pro v1.12.3"
+  name: "Adaptive Shades Pro v1.13.0"
   description: >-
     Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
     Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
@@ -300,6 +300,18 @@ blueprint:
               min: 0
               max: 240
               step: 5
+        last_command_helper:
+          name: (Optional) Last command timestamp helper
+          description: >-
+            An input_datetime helper to track when this automation last commanded shades.
+            Create one helper per automation instance (e.g., input_datetime.shades_living_room_last_cmd).
+            This enables reliable detection of manual adjustments from physical remotes or buttons
+            by comparing cover state changes against the last automation command time.
+            Without this helper, only Home Assistant UI changes are detected as manual.
+          default: ""
+          selector:
+            entity:
+              domain: input_datetime
         quiet_hours_start:
           name: (Optional) Quiet hours start
           description: >-
@@ -429,7 +441,7 @@ blueprint:
                   value: "verbose"
 
 variables:
-  blueprint_version: "1.12.3"
+  blueprint_version: "1.13.0"
   cover_target: !input cover_target
   base_cover: >-
     {% set ct = cover_target | default('') %}
@@ -466,6 +478,7 @@ variables:
   presence_required: !input presence_required
   manual_override: !input manual_override
   manual_timeout_minutes: !input manual_timeout_minutes
+  last_command_helper: !input last_command_helper
   quiet_hours_start: !input quiet_hours_start
   quiet_hours_end: !input quiet_hours_end
   vertical_irradiance_sensor: !input vertical_irradiance_sensor
@@ -617,9 +630,9 @@ variables:
     {% set mo = manual_override | default('') %}
     {{ mo != '' and is_state(mo, 'on') }}
   auto_override_active: >-
-    {# This is checked per-cover in the repeat loop using this_auto_override_active #}
-    {# This top-level variable only checks UI-initiated changes; position comparison #}
-    {# is done in the per-cover loop where desired_position_room is available #}
+    {# Manual override detection using timestamp helper (if configured) or UI context. #}
+    {# With helper: detects any cover change that wasn't shortly after our command. #}
+    {# Without helper: only detects UI-initiated changes (user_id present). #}
     {% if manual_timeout_minutes | int(0) <= 0 or not base_cover %}
       false
     {% else %}
@@ -630,18 +643,33 @@ variables:
         {# Cover is still moving - don't evaluate manual detection yet #}
         false
       {% else %}
-        {% set delta = (as_timestamp(now()) - as_timestamp(s.last_changed)) / 60 %}
+        {% set delta_minutes = (as_timestamp(now()) - as_timestamp(s.last_changed)) / 60 %}
         {% set ctx = s.context if s.context is defined else none %}
         {% set user_id = ctx.user_id | default('') if ctx else '' %}
         {% set parent_id = ctx.parent_id | default('') if ctx else '' %}
         {% set from_ui = user_id is string and (user_id | length > 0) %}
         {% set from_automation = parent_id is string and (parent_id | length > 0) %}
-        {# Only detect explicit UI changes here; device reports are handled per-cover #}
+        {# Check if helper is configured and has valid timestamp #}
+        {% set helper_entity = last_command_helper if last_command_helper not in ['', none] else none %}
+        {% set helper_state = states(helper_entity) if helper_entity else none %}
+        {% set has_helper = helper_state not in [none, 'unknown', 'unavailable', ''] %}
+        {% set last_cmd_ts = as_timestamp(helper_state) if has_helper else 0 %}
+        {% set cover_changed_ts = as_timestamp(s.last_changed) %}
+        {# Grace period: cover changes within 90s of our command are considered ours #}
+        {% set grace_seconds = 90 %}
+        {% set seconds_since_cmd = cover_changed_ts - last_cmd_ts %}
+        {% set is_our_result = has_helper and seconds_since_cmd >= 0 and seconds_since_cmd < grace_seconds %}
+        {# Determine if manual #}
         {% if from_ui %}
-          {{ delta < (manual_timeout_minutes | float) }}
+          {% set is_manual = true %}
+        {% elif from_automation %}
+          {% set is_manual = false %}
+        {% elif has_helper %}
+          {% set is_manual = not is_our_result %}
         {% else %}
-          false
+          {% set is_manual = false %}
         {% endif %}
+        {{ is_manual and (delta_minutes < (manual_timeout_minutes | float)) }}
       {% endif %}
     {% endif %}
   in_quiet_hours: >-
@@ -1005,29 +1033,39 @@ action:
                   {# Cover is still moving - don't evaluate manual detection yet #}
                   false
                 {% else %}
-                  {% set delta = (as_timestamp(now()) - as_timestamp(s.last_changed)) / 60 %}
+                  {% set delta_minutes = (as_timestamp(now()) - as_timestamp(s.last_changed)) / 60 %}
                   {% set ctx = s.context if s.context is defined else none %}
                   {% set user_id = ctx.user_id | default('') if ctx else '' %}
                   {% set parent_id = ctx.parent_id | default('') if ctx else '' %}
                   {% set from_ui = user_id is string and (user_id | length > 0) %}
                   {% set from_automation = parent_id is string and (parent_id | length > 0) %}
-                  {# Manual = UI change, or device report with position different from our target #}
+                  {# Check if helper is configured and has valid timestamp #}
+                  {% set helper_entity = last_command_helper if last_command_helper not in ['', none] else none %}
+                  {% set helper_state = states(helper_entity) if helper_entity else none %}
+                  {% set has_helper = helper_state not in [none, 'unknown', 'unavailable', ''] %}
+                  {% set last_cmd_ts = as_timestamp(helper_state) if has_helper else 0 %}
+                  {% set cover_changed_ts = as_timestamp(s.last_changed) %}
+                  {# Grace period: cover changes within 90s of our command are considered ours #}
+                  {% set grace_seconds = 90 %}
+                  {% set seconds_since_cmd = cover_changed_ts - last_cmd_ts %}
+                  {% set is_our_result = has_helper and seconds_since_cmd >= 0 and seconds_since_cmd < grace_seconds %}
+                  {# Determine if manual: #}
+                  {# 1. UI change (user_id present) = always manual #}
+                  {# 2. Automation change (parent_id present) = never manual #}
+                  {# 3. Device report with helper: manual if NOT within grace period of our command #}
+                  {# 4. Device report without helper: cannot determine, assume not manual #}
                   {% if from_ui %}
                     {% set is_manual = true %}
                   {% elif from_automation %}
                     {% set is_manual = false %}
+                  {% elif has_helper %}
+                    {# Helper configured: manual if change wasn't shortly after our command #}
+                    {% set is_manual = not is_our_result %}
                   {% else %}
-                    {% set current_pos = state_attr(this_cover, 'current_position') | float(none) %}
-                    {% set target = this_target_base %}
-                    {% if current_pos is none or target is none %}
-                      {% set is_manual = false %}
-                    {% else %}
-                      {% set effective_target = (100 - target) if inverted_shades else target %}
-                      {% set diff = (current_pos - effective_target) | abs %}
-                      {% set is_manual = diff > (position_hysteresis | float(3)) %}
-                    {% endif %}
+                    {# No helper: cannot reliably detect, assume not manual #}
+                    {% set is_manual = false %}
                   {% endif %}
-                  {{ is_manual and (delta < (manual_timeout_minutes | float)) }}
+                  {{ is_manual and (delta_minutes < (manual_timeout_minutes | float)) }}
                 {% endif %}
               {% endif %}
             this_target_position: >-
@@ -1141,6 +1179,15 @@ action:
                             domain: cover
             - conditions: []
               sequence:
+                # Record command timestamp before moving cover (if helper is configured)
+                - choose:
+                    - conditions: "{{ last_command_helper not in ['', none] }}"
+                      sequence:
+                        - service: input_datetime.set_datetime
+                          target:
+                            entity_id: "{{ last_command_helper }}"
+                          data:
+                            datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
                 - choose:
                     - conditions: "{{ cover_supports_tilt and shading_mode == 'slat' }}"
                       sequence:

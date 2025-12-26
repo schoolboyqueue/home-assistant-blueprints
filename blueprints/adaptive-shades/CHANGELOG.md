@@ -1,5 +1,27 @@
 # Adaptive Shades Pro - Changelog
 
+## [1.13.0] - 2025-12-26
+
+### Added
+
+- **Last command timestamp helper** (`last_command_helper`): New optional `input_datetime` helper input that enables reliable detection of manual adjustments from physical remotes or buttons. The automation records a timestamp before each cover command; any cover state change that occurs more than 90 seconds after the last command is considered manual. Create one helper per automation instance (e.g., `input_datetime.shades_living_room_last_cmd`) and select it in the blueprint configuration.
+
+### Changed
+
+- **Improved manual detection logic**: With the helper configured, the automation can now reliably distinguish between:
+  - Changes from this automation (within 90s of recorded command timestamp)
+  - Changes from Home Assistant UI (detected via `user_id` in context)
+  - Changes from other automations (detected via `parent_id` in context)
+  - Changes from physical remotes/buttons (detected as manual when helper is configured)
+  
+  Without the helper, behavior is unchanged from v1.12.4 (only UI changes detected as manual).
+
+## [1.12.4] - 2025-12-26
+
+### Fixed
+
+- **Fixed false positive manual detection**: Removed unreliable position-comparison fallback from manual adjustment detection. The previous logic compared current position to calculated target when no `user_id` or `parent_id` was present in state context, but this caused false positives because device state reports after automation commands have no `parent_id` and may differ from target due to rounding or drift. Manual detection now only triggers on clear UI-initiated changes (`user_id` present). Physical remote/button presses cannot be reliably distinguished from automation results and are no longer detected—users should use the manual override input_boolean for explicit manual control periods.
+
 ## [1.12.3] - 2025-12-26
 
 ### Fixed
