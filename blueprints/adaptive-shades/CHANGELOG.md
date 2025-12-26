@@ -1,5 +1,19 @@
 # Adaptive Shades Pro - Changelog
 
+## [1.12.1] - 2025-12-26
+
+### Fixed
+
+- **Pause conditions now properly stop execution**: Added missing `stop:` actions for manual override, quiet hours, and presence requirement conditions. Previously, these conditions would log a message but continue to move shades anyway.
+- **Prevent commanding shades while moving**: The automation now skips sending position commands when a cover is in `opening` or `closing` state, preventing interruption of in-progress movements (whether from automation or manual control).
+- **Improved manual adjustment detection**: The v1.11.0 `parent_id` approach caused false positives when devices reported state updates after automation commands, blocking all automatic movements. New approach detects manual changes by:
+  1. Ignoring state changes while cover is actively moving (`opening`/`closing` states)
+  2. UI interactions (`user_id` present) - always treated as manual
+  3. Automation/script changes (`parent_id` present) - never treated as manual
+  4. Device state reports (no `user_id` or `parent_id`) - treated as manual only if the final position differs significantly from the automation's target position (beyond the hysteresis threshold)
+  
+  This correctly detects physical remote control, voice assistant commands, and native app changes without false positives from intermediate position reports during shade movement or final position reports after automation-triggered movements.
+
 ## [1.12.0] - 2025-12-25
 
 ### Added

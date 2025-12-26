@@ -1,5 +1,5 @@
 blueprint:
-  name: "Adaptive Shades Pro v1.12.0"
+  name: "Adaptive Shades Pro v1.12.1"
   description: >-
     Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
     Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
@@ -429,7 +429,7 @@ blueprint:
                   value: "verbose"
 
 variables:
-  blueprint_version: "1.12.0"
+  blueprint_version: "1.12.1"
   cover_target: !input cover_target
   base_cover: >-
     {% set ct = cover_target | default('') %}
@@ -485,13 +485,41 @@ variables:
     {% if not triggered_by_cover %}
       false
     {% else %}
-      {% set ctx = trigger.to_state.context if trigger.to_state is defined else none %}
-      {% if ctx is none %}
+      {# Ignore state changes while cover is actively moving (opening/closing) #}
+      {% set cover_state = trigger.to_state.state if trigger.to_state is defined else '' %}
+      {% if cover_state in ['opening', 'closing'] %}
         false
       {% else %}
-        {# Changes from automations/scripts have a parent_id; manual/external changes don't #}
-        {% set parent_id = ctx.parent_id | default(none) %}
-        {{ parent_id is none or parent_id == '' }}
+        {% set ctx = trigger.to_state.context if trigger.to_state is defined else none %}
+        {% if ctx is none %}
+          false
+        {% else %}
+          {# UI changes have user_id; automations/scripts have parent_id; device reports have neither #}
+          {% set user_id = ctx.user_id | default('') %}
+          {% set parent_id = ctx.parent_id | default('') %}
+          {% set from_ui = user_id is string and (user_id | length > 0) %}
+          {% set from_automation = parent_id is string and (parent_id | length > 0) %}
+          {% if from_ui %}
+            {# Explicit UI interaction is always manual #}
+            true
+          {% elif from_automation %}
+            {# Change from an automation/script - not manual #}
+            false
+          {% else %}
+            {# Device state report (no user_id, no parent_id) - check if position differs from our target #}
+            {% set new_pos = trigger.to_state.attributes.current_position | float(none) %}
+            {% set target = desired_position_room %}
+            {% if new_pos is none or target is none %}
+              false
+            {% else %}
+              {# Account for inverted shades when comparing #}
+              {% set effective_target = (100 - target) if inverted_shades else target %}
+              {% set diff = (new_pos - effective_target) | abs %}
+              {# If position differs from our target by more than hysteresis, assume manual/external change #}
+              {{ diff > (position_hysteresis | float(3)) }}
+            {% endif %}
+          {% endif %}
+        {% endif %}
       {% endif %}
     {% endif %}
   pi: 3.141592653589793
@@ -605,12 +633,32 @@ variables:
       {% set s = states[base_cover] %}
       {% if s is none or s.last_changed is none %}
         false
+      {% elif s.state in ['opening', 'closing'] %}
+        {# Cover is still moving - don't evaluate manual detection yet #}
+        false
       {% else %}
         {% set delta = (as_timestamp(now()) - as_timestamp(s.last_changed)) / 60 %}
         {% set ctx = s.context if s.context is defined else none %}
-        {% set parent_id = ctx.parent_id | default(none) if ctx else none %}
-        {# Manual changes have no parent_id (not triggered by automation/script) #}
-        {% set is_manual = parent_id is none or parent_id == '' %}
+        {% set user_id = ctx.user_id | default('') if ctx else '' %}
+        {% set parent_id = ctx.parent_id | default('') if ctx else '' %}
+        {% set from_ui = user_id is string and (user_id | length > 0) %}
+        {% set from_automation = parent_id is string and (parent_id | length > 0) %}
+        {# Check if recent change was manual: UI, or device report with position different from target #}
+        {% if from_ui %}
+          {% set is_manual = true %}
+        {% elif from_automation %}
+          {% set is_manual = false %}
+        {% else %}
+          {% set current_pos = s.attributes.current_position | float(none) if s.attributes is defined else none %}
+          {% set target = desired_position_room %}
+          {% if current_pos is none or target is none %}
+            {% set is_manual = false %}
+          {% else %}
+            {% set effective_target = (100 - target) if inverted_shades else target %}
+            {% set diff = (current_pos - effective_target) | abs %}
+            {% set is_manual = diff > (position_hysteresis | float(3)) %}
+          {% endif %}
+        {% endif %}
         {{ is_manual and (delta < (manual_timeout_minutes | float)) }}
       {% endif %}
     {% endif %}
@@ -913,6 +961,7 @@ action:
               name: "Adaptive Shades"
               message: "Paused: manual override is ON. (v{{ blueprint_version }})"
               domain: cover
+          - stop: "Manual override active"
       - conditions: "{{ in_quiet_hours }}"
         sequence:
           - condition: template
@@ -922,6 +971,7 @@ action:
               name: "Adaptive Shades"
               message: "Paused during quiet hours. (v{{ blueprint_version }})"
               domain: cover
+          - stop: "Quiet hours active"
       - conditions: "{{ not presence_ok }}"
         sequence:
           - condition: template
@@ -931,6 +981,7 @@ action:
               name: "Adaptive Shades"
               message: "Skipped: presence requirement not met. (v{{ blueprint_version }})"
               domain: cover
+          - stop: "Presence requirement not met"
   - repeat:
       for_each: "{{ cover_target if cover_target is sequence else [cover_target] }}"
       sequence:
@@ -968,12 +1019,32 @@ action:
                 {% set s = states[this_cover] %}
                 {% if s is none or s.last_changed is none %}
                   false
+                {% elif s.state in ['opening', 'closing'] %}
+                  {# Cover is still moving - don't evaluate manual detection yet #}
+                  false
                 {% else %}
                   {% set delta = (as_timestamp(now()) - as_timestamp(s.last_changed)) / 60 %}
                   {% set ctx = s.context if s.context is defined else none %}
-                  {% set parent_id = ctx.parent_id | default(none) if ctx else none %}
-                  {# Manual/external changes have no parent_id (not triggered by automation/script) #}
-                  {% set is_manual = parent_id is none or parent_id == '' %}
+                  {% set user_id = ctx.user_id | default('') if ctx else '' %}
+                  {% set parent_id = ctx.parent_id | default('') if ctx else '' %}
+                  {% set from_ui = user_id is string and (user_id | length > 0) %}
+                  {% set from_automation = parent_id is string and (parent_id | length > 0) %}
+                  {# Manual = UI change, or device report with position different from our target #}
+                  {% if from_ui %}
+                    {% set is_manual = true %}
+                  {% elif from_automation %}
+                    {% set is_manual = false %}
+                  {% else %}
+                    {% set current_pos = s.attributes.current_position | float(none) if s.attributes is defined else none %}
+                    {% set target = this_target_base %}
+                    {% if current_pos is none or target is none %}
+                      {% set is_manual = false %}
+                    {% else %}
+                      {% set effective_target = (100 - target) if inverted_shades else target %}
+                      {% set diff = (current_pos - effective_target) | abs %}
+                      {% set is_manual = diff > (position_hysteresis | float(3)) %}
+                    {% endif %}
+                  {% endif %}
                   {{ is_manual and (delta < (manual_timeout_minutes | float)) }}
                 {% endif %}
               {% endif %}
@@ -1072,6 +1143,20 @@ action:
                     name: "Adaptive Shades"
                     message: "Cover {{ this_cover }} unavailable; no movement. (v{{ blueprint_version }})"
                     domain: cover
+            - conditions:
+                - condition: template
+                  value_template: "{{ is_state(this_cover, 'opening') or is_state(this_cover, 'closing') }}"
+              sequence:
+                - choose:
+                    - conditions:
+                        - condition: template
+                          value_template: "{{ debug_verbose }}"
+                      sequence:
+                        - service: logbook.log
+                          data:
+                            name: "Adaptive Shades"
+                            message: "Cover {{ this_cover }} is moving; waiting for it to stop. (v{{ blueprint_version }})"
+                            domain: cover
             - conditions: []
               sequence:
                 - choose:
