@@ -4,7 +4,7 @@
 
 ### Added
 
-- **Last command timestamp helper** (`last_command_helper`): New optional `input_datetime` helper input that enables reliable detection of manual adjustments from physical remotes or buttons. The automation records a timestamp before each cover command; any cover state change that occurs more than 90 seconds after the last command is considered manual. Create one helper per automation instance (e.g., `input_datetime.shades_living_room_last_cmd`) and select it in the blueprint configuration.
+- **Last command timestamp helper** (`last_command_helper`): New optional `input_datetime` helper input that enables reliable detection of manual adjustments from physical remotes or buttons. The automation records a timestamp before each cover command; any cover state change that occurs more than 90 seconds after the last command is considered manual. Create one helper per automation instance with **"Date and time" mode enabled** (not just date or just time) and select it in the blueprint configuration.
 
 ### Changed
 

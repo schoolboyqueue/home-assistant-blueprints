@@ -304,7 +304,8 @@ blueprint:
           name: (Optional) Last command timestamp helper
           description: >-
             An input_datetime helper to track when this automation last commanded shades.
-            Create one helper per automation instance (e.g., input_datetime.shades_living_room_last_cmd).
+            Create one helper per automation instance with "Date and time" mode enabled
+            (Settings → Devices & Services → Helpers → Create Helper → Date and/or time → enable both Date and Time).
             This enables reliable detection of manual adjustments from physical remotes or buttons
             by comparing cover state changes against the last automation command time.
             Without this helper, only Home Assistant UI changes are detected as manual.
