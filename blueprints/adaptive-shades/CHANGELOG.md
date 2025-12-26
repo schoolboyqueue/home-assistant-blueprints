@@ -1,5 +1,11 @@
 # Adaptive Shades Pro - Changelog
 
+## [1.12.3] - 2025-12-26
+
+### Fixed
+
+- **Fixed attribute access error**: Resolved `ReadOnlyDict has no attribute 'current_position'` error by using `state_attr()` helper instead of direct attribute access on state objects.
+
 ## [1.12.2] - 2025-12-26
 
 ### Fixed
