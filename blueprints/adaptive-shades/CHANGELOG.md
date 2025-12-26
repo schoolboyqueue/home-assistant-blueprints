@@ -1,5 +1,11 @@
 # Adaptive Shades Pro - Changelog
 
+## [1.13.3] - 2025-12-26
+
+### Fixed
+
+- **Fixed cover trigger false positives**: When the automation moved a cover, the subsequent device state report would trigger `cover_changed` and be falsely detected as manual (device reports have no `parent_id`). The `manual_change_detected` variable now uses the helper timestamp to check if the cover change occurred within 90 seconds of the last automation command, preventing false positives from automation-triggered movements.
+
 ## [1.13.2] - 2025-12-26
 
 ### Fixed

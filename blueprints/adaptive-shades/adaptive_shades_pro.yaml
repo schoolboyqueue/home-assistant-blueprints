@@ -1,5 +1,5 @@
 blueprint:
-  name: "Adaptive Shades Pro v1.13.2"
+  name: "Adaptive Shades Pro v1.13.3"
   description: >-
     Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
     Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
@@ -442,7 +442,7 @@ blueprint:
                   value: "verbose"
 
 variables:
-  blueprint_version: "1.13.2"
+  blueprint_version: "1.13.3"
   cover_target: !input cover_target
   base_cover: >-
     {% set ct = cover_target | default('') %}
@@ -520,10 +520,29 @@ variables:
             {# Change from an automation/script - not manual #}
             false
           {% else %}
-            {# Device state report (no user_id, no parent_id) - treat as potential manual change #}
-            {# Note: Cannot compare to target position here due to variable ordering; #}
-            {# the per-cover loop handles detailed position comparison #}
-            true
+            {# Device state report - check helper timestamp if available #}
+            {% set helper_entity = last_command_helper if last_command_helper not in ['', none] else none %}
+            {% set helper_ts = state_attr(helper_entity, 'timestamp') if helper_entity else none %}
+            {% set now_ts = as_timestamp(now()) %}
+            {% set max_helper_age = (manual_timeout_minutes | float) * 120 %}
+            {% set helper_age = (now_ts - helper_ts) if helper_ts is number else 999999 %}
+            {% set has_valid_helper = helper_ts is number and helper_ts > 0 and helper_age < max_helper_age %}
+            {% if has_valid_helper %}
+              {# Check if cover changed within grace period of our last command #}
+              {% set cover_changed_ts = as_timestamp(trigger.to_state.last_changed) if trigger.to_state.last_changed is defined else now_ts %}
+              {% set seconds_since_cmd = cover_changed_ts - helper_ts %}
+              {% set grace_seconds = 90 %}
+              {% if seconds_since_cmd >= 0 and seconds_since_cmd < grace_seconds %}
+                {# Cover changed shortly after our command - not manual #}
+                false
+              {% else %}
+                {# Cover changed outside grace period - manual #}
+                true
+              {% endif %}
+            {% else %}
+              {# No valid helper - cannot determine, assume not manual to avoid false positives #}
+              false
+            {% endif %}
           {% endif %}
         {% endif %}
       {% endif %}
