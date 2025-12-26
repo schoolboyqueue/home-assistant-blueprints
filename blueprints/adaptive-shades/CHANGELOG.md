@@ -1,5 +1,11 @@
 # Adaptive Shades Pro - Changelog
 
+## [1.12.2] - 2025-12-26
+
+### Fixed
+
+- **Fixed circular variable dependency error**: Resolved `UndefinedError: 'desired_position_room' is undefined` that occurred during variable rendering. The `manual_change_detected` and `auto_override_active` variables were referencing `desired_position_room` before it was defined in the variable chain. Manual detection now relies on context-based detection (UI vs automation) at the top level, with position-based comparison deferred to the per-cover loop where all variables are available.
+
 ## [1.12.1] - 2025-12-26
 
 ### Fixed

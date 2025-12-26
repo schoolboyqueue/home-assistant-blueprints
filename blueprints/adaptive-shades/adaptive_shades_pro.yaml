@@ -1,5 +1,5 @@
 blueprint:
-  name: "Adaptive Shades Pro v1.12.1"
+  name: "Adaptive Shades Pro v1.12.2"
   description: >-
     Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
     Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
@@ -429,7 +429,7 @@ blueprint:
                   value: "verbose"
 
 variables:
-  blueprint_version: "1.12.1"
+  blueprint_version: "1.12.2"
   cover_target: !input cover_target
   base_cover: >-
     {% set ct = cover_target | default('') %}
@@ -506,18 +506,10 @@ variables:
             {# Change from an automation/script - not manual #}
             false
           {% else %}
-            {# Device state report (no user_id, no parent_id) - check if position differs from our target #}
-            {% set new_pos = trigger.to_state.attributes.current_position | float(none) %}
-            {% set target = desired_position_room %}
-            {% if new_pos is none or target is none %}
-              false
-            {% else %}
-              {# Account for inverted shades when comparing #}
-              {% set effective_target = (100 - target) if inverted_shades else target %}
-              {% set diff = (new_pos - effective_target) | abs %}
-              {# If position differs from our target by more than hysteresis, assume manual/external change #}
-              {{ diff > (position_hysteresis | float(3)) }}
-            {% endif %}
+            {# Device state report (no user_id, no parent_id) - treat as potential manual change #}
+            {# Note: Cannot compare to target position here due to variable ordering; #}
+            {# the per-cover loop handles detailed position comparison #}
+            true
           {% endif %}
         {% endif %}
       {% endif %}
@@ -626,7 +618,8 @@ variables:
     {{ mo != '' and is_state(mo, 'on') }}
   auto_override_active: >-
     {# This is checked per-cover in the repeat loop using this_auto_override_active #}
-    {# Kept for backward compatibility but primary detection is now trigger-based #}
+    {# This top-level variable only checks UI-initiated changes; position comparison #}
+    {# is done in the per-cover loop where desired_position_room is available #}
     {% if manual_timeout_minutes | int(0) <= 0 or not base_cover %}
       false
     {% else %}
@@ -643,23 +636,12 @@ variables:
         {% set parent_id = ctx.parent_id | default('') if ctx else '' %}
         {% set from_ui = user_id is string and (user_id | length > 0) %}
         {% set from_automation = parent_id is string and (parent_id | length > 0) %}
-        {# Check if recent change was manual: UI, or device report with position different from target #}
+        {# Only detect explicit UI changes here; device reports are handled per-cover #}
         {% if from_ui %}
-          {% set is_manual = true %}
-        {% elif from_automation %}
-          {% set is_manual = false %}
+          {{ delta < (manual_timeout_minutes | float) }}
         {% else %}
-          {% set current_pos = s.attributes.current_position | float(none) if s.attributes is defined else none %}
-          {% set target = desired_position_room %}
-          {% if current_pos is none or target is none %}
-            {% set is_manual = false %}
-          {% else %}
-            {% set effective_target = (100 - target) if inverted_shades else target %}
-            {% set diff = (current_pos - effective_target) | abs %}
-            {% set is_manual = diff > (position_hysteresis | float(3)) %}
-          {% endif %}
+          false
         {% endif %}
-        {{ is_manual and (delta < (manual_timeout_minutes | float)) }}
       {% endif %}
     {% endif %}
   in_quiet_hours: >-
