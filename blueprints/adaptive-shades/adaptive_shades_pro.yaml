@@ -1,5 +1,5 @@
 blueprint:
-  name: "Adaptive Shades Pro v1.13.0"
+  name: "Adaptive Shades Pro v1.13.1"
   description: >-
     Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
     Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
@@ -442,7 +442,7 @@ blueprint:
                   value: "verbose"
 
 variables:
-  blueprint_version: "1.13.0"
+  blueprint_version: "1.13.1"
   cover_target: !input cover_target
   base_cover: >-
     {% set ct = cover_target | default('') %}
@@ -652,9 +652,9 @@ variables:
         {% set from_automation = parent_id is string and (parent_id | length > 0) %}
         {# Check if helper is configured and has valid timestamp #}
         {% set helper_entity = last_command_helper if last_command_helper not in ['', none] else none %}
-        {% set helper_state = states(helper_entity) if helper_entity else none %}
-        {% set has_helper = helper_state not in [none, 'unknown', 'unavailable', ''] %}
-        {% set last_cmd_ts = as_timestamp(helper_state) if has_helper else 0 %}
+        {% set helper_ts = state_attr(helper_entity, 'timestamp') if helper_entity else none %}
+        {% set has_helper = helper_ts is number and helper_ts > 0 %}
+        {% set last_cmd_ts = helper_ts if has_helper else 0 %}
         {% set cover_changed_ts = as_timestamp(s.last_changed) %}
         {# Grace period: cover changes within 90s of our command are considered ours #}
         {% set grace_seconds = 90 %}
@@ -1042,9 +1042,9 @@ action:
                   {% set from_automation = parent_id is string and (parent_id | length > 0) %}
                   {# Check if helper is configured and has valid timestamp #}
                   {% set helper_entity = last_command_helper if last_command_helper not in ['', none] else none %}
-                  {% set helper_state = states(helper_entity) if helper_entity else none %}
-                  {% set has_helper = helper_state not in [none, 'unknown', 'unavailable', ''] %}
-                  {% set last_cmd_ts = as_timestamp(helper_state) if has_helper else 0 %}
+                  {% set helper_ts = state_attr(helper_entity, 'timestamp') if helper_entity else none %}
+                  {% set has_helper = helper_ts is number and helper_ts > 0 %}
+                  {% set last_cmd_ts = helper_ts if has_helper else 0 %}
                   {% set cover_changed_ts = as_timestamp(s.last_changed) %}
                   {# Grace period: cover changes within 90s of our command are considered ours #}
                   {% set grace_seconds = 90 %}

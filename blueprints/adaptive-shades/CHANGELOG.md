@@ -1,5 +1,11 @@
 # Adaptive Shades Pro - Changelog
 
+## [1.13.1] - 2025-12-26
+
+### Fixed
+
+- **Fixed helper timestamp parsing**: The `input_datetime` helper stores state as `YYYY-MM-DD HH:MM:SS` which `as_timestamp()` cannot parse. Now uses `state_attr(helper, 'timestamp')` to get the Unix timestamp directly, which is the correct way to read `input_datetime` values for time comparisons.
+
 ## [1.13.0] - 2025-12-26
 
 ### Added
