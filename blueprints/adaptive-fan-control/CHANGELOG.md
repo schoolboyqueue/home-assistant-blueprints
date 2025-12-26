@@ -1,5 +1,11 @@
 # Ceiling Fan Climate Control Pro - Changelog
 
+## [2.2.3] - 2025-12-26
+
+### Fixed
+
+- **Variable ordering error**: Moved `calculated_speed` and `calculated_direction` definitions before variables that reference them, fixing "'calculated_direction' is undefined" template warnings in Home Assistant logs.
+
 ## [2.2.2] - 2025-12-25
 
 ### Fixed

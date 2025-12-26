@@ -1,5 +1,5 @@
 blueprint:
-  name: Ceiling Fan Climate Control Pro v2.2.2
+  name: Ceiling Fan Climate Control Pro v2.2.3
   description: >
     HVAC-aware ceiling fan automation with adaptive comfort control. Uses the
     EN 16798 / ASHRAE 55 adaptive comfort model to dynamically adjust fan behavior
@@ -332,7 +332,7 @@ blueprint:
               custom_value: false
 
 variables:
-  blueprint_version: "2.2.2"
+  blueprint_version: "2.2.3"
   fan_entity: !input fan_entity
   temp_sensor: !input temp_sensor
   humidity_sensor_input: !input humidity_sensor
@@ -529,6 +529,40 @@ variables:
   fan_current_pct: "{{ state_attr(fan_entity, 'percentage') | int(0) }}"
   fan_current_direction: "{{ state_attr(fan_entity, 'direction') | default('forward', true) | lower }}"
 
+  # Speed calculation (must be defined before desired_speed references it)
+  calculated_speed: >
+    {% if speed_mode == 'deviation' %}
+      {% set dev = comfort_deviation | float %}
+      {% if dev > speed_tier_2 %}
+        {{ speed_high_pct }}
+      {% elif dev > speed_tier_1 %}
+        {{ speed_medium_pct }}
+      {% else %}
+        {{ speed_low_pct }}
+      {% endif %}
+    {% else %}
+      {% set temp = t_effective_sys | float %}
+      {% set tier1 = effective_upper_sys | float + speed_tier_1 | float %}
+      {% set tier2 = effective_upper_sys | float + speed_tier_2 | float %}
+      {% if temp > tier2 %}
+        {{ speed_high_pct }}
+      {% elif temp > tier1 %}
+        {{ speed_medium_pct }}
+      {% else %}
+        {{ speed_low_pct }}
+      {% endif %}
+    {% endif %}
+
+  # Direction calculation (must be defined before desired_direction references it)
+  calculated_direction: >
+    {% if is_heating and reverse_when_heating %}
+      reverse
+    {% elif is_winter and not is_cooling %}
+      reverse
+    {% else %}
+      forward
+    {% endif %}
+
   # Determine desired fan state to enable early-exit optimization
   # This pre-calculates what the fan SHOULD be doing so we can skip entirely if no change needed
   desired_fan_state: >
@@ -567,40 +601,6 @@ variables:
   fan_speed_matches: "{{ desired_fan_state == 'off' or fan_current_pct == desired_speed | int }}"
   fan_direction_matches: "{{ not supports_direction or desired_fan_state == 'off' or fan_current_direction == desired_direction }}"
   no_change_needed: "{{ fan_state_matches and fan_speed_matches and fan_direction_matches }}"
-
-  # Speed calculation
-  calculated_speed: >
-    {% if speed_mode == 'deviation' %}
-      {% set dev = comfort_deviation | float %}
-      {% if dev > speed_tier_2 %}
-        {{ speed_high_pct }}
-      {% elif dev > speed_tier_1 %}
-        {{ speed_medium_pct }}
-      {% else %}
-        {{ speed_low_pct }}
-      {% endif %}
-    {% else %}
-      {% set temp = t_effective_sys | float %}
-      {% set tier1 = effective_upper_sys | float + speed_tier_1 | float %}
-      {% set tier2 = effective_upper_sys | float + speed_tier_2 | float %}
-      {% if temp > tier2 %}
-        {{ speed_high_pct }}
-      {% elif temp > tier1 %}
-        {{ speed_medium_pct }}
-      {% else %}
-        {{ speed_low_pct }}
-      {% endif %}
-    {% endif %}
-
-  # Direction calculation
-  calculated_direction: >
-    {% if is_heating and reverse_when_heating %}
-      reverse
-    {% elif is_winter and not is_cooling %}
-      reverse
-    {% else %}
-      forward
-    {% endif %}
 
   # Speed tolerance for comparison (avoid redundant commands for small differences)
   speed_tolerance: 5
