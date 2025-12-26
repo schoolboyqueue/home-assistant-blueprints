@@ -315,6 +315,10 @@ class BlueprintValidator:
             self.errors.append("'variables' must be a dictionary")
             return
 
+        # Track defined variables in order for dependency checking
+        defined_vars: set[str] = set()
+        var_order = list(variables.keys())
+
         # Record variables that appear to build comma-joined strings
         for name, value in variables.items():
             if isinstance(value, str):
@@ -324,9 +328,101 @@ class BlueprintValidator:
                 # Track !input references in variables
                 self._collect_input_refs(value)
 
+                # Check for forward references to variables not yet defined
+                self._check_variable_ordering(name, value, defined_vars, var_order)
+
+                # Check for direct attribute access on state objects
+                self._check_state_attribute_access(name, value)
+
+            defined_vars.add(name)
+
         # Check for blueprint_version
         if "blueprint_version" not in variables:
             self.warnings.append("No 'blueprint_version' variable defined")
+
+    def _check_variable_ordering(
+        self, var_name: str, value: str, defined_vars: set[str], var_order: list[str]
+    ) -> None:
+        """Check if a variable references other variables that aren't defined yet.
+
+        Args:
+            var_name: Name of the variable being checked.
+            value: The template string value.
+            defined_vars: Set of variables defined so far.
+            var_order: Ordered list of all variable names.
+        """
+        # Find variable references in the template (excluding Jinja built-ins)
+        # Pattern matches: {{ var_name or {{ var_name. or {{ var_name | etc.
+        jinja_builtins = {
+            "true", "false", "none", "True", "False", "None",
+            "now", "utcnow", "as_timestamp", "states", "is_state",
+            "state_attr", "has_value", "expand", "device_entities",
+            "area_entities", "integration_entities", "device_attr",
+            "area_name", "area_id", "relative_time", "timedelta",
+            "strptime", "as_datetime", "as_local", "today_at",
+            "trigger", "this", "repeat", "context",
+        }
+
+        # Look for variable references
+        for other_var in var_order:
+            if other_var == var_name:
+                continue
+            if other_var in jinja_builtins:
+                continue
+
+            # Check if this variable references another variable
+            # Match patterns like: {{ other_var, {{ other_var., {{ other_var |, etc.
+            pattern = rf"\{{\{{\s*{re.escape(other_var)}(?:\s|[|.\[\]()}}])"
+            if re.search(pattern, value):
+                if other_var not in defined_vars:
+                    self.errors.append(
+                        f"Variable '{var_name}' references '{other_var}' which is "
+                        f"defined later in the variables section. Variables are "
+                        f"evaluated in order - move '{other_var}' before '{var_name}' "
+                        f"or restructure to avoid the dependency."
+                    )
+
+    def _check_state_attribute_access(self, var_name: str, value: str) -> None:
+        """Check for direct attribute access on state objects.
+
+        In Home Assistant templates, state objects retrieved via states[entity]
+        have attributes in a ReadOnlyDict. Direct dot notation access like
+        s.attributes.brightness doesn't work - use state_attr() instead.
+
+        Args:
+            var_name: Name of the variable being checked.
+            value: The template string value.
+        """
+        # Pattern to match: variable.attributes.something
+        # This catches: s.attributes.current_position, state.attributes.brightness, etc.
+        pattern = r"\b(\w+)\.attributes\.(\w+)"
+        matches = re.findall(pattern, value)
+
+        for var, attr in matches:
+            # Skip if it's clearly not a state object access
+            # (e.g., it's accessing trigger.to_state.attributes which is valid)
+            if var in ("to_state", "from_state", "trigger"):
+                continue
+
+            self.warnings.append(
+                f"Variable '{var_name}': Direct attribute access '{var}.attributes.{attr}' "
+                f"may fail with ReadOnlyDict error. Consider using "
+                f"state_attr(entity_id, '{attr}') instead."
+            )
+
+    def _validate_action_variables(
+        self, variables: dict[str, Any], path: str
+    ) -> None:
+        """Validate inline variables defined within action blocks.
+
+        Args:
+            variables: Dictionary of variable definitions.
+            path: Current path for error messages.
+        """
+        for name, value in variables.items():
+            if isinstance(value, str):
+                # Check for direct attribute access on state objects
+                self._check_state_attribute_access(f"{path}.{name}", value)
 
     def _validate_version_sync(self) -> None:
         """Validate that blueprint_version matches version in name field."""
@@ -581,6 +677,11 @@ class BlueprintValidator:
         if not isinstance(action, dict):
             self.errors.append(f"{path}: Must be a dictionary")
             return
+
+        # Check for inline variables in actions
+        variables = action.get("variables")
+        if isinstance(variables, dict):
+            self._validate_action_variables(variables, f"{path}.variables")
 
         # Check for service calls
         service = action.get("service")
