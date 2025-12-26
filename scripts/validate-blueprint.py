@@ -118,6 +118,7 @@ class BlueprintValidator:
         self.join_variables: set[str] = set()
         self.defined_inputs: set[str] = set()
         self.used_inputs: set[str] = set()
+        self.input_datetime_inputs: set[str] = set()  # inputs with input_datetime selector
 
     def validate(self) -> bool:
         """Run all validation checks.
@@ -285,6 +286,9 @@ class BlueprintValidator:
             input_def: The input definition dictionary.
             path: Current path for error messages.
         """
+        # Extract input name from path (e.g., "blueprint.input.foo" -> "foo")
+        input_name = path.split(".")[-1]
+
         # Check for selector
         selector = input_def.get("selector")
         if selector is None:
@@ -297,12 +301,20 @@ class BlueprintValidator:
             self.errors.append(f"{path}.selector: Must be a dictionary")
             return
 
-        # Validate selector type
+        # Validate selector type and track special types
         for selector_type in selector:
             if selector_type not in self.VALID_SELECTOR_TYPES:
                 self.warnings.append(
                     f"{path}.selector: Unknown selector type '{selector_type}'"
                 )
+
+            # Track input_datetime inputs for later validation
+            if selector_type == "entity":
+                entity_selector = selector.get("entity", {})
+                if isinstance(entity_selector, dict):
+                    domain = entity_selector.get("domain")
+                    if domain == "input_datetime":
+                        self.input_datetime_inputs.add(input_name)
 
     def _validate_variables(self) -> None:
         """Validate variables section."""
@@ -333,6 +345,9 @@ class BlueprintValidator:
 
                 # Check for direct attribute access on state objects
                 self._check_state_attribute_access(name, value)
+
+                # Check for incorrect input_datetime usage
+                self._check_input_datetime_usage(name, value)
 
             defined_vars.add(name)
 
@@ -410,6 +425,54 @@ class BlueprintValidator:
                 f"state_attr(entity_id, '{attr}') instead."
             )
 
+    def _check_input_datetime_usage(self, var_name: str, value: str) -> None:
+        """Check for incorrect usage of input_datetime helpers.
+
+        input_datetime entities store state as 'YYYY-MM-DD HH:MM:SS' which
+        as_timestamp() cannot parse. Use state_attr(entity, 'timestamp') instead.
+
+        Args:
+            var_name: Name of the variable being checked.
+            value: The template string value.
+        """
+        # Get variables that are bound to input_datetime inputs
+        variables = self.data.get("variables", {})
+        datetime_vars: set[str] = set()
+
+        for name, val in variables.items():
+            if isinstance(val, str) and val.startswith("!input "):
+                input_name = val[7:].strip()
+                if input_name in self.input_datetime_inputs:
+                    datetime_vars.add(name)
+
+        # Check for patterns like: as_timestamp(states(var)) or as_timestamp(helper_state)
+        # where var is bound to an input_datetime input
+        for dt_var in datetime_vars:
+            # Pattern 1: as_timestamp(states(dt_var))
+            pattern1 = rf"as_timestamp\s*\(\s*states\s*\(\s*{re.escape(dt_var)}\s*\)"
+            if re.search(pattern1, value):
+                self.errors.append(
+                    f"Variable '{var_name}': as_timestamp(states({dt_var})) won't work "
+                    f"for input_datetime entities. The state format 'YYYY-MM-DD HH:MM:SS' "
+                    f"isn't parseable by as_timestamp(). Use state_attr({dt_var}, 'timestamp') "
+                    f"instead to get the Unix timestamp directly."
+                )
+
+            # Pattern 2: intermediate variable like helper_state = states(dt_var),
+            # then as_timestamp(helper_state)
+            # First find if there's a variable assignment like: helper_state = states(dt_var)
+            state_var_pattern = rf"(\w+)\s*=\s*states\s*\(\s*{re.escape(dt_var)}\s*\)"
+            state_var_matches = re.findall(state_var_pattern, value)
+            for state_var in state_var_matches:
+                # Check if as_timestamp is called on this intermediate variable
+                ts_pattern = rf"as_timestamp\s*\(\s*{re.escape(state_var)}\s*\)"
+                if re.search(ts_pattern, value):
+                    self.errors.append(
+                        f"Variable '{var_name}': as_timestamp({state_var}) won't work when "
+                        f"{state_var} is from states({dt_var}) (an input_datetime). "
+                        f"Use state_attr({dt_var}, 'timestamp') instead."
+                    )
+
     def _validate_action_variables(
         self, variables: dict[str, Any], path: str
     ) -> None:
@@ -423,6 +486,8 @@ class BlueprintValidator:
             if isinstance(value, str):
                 # Check for direct attribute access on state objects
                 self._check_state_attribute_access(f"{path}.{name}", value)
+                # Check for incorrect input_datetime usage
+                self._check_input_datetime_usage(f"{path}.{name}", value)
 
     def _validate_version_sync(self) -> None:
         """Validate that blueprint_version matches version in name field."""
