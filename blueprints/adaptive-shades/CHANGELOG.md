@@ -1,5 +1,13 @@
 # Adaptive Shades Pro - Changelog
 
+## [1.13.4] - 2025-12-26
+
+### Fixed
+
+- **Fixed multi-cover support**: Two issues with multiple covers per automation:
+  1. The helper timestamp was updated per-cover inside the loop, causing timing issues when covers report state asynchronously. Now updates helper ONCE before the loop starts.
+  2. The `stop: true` for manual override detection was stopping the entire automation instead of just skipping that cover. Now uses a condition to skip remaining actions for that cover while continuing to process other covers.
+
 ## [1.13.3] - 2025-12-26
 
 ### Fixed

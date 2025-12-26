@@ -1,5 +1,5 @@
 blueprint:
-  name: "Adaptive Shades Pro v1.13.3"
+  name: "Adaptive Shades Pro v1.13.4"
   description: >-
     Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
     Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
@@ -442,7 +442,7 @@ blueprint:
                   value: "verbose"
 
 variables:
-  blueprint_version: "1.13.3"
+  blueprint_version: "1.13.4"
   cover_target: !input cover_target
   base_cover: >-
     {% set ct = cover_target | default('') %}
@@ -1016,6 +1016,15 @@ action:
               message: "Skipped: presence requirement not met. (v{{ blueprint_version }})"
               domain: cover
           - stop: "Presence requirement not met"
+  # Record command timestamp ONCE before processing covers (for multi-cover support)
+  - choose:
+      - conditions: "{{ last_command_helper not in ['', none] }}"
+        sequence:
+          - service: input_datetime.set_datetime
+            target:
+              entity_id: "{{ last_command_helper }}"
+            data:
+              datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
   - repeat:
       for_each: "{{ cover_target if cover_target is sequence else [cover_target] }}"
       sequence:
@@ -1132,7 +1141,9 @@ action:
                             name: "Adaptive Shades"
                             message: "Paused for manual adjustment timeout on {{ this_cover }}. (v{{ blueprint_version }})"
                             domain: cover
-                - stop: true
+        # Skip remaining actions for this cover if manual override active
+        - condition: template
+          value_template: "{{ not this_auto_override_active }}"
 
         - choose:
             - conditions:
@@ -1207,15 +1218,6 @@ action:
                             domain: cover
             - conditions: []
               sequence:
-                # Record command timestamp before moving cover (if helper is configured)
-                - choose:
-                    - conditions: "{{ last_command_helper not in ['', none] }}"
-                      sequence:
-                        - service: input_datetime.set_datetime
-                          target:
-                            entity_id: "{{ last_command_helper }}"
-                          data:
-                            datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
                 - choose:
                     - conditions: "{{ cover_supports_tilt and shading_mode == 'slat' }}"
                       sequence:
