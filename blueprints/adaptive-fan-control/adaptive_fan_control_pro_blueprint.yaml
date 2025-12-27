@@ -1,5 +1,5 @@
 blueprint:
-  name: Ceiling Fan Climate Control Pro v2.2.3
+  name: Ceiling Fan Climate Control Pro v2.2.4
   description: >
     HVAC-aware ceiling fan automation with adaptive comfort control. Uses the
     EN 16798 / ASHRAE 55 adaptive comfort model to dynamically adjust fan behavior
@@ -332,7 +332,7 @@ blueprint:
               custom_value: false
 
 variables:
-  blueprint_version: "2.2.3"
+  blueprint_version: "2.2.4"
   fan_entity: !input fan_entity
   temp_sensor: !input temp_sensor
   humidity_sensor_input: !input humidity_sensor
@@ -380,9 +380,9 @@ variables:
   _sensor_unit: "{{ state_attr(temp_sensor, 'unit_of_measurement') | default('°F', true) | string }}"
   is_imperial: >
     {% if units_input == 'f' %}
-      true
+      {{ true }}
     {% elif units_input == 'c' %}
-      false
+      {{ false }}
     {% else %}
       {{ _sensor_unit | lower in ['°f', 'f', 'fahrenheit'] }}
     {% endif %}

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.4 - 2025-12-27
+
+### Fixed
+
+- **Jinja2 boolean output**: Replaced bare `false` with `{{ false }}` in `state_sync_any_light_on` variable to output actual boolean instead of string.
+
 ## 1.9.3 - 2025-12-21
 
 ### Changed

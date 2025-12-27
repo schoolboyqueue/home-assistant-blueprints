@@ -1,3 +1,9 @@
+## [4.20.1] — 2025-12-27
+
+### Fixed
+
+- **Jinja2 boolean output**: Replaced bare `true`/`false` with `{{ true }}`/`{{ false }}` in variable assignments to output actual booleans instead of strings, preventing unexpected truthy behavior in conditionals.
+
 ## [4.20.0] — 2025-11-25
 
 ### Added

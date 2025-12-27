@@ -1,5 +1,5 @@
 blueprint:
-  name: "Bathroom Light Fan Control Pro v1.10.8"
+  name: "Bathroom Light Fan Control Pro v1.10.9"
   description: >-
     Smart bathroom controller for lights and exhaust fan.
     Lights: Turns on from motion or door activity (Wasp-in-a-Box), respects presence and optional lux threshold, supports Night Mode (dim and color temperature), and shuts off after vacancy with a grace period. Includes a manual-off override window to prevent auto-on.
@@ -424,7 +424,7 @@ variables:
   ror_min_on_time_min: !input ror_min_on_time_min
   ror_latch_until: !input ror_latch_until
   light_area: !input light_area
-  blueprint_version: "1.10.8"
+  blueprint_version: "1.10.9"
   area_set: >-
     {{ light_area is not none and (light_area|string) != '' }}
 
@@ -444,14 +444,14 @@ variables:
   # Night schedule computation
   in_night_schedule: >-
     {% if not night_enabled %}
-      false
+      {{ false }}
     {% else %}
       {% set fmt = '%H:%M:%S' %}
       {% set start_dt = strptime(night_start, fmt) %}
       {% set end_dt = strptime(night_end, fmt) %}
       {% set now_dt = now() %}
       {% if start_dt is none or end_dt is none or now_dt is none %}
-        false
+        {{ false }}
       {% else %}
         {% set start_mins = start_dt.hour * 60 + start_dt.minute %}
         {% set end_mins = end_dt.hour * 60 + end_dt.minute %}
@@ -474,7 +474,7 @@ variables:
   presence_ok: >-
     {% set ents = presence_entities if presence_entities is defined and presence_entities is not none else [] %}
     {% if ents | length == 0 %}
-      true
+      {{ true }}
     {% else %}
       {% set ns = namespace(found=false) %}
       {% for e in ents %}
@@ -488,11 +488,11 @@ variables:
   override_ok: >-
     {% set disabled = manual_override_duration_min | int(0) == 0 %}
     {% if disabled or manual_override_until in ['', None] %}
-      true
+      {{ true }}
     {% else %}
       {% set until_state = states(manual_override_until) %}
       {% if until_state in ['unknown','unavailable','', None] %}
-        true
+        {{ true }}
       {% else %}
         {# Use timestamp attribute directly to avoid timezone conversion issues #}
         {% set until_ts = state_attr(manual_override_until, 'timestamp') %}
@@ -505,12 +505,12 @@ variables:
     {% if illuminance_sensor %}
       {% set lux_state = states(illuminance_sensor) %}
       {% if lux_state in ['unknown','unavailable','', None] %}
-        true
+        {{ true }}
       {% else %}
         {{ (lux_state | float(0)) < (illuminance_threshold | float(0)) }}
       {% endif %}
     {% else %}
-      true
+      {{ true }}
     {% endif %}
 
   should_turn_on_light: >-

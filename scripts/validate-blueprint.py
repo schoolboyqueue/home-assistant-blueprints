@@ -14,6 +14,7 @@ This script performs comprehensive validation of Home Assistant blueprint files:
 10. Input reference validation
 11. Delay/wait validation
 12. Choose/sequence validation
+13. Bare boolean literal detection (true/false outputting strings instead of booleans)
 
 Usage:
     python3 validate-blueprint.py <blueprint.yaml>
@@ -349,6 +350,9 @@ class BlueprintValidator:
                 # Check for incorrect input_datetime usage
                 self._check_input_datetime_usage(name, value)
 
+                # Check for bare boolean literals in templates
+                self._check_bare_boolean_literals(name, value)
+
             defined_vars.add(name)
 
         # Check for blueprint_version
@@ -473,6 +477,97 @@ class BlueprintValidator:
                         f"Use state_attr({dt_var}, 'timestamp') instead."
                     )
 
+    def _check_bare_boolean_literals(self, var_name: str, value: str) -> None:
+        """Check for bare boolean literals in Jinja2 templates.
+
+        In multi-line YAML templates (using >- or |), outputting bare 'true' or
+        'false' without {{ }} creates a STRING, not a boolean. The string "false"
+        is truthy in Python/Jinja2 because it's a non-empty string. This causes
+        subtle bugs where {% if some_var %} unexpectedly evaluates to True.
+
+        Correct: {{ false }} or {{ true }} outputs actual booleans.
+        Wrong:   false or true as bare text outputs strings.
+
+        Args:
+            var_name: Name of the variable being checked.
+            value: The template string value.
+        """
+        # Only check multi-line templates that look like they're meant to output booleans
+        # Pattern: lines that contain just 'true' or 'false' (possibly with whitespace)
+        # but NOT inside {{ }} blocks
+        lines = value.split("\n")
+
+        # Track which types of bare booleans we've found (to avoid duplicate warnings)
+        found_bare_true = False
+        found_bare_false = False
+
+        # Track nesting of Jinja control blocks
+        block_depth = 0
+
+        for line_num, line in enumerate(lines, 1):
+            stripped = line.strip()
+
+            # Track block depth: {% if/for/etc %} increases, {% endif/endfor/else/elif %} may change
+            # We use a simplified approach: count {% and %} pairs
+            # Opening blocks: if, for, macro, call, filter, set (when multi-line)
+            # Closing blocks: endif, endfor, endmacro, endcall, endfilter, endset
+            # Note: else/elif don't change depth but are still inside a block
+
+            # Count block opens and closes on this line
+            open_blocks = len(re.findall(r"\{%\s*(?:if|for|macro|call|filter)\b", line))
+            close_blocks = len(re.findall(r"\{%\s*(?:endif|endfor|endmacro|endcall|endfilter)\b", line))
+
+            # Update depth based on what we see
+            # Process closes first (for lines like {% endif %}{% if %})
+            block_depth = max(0, block_depth - close_blocks)
+            block_depth += open_blocks
+
+            # Skip empty lines
+            if not stripped:
+                continue
+
+            # Only check lines that are just 'true' or 'false'
+            if stripped not in ("true", "false"):
+                continue
+
+            # If we're inside a control block (if/for/etc), the literal might
+            # legitimately be part of template logic, not bare output.
+            # However, if block_depth is 0, this bare literal WILL be output.
+            # But wait - we need to track this more carefully:
+            # {% if x %}
+            #   false    <- this is output if x is true, and it's a STRING
+            # {% endif %}
+            #
+            # The issue is that ANY bare true/false in a multi-line template
+            # that gets output will be a string. Let's warn on all of them
+            # but only if they look like they're meant to be returned values.
+
+            # Check if this looks like a return value (not inside {{ }} expression on same line)
+            if "{{" in line and "}}" in line:
+                # The true/false is part of an expression on this line, skip
+                continue
+
+            # Check if there's a {{ before and no matching }} on this line (inside expression)
+            line_before = line[:line.find(stripped)] if stripped in line else ""
+            if "{{" in line_before and "}}" not in line_before:
+                continue
+
+            # This is a bare boolean literal that will be output as a string
+            if stripped == "true" and not found_bare_true:
+                found_bare_true = True
+                self.warnings.append(
+                    f"Variable '{var_name}': Bare 'true' outputs STRING \"true\", "
+                    f"not boolean. Use '{{{{ true }}}}' to output actual boolean. "
+                    f"(String \"false\" is truthy, causing subtle bugs in conditionals.)"
+                )
+            elif stripped == "false" and not found_bare_false:
+                found_bare_false = True
+                self.warnings.append(
+                    f"Variable '{var_name}': Bare 'false' outputs STRING \"false\", "
+                    f"not boolean. The string \"false\" is TRUTHY (non-empty), so "
+                    f"'{{% if var %}}' passes unexpectedly. Use '{{{{ false }}}}' instead."
+                )
+
     def _validate_action_variables(
         self, variables: dict[str, Any], path: str
     ) -> None:
@@ -488,6 +583,8 @@ class BlueprintValidator:
                 self._check_state_attribute_access(f"{path}.{name}", value)
                 # Check for incorrect input_datetime usage
                 self._check_input_datetime_usage(f"{path}.{name}", value)
+                # Check for bare boolean literals
+                self._check_bare_boolean_literals(f"{path}.{name}", value)
 
     def _validate_version_sync(self) -> None:
         """Validate that blueprint_version matches version in name field."""

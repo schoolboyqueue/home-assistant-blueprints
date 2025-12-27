@@ -1,5 +1,5 @@
 blueprint:
-  name: "Adaptive Shades Pro v1.13.4"
+  name: "Adaptive Shades Pro v1.13.6"
   description: >-
     Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
     Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
@@ -442,7 +442,7 @@ blueprint:
                   value: "verbose"
 
 variables:
-  blueprint_version: "1.13.4"
+  blueprint_version: "1.13.6"
   cover_target: !input cover_target
   base_cover: >-
     {% set ct = cover_target | default('') %}
@@ -497,16 +497,16 @@ variables:
   triggered_cover_entity: "{{ trigger.entity_id if triggered_by_cover else none }}"
   manual_change_detected: >-
     {% if not triggered_by_cover %}
-      false
+      {{ false }}
     {% else %}
       {# Ignore state changes while cover is actively moving (opening/closing) #}
       {% set cover_state = trigger.to_state.state if trigger.to_state is defined else '' %}
       {% if cover_state in ['opening', 'closing'] %}
-        false
+        {{ false }}
       {% else %}
         {% set ctx = trigger.to_state.context if trigger.to_state is defined else none %}
         {% if ctx is none %}
-          false
+          {{ false }}
         {% else %}
           {# UI changes have user_id; automations/scripts have parent_id; device reports have neither #}
           {% set user_id = ctx.user_id | default('') %}
@@ -515,10 +515,10 @@ variables:
           {% set from_automation = parent_id is string and (parent_id | length > 0) %}
           {% if from_ui %}
             {# Explicit UI interaction is always manual #}
-            true
+            {{ true }}
           {% elif from_automation %}
             {# Change from an automation/script - not manual #}
-            false
+            {{ false }}
           {% else %}
             {# Device state report - check helper timestamp if available #}
             {% set helper_entity = last_command_helper if last_command_helper not in ['', none] else none %}
@@ -526,7 +526,8 @@ variables:
             {% set now_ts = as_timestamp(now()) %}
             {% set max_helper_age = (manual_timeout_minutes | float) * 120 %}
             {% set helper_age = (now_ts - helper_ts) if helper_ts is number else 999999 %}
-            {% set has_valid_helper = helper_ts is number and helper_ts > 0 and helper_age < max_helper_age %}
+            {# Reject future timestamps (helper_age < 0) and stale timestamps #}
+            {% set has_valid_helper = helper_ts is number and helper_ts > 0 and helper_age >= 0 and helper_age < max_helper_age %}
             {% if has_valid_helper %}
               {# Check if cover changed within grace period of our last command #}
               {% set cover_changed_ts = as_timestamp(trigger.to_state.last_changed) if trigger.to_state.last_changed is defined else now_ts %}
@@ -534,14 +535,14 @@ variables:
               {% set grace_seconds = 90 %}
               {% if seconds_since_cmd >= 0 and seconds_since_cmd < grace_seconds %}
                 {# Cover changed shortly after our command - not manual #}
-                false
+                {{ false }}
               {% else %}
                 {# Cover changed outside grace period - manual #}
-                true
+                {{ true }}
               {% endif %}
             {% else %}
               {# No valid helper - cannot determine, assume not manual to avoid false positives #}
-              false
+              {{ false }}
             {% endif %}
           {% endif %}
         {% endif %}
@@ -572,13 +573,13 @@ variables:
     {% endif %}
   climate_heating: >-
     {% if not climate_entity %}
-      false
+      {{ false }}
     {% else %}
       {{ climate_hvac_action in ['heating'] or climate_hvac_mode in ['heat'] }}
     {% endif %}
   climate_cooling: >-
     {% if not climate_entity %}
-      false
+      {{ false }}
     {% else %}
       {{ climate_hvac_action in ['cooling'] or climate_hvac_mode in ['cool'] }}
     {% endif %}
@@ -589,7 +590,7 @@ variables:
   weather_state: "{{ states(weather_entity) if weather_entity else none }}"
   weather_is_overcast: >-
     {% if not weather_state %}
-      false
+      {{ false }}
     {% else %}
       {% set s = weather_state %}
       {{ s in ['cloudy', 'overcast', 'rainy', 'pouring', 'snowy', 'hail', 'partlycloudy'] }}
@@ -627,22 +628,22 @@ variables:
   indoor_lux: "{{ states(indoor_lux_sensor | default('')) | float(none) if indoor_lux_sensor else none }}"
   presence_present: >-
     {% if not presence_entity %}
-      false
+      {{ false }}
     {% else %}
       {% set s = states(presence_entity) %}
       {{ s in ['on', 'home', 'occupied', 'present'] }}
     {% endif %}
   presence_ok: >-
     {% if not presence_entity %}
-      true
+      {{ true }}
     {% elif not presence_required %}
-      true
+      {{ true }}
     {% else %}
       {{ presence_present }}
     {% endif %}
   occupied: >-
     {% if not presence_entity %}
-      true
+      {{ true }}
     {% else %}
       {{ presence_present }}
     {% endif %}
@@ -654,14 +655,14 @@ variables:
     {# With helper: detects any cover change that wasn't shortly after our command. #}
     {# Without helper: only detects UI-initiated changes (user_id present). #}
     {% if manual_timeout_minutes | int(0) <= 0 or not base_cover %}
-      false
+      {{ false }}
     {% else %}
       {% set s = states[base_cover] %}
       {% if s is none or s.last_changed is none %}
-        false
+        {{ false }}
       {% elif s.state in ['opening', 'closing'] %}
         {# Cover is still moving - don't evaluate manual detection yet #}
-        false
+        {{ false }}
       {% else %}
         {% set delta_minutes = (as_timestamp(now()) - as_timestamp(s.last_changed)) / 60 %}
         {% set ctx = s.context if s.context is defined else none %}
@@ -676,9 +677,10 @@ variables:
         {% set cover_changed_ts = as_timestamp(s.last_changed) %}
         {# Helper is only valid if timestamp is recent (within 2x manual timeout) #}
         {# This handles fresh helpers that haven't been set yet #}
+        {# Also reject future timestamps (helper_age < 0) which indicate corrupt/invalid data #}
         {% set max_helper_age = (manual_timeout_minutes | float) * 120 %}
         {% set helper_age = (now_ts - helper_ts) if helper_ts is number else 999999 %}
-        {% set has_valid_helper = helper_ts is number and helper_ts > 0 and helper_age < max_helper_age %}
+        {% set has_valid_helper = helper_ts is number and helper_ts > 0 and helper_age >= 0 and helper_age < max_helper_age %}
         {# Grace period: cover changes within 90s of our command are considered ours #}
         {% set grace_seconds = 90 %}
         {% set seconds_since_cmd = (cover_changed_ts - helper_ts) if has_valid_helper else 0 %}
@@ -698,7 +700,7 @@ variables:
     {% endif %}
   in_quiet_hours: >-
     {% if not quiet_hours_start or not quiet_hours_end %}
-      false
+      {{ false }}
     {% else %}
       {% set now_time = now().time() %}
       {% set start = strptime(quiet_hours_start, '%H:%M:%S').time() %}
@@ -713,17 +715,17 @@ variables:
     {% if indoor_temp is not none %}
       {{ indoor_temp >= (effective_cooling_setpoint - comfort_margin) or climate_cooling }}
     {% elif climate_cooling %}
-      true
+      {{ true }}
     {% else %}
-      false
+      {{ false }}
     {% endif %}
   heating_needed: >-
     {% if indoor_temp is not none %}
       {{ indoor_temp <= (effective_heating_setpoint + comfort_margin) or climate_heating }}
     {% elif climate_heating %}
-      true
+      {{ true }}
     {% else %}
-      false
+      {{ false }}
     {% endif %}
   measured_irradiance: "{{ states(vertical_irradiance_sensor | default('')) | float(none) if vertical_irradiance_sensor else none }}"
   cos_az_offset: "{{ ((sun_azimuth - window_orientation_deg) | float * deg_to_rad) | cos }}"
@@ -759,7 +761,7 @@ variables:
     {% if indoor_lux is not none %}
       {{ indoor_lux >= effective_glare_lux_threshold }}
     {% else %}
-      false
+      {{ false }}
     {% endif %}
   beta_deg: >-
     {% if cos_az_offset == 0 %}
@@ -1040,13 +1042,13 @@ action:
               {% endif %}
             this_window_open: >-
               {% if not this_window or not is_state(this_window, 'on') %}
-                false
+                {{ false }}
               {% elif window_open_delay | int(0) <= 0 %}
-                true
+                {{ true }}
               {% else %}
                 {% set w = states[this_window] %}
                 {% if w is none or w.last_changed is none %}
-                  false
+                  {{ false }}
                 {% else %}
                   {% set open_seconds = (as_timestamp(now()) - as_timestamp(w.last_changed)) %}
                   {{ open_seconds >= (window_open_delay | int(0)) }}
@@ -1057,14 +1059,14 @@ action:
             this_target_base: "{{ desired_position_room }}"
             this_auto_override_active: >-
               {% if manual_timeout_minutes | int(0) <= 0 %}
-                false
+                {{ false }}
               {% else %}
                 {% set s = states[this_cover] %}
                 {% if s is none or s.last_changed is none %}
-                  false
+                  {{ false }}
                 {% elif s.state in ['opening', 'closing'] %}
                   {# Cover is still moving - don't evaluate manual detection yet #}
-                  false
+                  {{ false }}
                 {% else %}
                   {% set delta_minutes = (as_timestamp(now()) - as_timestamp(s.last_changed)) / 60 %}
                   {% set ctx = s.context if s.context is defined else none %}
@@ -1078,9 +1080,10 @@ action:
                   {% set now_ts = as_timestamp(now()) %}
                   {# Helper is only valid if timestamp is recent (within 2x manual timeout) #}
                   {# This handles fresh helpers that haven't been set yet #}
+                  {# Also reject future timestamps (helper_age < 0) which indicate corrupt/invalid data #}
                   {% set max_helper_age = (manual_timeout_minutes | float) * 120 %}
                   {% set helper_age = (now_ts - helper_ts) if helper_ts is number else 999999 %}
-                  {% set has_valid_helper = helper_ts is number and helper_ts > 0 and helper_age < max_helper_age %}
+                  {% set has_valid_helper = helper_ts is number and helper_ts > 0 and helper_age >= 0 and helper_age < max_helper_age %}
                   {% set cover_changed_ts = as_timestamp(s.last_changed) %}
                   {# Grace period: cover changes within 90s of our command are considered ours #}
                   {% set grace_seconds = 90 %}
@@ -1108,7 +1111,8 @@ action:
             this_target_position: >-
               {% if this_target_base is none %}
                 {{ none }}
-              {% elif this_window_open %}
+              {% elif this_window_open | bool %}
+                {# Window is open: force shade fully open #}
                 {% if inverted_shades %}
                   100
                 {% else %}

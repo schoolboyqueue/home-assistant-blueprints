@@ -1,5 +1,13 @@
 # Bathroom Light & Fan Control Pro - Changelog
 
+## [1.10.9] - 2025-12-27
+
+### Fixed
+
+- **Jinja2 boolean output**: Replaced bare `true`/`false` with `{{ true }}`/`{{ false }}` in variable assignments to output actual booleans instead of strings.
+
+---
+
 ## [1.10.8] - 2025-12-25
 
 ### Fixed

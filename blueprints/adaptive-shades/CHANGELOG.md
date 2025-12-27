@@ -1,5 +1,19 @@
 # Adaptive Shades Pro - Changelog
 
+## [1.13.6] - 2025-12-27
+
+### Fixed
+
+- **Jinja2 boolean output**: Replaced bare `true`/`false` with `{{ true }}`/`{{ false }}` across all variable assignments to output actual booleans instead of strings, preventing unexpected truthy behavior in conditionals.
+
+## [1.13.5] - 2025-12-27
+
+### Fixed
+
+- **Fixed inverted shades not closing at night**: The `this_window_open` variable was outputting the literal string `"false"` instead of a boolean `false`. In Jinja2, a non-empty string is truthy, so the condition `{% elif this_window_open %}` was always true, causing inverted shades to always go to position 100 (fully open) instead of the correct night position. Now outputs proper booleans with `{{ false }}` / `{{ true }}` and adds explicit `| bool` filter for safety.
+
+- **Fixed future helper timestamp causing false manual detection**: When a helper timestamp was in the future (due to timezone issues or corrupt data when first created), the manual detection logic would incorrectly evaluate it as valid, causing all automation movements to be blocked. Now explicitly rejects helper timestamps that are in the future (`helper_age < 0`).
+
 ## [1.13.4] - 2025-12-26
 
 ### Fixed

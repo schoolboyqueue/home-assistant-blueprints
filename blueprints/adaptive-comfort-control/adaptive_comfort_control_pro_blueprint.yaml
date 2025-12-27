@@ -1,5 +1,5 @@
 blueprint:
-    name: "Adaptive Comfort Control Pro v4.20.0"
+    name: "Adaptive Comfort Control Pro v4.20.1"
     description: >
         Adaptive comfort control + HVAC pause with unit awareness (°C/°F), seasonal bias,
         built-in psychrometrics (dew point, absolute humidity, enthalpy), optional RMOT,
@@ -918,7 +918,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.20.0"
+    blueprint_version: "4.20.1"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
@@ -1114,12 +1114,12 @@ variables:
     # Check if manual override is currently active
     is_override_active: >
         {% if not manual_override_enable or manual_override_duration_min | int(0) <= 0 or not manual_override_until_id %}
-          false
+          {{ false }}
         {% else %}
           {% set until_ts = state_attr(manual_override_until_id, 'timestamp') %}
           {% set now_ts = as_timestamp(now()) %}
           {% if until_ts is none or now_ts is none %}
-            false
+            {{ false }}
           {% else %}
             {{ now_ts < until_ts }}
           {% endif %}
@@ -1555,9 +1555,9 @@ variables:
           {% set on_states  = ['on','home','present','occupied','true','detected','motion'] %}
           {% set off_states = ['off','not_home','away','clear','false','standby','none','closed'] %}
           {% if s in on_states %}
-            true
+            {{ true }}
           {% elif s in off_states %}
-            false
+            {{ false }}
           {% else %}
             {# Fallbacks by device class: presence/occupancy/motion default false unless explicitly on; person/device_tracker: home=on, not_home=off #}
             {% if dc in ['presence','occupancy','motion'] %}
@@ -1567,12 +1567,12 @@ variables:
               {% if s|float(none) is not none %}
                 {{ (s | float(0)) > 0 }}
               {% else %}
-                false
+                {{ false }}
               {% endif %}
             {% endif %}
           {% endif %}
         {% else %}
-          true
+          {{ true }}
         {% endif %}
 
     setback_apply_c: "{{ setback_c if (energy_save and (not (occ_now | default(false) | bool))) else 0 }}"
@@ -1794,7 +1794,7 @@ variables:
     mode_cooldown_sec: "{{ cooldown_min | int(0) * 60 }}"
     mode_switch_allowed: >
         {% if mode_cooldown_sec | int(0) <= 0 %}
-          true
+          {{ true }}
         {% else %}
           {% set now_ts = as_timestamp(now()) | float(0) %}
           {% set delta = now_ts - hvac_last_changed_ts %}
@@ -1993,7 +1993,7 @@ variables:
     # For dual setpoint modes (auto/heat_cool)
     _dual_mode_matches: >
         {% if not (supports_auto or supports_heat_cool) %}
-          false
+          {{ false }}
         {% else %}
           {% set low_match = (temp_low_now_sys - target_low_cli) | abs < _setpoint_tolerance %}
           {% set high_match = (temp_high_now_sys - target_high_cli) | abs < _setpoint_tolerance %}
@@ -2003,7 +2003,7 @@ variables:
     # For single setpoint modes (heat/cool)
     _single_mode_matches: >
         {% if hvac_mode_now not in ['cool','heat'] %}
-          false
+          {{ false }}
         {% else %}
           {{ (temp_now_sys - t_adapt_cli_q) | abs < _setpoint_tolerance }}
         {% endif %}
@@ -2090,7 +2090,7 @@ action:
       _nat_vent_active: false
       _manual_change_detected: >
         {% if not _manual_trigger %}
-          false
+          {{ false }}
         {% else %}
           {% set tol_cli = manual_override_tolerance | float(1.0) %}
           {% set tol_c = ((tol_cli - 32) * 5/9) if climate_is_imperial else tol_cli %}

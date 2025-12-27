@@ -1,5 +1,11 @@
 # Ceiling Fan Climate Control Pro - Changelog
 
+## [2.2.4] - 2025-12-27
+
+### Fixed
+
+- **Jinja2 boolean output**: Replaced bare `true`/`false` with `{{ true }}`/`{{ false }}` in `is_imperial` variable to output actual booleans instead of strings.
+
 ## [2.2.3] - 2025-12-26
 
 ### Fixed
