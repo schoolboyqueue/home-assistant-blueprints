@@ -1,5 +1,5 @@
 blueprint:
-  name: "Multi Switch Light Control Pro v1.9.4"
+  name: "Multi Switch Light Control Pro v1.9.5"
   description: >
     Turn a supported switch or remote into a smart light controller. Supports Inovelli
     Zigbee switches (via Zigbee2MQTT or ZHA), Zooz/Inovelli Z-Wave switches, and Lutron
@@ -31,12 +31,11 @@ blueprint:
           description: >
             OPTIONAL. For Zigbee switches only. The blueprint tries to auto-detect this,
             but if auto-detection fails, manually select the action sensor entity
-            (e.g., sensor.switch_name_action). Leave at the placeholder value for
-            Z-Wave/Lutron devices.
-          default: sensor.placeholder_action_sensor
+            (e.g., sensor.switch_name_action). Leave at default (sun.sun) for
+            Z-Wave/Lutron devices - the triggers will never match sun state values.
+          default: sun.sun
           selector:
-            entity:
-              domain: sensor
+            entity: {}
         hold_release_helper:
           name: "Hold release helper (optional)"
           description: >
@@ -286,7 +285,7 @@ blueprint:
                 - "basic"
                 - "verbose"
 variables:
-  blueprint_version: "1.9.4"
+  blueprint_version: "1.9.5"
 
   switch_device: !input switch_device
   zigbee_action_sensor_input: !input zigbee_action_sensor
@@ -383,7 +382,7 @@ variables:
   lutron_serial: "{{ device_attr(switch_device, 'serial_number') | default('') }}"
 
   # Auto-detect or use manual Zigbee2MQTT/ZHA action sensor entity
-  action_sensor_placeholder: "sensor.placeholder_action_sensor"
+  action_sensor_placeholder: "sun.sun"
   action_sensor_detection: >-
     {% set entities = device_entities(switch_device) %}
     {% set action_sensors = entities | select('match', '^sensor\\..*_action$') | list %}

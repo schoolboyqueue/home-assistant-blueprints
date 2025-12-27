@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.5 - 2025-12-27
+
+### Fixed
+
+- **Spook ghost entity warning**: Changed Zigbee action sensor default from `sensor.placeholder_action_sensor` (which doesn't exist) to `sun.sun` (which always exists). The state triggers will never fire on sun.sun since it never outputs Zigbee action values like "up_single". This eliminates the "ghost entity" warning from Spook for non-Zigbee setups.
+
 ## 1.9.4 - 2025-12-27
 
 ### Fixed
