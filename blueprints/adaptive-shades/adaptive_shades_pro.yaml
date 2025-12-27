@@ -1,5 +1,5 @@
 blueprint:
-  name: "Adaptive Shades Pro v1.13.6"
+  name: "Adaptive Shades Pro v1.13.7"
   description: >-
     Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
     Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
@@ -442,7 +442,7 @@ blueprint:
                   value: "verbose"
 
 variables:
-  blueprint_version: "1.13.6"
+  blueprint_version: "1.13.7"
   cover_target: !input cover_target
   base_cover: >-
     {% set ct = cover_target | default('') %}
@@ -684,11 +684,17 @@ variables:
         {# Grace period: cover changes within 90s of our command are considered ours #}
         {% set grace_seconds = 90 %}
         {% set seconds_since_cmd = (cover_changed_ts - helper_ts) if has_valid_helper else 0 %}
+        {# Cover change is "ours" if it happened within grace period AFTER our command #}
         {% set is_our_result = has_valid_helper and seconds_since_cmd >= 0 and seconds_since_cmd < grace_seconds %}
+        {# Cover changed BEFORE our command means it's old state, not manual #}
+        {% set changed_before_cmd = has_valid_helper and seconds_since_cmd < 0 %}
         {# Determine if manual #}
         {% if from_ui %}
           {% set is_manual = true %}
         {% elif from_automation %}
+          {% set is_manual = false %}
+        {% elif changed_before_cmd %}
+          {# Cover's last change was before our command - it's old state, not manual #}
           {% set is_manual = false %}
         {% elif has_valid_helper %}
           {% set is_manual = not is_our_result %}
@@ -1088,15 +1094,22 @@ action:
                   {# Grace period: cover changes within 90s of our command are considered ours #}
                   {% set grace_seconds = 90 %}
                   {% set seconds_since_cmd = (cover_changed_ts - helper_ts) if has_valid_helper else 0 %}
+                  {# Cover change is "ours" if it happened within grace period AFTER our command #}
                   {% set is_our_result = has_valid_helper and seconds_since_cmd >= 0 and seconds_since_cmd < grace_seconds %}
+                  {# Cover changed BEFORE our command means it's old state, not manual #}
+                  {% set changed_before_cmd = has_valid_helper and seconds_since_cmd < 0 %}
                   {# Determine if manual: #}
                   {# 1. UI change (user_id present) = always manual #}
                   {# 2. Automation change (parent_id present) = never manual #}
-                  {# 3. Device report with valid helper: manual if NOT within grace period #}
-                  {# 4. No valid helper: cannot determine, assume not manual #}
+                  {# 3. Cover changed before our last command = not manual (old state) #}
+                  {# 4. Device report with valid helper: manual if NOT within grace period #}
+                  {# 5. No valid helper: cannot determine, assume not manual #}
                   {% if from_ui %}
                     {% set is_manual = true %}
                   {% elif from_automation %}
+                    {% set is_manual = false %}
+                  {% elif changed_before_cmd %}
+                    {# Cover's last change was before our command - it's old state, not manual #}
                     {% set is_manual = false %}
                   {% elif has_valid_helper %}
                     {# Valid helper: manual if change wasn't shortly after our command #}

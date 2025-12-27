@@ -1,5 +1,11 @@
 # Adaptive Shades Pro - Changelog
 
+## [1.13.7] - 2025-12-27
+
+### Fixed
+
+- **Fixed false manual detection in multi-cover setups**: When the helper timestamp was updated at the start of a run, covers that hadn't moved recently would have a `last_changed` timestamp BEFORE the helper timestamp, causing `seconds_since_cmd` to be negative. This was incorrectly interpreted as a manual change. Now explicitly checks for `changed_before_cmd` and treats it as old state (not manual).
+
 ## [1.13.6] - 2025-12-27
 
 ### Fixed
