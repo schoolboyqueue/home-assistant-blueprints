@@ -15,6 +15,7 @@ This script performs comprehensive validation of Home Assistant blueprint files:
 11. Delay/wait validation
 12. Choose/sequence validation
 13. Bare boolean literal detection (true/false outputting strings instead of booleans)
+14. Entity ID boolean context detection (unreliable string truthiness in conditions)
 
 Usage:
     python3 validate-blueprint.py <blueprint.yaml>
@@ -122,6 +123,7 @@ class BlueprintValidator:
         self.input_datetime_inputs: set[str] = (
             set()
         )  # inputs with input_datetime selector
+        self.entity_inputs: set[str] = set()  # inputs with entity selector
 
     def validate(self) -> bool:
         """Run all validation checks.
@@ -311,8 +313,9 @@ class BlueprintValidator:
                     f"{path}.selector: Unknown selector type '{selector_type}'"
                 )
 
-            # Track input_datetime inputs for later validation
+            # Track entity selector inputs for later validation
             if selector_type == "entity":
+                self.entity_inputs.add(input_name)
                 entity_selector = selector.get("entity", {})
                 if isinstance(entity_selector, dict):
                     domain = entity_selector.get("domain")
@@ -372,6 +375,9 @@ class BlueprintValidator:
 
                 # Check for math functions that need guards
                 self._check_math_function_safety(name, value)
+
+                # Check for entity ID variables in boolean contexts
+                self._check_entity_id_boolean_context(name, value)
 
             defined_vars.add(name)
 
@@ -711,6 +717,52 @@ class BlueprintValidator:
                     f"'{{% if var %}}' passes unexpectedly. Use '{{{{ false }}}}' instead."
                 )
 
+    def _check_entity_id_boolean_context(self, var_name: str, value: str) -> None:
+        """Check for entity ID variables used in boolean contexts without explicit checks.
+
+        In Jinja2 templates, using an entity ID variable directly in a boolean
+        context like `and entity_var }}` can be unreliable. The string truthiness
+        check may fail unexpectedly. It's safer to use an explicit check like
+        `and (entity_var | string | length > 0)`.
+
+        Args:
+            var_name: Name of the variable being checked.
+            value: The template string value.
+        """
+        # Get variables that are bound to entity selector inputs
+        variables = self.data.get("variables", {})
+        entity_vars: set[str] = set()
+
+        for name, val in variables.items():
+            if isinstance(val, str) and val.startswith("!input "):
+                input_name = val[7:].strip()
+                if input_name in self.entity_inputs:
+                    entity_vars.add(name)
+
+        # Check for patterns like: `and entity_var }}` or `and entity_var %}`
+        # without explicit string/length checks
+        for entity_var in entity_vars:
+            # Pattern: `and entity_var` followed by }} or %} (end of expression)
+            # but NOT followed by | (which would indicate a filter is applied)
+            pattern = rf"\band\s+{re.escape(entity_var)}\s*[}}%]"
+            if re.search(pattern, value):
+                # Check if there's already an explicit check nearby
+                # e.g., `(entity_var | string | length > 0)` or `entity_var != ''`
+                explicit_check_pattern = (
+                    rf"{re.escape(entity_var)}\s*\|\s*string\s*\|\s*length|"
+                    rf"{re.escape(entity_var)}\s*!=\s*['\"]|"
+                    rf"len\s*\(\s*{re.escape(entity_var)}\s*\)|"
+                    rf"{re.escape(entity_var)}\s*\|\s*length"
+                )
+                if not re.search(explicit_check_pattern, value):
+                    self.warnings.append(
+                        f"Variable '{var_name}': Entity ID variable '{entity_var}' used "
+                        f"in boolean context without explicit check. String truthiness "
+                        f"can be unreliable. Consider using "
+                        f"'({entity_var} | string | length > 0)' instead of just "
+                        f"'{entity_var}'."
+                    )
+
     def _check_cross_variable_arithmetic(
         self, variables: dict[str, Any], path: str
     ) -> None:
@@ -798,6 +850,8 @@ class BlueprintValidator:
                 self._check_input_datetime_usage(f"{path}.{name}", value)
                 # Check for bare boolean literals
                 self._check_bare_boolean_literals(f"{path}.{name}", value)
+                # Check for entity ID variables in boolean contexts
+                self._check_entity_id_boolean_context(f"{path}.{name}", value)
 
     def _validate_version_sync(self) -> None:
         """Validate that blueprint_version matches version in name field."""
@@ -995,6 +1049,14 @@ class BlueprintValidator:
             entity_id = condition.get("entity_id")
             if entity_id is not None:
                 self._collect_input_refs(entity_id)
+
+        # Check template conditions for entity ID boolean context issues
+        if condition_type == "template":
+            value_template = condition.get("value_template")
+            if isinstance(value_template, str):
+                self._check_entity_id_boolean_context(
+                    f"{path}.value_template", value_template
+                )
 
         # Collect !input references
         self._collect_input_refs_from_dict(condition)

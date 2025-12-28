@@ -2161,7 +2161,7 @@ action:
           - choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ manual_override_enable and (manual_override_duration_min | int(0) > 0) and manual_override_until_id }}"
+                    value_template: "{{ manual_override_enable and (manual_override_duration_min | int(0) > 0) and (manual_override_until_id | string | length > 0) }}"
                 sequence:
                   - variables:
                       _override_until_ts: >
@@ -2219,7 +2219,7 @@ action:
   - choose:
       - conditions:
           - condition: template
-            value_template: "{{ dbg == 'verbose' and manual_override_enable and manual_override_until_id }}"
+            value_template: "{{ dbg == 'verbose' and manual_override_enable and (manual_override_until_id | string | length > 0) }}"
         sequence:
           - service: logbook.log
             data:
