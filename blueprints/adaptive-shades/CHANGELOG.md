@@ -1,5 +1,11 @@
 # Adaptive Shades Pro - Changelog
 
+## [1.13.9] - 2025-12-28
+
+### Fixed
+
+- **Jinja2 min/max syntax error**: Fixed `'list object' has no attribute 'min'` error in `target_angle_deg` calculation. Replaced Python-style list method syntax (`[a, b].min()`) with proper Jinja2 filter syntax (`[a, b] | min`).
+
 ## [1.13.8] - 2025-12-28
 
 ### Fixed

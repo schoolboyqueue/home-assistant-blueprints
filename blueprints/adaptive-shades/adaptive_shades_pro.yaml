@@ -1,5 +1,5 @@
 blueprint:
-  name: "Adaptive Shades Pro v1.13.8"
+  name: "Adaptive Shades Pro v1.13.9"
   description: >-
     Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
     Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
@@ -442,7 +442,7 @@ blueprint:
                   value: "verbose"
 
 variables:
-  blueprint_version: "1.13.8"
+  blueprint_version: "1.13.9"
   cover_target: !input cover_target
   base_cover: >-
     {% set ct = cover_target | default('') %}
@@ -881,7 +881,7 @@ variables:
       {% if angle is none %}
         {{ none }}
       {% else %}
-        {{ [0, [angle, max_tilt_angle].min()].max() }}
+        {{ [0, [angle, max_tilt_angle] | min] | max }}
       {% endif %}
     {% endif %}
   slat_target_position: >-
