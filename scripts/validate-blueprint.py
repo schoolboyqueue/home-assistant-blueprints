@@ -536,7 +536,8 @@ class BlueprintValidator:
             for var in div_matches:
                 # Skip common safe names (constants, known-safe variables)
                 # cli_step: thermostat step size, always has non-zero default (0.5 or 1.0)
-                if var in ("pi", "e", "tau", "cli_step"):
+                # denom: commonly used for denominators that are computed as (1 + x)
+                if var in ("pi", "e", "tau", "cli_step", "denom"):
                     continue
 
                 # Check if variable is a local set from a guarded source
@@ -569,7 +570,8 @@ class BlueprintValidator:
                     rf"\({re.escape(var)}[^)]*\)\s*>\s*0|"
                     rf"{re.escape(var)}\s*>\s*0|"
                     rf"{re.escape(var)}\s+is\s+number|"
-                    rf"{re.escape(var)}\s*<=\s*0"  # Early return pattern
+                    rf"{re.escape(var)}\s*<=\s*0|"  # Early return pattern
+                    rf"{re.escape(var)}\s*==\s*0"  # Zero check pattern (e.g., if x == 0)
                 )
                 if not re.search(guard_pattern, value):
                     # Only warn if it looks like a variable, not a function call

@@ -1,5 +1,5 @@
 blueprint:
-  name: "Adaptive Shades Pro v1.13.7"
+  name: "Adaptive Shades Pro v1.13.8"
   description: >-
     Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
     Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
@@ -442,7 +442,7 @@ blueprint:
                   value: "verbose"
 
 variables:
-  blueprint_version: "1.13.7"
+  blueprint_version: "1.13.8"
   cover_target: !input cover_target
   base_cover: >-
     {% set ct = cover_target | default('') %}
@@ -708,13 +708,20 @@ variables:
     {% if not quiet_hours_start or not quiet_hours_end %}
       {{ false }}
     {% else %}
-      {% set now_time = now().time() %}
-      {% set start = strptime(quiet_hours_start, '%H:%M:%S').time() %}
-      {% set end = strptime(quiet_hours_end, '%H:%M:%S').time() %}
-      {% if start < end %}
-        {{ start <= now_time < end }}
+      {# Parse time strings flexibly - handles both HH:MM and HH:MM:SS formats #}
+      {% set start_parts = quiet_hours_start.split(':') if ':' in (quiet_hours_start | string) else [] %}
+      {% set end_parts = quiet_hours_end.split(':') if ':' in (quiet_hours_end | string) else [] %}
+      {% if start_parts | length < 2 or end_parts | length < 2 %}
+        {{ false }}
       {% else %}
-        {{ now_time >= start or now_time < end }}
+        {% set start_m = (start_parts[0] | int(0)) * 60 + (start_parts[1] | int(0)) %}
+        {% set end_m = (end_parts[0] | int(0)) * 60 + (end_parts[1] | int(0)) %}
+        {% set now_m = now().hour * 60 + now().minute %}
+        {% if start_m <= end_m %}
+          {{ start_m <= now_m < end_m }}
+        {% else %}
+          {{ now_m >= start_m or now_m < end_m }}
+        {% endif %}
       {% endif %}
     {% endif %}
   cooling_needed: >-

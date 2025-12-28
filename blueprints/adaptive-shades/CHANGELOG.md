@@ -1,5 +1,11 @@
 # Adaptive Shades Pro - Changelog
 
+## [1.13.8] - 2025-12-28
+
+### Fixed
+
+- **Quiet hours time parsing robustness**: Replaced `strptime()` with string splitting to handle both `HH:MM` and `HH:MM:SS` time formats. Previously, if the time selector output didn't match the expected format exactly, quiet hours detection would fail silently.
+
 ## [1.13.7] - 2025-12-27
 
 ### Fixed
@@ -104,7 +110,7 @@
 
 ### Added
 
-- **Window contact trigger**: Added state trigger for `window_contacts` with id `window_changed` so the automation reacts immediately when a window contact sensor changes state, rather than waiting for the next 5-minute time pattern trigger
+- **Window contact trigger**: Added state trigger for `window_contacts` with id `window_changed` so the automation reacts immediately when a window contact sensor changes state, rather than waiting for the next 5-minute time pattern trigger.
 
 ## [1.10.0] - 2025-11-29
 
@@ -130,29 +136,11 @@
 
 - Manual adjustment timeout now only activates when the last cover change includes a user context (manual interaction). Automation-initiated movements no longer trigger the timeout.
 
-## [1.7.0] - 2025-11-25
-
-### Added
-
-- Inverted shades option to flip open/block percentages for devices that report 0% as fully closed and 100% as fully open.
-
-## [1.8.0] - 2025-11-25
-
-### Added
-
-- Presence-required toggle and refined presence/glare handling for zebra mode: presence now gates movement (when required) and drives glare-sensitive behavior while unoccupied paths still consider heating/cooling needs.
-
-## [1.8.3] - 2025-11-25
+## [1.9.1] - 2025-11-25
 
 ### Fixed
 
-- Multi-cover support hardened: state/feature lookups now use the first cover (base_cover) to avoid unhashable list errors in HA templates.
-
-## [1.8.4] - 2025-11-25
-
-### Changed
-
-- Expanded manual comfort setpoint ranges (0–120) so users can input Fahrenheit or Celsius; climate-derived setpoints still take priority when a climate entity is provided.
+- Manual adjustment timeout is now evaluated per cover inside the repeat loop, so manual moves on any shade pause automation for that shade.
 
 ## [1.9.0] - 2025-11-25
 
@@ -162,17 +150,29 @@
 - Per-cover loop for movement, hysteresis, and logging; honors inverted shades per cover.
 - Presence/sun/comfort logic remains shared at room level.
 
-## [1.9.1] - 2025-11-25
-
-### Fixed
-
-- Manual adjustment timeout is now evaluated per cover inside the repeat loop, so manual moves on any shade pause automation for that shade.
-
-## [Unreleased]
+## [1.8.4] - 2025-11-25
 
 ### Changed
 
-- Comfort setpoints now derive from the climate entity when provided; manual setpoints are used only when no climate is configured. Mode detection prefers HVAC actions (heating/cooling) when available.
+- Expanded manual comfort setpoint ranges (0–120) so users can input Fahrenheit or Celsius; climate-derived setpoints still take priority when a climate entity is provided.
+
+## [1.8.3] - 2025-11-25
+
+### Fixed
+
+- Multi-cover support hardened: state/feature lookups now use the first cover (base_cover) to avoid unhashable list errors in HA templates.
+
+## [1.8.0] - 2025-11-25
+
+### Added
+
+- Presence-required toggle and refined presence/glare handling for zebra mode: presence now gates movement (when required) and drives glare-sensitive behavior while unoccupied paths still consider heating/cooling needs.
+
+## [1.7.0] - 2025-11-25
+
+### Added
+
+- Inverted shades option to flip open/block percentages for devices that report 0% as fully closed and 100% as fully open.
 
 ## [1.6.0] - 2025-11-25
 
@@ -183,24 +183,6 @@
 ### Fixed
 
 - Manual override timeout now uses the first selected cover safely for last_changed and supported_features checks.
-
-## [1.5.0] - 2025-11-25
-
-### Added
-
-- Optional climate entity to bias heating/cooling classification and reflect HVAC state in shading decisions.
-- Room profile (living/office/bedroom) that adjusts glare sensitivity; effective glare threshold derived from profile.
-
-### Changed
-
-- Comfort mode detection now prefers active HVAC state when provided, falling back to setpoints.
-- Glare detection uses the profile-adjusted threshold; documentation updated for clarity.
-
-## [1.5.3] - 2025-11-25
-
-### Fixed
-
-- Replaced unsupported Jinja `exp` filter in clear-sky irradiance calculation with explicit exponent math (uses `e_const ** exponent`).
 
 ## [1.5.7] - 2025-11-25
 
@@ -220,6 +202,12 @@
 
 - Diagnostics input with `debug_level` (off/basic/verbose) and gated logbook logging, including verbose no-movement traces for troubleshooting.
 
+## [1.5.3] - 2025-11-25
+
+### Fixed
+
+- Replaced unsupported Jinja `exp` filter in clear-sky irradiance calculation with explicit exponent math (uses `e_const ** exponent`).
+
 ## [1.5.2] - 2025-11-25
 
 ### Fixed
@@ -231,6 +219,19 @@
 ### Fixed
 
 - Corrected tilt capability detection template to avoid template parse errors in Home Assistant (bitwise detection now uses `bitwise_and`).
+
+## [1.5.0] - 2025-11-25
+
+### Added
+
+- Optional climate entity to bias heating/cooling classification and reflect HVAC state in shading decisions.
+- Room profile (living/office/bedroom) that adjusts glare sensitivity; effective glare threshold derived from profile.
+
+### Changed
+
+- Comfort mode detection now prefers active HVAC state when provided, falling back to setpoints.
+- Comfort setpoints now derive from the climate entity when provided; manual setpoints are used only when no climate is configured.
+- Glare detection uses the profile-adjusted threshold; documentation updated for clarity.
 
 ## [1.4.0] - 2025-11-25
 
@@ -268,7 +269,7 @@
 
 ### Changed
 
-- Auto-compute minimum sun elevation from Home Assistant’s `sun.sun` (uses 1° when above horizon, otherwise disables sun-on-window) so users no longer configure this threshold manually.
+- Auto-compute minimum sun elevation from Home Assistant's `sun.sun` (uses 1° when above horizon, otherwise disables sun-on-window) so users no longer configure this threshold manually.
 
 ## [1.1.0] - 2025-11-25
 
@@ -286,5 +287,3 @@
 - Comfort-aware logic that biases open for heating (solar gain) and closed for cooling, using optional indoor/outdoor temperature sensors and hysteresis.
 - Glare protection via optional indoor lux threshold, plus presence, manual override, and quiet-hours pauses.
 - Import badge and README for quick setup guidance.
-
----
