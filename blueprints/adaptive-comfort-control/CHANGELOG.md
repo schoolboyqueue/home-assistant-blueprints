@@ -1,3 +1,55 @@
+## [4.21.0] — 2025-12-28
+
+### Added
+
+- **Deadband hysteresis for setpoint updates**: The previously reserved `heat_deadband` and `cool_deadband` inputs are now fully implemented. Setpoint commands are skipped when current temperature is within deadband of target, reducing unnecessary thermostat writes and preventing oscillation near setpoints.
+- **Dynamic dual-mode support**: Added `preferred_dual_mode` variable that detects whether the thermostat supports `heat_cool` or `auto` mode, and `is_in_dual_mode` for checking current state. Mode-setting logic now dynamically uses the correct mode name instead of hardcoding `heat_cool`.
+- **Band inversion prevention comments**: Added detailed inline documentation explaining the nested min/max logic that prevents comfort band inversion when adaptive target approaches band edges.
+
+### Fixed
+
+- **Natural ventilation override persistence**: Added `stop` action after natural ventilation activates to prevent subsequent mode-setting blocks from re-enabling HVAC. Previously, the HVAC could be turned back on in the same run after ventilation was preferred.
+- **Psychrometric division safety**: Added `is number` guards to saturation pressure (`psat_in_kpa`, `psat_out_kpa`), vapor pressure (`pv_in_kpa`, `pv_out_kpa`), absolute humidity (`ah_in`, `ah_out`), humidity ratio (`w_in`, `w_out`), and enthalpy (`h_in`, `h_out`) calculations to prevent division/math errors when temperature or pressure inputs are unavailable or non-numeric.
+- **Dew point log(0) protection**: Added `x > 0` guards before `log()` calls in dew point calculations to prevent math domain errors when vapor pressure is extremely low.
+- **Time parsing robustness**: Improved sleep schedule time parsing to handle both `HH:MM` and `HH:MM:SS` formats with explicit length checks, preventing index errors on malformed time strings.
+- **Boolean variable syntax**: Changed `is_imperial` and `climate_is_imperial` assignments to use explicit `{{ true }}`/`{{ false }}` syntax instead of bare literals for consistent Jinja2 boolean output.
+
+### Changed
+
+- **Simplified optional sensor parsing**: Standardized 9 optional sensor ID extraction blocks into a cleaner 3-line pattern, removing redundant `| default('', true)` calls and improving readability.
+- **Removed dead code**: Removed the unused `_nat_vent_active` runtime variable assignment (natural ventilation state is now handled via `stop` action and pre-computed `nat_vent_would_activate`).
+
+## [4.20.5] — 2025-12-28
+
+### Fixed
+
+- **Manual override detection reliability**: Completely rewrote the manual override detection logic. Instead of comparing the thermostat setpoint against the predicted adaptive target (which can drift due to changing conditions), now compares against the exact setpoints the automation WOULD set (`target_low_cli`/`target_high_cli` for dual mode, `t_adapt_cli_q` for single mode). This prevents the automation from detecting its own temperature changes as manual overrides, which was causing a feedback loop where learning would trigger on every automation update.
+
+## [4.20.4] — 2025-12-28
+
+### Changed
+
+- **Season inference alignment**: Month-based fallback now outputs `spring`/`autumn` to match Home Assistant's `season` sensor output instead of the internal `shoulder` value. The shoulder bias is still applied to spring and autumn seasons.
+- **Code cleanup**: Removed unused `heat_db_sys` and `cool_db_sys` variable bindings (inputs are preserved for future use). Removed unused `prev_cli` variables from manual override detection logic.
+
+## [4.20.3] — 2025-12-28
+
+### Fixed
+
+- **HVAC mode detection**: Fixed `hvac_mode_now` to read from entity state (`states()`) instead of incorrectly reading from attribute (`state_attr()`). This was causing incorrect mode detection and potentially unnecessary mode changes.
+- **Absolute humidity operator precedence**: Fixed `ah_in` and `ah_out` calculations where the `| round(2)` filter was only applying to `1000.0` instead of the entire expression due to operator precedence.
+- **Enthalpy null safety**: Added guard for `w_in`/`w_out` being `none` in enthalpy (`h_in`/`h_out`) calculations to prevent math errors when humidity ratio cannot be computed.
+- **Dew point log(0) protection**: Added guard against computing `log(0)` in dew point calculations when vapor pressure is extremely low (near 0% RH).
+- **Natural ventilation variable scope**: Fixed `_nat_vent_active` flag not propagating across `choose` block boundaries. Now pre-computes natural ventilation eligibility in the variables section as `nat_vent_would_activate`.
+- **Missing pause/resume actions**: Added execution of `pause_action` and `resume_action` inputs which were defined but never called in the action sequence.
+
+## [4.20.2] — 2025-12-28
+
+### Fixed
+
+- **Manual override tolerance conversion**: Fixed unit conversion for manual override tolerance that incorrectly treated the delta as an absolute temperature (subtracting 32 before multiplying by 5/9). For imperial users, this caused the tolerance to become a large negative number, making every thermostat change appear as a manual override.
+- **Self-triggering detection**: Added logic to distinguish automation-initiated setpoint changes from true manual overrides by checking if the new setpoint is near the automation's predicted target. Previously, the automation's own temperature updates would trigger false manual override detections.
+
 ## [4.20.1] — 2025-12-27
 
 ### Fixed

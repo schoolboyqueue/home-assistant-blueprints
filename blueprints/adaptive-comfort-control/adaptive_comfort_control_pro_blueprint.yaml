@@ -1,5 +1,5 @@
 blueprint:
-    name: "Adaptive Comfort Control Pro v4.20.1"
+    name: "Adaptive Comfort Control Pro v4.21.0"
     description: >
         Adaptive comfort control + HVAC pause with unit awareness (°C/°F), seasonal bias,
         built-in psychrometrics (dew point, absolute humidity, enthalpy), optional RMOT,
@@ -918,7 +918,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.20.1"
+    blueprint_version: "4.21.0"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
@@ -947,8 +947,8 @@ variables:
     adaptive_fan: !input adaptive_air_velocity
     humid_enable: !input humidity_comfort_enable
     precision: !input comfort_precision_mode
-    heat_db_sys: !input heat_deadband
-    cool_db_sys: !input cool_deadband
+    heat_deadband_sys: !input heat_deadband
+    cool_deadband_sys: !input cool_deadband
     inside_half_sys: !input inside_band_half_width
     auto_sep_sys: !input auto_min_separation
     cooldown_min: !input mode_cooldown_min
@@ -1001,8 +1001,8 @@ variables:
     _u_climate: >
         {{ state_attr(climate_entity_id, 'temperature_unit') | default(state_attr(climate_entity_id, 'unit_of_measurement'), true) | default('', true) | string }}
     is_imperial: >
-        {% if units_override_val == 'c' %} false
-        {% elif units_override_val == 'f' %} true
+        {% if units_override_val == 'c' %}{{ false }}
+        {% elif units_override_val == 'f' %}{{ true }}
         {% else %}
           {% set u = (_u_indoor or _u_outdoor or _u_climate) | lower %}
           {{ 'f' in u }}
@@ -1015,80 +1015,39 @@ variables:
     _to_sys_mult: "{{ 9/5 if is_imperial else 1 }}"
     _to_sys_add: "{{ 32 if is_imperial else 0 }}"
 
+    # Helper pattern for optional sensor IDs: extract first value if list, normalize to empty string for 'none' defaults
     mrt_sensor_id: >
         {% set raw = _raw_mrt_sensor_values %}
-        {% if raw is string %}
-          {% set e = raw %}
-        {% elif raw is iterable %}
-          {% set e = (raw[0] if raw|length > 0 else '') %}
-        {% else %}
-          {% set e = '' %}
-        {% endif %}
-        {% set e = e | default('', true) %}
-        {% set v = e | string | lower %}
-        {% if v not in ['', 'none', 'sensor.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
+        {% set e = raw if raw is string else (raw[0] if (raw is iterable and raw|length > 0) else '') %}
+        {% set v = (e | default('', true) | string | lower) %}
+        {{ e if v not in ['', 'none', 'sensor.none'] else '' }}
     rh_in_id: >
         {% set raw = _raw_rh_in_values %}
-        {% if raw is string %}
-          {% set e = raw %}
-        {% elif raw is iterable %}
-          {% set e = (raw[0] if raw|length > 0 else '') %}
-        {% else %}
-          {% set e = '' %}
-        {% endif %}
-        {% set e = e | default('', true) %}
-        {% set v = e | string | lower %}
-        {% if v not in ['', 'none', 'sensor.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
+        {% set e = raw if raw is string else (raw[0] if (raw is iterable and raw|length > 0) else '') %}
+        {% set v = (e | default('', true) | string | lower) %}
+        {{ e if v not in ['', 'none', 'sensor.none'] else '' }}
     rh_out_id: >
         {% set raw = _raw_rh_out_values %}
-        {% if raw is string %}
-          {% set e = raw %}
-        {% elif raw is iterable %}
-          {% set e = (raw[0] if raw|length > 0 else '') %}
-        {% else %}
-          {% set e = '' %}
-        {% endif %}
-        {% set e = e | default('', true) %}
-        {% set v = e | string | lower %}
-        {% if v not in ['', 'none', 'sensor.none', 'weather.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
+        {% set e = raw if raw is string else (raw[0] if (raw is iterable and raw|length > 0) else '') %}
+        {% set v = (e | default('', true) | string | lower) %}
+        {{ e if v not in ['', 'none', 'sensor.none', 'weather.none'] else '' }}
     occupancy_sensor_id: >
         {% set raw = _raw_occupancy_values %}
-        {% if raw is string %}
-          {% set e = raw %}
-        {% elif raw is iterable %}
-          {% set e = (raw[0] if raw|length > 0 else '') %}
-        {% else %}
-          {% set e = '' %}
-        {% endif %}
-        {% set e = e | default('', true) %}
-        {% set v = e | string | lower %}
-        {% if v not in ['', 'none', 'binary_sensor.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
+        {% set e = raw if raw is string else (raw[0] if (raw is iterable and raw|length > 0) else '') %}
+        {% set v = (e | default('', true) | string | lower) %}
+        {{ e if v not in ['', 'none', 'binary_sensor.none'] else '' }}
 
     sleep_entity_id: >
         {% set raw = _raw_sleep_entity_values %}
-        {% if raw is string %}
-          {% set e = raw %}
-        {% elif raw is iterable %}
-          {% set e = (raw[0] if raw|length > 0 else '') %}
-        {% else %}
-          {% set e = '' %}
-        {% endif %}
-        {% set e = e | default('', true) %}
-        {% set v = e | string | lower %}
-        {% if v not in ['', 'none', 'binary_sensor.none', 'input_boolean.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
+        {% set e = raw if raw is string else (raw[0] if (raw is iterable and raw|length > 0) else '') %}
+        {% set v = (e | default('', true) | string | lower) %}
+        {{ e if v not in ['', 'none', 'binary_sensor.none', 'input_boolean.none'] else '' }}
 
     learned_offset_helper_id: >
         {% set raw = _raw_learned_offset_helper %}
-        {% if raw is string %}
-          {% set e = raw %}
-        {% elif raw is iterable %}
-          {% set e = (raw[0] if raw|length > 0 else '') %}
-        {% else %}
-          {% set e = '' %}
-        {% endif %}
-        {% set e = e | default('', true) %}
-        {% set v = e | string | lower %}
-        {% if v not in ['', 'none', 'input_number.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
+        {% set e = raw if raw is string else (raw[0] if (raw is iterable and raw|length > 0) else '') %}
+        {% set v = (e | default('', true) | string | lower) %}
+        {{ e if v not in ['', 'none', 'input_number.none'] else '' }}
 
     # Read current learned offset (in system units, will be converted to C)
     learned_offset_sys: >
@@ -1100,16 +1059,9 @@ variables:
     # Manual override helper parsing
     manual_override_until_id: >
         {% set raw = _raw_manual_override_until %}
-        {% if raw is string %}
-          {% set e = raw %}
-        {% elif raw is iterable %}
-          {% set e = (raw[0] if raw|length > 0 else '') %}
-        {% else %}
-          {% set e = '' %}
-        {% endif %}
-        {% set e = e | default('', true) %}
-        {% set v = e | string | lower %}
-        {% if v not in ['', 'none', 'input_datetime.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
+        {% set e = raw if raw is string else (raw[0] if (raw is iterable and raw|length > 0) else '') %}
+        {% set v = (e | default('', true) | string | lower) %}
+        {{ e if v not in ['', 'none', 'input_datetime.none'] else '' }}
 
     # Check if manual override is currently active
     is_override_active: >
@@ -1145,68 +1097,33 @@ variables:
     rmot_enable: !input rmot_enable
     co2_in_id: >
         {% set raw = _raw_co2_in_values %}
-        {% if raw is string %}
-          {% set e = raw %}
-        {% elif raw is iterable %}
-          {% set e = (raw[0] if raw|length > 0 else '') %}
-        {% else %}
-          {% set e = '' %}
-        {% endif %}
-        {% set e = e | default('', true) %}
-        {% set v = e | string | lower %}
-        {% if v not in ['', 'none', 'sensor.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
+        {% set e = raw if raw is string else (raw[0] if (raw is iterable and raw|length > 0) else '') %}
+        {% set v = (e | default('', true) | string | lower) %}
+        {{ e if v not in ['', 'none', 'sensor.none'] else '' }}
     co2_out_id: >
         {% set raw = _raw_co2_out_values %}
-        {% if raw is string %}
-          {% set e = raw %}
-        {% elif raw is iterable %}
-          {% set e = (raw[0] if raw|length > 0 else '') %}
-        {% else %}
-          {% set e = '' %}
-        {% endif %}
-        {% set e = e | default('', true) %}
-        {% set v = e | string | lower %}
-        {% if v not in ['', 'none', 'sensor.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
+        {% set e = raw if raw is string else (raw[0] if (raw is iterable and raw|length > 0) else '') %}
+        {% set v = (e | default('', true) | string | lower) %}
+        {{ e if v not in ['', 'none', 'sensor.none'] else '' }}
     rmot_sensor_id: >
         {% set raw = _raw_rmot_values %}
-        {% if raw is string %}
-          {% set e = raw %}
-        {% elif raw is iterable %}
-          {% set e = (raw[0] if raw|length > 0 else '') %}
-        {% else %}
-          {% set e = '' %}
-        {% endif %}
-        {% set e = e | default('', true) %}
-        {% set v = e | string | lower %}
-        {% if v not in ['', 'none', 'sensor.none', 'input_number.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
+        {% set e = raw if raw is string else (raw[0] if (raw is iterable and raw|length > 0) else '') %}
+        {% set v = (e | default('', true) | string | lower) %}
+        {{ e if v not in ['', 'none', 'sensor.none', 'input_number.none'] else '' }}
 
     _raw_baro_values: !input baro_pressure_sensor
     baro_sensor_id: >
         {% set raw = _raw_baro_values %}
-        {% if raw is string %}
-          {% set e = raw %}
-        {% elif raw is iterable %}
-          {% set e = (raw[0] if raw|length > 0 else '') %}
-        {% else %}
-          {% set e = '' %}
-        {% endif %}
-        {% set e = e | default('', true) %}
-        {% set v = e | string | lower %}
-        {% if v not in ['', 'none', 'sensor.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
+        {% set e = raw if raw is string else (raw[0] if (raw is iterable and raw|length > 0) else '') %}
+        {% set v = (e | default('', true) | string | lower) %}
+        {{ e if v not in ['', 'none', 'sensor.none'] else '' }}
 
     # Seasons (manual biases)
     season_entity_id: >
         {% set raw = _raw_season_entity_values %}
-        {% if raw is string %}
-          {% set e = raw %}
-        {% elif raw is iterable %}
-          {% set e = (raw[0] if raw|length > 0 else '') %}
-        {% else %}
-          {% set e = '' %}
-        {% endif %}
-        {% set e = e | default('', true) %}
-        {% set v = e | string | lower %}
-        {% if v not in ['', 'none', 'sensor.none'] %}{{ e }}{% else %}{{ '' }}{% endif %}
+        {% set e = raw if raw is string else (raw[0] if (raw is iterable and raw|length > 0) else '') %}
+        {% set v = (e | default('', true) | string | lower) %}
+        {{ e if v not in ['', 'none', 'sensor.none'] else '' }}
     winter_bias_sys_manual: !input winter_bias
     summer_bias_sys_manual: !input summer_bias
     shoulder_bias_sys_manual: !input shoulder_bias
@@ -1521,29 +1438,29 @@ variables:
     # --------- Built-in psychrometrics (T in °C, RH in %) ---------
     _psychro_on: "{{ psychro_enable or dbg == 'verbose' }}"
     psat_in_kpa: >
-        {% if _psychro_on %}{{ 0.61078 * (2.718281828 ** ((17.2694 * t_in_c) / (t_in_c + 237.3))) }}{% else %}{{ none }}{% endif %}
+        {% if _psychro_on and t_in_c is number %}{{ 0.61078 * (2.718281828 ** ((17.2694 * t_in_c) / (t_in_c + 237.3))) }}{% else %}{{ none }}{% endif %}
     psat_out_kpa: >
-        {% if _psychro_on %}{{ 0.61078 * (2.718281828 ** ((17.2694 * t_out_c) / (t_out_c + 237.3))) }}{% else %}{{ none }}{% endif %}
-    pv_in_kpa:  "{{ ( (rh_in  | float(50) / 100.0) * psat_in_kpa )  if _psychro_on else none }}"
-    pv_out_kpa: "{{ ( (rh_out | float(50) / 100.0) * psat_out_kpa ) if _psychro_on else none }}"
+        {% if _psychro_on and t_out_c is number %}{{ 0.61078 * (2.718281828 ** ((17.2694 * t_out_c) / (t_out_c + 237.3))) }}{% else %}{{ none }}{% endif %}
+    pv_in_kpa:  "{{ ( (rh_in  | float(50) / 100.0) * psat_in_kpa )  if (_psychro_on and psat_in_kpa is number) else none }}"
+    pv_out_kpa: "{{ ( (rh_out | float(50) / 100.0) * psat_out_kpa ) if (_psychro_on and psat_out_kpa is number) else none }}"
     dp_in_c: >
-        {% if _psychro_on %}
-          {% set x = pv_in_kpa / 0.61078 %}{% set ln = log(x) %}
-          {{ (237.3 * ln) / (17.2694 - ln) }}
+        {% if _psychro_on and pv_in_kpa is number and pv_in_kpa | float(0) > 0.001 %}
+          {% set x = pv_in_kpa / 0.61078 %}
+          {% if x > 0 %}{% set ln = log(x) %}{{ (237.3 * ln) / (17.2694 - ln) }}{% else %}{{ none }}{% endif %}
         {% else %}{{ none }}{% endif %}
     dp_out_c: >
-        {% if _psychro_on %}
-          {% set x = pv_out_kpa / 0.61078 %}{% set ln = log(x) %}
-          {{ (237.3 * ln) / (17.2694 - ln) }}
+        {% if _psychro_on and pv_out_kpa is number and pv_out_kpa | float(0) > 0.001 %}
+          {% set x = pv_out_kpa / 0.61078 %}
+          {% if x > 0 %}{% set ln = log(x) %}{{ (237.3 * ln) / (17.2694 - ln) }}{% else %}{{ none }}{% endif %}
         {% else %}{{ none }}{% endif %}
     ah_in: >
-        {% if _psychro_on %}{% set Tk = t_in_c + 273.15 %}{{ (2.1674 * pv_in_kpa / Tk) * 1000.0 | round(2) }}{% else %}{{ none }}{% endif %}
+        {% if _psychro_on and t_in_c is number and pv_in_kpa is number %}{% set Tk = t_in_c + 273.15 %}{{ ((2.1674 * pv_in_kpa / Tk) * 1000.0) | round(2) }}{% else %}{{ none }}{% endif %}
     ah_out: >
-        {% if _psychro_on %}{% set Tk = t_out_c + 273.15 %}{{ (2.1674 * pv_out_kpa / Tk) * 1000.0 | round(2) }}{% else %}{{ none }}{% endif %}
-    w_in:  "{{ (0.62198 * pv_in_kpa  / (pressure_kpa - pv_in_kpa))  if (_psychro_on and (pressure_kpa - pv_in_kpa) > 0.1) else none }}"
-    w_out: "{{ (0.62198 * pv_out_kpa / (pressure_kpa - pv_out_kpa)) if (_psychro_on and (pressure_kpa - pv_out_kpa) > 0.1) else none }}"
-    h_in:  "{{ (1.006 * t_in_c  + w_in  * (2501 + 1.86 * t_in_c))  | round(2) if _psychro_on else none }}"
-    h_out: "{{ (1.006 * t_out_c + w_out * (2501 + 1.86 * t_out_c)) | round(2) if _psychro_on else none }}"
+        {% if _psychro_on and t_out_c is number and pv_out_kpa is number %}{% set Tk = t_out_c + 273.15 %}{{ ((2.1674 * pv_out_kpa / Tk) * 1000.0) | round(2) }}{% else %}{{ none }}{% endif %}
+    w_in:  "{{ (0.62198 * pv_in_kpa  / (pressure_kpa - pv_in_kpa))  if (_psychro_on and pressure_kpa is number and pv_in_kpa is number and (pressure_kpa - pv_in_kpa) > 0.1) else none }}"
+    w_out: "{{ (0.62198 * pv_out_kpa / (pressure_kpa - pv_out_kpa)) if (_psychro_on and pressure_kpa is number and pv_out_kpa is number and (pressure_kpa - pv_out_kpa) > 0.1) else none }}"
+    h_in:  "{{ ((1.006 * t_in_c  + w_in  * (2501 + 1.86 * t_in_c))  | round(2)) if (_psychro_on and w_in is number) else none }}"
+    h_out: "{{ ((1.006 * t_out_c + w_out * (2501 + 1.86 * t_out_c)) | round(2)) if (_psychro_on and w_out is number) else none }}"
 
     # --------- Occupancy / Energy Save (must be defined before sleep logic) ---------
     occ_now: >
@@ -1583,12 +1500,21 @@ variables:
 
     # Time-window evaluation with wrap-around support (e.g., 22:00 → 07:00)
     _now_m: "{{ now().hour*60 + now().minute }}"
-    _st_parts: "{{ sleep_start_str.split(':') if sleep_start_str else ['22','0','0'] }}"
-    _en_parts: "{{ sleep_end_str.split(':') if sleep_end_str else ['7','0','0'] }}"
+    # Parse time strings safely - handles HH:MM and HH:MM:SS formats, with fallbacks for invalid input
+    _st_parts: >
+        {% set parts = (sleep_start_str.split(':') if (sleep_start_str and ':' in sleep_start_str) else ['22','0']) %}
+        {{ parts if parts|length >= 2 else ['22','0'] }}
+    _en_parts: >
+        {% set parts = (sleep_end_str.split(':') if (sleep_end_str and ':' in sleep_end_str) else ['7','0']) %}
+        {{ parts if parts|length >= 2 else ['7','0'] }}
     _st_m: >
-        {% set h = (_st_parts[0]|int(22)) %}{% set m = (_st_parts[1]|int(0)) %}{{ h*60 + m }}
+        {% set h = (_st_parts[0]|int(22) if _st_parts|length > 0 else 22) %}
+        {% set m = (_st_parts[1]|int(0) if _st_parts|length > 1 else 0) %}
+        {{ h*60 + m }}
     _en_m: >
-        {% set h = (_en_parts[0]|int(7)) %}{% set m = (_en_parts[1]|int(0)) %}{{ h*60 + m }}
+        {% set h = (_en_parts[0]|int(7) if _en_parts|length > 0 else 7) %}
+        {% set m = (_en_parts[1]|int(0) if _en_parts|length > 1 else 0) %}
+        {{ h*60 + m }}
     _time_active: >
         {% set nowm = _now_m|int %}
         {% set s = _st_m|int %}
@@ -1661,9 +1587,11 @@ variables:
           {% set m = now().month %}
           {% if m in [12,1,2] %} winter
           {% elif m in [6,7,8] %} summer
-          {% else %} shoulder {% endif %}
+          {% elif m in [3,4,5] %} spring
+          {% else %} autumn {% endif %}
         {% endif %}
     season_now: "{{ _season_raw }}"
+    # Map season to bias: winter/summer have dedicated biases, spring/autumn use shoulder bias
     season_bias_sys_active: >
         {% if season_now == 'winter' %} {{ winter_bias_sys | float(0) }}
         {% elif season_now == 'summer' %} {{ summer_bias_sys | float(0) }}
@@ -1736,8 +1664,15 @@ variables:
     band_min_c: "{{ [ [ t_adapt_c_guard - tol_c - setback_apply_c, min_c ] | max, max_c ] | min | round(2) }}"
     band_max_c: "{{ [ [ t_adapt_c_guard + tol_c + setback_apply_c, max_c ] | min, min_c ] | max | round(2) }}"
     # --- Final clamp with built-in ordering (no separate "sane" step needed) ---
-    # Ensure band_min <= band_max (handle edge cases where adjustments cause inversion),
-    # then apply final safety bounds to prevent exceeding user-configured limits.
+    # Band inversion fix: When setback, tolerance, or seasonal biases push band_min > band_max,
+    # we must correct this before clamping to safety bounds. The logic works as follows:
+    #   1. Take min(band_min_c, band_max_c) for band_min_c_final (ensures band_min <= band_max)
+    #   2. Take max(band_min_c, band_max_c) for band_max_c_final (ensures band_max >= band_min)
+    #   3. Then clamp both to [min_c, max_c] range (user comfort limits capped by safety bounds)
+    # This nested expression: [[[ inner ] | min, max_c ] | min, min_c ] | max
+    #   - Inner: select the correct value from [band_min_c, band_max_c]
+    #   - Middle: cap at max_c (don't exceed comfort ceiling)
+    #   - Outer: floor at min_c (don't go below comfort floor)
     band_min_c_final: "{{ [ [ [ band_min_c, band_max_c ] | min | round(2), max_c ] | min, min_c ] | max }}"
     band_max_c_final: "{{ [ [ [ band_min_c, band_max_c ] | max | round(2), max_c ] | min, min_c ] | max }}"
     inside_low_c: "{{ (t_adapt_c - inside_half_c_eff - (setback_apply_c/2)) | round(2) }}"
@@ -1760,9 +1695,13 @@ variables:
     # Detect climate unit: prefer explicit attribute; fallback to range heuristic
     climate_is_imperial: >
         {% set u = _u_climate | lower %}
-        {% if 'f' in u %} true
-        {% elif (max_allowed_raw | float(0)) >= 60 or (min_allowed_raw | float(0)) >= 30 %} true
-        {% else %} false {% endif %}
+        {% if 'f' in u %}{{ true }}
+        {% elif (max_allowed_raw | float(0)) >= 60 or (min_allowed_raw | float(0)) >= 30 %}{{ true }}
+        {% else %}{{ false }}{% endif %}
+
+    # Convert deadbands to climate units for comparison
+    heat_deadband_cli: "{{ heat_deadband_sys | float(1.5) if climate_is_imperial else (heat_deadband_sys | float(1.5) * 5/9) }}"
+    cool_deadband_cli: "{{ cool_deadband_sys | float(1.0) if climate_is_imperial else (cool_deadband_sys | float(1.0) * 5/9) }}"
 
     t_adapt_cli: "{{ (t_adapt_c_guard * 9/5 + 32) if climate_is_imperial else t_adapt_c_guard }}"
     band_min_cli: "{{ (band_min_c_final * 9/5 + 32) if climate_is_imperial else band_min_c_final }}"
@@ -1784,6 +1723,8 @@ variables:
     hvac_modes: "{{ state_attr(climate_entity_id, 'hvac_modes') | default([], true) }}"
     supports_auto: "{{ 'auto' in hvac_modes }}"
     supports_heat_cool: "{{ 'heat_cool' in hvac_modes }}"
+    # Preferred dual-setpoint mode: prefer heat_cool if available, fall back to auto
+    preferred_dual_mode: "{{ 'heat_cool' if supports_heat_cool else ('auto' if supports_auto else 'off') }}"
     hvac_last_changed_ts: >
         {% set s = states[climate_entity_id] %}
         {% if s is not none %}
@@ -1801,7 +1742,8 @@ variables:
           {{ delta >= (mode_cooldown_sec | float(0)) }}
         {% endif %}
     fan_modes: "{{ state_attr(climate_entity_id, 'fan_modes') | default([], true) }}"
-    hvac_mode_now: "{{ state_attr(climate_entity_id, 'hvac_mode') | string | lower }}"
+    hvac_mode_now: "{{ states(climate_entity_id) | string | lower }}"
+    is_in_dual_mode: "{{ hvac_mode_now in ['heat_cool', 'auto'] }}"
     temp_now_sys: "{{ state_attr(climate_entity_id, 'temperature') | float(0) }}"
     temp_low_now_sys: "{{ state_attr(climate_entity_id, 'target_temp_low') | float(0) }}"
     temp_high_now_sys: "{{ state_attr(climate_entity_id, 'target_temp_high') | float(0) }}"
@@ -1987,29 +1929,55 @@ variables:
     target_high_cli: "{{ [ [ target_high_cli_cap, target_low_cli_cap  ] | max , min_allowed_cli ] | max }}"
 
     # --------- Check if thermostat already at target setpoints (avoid unnecessary commands) ---------
-    # Compare with tolerance to account for quantization/rounding
-    _setpoint_tolerance: "{{ cli_step * 0.6 }}"  # Slightly more than half a step
+    # Uses deadband hysteresis to prevent chattering near setpoints.
+    # heat_deadband_cli applies when heating (target_low changes), cool_deadband_cli for cooling (target_high).
+    _setpoint_tolerance: "{{ cli_step * 0.6 }}"  # Slightly more than half a step for rounding tolerance
     
-    # For dual setpoint modes (auto/heat_cool)
+    # For dual setpoint modes (auto/heat_cool): use heat deadband for low setpoint, cool deadband for high
     _dual_mode_matches: >
         {% if not (supports_auto or supports_heat_cool) %}
           {{ false }}
         {% else %}
-          {% set low_match = (temp_low_now_sys - target_low_cli) | abs < _setpoint_tolerance %}
-          {% set high_match = (temp_high_now_sys - target_high_cli) | abs < _setpoint_tolerance %}
+          {% set low_diff = (temp_low_now_sys - target_low_cli) | abs %}
+          {% set high_diff = (temp_high_now_sys - target_high_cli) | abs %}
+          {# Only update if change exceeds the relevant deadband (or rounding tolerance, whichever is smaller) #}
+          {% set low_tol = [_setpoint_tolerance, heat_deadband_cli | float(1.5)] | min %}
+          {% set high_tol = [_setpoint_tolerance, cool_deadband_cli | float(1.0)] | min %}
+          {% set low_match = low_diff < low_tol %}
+          {% set high_match = high_diff < high_tol %}
           {{ low_match and high_match }}
         {% endif %}
     
-    # For single setpoint modes (heat/cool)
+    # For single setpoint modes (heat/cool): use appropriate deadband based on current mode
     _single_mode_matches: >
         {% if hvac_mode_now not in ['cool','heat'] %}
           {{ false }}
         {% else %}
-          {{ (temp_now_sys - t_adapt_cli_q) | abs < _setpoint_tolerance }}
+          {% set diff = (temp_now_sys - t_adapt_cli_q) | abs %}
+          {% set tol = heat_deadband_cli if hvac_mode_now == 'heat' else cool_deadband_cli %}
+          {% set effective_tol = [_setpoint_tolerance, tol | float(1.0)] | min %}
+          {{ diff < effective_tol }}
         {% endif %}
     
-    # Check if we need to send commands
+    # Check if we need to send commands (respects deadband hysteresis)
     needs_temp_update: "{{ not (_dual_mode_matches or _single_mode_matches) }}"
+
+    # Pre-compute natural ventilation eligibility (used to skip climate.turn_on)
+    nat_vent_would_activate: >
+        {{ nat_vent_enable
+           and (not vent_requires_occupancy or occ_now | bool)
+           and (t_out_c is number) and (t_in_c is number)
+           and ((t_out_c - t_in_c) | abs <= dv_c | float(1.0))
+           and (
+                 (not psychro_enable)
+                 or (
+                       (dp_out_c is not none and dp_in_c is not none and (dp_out_c | float - dp_in_c | float) <= muggy_delta_dp_c | float(1.0))
+                       and ((h_out is not none and h_in is not none and (h_in | float - h_out | float) >= econ_dh | float(0)) or
+                            (ah_out is not none and ah_in is not none and (ah_in | float - ah_out | float) >= econ_dah | float(0)))
+                       and (dp_out_c is not none and (dp_out_c | float <= max_outdoor_dp_c | float(30)))
+                     )
+               )
+        }}
 
     # --------- Debug helpers (strings computed in action when needed) ---------
     climate_unit_sym: "{{ '°F' if climate_is_imperial else '°C' }}"
@@ -2087,27 +2055,41 @@ action:
   - variables:
       _manual_trigger: >
         {{ trigger.id in ['climate_manual_change', 'climate_manual_change_low', 'climate_manual_change_high'] }}
-      _nat_vent_active: false
       _manual_change_detected: >
         {% if not _manual_trigger %}
           {{ false }}
         {% else %}
+          {# Convert tolerance delta properly (no offset subtraction for deltas) #}
           {% set tol_cli = manual_override_tolerance | float(1.0) %}
-          {% set tol_c = ((tol_cli - 32) * 5/9) if climate_is_imperial else tol_cli %}
 
+          {# Get current thermostat setpoints from trigger #}
           {% if trigger.id == 'climate_manual_change' %}
-            {% set manual_cli = trigger.to_state.attributes.temperature | float(0) %}
+            {% set current_temp_cli = trigger.to_state.attributes.temperature | float(0) %}
+            {% set is_dual_mode = false %}
           {% elif trigger.id in ['climate_manual_change_low','climate_manual_change_high'] %}
-            {% set low = trigger.to_state.attributes.target_temp_low  | float(0) %}
-            {% set high = trigger.to_state.attributes.target_temp_high | float(0) %}
-            {% set manual_cli = (low + high) / 2 %}
+            {% set current_low_cli = trigger.to_state.attributes.target_temp_low | float(0) %}
+            {% set current_high_cli = trigger.to_state.attributes.target_temp_high | float(0) %}
+            {% set is_dual_mode = true %}
           {% else %}
-            {% set manual_cli = 0 %}
+            {% set current_temp_cli = 0 %}
+            {% set is_dual_mode = false %}
           {% endif %}
 
-          {% set manual_c = ((manual_cli - 32) * 5/9) if climate_is_imperial else manual_cli %}
-          {% set predicted_c = t_adapt_c_guard %}
-          {{ (manual_c - predicted_c) | abs >= tol_c }}
+          {# Compare against what automation WOULD set (not what it predicted) #}
+          {# This prevents detecting our own changes as manual overrides #}
+          {% if is_dual_mode %}
+            {# For dual setpoint: check if current matches our target_low/high within tolerance #}
+            {% set low_diff = (current_low_cli - target_low_cli) | abs %}
+            {% set high_diff = (current_high_cli - target_high_cli) | abs %}
+            {% set is_automation_setpoint = (low_diff < tol_cli) and (high_diff < tol_cli) %}
+          {% else %}
+            {# For single setpoint: check if current matches our target within tolerance #}
+            {% set temp_diff = (current_temp_cli - t_adapt_cli_q) | abs %}
+            {% set is_automation_setpoint = temp_diff < tol_cli %}
+          {% endif %}
+          
+          {# It's a manual override if the setpoint does NOT match what automation would set #}
+          {{ not is_automation_setpoint }}
         {% endif %}
 
   - variables:
@@ -2284,6 +2266,12 @@ action:
               entity_id: !input climate_entity
             data:
               hvac_mode: "off"
+          # Run custom pause action
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ true }}"
+                sequence: !input pause_action
           - choose:
               - conditions:
                   - condition: template
@@ -2311,6 +2299,12 @@ action:
         sequence:
           - delay:
               seconds: "{{ pause_close_delay_eff }}"
+          # Run custom resume action
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ true }}"
+                sequence: !input resume_action
 
           # Safety-only branches: if HVAC is manually off but we are near freeze/overheat guards,
           # re-enable in heat-only / cool-only to hold safety minima/maxima.
@@ -2379,8 +2373,6 @@ action:
                       entity_id: !input climate_entity
                     data:
                       hvac_mode: "off"
-                  - variables:
-                      _nat_vent_active: true
                   - choose:
                       - conditions:
                           - condition: template
@@ -2390,6 +2382,7 @@ action:
                             data:
                               name: "HVAC Pro"
                               message: "Natural ventilation preferred; HVAC kept off."
+                  - stop: "Natural ventilation active - skipping HVAC control"
 
           # Otherwise enforce targets (only if values changed)
           - choose:
@@ -2397,17 +2390,17 @@ action:
                   - condition: template
                     value_template: "{{ supports_auto or supports_heat_cool }}"
                 sequence:
-                  # Set mode if needed
+                  # Set mode if needed (supports both heat_cool and auto modes)
                   - choose:
                       - conditions:
                           - condition: template
-                            value_template: "{{ hvac_mode_now != 'heat_cool' and mode_switch_allowed }}"
+                            value_template: "{{ not is_in_dual_mode and mode_switch_allowed and preferred_dual_mode != 'off' }}"
                         sequence:
                           - service: climate.set_hvac_mode
                             target:
                               entity_id: !input climate_entity
                             data:
-                              hvac_mode: "heat_cool"
+                              hvac_mode: "{{ preferred_dual_mode }}"
                           - choose:
                               - conditions:
                                   - condition: template
@@ -2416,15 +2409,15 @@ action:
                                   - service: logbook.log
                                     data:
                                       name: "HVAC Pro"
-                                      message: "Mode changed: {{ hvac_mode_now }} → heat_cool"
+                                      message: "Mode changed: {{ hvac_mode_now }} → {{ preferred_dual_mode }}"
                       - conditions:
                           - condition: template
-                            value_template: "{{ hvac_mode_now != 'heat_cool' and not mode_switch_allowed and dbg in ['basic','verbose'] }}"
+                            value_template: "{{ not is_in_dual_mode and not mode_switch_allowed and dbg in ['basic','verbose'] }}"
                         sequence:
                           - service: logbook.log
                             data:
                               name: "HVAC Pro"
-                              message: "Mode change to heat_cool blocked by cooldown ({{ cooldown_min }} min)."
+                              message: "Mode change to {{ preferred_dual_mode }} blocked by cooldown ({{ cooldown_min }} min)."
                   # Set temperature if needed
                   - choose:
                       - conditions:
@@ -2515,10 +2508,11 @@ action:
                               message: "Fan mode updated: {{ fan_now }} → {{ fan_target_mode }}"
           # Turn on climate when not explicitly in hvac_mode 'off',
           # or when safety guards are enabled and we are approaching guard thresholds (safety-first).
+          # Skip if natural ventilation is preferred.
           - choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ (hvac_mode_now != 'off' or safety_reenable_needed) and not _nat_vent_active }}"
+                    value_template: "{{ (hvac_mode_now != 'off' or safety_reenable_needed) and not nat_vent_would_activate }}"
                 sequence:
                   - service: climate.turn_on
                     target:

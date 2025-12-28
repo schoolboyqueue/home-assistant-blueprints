@@ -119,7 +119,9 @@ class BlueprintValidator:
         self.join_variables: set[str] = set()
         self.defined_inputs: set[str] = set()
         self.used_inputs: set[str] = set()
-        self.input_datetime_inputs: set[str] = set()  # inputs with input_datetime selector
+        self.input_datetime_inputs: set[str] = (
+            set()
+        )  # inputs with input_datetime selector
 
     def validate(self) -> bool:
         """Run all validation checks.
@@ -353,6 +355,9 @@ class BlueprintValidator:
                 # Check for bare boolean literals in templates
                 self._check_bare_boolean_literals(name, value)
 
+                # Check for math functions that need guards
+                self._check_math_function_safety(name, value)
+
             defined_vars.add(name)
 
         # Check for blueprint_version
@@ -373,13 +378,36 @@ class BlueprintValidator:
         # Find variable references in the template (excluding Jinja built-ins)
         # Pattern matches: {{ var_name or {{ var_name. or {{ var_name | etc.
         jinja_builtins = {
-            "true", "false", "none", "True", "False", "None",
-            "now", "utcnow", "as_timestamp", "states", "is_state",
-            "state_attr", "has_value", "expand", "device_entities",
-            "area_entities", "integration_entities", "device_attr",
-            "area_name", "area_id", "relative_time", "timedelta",
-            "strptime", "as_datetime", "as_local", "today_at",
-            "trigger", "this", "repeat", "context",
+            "true",
+            "false",
+            "none",
+            "True",
+            "False",
+            "None",
+            "now",
+            "utcnow",
+            "as_timestamp",
+            "states",
+            "is_state",
+            "state_attr",
+            "has_value",
+            "expand",
+            "device_entities",
+            "area_entities",
+            "integration_entities",
+            "device_attr",
+            "area_name",
+            "area_id",
+            "relative_time",
+            "timedelta",
+            "strptime",
+            "as_datetime",
+            "as_local",
+            "today_at",
+            "trigger",
+            "this",
+            "repeat",
+            "context",
         }
 
         # Look for variable references
@@ -477,6 +505,80 @@ class BlueprintValidator:
                         f"Use state_attr({dt_var}, 'timestamp') instead."
                     )
 
+    def _check_math_function_safety(self, var_name: str, value: str) -> None:
+        """Check for math functions that may fail without proper guards.
+
+        The log() function requires x > 0, and division requires non-zero denominators.
+        This check warns when these are used without apparent guards.
+
+        Args:
+            var_name: Name of the variable being checked.
+            value: The template string value.
+        """
+        # Check for log() usage - needs x > 0 guard
+        log_matches = re.findall(r"log\s*\(\s*(\w+)\s*\)", value)
+        for var in log_matches:
+            # Check if there's a guard like "if x > 0" or "x > 0.001" before the log
+            guard_pattern = rf"{re.escape(var)}\s*>\s*0|{re.escape(var)}\s*is\s+number"
+            if not re.search(guard_pattern, value):
+                self.warnings.append(
+                    f"Variable '{var_name}': log({var}) may fail if {var} <= 0. "
+                    f"Consider adding a guard like 'if {var} > 0' before the log() call."
+                )
+
+        # Check for division that might fail
+        # Only check inside {{ }} template blocks to avoid false positives in strings
+        template_blocks = re.findall(r"\{\{([^}]+)\}\}", value)
+        for block in template_blocks:
+            # Pattern: / followed by variable (not inside a string quote)
+            # This handles: / var, / (var), / (var - x)
+            div_matches = re.findall(r"/\s*\(?\s*([a-zA-Z_][a-zA-Z0-9_]*)", block)
+            for var in div_matches:
+                # Skip common safe names (constants, known-safe variables)
+                # cli_step: thermostat step size, always has non-zero default (0.5 or 1.0)
+                if var in ("pi", "e", "tau", "cli_step"):
+                    continue
+
+                # Check if variable is a local set from a guarded source
+                # Pattern: {% set var = source ... %} where source has is number check
+                local_set_pattern = rf"{{% set {re.escape(var)}\s*="
+                if re.search(local_set_pattern, value):
+                    # Local variable - check if the source expression is guarded
+                    # e.g., {% set Tk = t_in_c + 273.15 %} is safe if t_in_c is guarded
+                    set_match = re.search(
+                        rf"{{% set {re.escape(var)}\s*=\s*([^%]+)%}}", value
+                    )
+                    if set_match:
+                        source_expr = set_match.group(1)
+                        # Extract source variables from the set expression
+                        source_vars = re.findall(
+                            r"([a-zA-Z_][a-zA-Z0-9_]*)", source_expr
+                        )
+                        # Check if any source var is guarded
+                        all_guarded = all(
+                            re.search(rf"{re.escape(sv)}\s+is\s+number", value)
+                            for sv in source_vars
+                            if not sv.isdigit()
+                            and sv not in ("set", "if", "else", "endif")
+                        )
+                        if all_guarded:
+                            continue
+
+                # Check if there's a guard in the same block or value
+                guard_pattern = (
+                    rf"\({re.escape(var)}[^)]*\)\s*>\s*0|"
+                    rf"{re.escape(var)}\s*>\s*0|"
+                    rf"{re.escape(var)}\s+is\s+number|"
+                    rf"{re.escape(var)}\s*<=\s*0"  # Early return pattern
+                )
+                if not re.search(guard_pattern, value):
+                    # Only warn if it looks like a variable, not a function call
+                    if not re.search(rf"{re.escape(var)}\s*\(", block):
+                        self.warnings.append(
+                            f"Variable '{var_name}': Division by '{var}' may fail if it's "
+                            f"zero, none, or not a number. Consider adding guards."
+                        )
+
     def _check_bare_boolean_literals(self, var_name: str, value: str) -> None:
         """Check for bare boolean literals in Jinja2 templates.
 
@@ -515,7 +617,9 @@ class BlueprintValidator:
 
             # Count block opens and closes on this line
             open_blocks = len(re.findall(r"\{%\s*(?:if|for|macro|call|filter)\b", line))
-            close_blocks = len(re.findall(r"\{%\s*(?:endif|endfor|endmacro|endcall|endfilter)\b", line))
+            close_blocks = len(
+                re.findall(r"\{%\s*(?:endif|endfor|endmacro|endcall|endfilter)\b", line)
+            )
 
             # Update depth based on what we see
             # Process closes first (for lines like {% endif %}{% if %})
@@ -548,7 +652,7 @@ class BlueprintValidator:
                 continue
 
             # Check if there's a {{ before and no matching }} on this line (inside expression)
-            line_before = line[:line.find(stripped)] if stripped in line else ""
+            line_before = line[: line.find(stripped)] if stripped in line else ""
             if "{{" in line_before and "}}" not in line_before:
                 continue
 
@@ -558,19 +662,17 @@ class BlueprintValidator:
                 self.warnings.append(
                     f"Variable '{var_name}': Bare 'true' outputs STRING \"true\", "
                     f"not boolean. Use '{{{{ true }}}}' to output actual boolean. "
-                    f"(String \"false\" is truthy, causing subtle bugs in conditionals.)"
+                    f'(String "false" is truthy, causing subtle bugs in conditionals.)'
                 )
             elif stripped == "false" and not found_bare_false:
                 found_bare_false = True
                 self.warnings.append(
                     f"Variable '{var_name}': Bare 'false' outputs STRING \"false\", "
-                    f"not boolean. The string \"false\" is TRUTHY (non-empty), so "
+                    f'not boolean. The string "false" is TRUTHY (non-empty), so '
                     f"'{{% if var %}}' passes unexpectedly. Use '{{{{ false }}}}' instead."
                 )
 
-    def _validate_action_variables(
-        self, variables: dict[str, Any], path: str
-    ) -> None:
+    def _validate_action_variables(self, variables: dict[str, Any], path: str) -> None:
         """Validate inline variables defined within action blocks.
 
         Args:
