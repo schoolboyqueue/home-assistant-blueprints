@@ -16,6 +16,7 @@ This script performs comprehensive validation of Home Assistant blueprint files:
 12. Choose/sequence validation
 13. Bare boolean literal detection (true/false outputting strings instead of booleans)
 14. Entity ID boolean context detection (unreliable string truthiness in conditions)
+15. Python-style list method detection (e.g., [a,b].min() should be [a,b] | min)
 
 Usage:
     python3 validate-blueprint.py <blueprint.yaml>
@@ -1440,6 +1441,23 @@ class BlueprintValidator:
                 self.warnings.append(
                     f"Possible use of unsupported function/filter matching "
                     f"pattern: {pattern}"
+                )
+
+        # Check for Python-style list methods that don't work in Jinja2
+        # e.g., [a, b].min() should be [a, b] | min
+        python_list_methods = [
+            (r"\[[^\]]+\]\.min\s*\(", ".min()", "| min"),
+            (r"\[[^\]]+\]\.max\s*\(", ".max()", "| max"),
+            (r"\[[^\]]+\]\.sort\s*\(", ".sort()", "| sort"),
+            (r"\[[^\]]+\]\.append\s*\(", ".append()", "cannot modify lists in Jinja2"),
+            (r"\[[^\]]+\]\.extend\s*\(", ".extend()", "cannot modify lists in Jinja2"),
+        ]
+
+        for pattern, method, fix in python_list_methods:
+            if re.search(pattern, content):
+                self.errors.append(
+                    f"Python-style list method '{method}' does not work in Jinja2. "
+                    f"Use '{fix}' instead."
                 )
 
     def _check_entity_id_value(self, value: Any, path: str) -> None:
