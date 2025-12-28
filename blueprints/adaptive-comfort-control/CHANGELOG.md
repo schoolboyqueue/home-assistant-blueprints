@@ -1,3 +1,9 @@
+## [4.21.2] — 2025-12-28
+
+### Fixed
+
+- **Manual override helper condition failing**: Fixed entity ID variable truthiness checks that were causing the override helper update condition to evaluate as `false` even when all inputs were correctly configured. Replaced unreliable `and entity_var` patterns with explicit `(entity_var | string | length > 0)` checks for consistent boolean evaluation.
+
 ## [4.21.1] — 2025-12-28
 
 ### Fixed
