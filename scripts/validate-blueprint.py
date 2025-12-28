@@ -334,6 +334,21 @@ class BlueprintValidator:
         defined_vars: set[str] = set()
         var_order = list(variables.keys())
 
+        # Pre-pass: collect variables that have non-zero defaults
+        # These are safe to divide by even when used in other variables
+        self.nonzero_default_vars: set[str] = set()
+        for name, value in variables.items():
+            if isinstance(value, str):
+                # Pattern: | float(X) or | int(X) where X > 0
+                # This catches: state_attr(...) | float(1.0) or | float(0.5)
+                default_match = re.search(
+                    r"\|\s*(?:float|int)\s*\(\s*(\d+\.?\d*)", value
+                )
+                if default_match:
+                    default_val = float(default_match.group(1))
+                    if default_val > 0:
+                        self.nonzero_default_vars.add(name)
+
         # Record variables that appear to build comma-joined strings
         for name, value in variables.items():
             if isinstance(value, str):
@@ -534,10 +549,15 @@ class BlueprintValidator:
             # This handles: / var, / (var), / (var - x)
             div_matches = re.findall(r"/\s*\(?\s*([a-zA-Z_][a-zA-Z0-9_]*)", block)
             for var in div_matches:
-                # Skip common safe names (constants, known-safe variables)
-                # cli_step: thermostat step size, always has non-zero default (0.5 or 1.0)
-                # denom: commonly used for denominators that are computed as (1 + x)
-                if var in ("pi", "e", "tau", "cli_step", "denom"):
+                # Skip mathematical constants (always non-zero)
+                if var in ("pi", "e", "tau"):
+                    continue
+
+                # Skip variables that were identified as having non-zero defaults
+                if (
+                    hasattr(self, "nonzero_default_vars")
+                    and var in self.nonzero_default_vars
+                ):
                     continue
 
                 # Check if variable is a local set from a guarded source
@@ -551,6 +571,12 @@ class BlueprintValidator:
                     )
                     if set_match:
                         source_expr = set_match.group(1)
+                        # Check if the expression is of the form (1 + x) or (constant + x)
+                        # These are always non-zero when x >= 0
+                        if re.match(r"^\s*\d+\s*\+", source_expr) or re.match(
+                            r"^\s*\d+\.\d+\s*\+", source_expr
+                        ):
+                            continue
                         # Extract source variables from the set expression
                         source_vars = re.findall(
                             r"([a-zA-Z_][a-zA-Z0-9_]*)", source_expr
@@ -564,6 +590,17 @@ class BlueprintValidator:
                         )
                         if all_guarded:
                             continue
+
+                # Check if variable has a non-zero default via | float(X) or | int(X)
+                # Pattern: var | float(0.5) or var | int(1) where X > 0
+                default_pattern = (
+                    rf"{re.escape(var)}\s*\|\s*(?:float|int)\s*\(\s*(\d+\.?\d*)"
+                )
+                default_match = re.search(default_pattern, value)
+                if default_match:
+                    default_val = float(default_match.group(1))
+                    if default_val > 0:
+                        continue
 
                 # Check if there's a guard in the same block or value
                 guard_pattern = (
