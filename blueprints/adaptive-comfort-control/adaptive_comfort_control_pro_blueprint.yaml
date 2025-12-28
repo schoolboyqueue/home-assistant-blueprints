@@ -1,5 +1,5 @@
 blueprint:
-    name: "Adaptive Comfort Control Pro v4.21.0"
+    name: "Adaptive Comfort Control Pro v4.21.1"
     description: >
         Adaptive comfort control + HVAC pause with unit awareness (°C/°F), seasonal bias,
         built-in psychrometrics (dew point, absolute humidity, enthalpy), optional RMOT,
@@ -918,7 +918,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.21.0"
+    blueprint_version: "4.21.1"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
@@ -2119,23 +2119,27 @@ action:
             value_template: "{{ _manual_change_detected }}"
         sequence:
           # Calculate learned offset adjustment
+          # NOTE: All calculations done in single Jinja2 blocks to avoid string concatenation bugs
           - variables:
               _manual_temp_cli: >
                 {% if trigger.id == 'climate_manual_change' %}
                   {{ trigger.to_state.attributes.temperature | float(0) }}
                 {% elif trigger.id == 'climate_manual_change_low' or trigger.id == 'climate_manual_change_high' %}
-                  {# For dual setpoint, use midpoint #}
                   {% set low = trigger.to_state.attributes.target_temp_low | float(0) %}
                   {% set high = trigger.to_state.attributes.target_temp_high | float(0) %}
                   {{ (low + high) / 2 }}
                 {% else %}0{% endif %}
-              _manual_temp_c: "{{ (_manual_temp_cli - 32) * 5/9 if climate_is_imperial else _manual_temp_cli }}"
+              _manual_temp_c: "{{ ((_manual_temp_cli | float) - 32) * 5/9 if climate_is_imperial else (_manual_temp_cli | float) }}"
               _predicted_temp_c: "{{ t_adapt_c_guard }}"
-              _error_c: "{{ _manual_temp_c - _predicted_temp_c }}"
+              _error_c: "{{ (_manual_temp_c | float) - (_predicted_temp_c | float) }}"
               _old_offset_c: "{{ learned_offset_c }}"
               _alpha: "{{ learning_rate | float(0.15) }}"
-              _new_offset_c: "{{ (1 - _alpha) * _old_offset_c + _alpha * _error_c }}"
-              _new_offset_sys: "{{ _new_offset_c * 9/5 if is_imperial else _new_offset_c }}"
+              _new_offset_c: >
+                {% set alpha = learning_rate | float(0.15) %}
+                {% set old_offset = learned_offset_c | float(0) %}
+                {% set error = (_manual_temp_c | float(0)) - (t_adapt_c_guard | float(0)) %}
+                {{ ((1 - alpha) * old_offset + alpha * error) | round(4) }}
+              _new_offset_sys: "{{ (_new_offset_c | float) * 9/5 if is_imperial else (_new_offset_c | float) }}"
 
           # Update learned offset if learning enabled and helper provided
           - choose:
@@ -2160,14 +2164,24 @@ action:
                     value_template: "{{ manual_override_enable and (manual_override_duration_min | int(0) > 0) and manual_override_until_id }}"
                 sequence:
                   - variables:
-                      _now_ts: "{{ as_timestamp(now()) | float(0) }}"
-                      _duration_sec: "{{ manual_override_duration_min | int(60) * 60 }}"
-                      _until_ts: "{{ (_now_ts + _duration_sec) | int }}"
+                      _override_until_ts: >
+                        {% set now_ts = as_timestamp(now()) %}
+                        {% set duration_sec = (manual_override_duration_min | int(60)) * 60 %}
+                        {{ (now_ts + duration_sec) | int }}
                   - service: input_datetime.set_datetime
                     target:
                       entity_id: "{{ manual_override_until_id }}"
                     data:
-                      timestamp: "{{ _until_ts }}"
+                      timestamp: "{{ _override_until_ts | int }}"
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ dbg in ['basic','verbose'] }}"
+                        sequence:
+                          - service: logbook.log
+                            data:
+                              name: "HVAC Pro"
+                              message: "DEBUG: Set override helper {{ manual_override_until_id }} to timestamp {{ _override_until_ts }} ({{ _override_until_ts | timestamp_custom('%Y-%m-%d %H:%M:%S') }})"
 
           # Log override
           - choose:
@@ -2201,6 +2215,20 @@ action:
                   - stop: "Manual override active - stopping automation"
 
   # ---------- Check if override is still active (persists across restarts) ----------
+  # Debug: log override check details when verbose
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ dbg == 'verbose' and manual_override_enable and manual_override_until_id }}"
+        sequence:
+          - service: logbook.log
+            data:
+              name: "HVAC Pro"
+              message: >
+                DEBUG override check: helper={{ manual_override_until_id }}, 
+                until_ts={{ state_attr(manual_override_until_id, 'timestamp') }}, 
+                now_ts={{ as_timestamp(now()) | int }}, 
+                is_active={{ is_override_active }}
   - choose:
       - conditions:
           - condition: template

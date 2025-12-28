@@ -1,5 +1,13 @@
 # Bathroom Light & Fan Control Pro - Changelog
 
+## [1.10.10] - 2025-12-28
+
+### Fixed
+
+- **Timestamp arithmetic bug**: Fixed manual override and ROR latch timestamp calculations. Variables defined in action blocks become strings, so `_now_ts + _duration_sec` performed string concatenation instead of addition. Consolidated calculations into single Jinja2 blocks to ensure proper numeric arithmetic.
+
+---
+
 ## [1.10.9] - 2025-12-27
 
 ### Fixed

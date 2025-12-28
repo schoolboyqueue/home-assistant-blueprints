@@ -1,5 +1,5 @@
 blueprint:
-  name: "Bathroom Light Fan Control Pro v1.10.9"
+  name: "Bathroom Light Fan Control Pro v1.10.10"
   description: >-
     Smart bathroom controller for lights and exhaust fan.
     Lights: Turns on from motion or door activity (Wasp-in-a-Box), respects presence and optional lux threshold, supports Night Mode (dim and color temperature), and shuts off after vacancy with a grace period. Includes a manual-off override window to prevent auto-on.
@@ -424,7 +424,7 @@ variables:
   ror_min_on_time_min: !input ror_min_on_time_min
   ror_latch_until: !input ror_latch_until
   light_area: !input light_area
-  blueprint_version: "1.10.9"
+  blueprint_version: "1.10.10"
   area_set: >-
     {{ light_area is not none and (light_area|string) != '' }}
 
@@ -1023,13 +1023,14 @@ action:
                 value_template: "{{ manual_override_until not in ['', None] }}"
             then:
               - variables:
-                  _now_ts: "{{ as_timestamp(now()) }}"
-                  _duration_sec: "{{ manual_override_duration_min | int(0) * 60 }}"
-                  _until_ts: "{{ (_now_ts | float(0) + _duration_sec) | int }}"
+                  _until_ts: >
+                    {% set now_ts = as_timestamp(now()) %}
+                    {% set duration_sec = (manual_override_duration_min | int(0)) * 60 %}
+                    {{ (now_ts + duration_sec) | int }}
               - service: input_datetime.set_datetime
                 data:
                   entity_id: "{{ manual_override_until }}"
-                  timestamp: "{{ _until_ts }}"
+                  timestamp: "{{ _until_ts | int }}"
               - choose:
                   - conditions: "{{ debug_level in ['basic','verbose'] }}"
                     sequence:
@@ -1081,13 +1082,14 @@ action:
               - conditions: "{{ _ror_triggered and (ror_min_on_time_min|int(0) > 0) and (ror_latch_until not in ['', None]) }}"
                 sequence:
                   - variables:
-                      _now_ts: "{{ as_timestamp(now()) | float(0) }}"
-                      _latch_duration_sec: "{{ ror_min_on_time_min|int(0) * 60 }}"
-                      _latch_until_ts: "{{ (_now_ts + _latch_duration_sec) | int }}"
+                      _latch_until_ts: >
+                        {% set now_ts = as_timestamp(now()) %}
+                        {% set latch_duration_sec = (ror_min_on_time_min | int(0)) * 60 %}
+                        {{ (now_ts + latch_duration_sec) | int }}
                   - service: input_datetime.set_datetime
                     data:
                       entity_id: "{{ ror_latch_until }}"
-                      timestamp: "{{ _latch_until_ts }}"
+                      timestamp: "{{ _latch_until_ts | int }}"
                   - choose:
                       - conditions: "{{ debug_level in ['basic','verbose'] }}"
                         sequence:

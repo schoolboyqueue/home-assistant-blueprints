@@ -711,6 +711,75 @@ class BlueprintValidator:
                     f"'{{% if var %}}' passes unexpectedly. Use '{{{{ false }}}}' instead."
                 )
 
+    def _check_cross_variable_arithmetic(
+        self, variables: dict[str, Any], path: str
+    ) -> None:
+        """Check for ADDITION between action-block variables (string concatenation bug).
+
+        When variables are defined in an action block like:
+            - variables:
+                _now_ts: "{{ as_timestamp(now()) | float(0) }}"
+                _duration_sec: "{{ x | int(60) * 60 }}"
+                _until_ts: "{{ (_now_ts + _duration_sec) | int }}"
+
+        The values of _now_ts and _duration_sec are STRINGS when used in the
+        third variable's template. So `_now_ts + _duration_sec` performs string
+        concatenation instead of addition: "1735423328" + "1800" = "17354233281800"
+
+        NOTE: Only the + operator is affected. Jinja2's -, *, / operators coerce
+        strings to numbers, so subtraction/multiplication/division work correctly.
+        The + operator is overloaded for both addition and string concatenation.
+
+        The fix is to compute all values in a single Jinja2 block:
+            _until_ts: >
+              {% set now_ts = as_timestamp(now()) %}
+              {% set duration = x | int(60) * 60 %}
+              {{ (now_ts + duration) | int }}
+
+        Args:
+            variables: Dictionary of variable definitions in this action block.
+            path: Current path for error messages.
+        """
+        var_names = set(variables.keys())
+
+        for name, value in variables.items():
+            if not isinstance(value, str):
+                continue
+
+            # Look for ADDITION operations (+) involving other variables
+            # from this same variables block. Only + is affected because it's
+            # overloaded for string concatenation. -, *, / coerce to numbers.
+            for other_var in var_names:
+                if other_var == name:
+                    continue
+
+                # Pattern: other_var + something, or something + other_var
+                # Must be + specifically, not -, *, /
+                # Examples: (_now_ts + _duration_sec), _now_ts + 60
+                addition_pattern = (
+                    rf"\b{re.escape(other_var)}\s*\+|"
+                    rf"\+\s*{re.escape(other_var)}\b|"
+                    rf"\+\s*\({re.escape(other_var)}|"
+                    rf"{re.escape(other_var)}\)\s*\+"
+                )
+
+                if re.search(addition_pattern, value):
+                    # Check if other_var is defined as a simple template (likely numeric)
+                    other_value = variables.get(other_var, "")
+                    if isinstance(other_value, str) and "{{" in other_value:
+                        # This looks like cross-variable addition
+                        self.errors.append(
+                            f"{path}.{name}: Uses '+' with '{other_var}' which is "
+                            f"defined earlier in the same variables block. In action-block "
+                            f"variables, each value becomes a STRING, so '{other_var} + x' "
+                            f"performs string concatenation, not addition. "
+                            f"Fix: compute all values in a single Jinja2 block using "
+                            f"{{% set %}} statements, or use '| float' on the variable: "
+                            f"'({other_var} | float) + x'."
+                        )
+                        # Only report once per variable
+                        break
+
     def _validate_action_variables(self, variables: dict[str, Any], path: str) -> None:
         """Validate inline variables defined within action blocks.
 
@@ -718,6 +787,9 @@ class BlueprintValidator:
             variables: Dictionary of variable definitions.
             path: Current path for error messages.
         """
+        # Check for cross-variable arithmetic (string concatenation bug)
+        self._check_cross_variable_arithmetic(variables, path)
+
         for name, value in variables.items():
             if isinstance(value, str):
                 # Check for direct attribute access on state objects

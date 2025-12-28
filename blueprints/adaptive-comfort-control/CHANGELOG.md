@@ -1,3 +1,10 @@
+## [4.21.1] — 2025-12-28
+
+### Fixed
+
+- **Manual override helper not updating**: Fixed timestamp arithmetic in the override expiry calculation. The variables `_now_ts` and `_duration_sec` were being treated as strings, causing string concatenation instead of numeric addition. Now computes the timestamp correctly within a single Jinja2 block with proper numeric types.
+- **Added debug logging for override checks**: When debug level is `verbose`, now logs the override helper state, timestamps, and computed `is_override_active` value on each automation run to help diagnose override persistence issues.
+
 ## [4.21.0] — 2025-12-28
 
 ### Added

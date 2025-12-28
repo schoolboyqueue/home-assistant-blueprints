@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.6 - 2025-12-28
+
+### Fixed
+
+- **Brightness calculation bug**: Fixed hold-to-brighten/dim brightness calculations. When calculating `target_brightness`, the template referenced `current_brightness` from the same action variables block, which is a string. The `+` operator on strings performs concatenation, not addition. Now computes brightness directly in the template using `state_attr()` to ensure proper numeric arithmetic.
+
 ## 1.9.5 - 2025-12-27
 
 ### Fixed
