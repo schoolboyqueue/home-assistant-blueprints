@@ -398,7 +398,7 @@ class BlueprintValidator:
             var_order: Ordered list of all variable names.
         """
         # Find variable references in the template (excluding Jinja built-ins)
-        # Pattern matches: {{ var_name or {{ var_name. or {{ var_name | etc.
+        # Pattern matches references in both {{ }} expressions and {% %} control blocks
         jinja_builtins = {
             "true",
             "false",
@@ -430,6 +430,34 @@ class BlueprintValidator:
             "this",
             "repeat",
             "context",
+            # Common Jinja2 control keywords
+            "set",
+            "if",
+            "else",
+            "elif",
+            "endif",
+            "for",
+            "endfor",
+            "in",
+            "not",
+            "and",
+            "or",
+            "is",
+            "defined",
+            "undefined",
+            "number",
+            "string",
+            "mapping",
+            "iterable",
+            "int",
+            "float",
+            "round",
+            "abs",
+            "default",
+            "length",
+            "log",
+            "min",
+            "max",
         }
 
         # Look for variable references
@@ -440,10 +468,36 @@ class BlueprintValidator:
                 continue
 
             # Check if this variable references another variable
-            # Match patterns like: {{ other_var, {{ other_var., {{ other_var |, etc.
-            pattern = rf"\{{\{{\s*{re.escape(other_var)}(?:\s|[|.\[\]()}}])"
+            # Match patterns in both {{ }} and {% %} blocks:
+            # - {{ other_var }} or {{ other_var | filter }}
+            # - {% set x = other_var %} or {% if other_var %}
+            # Use word boundary \b to avoid partial matches
+            pattern = rf"\b{re.escape(other_var)}\b"
             if re.search(pattern, value):
-                if other_var not in defined_vars:
+                # Verify it's actually inside a Jinja block ({{ }} or {% %})
+                # by checking if it appears after {{ or {% and before }} or %}
+                in_jinja_block = False
+                for match in re.finditer(pattern, value):
+                    pos = match.start()
+                    # Look backwards for {{ or {%
+                    before = value[:pos]
+                    # Find the last Jinja opener
+                    last_expr_open = before.rfind("{{")
+                    last_ctrl_open = before.rfind("{%")
+                    last_open = max(last_expr_open, last_ctrl_open)
+
+                    if last_open == -1:
+                        continue
+
+                    # Check if there's a closer between the opener and our match
+                    between = value[last_open:pos]
+                    if "}}" in between or "%}" in between:
+                        continue  # The opener was already closed
+
+                    in_jinja_block = True
+                    break
+
+                if in_jinja_block and other_var not in defined_vars:
                     self.errors.append(
                         f"Variable '{var_name}' references '{other_var}' which is "
                         f"defined later in the variables section. Variables are "
