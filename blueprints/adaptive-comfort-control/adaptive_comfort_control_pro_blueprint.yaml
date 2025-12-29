@@ -1058,10 +1058,13 @@ variables:
         {% else %}{{ {} }}{% endif %}
     
     # Determine if it's currently "night" using the sleep schedule
+    # Self-contained calculation (doesn't depend on variables defined later)
     _is_night_now: >
-        {% set nowm = _now_m | int(0) %}
-        {% set s = _st_m | int(1320) %}
-        {% set e = _en_m | int(420) %}
+        {% set nowm = now().hour * 60 + now().minute %}
+        {% set st_parts = (sleep_start_str.split(':') if (sleep_start_str and ':' in sleep_start_str) else ['22','0']) %}
+        {% set en_parts = (sleep_end_str.split(':') if (sleep_end_str and ':' in sleep_end_str) else ['7','0']) %}
+        {% set s = (st_parts[0] | int(22)) * 60 + (st_parts[1] | int(0)) %}
+        {% set e = (en_parts[0] | int(7)) * 60 + (en_parts[1] | int(0)) %}
         {% if s <= e %}{{ (nowm >= s) and (nowm < e) }}
         {% else %}{{ (nowm >= s) or (nowm < e) }}{% endif %}
     
