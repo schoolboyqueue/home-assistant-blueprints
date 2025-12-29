@@ -1,5 +1,5 @@
 blueprint:
-    name: "Adaptive Comfort Control Pro v4.21.2"
+    name: "Adaptive Comfort Control Pro v4.22.0"
     description: >
         Adaptive comfort control + HVAC pause with unit awareness (°C/°F), seasonal bias,
         built-in psychrometrics (dew point, absolute humidity, enthalpy), optional RMOT,
@@ -563,13 +563,13 @@ blueprint:
                             max: 0.5
                             step: 0.05
 
-                learned_offset_helper:
-                    name: "Learned Offset Storage (input_number helper)"
-                    description: "Create an input_number helper to store learned preferences. IMPORTANT: set its minimum below 0 (e.g., -10) and maximum above 0 so both warmer and cooler manual changes can be learned. Leave empty to disable learning persistence."
+                learned_prefs_sensor:
+                    name: "Learned Preferences Sensor (trigger-based template sensor)"
+                    description: "A trigger-based template sensor that stores learned preferences as JSON. See LEARNING_SETUP.md for setup instructions. This enables time-of-day aware learning with separate heat/cool offsets for day and night. Leave empty to disable learning persistence."
                     default: ""
                     selector:
                         entity:
-                            domain: ["input_number"]
+                            domain: ["sensor"]
                             multiple: false
 
                 manual_override_until:
@@ -918,7 +918,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.21.2"
+    blueprint_version: "4.22.0"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
@@ -987,7 +987,7 @@ variables:
     manual_override_tolerance: !input manual_override_tolerance
     learn_from_overrides: !input learn_from_overrides
     learning_rate: !input learning_rate
-    _raw_learned_offset_helper: !input learned_offset_helper
+    _raw_learned_prefs_sensor: !input learned_prefs_sensor
     _raw_manual_override_until: !input manual_override_until
 
     # --------- Unit inference ---------
@@ -1043,17 +1043,43 @@ variables:
         {% set v = (e | default('', true) | string | lower) %}
         {{ e if v not in ['', 'none', 'binary_sensor.none', 'input_boolean.none'] else '' }}
 
-    learned_offset_helper_id: >
-        {% set raw = _raw_learned_offset_helper %}
+    learned_prefs_sensor_id: >
+        {% set raw = _raw_learned_prefs_sensor %}
         {% set e = raw if raw is string else (raw[0] if (raw is iterable and raw|length > 0) else '') %}
         {% set v = (e | default('', true) | string | lower) %}
-        {{ e if v not in ['', 'none', 'input_number.none'] else '' }}
+        {{ e if v not in ['', 'none', 'sensor.none'] else '' }}
 
-    # Read current learned offset (in system units, will be converted to C)
+    # Read learned preferences from trigger-based template sensor
+    # The sensor stores 4 offsets: heat_day, heat_night, cool_day, cool_night (in system units)
+    # We determine which to use based on current time (day/night) - heating/cooling is determined at learning time
+    _learned_prefs_vars: >
+        {% if learned_prefs_sensor_id %}
+          {{ (state_attr(learned_prefs_sensor_id, 'variables') or {}) }}
+        {% else %}{{ {} }}{% endif %}
+    
+    # Determine if it's currently "night" using the sleep schedule
+    _is_night_now: >
+        {% set nowm = _now_m | int(0) %}
+        {% set s = _st_m | int(1320) %}
+        {% set e = _en_m | int(420) %}
+        {% if s <= e %}{{ (nowm >= s) and (nowm < e) }}
+        {% else %}{{ (nowm >= s) or (nowm < e) }}{% endif %}
+    
+    # Read the 4 learned offsets (stored in system units)
+    learned_heat_day_sys: "{{ _learned_prefs_vars.get('heat_day', 0) | float(0) }}"
+    learned_heat_night_sys: "{{ _learned_prefs_vars.get('heat_night', 0) | float(0) }}"
+    learned_cool_day_sys: "{{ _learned_prefs_vars.get('cool_day', 0) | float(0) }}"
+    learned_cool_night_sys: "{{ _learned_prefs_vars.get('cool_night', 0) | float(0) }}"
+    
+    # Select the appropriate offset for current time of day (heating vs cooling determined by mode/trigger)
+    # For the adaptive target calculation, we use an average of heat and cool offsets for the current time period
+    # This provides a balanced target; the specific heat/cool offsets are used in the learning update
     learned_offset_sys: >
-        {% if learned_offset_helper_id %}
-          {{ states(learned_offset_helper_id) | float(0) }}
-        {% else %}0{% endif %}
+        {% if _is_night_now %}
+          {{ ((learned_heat_night_sys | float(0)) + (learned_cool_night_sys | float(0))) / 2 }}
+        {% else %}
+          {{ ((learned_heat_day_sys | float(0)) + (learned_cool_day_sys | float(0))) / 2 }}
+        {% endif %}
     learned_offset_c: "{{ (learned_offset_sys * 5/9) if is_imperial else learned_offset_sys }}"
 
     # Manual override helper parsing
@@ -1659,8 +1685,12 @@ variables:
                + velocity_offset_c) | round(2) }}
         {% endif %}
     t_adapt_c: "{{ (t_adapt_c_raw) | round(2) }}"
-    # Guard: keep adaptive target within [min_c+tol+setback, max_c-tol-setback] so band doesn't collapse to the edges
-    t_adapt_c_guard: "{{ [ [ t_adapt_c, (max_c - tol_c - setback_apply_c) ] | min , (min_c + tol_c + setback_apply_c) ] | max | round(2) }}"
+    # Guard: keep adaptive target within user's comfort range [min_c, max_c]
+    # Note: The band calculations (band_min_c, band_max_c) handle the tolerance/setback offsets
+    # and their own clamping, so we don't need to pre-constrain t_adapt_c_guard by tol_c here.
+    # This allows heating setpoints to vary across the full [min_c, t_adapt_c_guard] range
+    # instead of always collapsing to min_c when the adaptive target is near the minimum.
+    t_adapt_c_guard: "{{ [ [ t_adapt_c, max_c ] | min , min_c ] | max | round(2) }}"
     band_min_c: "{{ [ [ t_adapt_c_guard - tol_c - setback_apply_c, min_c ] | max, max_c ] | min | round(2) }}"
     band_max_c: "{{ [ [ t_adapt_c_guard + tol_c + setback_apply_c, max_c ] | min, min_c ] | max | round(2) }}"
     # --- Final clamp with built-in ordering (no separate "sane" step needed) ---
@@ -2121,40 +2151,77 @@ action:
           # Calculate learned offset adjustment
           # NOTE: All calculations done in single Jinja2 blocks to avoid string concatenation bugs
           - variables:
+              # For auto/heat_cool mode: compare the changed setpoint against what automation would set
+              # For single setpoint mode: compare temperature against adaptive target
+              # This ensures learning correctly interprets "I want it warmer" vs "I want it cooler"
               _manual_temp_cli: >
                 {% if trigger.id == 'climate_manual_change' %}
                   {{ trigger.to_state.attributes.temperature | float(0) }}
-                {% elif trigger.id == 'climate_manual_change_low' or trigger.id == 'climate_manual_change_high' %}
-                  {% set low = trigger.to_state.attributes.target_temp_low | float(0) %}
-                  {% set high = trigger.to_state.attributes.target_temp_high | float(0) %}
-                  {{ (low + high) / 2 }}
+                {% elif trigger.id == 'climate_manual_change_low' %}
+                  {# User adjusted heating setpoint - compare against our target_low #}
+                  {{ trigger.to_state.attributes.target_temp_low | float(0) }}
+                {% elif trigger.id == 'climate_manual_change_high' %}
+                  {# User adjusted cooling setpoint - compare against our target_high #}
+                  {{ trigger.to_state.attributes.target_temp_high | float(0) }}
                 {% else %}0{% endif %}
+              _predicted_temp_cli: >
+                {% if trigger.id == 'climate_manual_change' %}
+                  {{ t_adapt_cli_q }}
+                {% elif trigger.id == 'climate_manual_change_low' %}
+                  {# Compare against what we would have set for heating #}
+                  {{ target_low_cli }}
+                {% elif trigger.id == 'climate_manual_change_high' %}
+                  {# Compare against what we would have set for cooling #}
+                  {{ target_high_cli }}
+                {% else %}{{ t_adapt_cli_q }}{% endif %}
               _manual_temp_c: "{{ ((_manual_temp_cli | float) - 32) * 5/9 if climate_is_imperial else (_manual_temp_cli | float) }}"
-              _predicted_temp_c: "{{ t_adapt_c_guard }}"
+              _predicted_temp_c: "{{ ((_predicted_temp_cli | float) - 32) * 5/9 if climate_is_imperial else (_predicted_temp_cli | float) }}"
               _error_c: "{{ (_manual_temp_c | float) - (_predicted_temp_c | float) }}"
-              _old_offset_c: "{{ learned_offset_c }}"
+              
+              # Determine which offset key to update based on:
+              # 1. Heat vs Cool: trigger.id tells us (climate_manual_change_low = heat, _high = cool)
+              #    For single setpoint mode, use current HVAC mode
+              # 2. Day vs Night: use _is_night_now
+              _is_heat_adjustment: >
+                {% if trigger.id == 'climate_manual_change_low' %}
+                  {{ true }}
+                {% elif trigger.id == 'climate_manual_change_high' %}
+                  {{ false }}
+                {% else %}
+                  {# Single setpoint mode - check HVAC mode #}
+                  {{ hvac_mode_now == 'heat' }}
+                {% endif %}
+              _offset_key: >
+                {% set mode = 'heat' if _is_heat_adjustment else 'cool' %}
+                {% set time = 'night' if _is_night_now else 'day' %}
+                {{ mode ~ '_' ~ time }}
+              
+              # Get the current offset for this specific key
+              _old_offset_sys: "{{ _learned_prefs_vars.get(_offset_key, 0) | float(0) }}"
+              _old_offset_c: "{{ (_old_offset_sys * 5/9) if is_imperial else _old_offset_sys }}"
+              
               _alpha: "{{ learning_rate | float(0.15) }}"
               _new_offset_c: >
                 {% set alpha = learning_rate | float(0.15) %}
-                {% set old_offset = learned_offset_c | float(0) %}
-                {% set error = (_manual_temp_c | float(0)) - (t_adapt_c_guard | float(0)) %}
+                {% set old_offset = _old_offset_c | float(0) %}
+                {% set error = (_manual_temp_c | float(0)) - (_predicted_temp_c | float(0)) %}
                 {{ ((1 - alpha) * old_offset + alpha * error) | round(4) }}
               _new_offset_sys: "{{ (_new_offset_c | float) * 9/5 if is_imperial else (_new_offset_c | float) }}"
 
-          # Update learned offset if learning enabled and helper provided
+          # Update learned offset if learning enabled and sensor is configured
+          # Uses event-based storage via trigger-based template sensor
           - choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ (learn_from_overrides | bool) and (learned_offset_helper_id | string | length > 0) }}"
+                    value_template: "{{ (learn_from_overrides | bool) and (learned_prefs_sensor_id | string | length > 0) }}"
                 sequence:
                   - service: logbook.log
                     data:
                       name: "HVAC Pro"
-                      message: "DEBUG: writing learned offset helper {{ learned_offset_helper_id }} = {{ _new_offset_sys | round(2) }}"
-                  - service: input_number.set_value
-                    target:
-                      entity_id: "{{ learned_offset_helper_id }}"
-                    data:
+                      message: "Learning: {{ _offset_key }} {{ _old_offset_sys | round(2) }} → {{ _new_offset_sys | round(2) }}{{ unit_sym }} (error={{ _error_c | round(2) }}°C)"
+                  - event: set_variable
+                    event_data:
+                      key: "{{ _offset_key }}"
                       value: "{{ _new_offset_sys | round(2) }}"
 
           # Set override expiry timestamp if helper is configured and override duration > 0
@@ -2194,8 +2261,8 @@ action:
                       name: "HVAC Pro"
                       message: >
                         Manual override detected ({{ trigger.id }}). Manual={{ _manual_temp_c | round(1) }}°C, Predicted={{ _predicted_temp_c | round(1) }}°C, Error={{ _error_c | round(2) }}°C. 
-                        {% if learn_from_overrides and learned_offset_helper_id %}
-                        Learned offset: {{ _old_offset_c | round(2) }}°C → {{ _new_offset_c | round(2) }}°C.
+                        {% if learn_from_overrides and learned_prefs_sensor_id %}
+                        Learned [{{ _offset_key }}]: {{ _old_offset_sys | round(2) }} → {{ _new_offset_sys | round(2) }}{{ unit_sym }}.
                         {% endif %}
                         Pausing for {{ manual_override_duration_min }} min{{ ' (helper set)' if manual_override_until_id else ' (WARNING: no helper - will NOT persist!)' }}.
 

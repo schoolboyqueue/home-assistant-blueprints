@@ -1,22 +1,84 @@
 # Adaptive Learning Setup Guide
 
-## Quick Start (Optional Persistence)
+## Overview
 
-### 1. Create Input Number Helper
+The learning system tracks your manual temperature adjustments and adapts to your preferences over time. It stores **4 separate offsets**:
 
-In Home Assistant:
+| Key | Description |
+|-----|-------------|
+| `heat_day` | Your heating preference during daytime |
+| `heat_night` | Your heating preference during nighttime (sleep hours) |
+| `cool_day` | Your cooling preference during daytime |
+| `cool_night` | Your cooling preference during nighttime |
 
-1. Go to **Settings → Devices & Services → Helpers**
-2. Click **"+ Create Helper" → Number**
-3. Configure:
-   - **Name**: `Adaptive Comfort Learned Offset`
-   - **Minimum**: `-10`
-   - **Maximum**: `10`
-   - **Step**: `0.01`
-   - **Unit**: `°F` (or `°C` depending on your system)
-   - **Icon**: `mdi:brain` (optional)
+This means the system learns that you might want it warmer in the morning (heat_day) but cooler at night (cool_night), or any other combination of preferences.
 
-### 2. Configure Blueprint
+## Setup Instructions
+
+### Step 1: Create the Variables Sensor
+
+Add this to your `configuration.yaml` (or a separate file included via `template:`):
+
+```yaml
+template:
+  - trigger:
+      - platform: event
+        event_type: set_variable
+      - platform: event
+        event_type: remove_variable
+      - platform: event
+        event_type: clear_variables
+    condition:
+      - condition: template
+        value_template: >
+          {{
+              (
+                trigger.event.event_type == 'set_variable'
+                and trigger.event.data is defined
+                and trigger.event.data.key is defined
+                and trigger.event.data.value is defined
+              )
+              or
+              (
+                trigger.event.event_type == 'remove_variable'
+                and trigger.event.data is defined
+                and trigger.event.data.key is defined
+              )
+              or 
+              trigger.event.event_type == 'clear_variables'
+          }}
+    action:
+      - if: "{{ trigger.event.data.get('log', state_attr('sensor.comfort_learning', 'log_events')) }}"
+        then:
+          - service: logbook.log
+            data:
+              name: "Comfort Learning"
+              message: >
+                {{ trigger.event.data.key | default('All variables removed') }}
+                {%- if trigger.event.event_type == 'set_variable' -%}
+                  : {{ trigger.event.data.value }}
+                {%- endif -%}
+    sensor:
+      - unique_id: comfort_learning_prefs
+        name: Comfort Learning
+        state: "{{ this.attributes.variables | default({}) | length }} preferences"
+        attributes:
+          log_events: true
+          variables: >
+            {% set others = dict(this.attributes.get('variables', {}).items() | rejectattr('0', 'eq', trigger.event.data.key)) %}
+            {% if trigger.event.event_type == 'set_variable' %}
+              {% set new = {trigger.event.data.key: trigger.event.data.value} %}
+              {{ dict(others, **new) }}
+            {% elif trigger.event.event_type == 'remove_variable' %}
+              {{ others }}
+            {% elif trigger.event.event_type == 'clear_variables' %}
+              {}
+            {% endif %}
+```
+
+After adding this, restart Home Assistant or reload template entities.
+
+### Step 2: Configure the Blueprint
 
 In your automation:
 
@@ -25,24 +87,136 @@ In your automation:
    - **Override Duration**: 60 minutes (adjust as needed)
    - ✅ **Learn from Manual Adjustments**: On
    - **Learning Rate**: 0.15 (start conservative)
-   - **Learned Offset Storage**: Select `input_number.adaptive_comfort_learned_offset`
+   - **Learned Preferences Sensor**: Select `sensor.comfort_learning`
+
+### Step 3: Verify Setup
+
+1. Go to **Developer Tools → States**
+2. Search for `sensor.comfort_learning`
+3. You should see it with `variables: {}` in attributes (empty until you make adjustments)
 
 ## How It Works
 
-### The Learning Process
+### Learning Process
+
+When you manually adjust the thermostat:
+
+1. **Blueprint detects the change** (heating setpoint vs cooling setpoint)
+2. **Determines time of day** (day vs night based on your sleep schedule)
+3. **Calculates the error** (what you set - what we predicted)
+4. **Updates the appropriate offset** using exponential moving average
+
+Example:
 
 ```text
-User adjusts thermostat: 70°F → 73°F
-Blueprint predicted: 70°F
-Error: +3°F
+You adjust heating setpoint: 66°F → 70°F (during daytime)
+Blueprint predicted: 66°F
+Error: +4°F
 
-Calculation:
-new_offset = 0.85 * old_offset + 0.15 * (+3°F)
-           = 0.85 * 0 + 0.45
-           = +0.45°F
+Key updated: heat_day
+Calculation: new = 0.85 * old + 0.15 * (+4°F)
+           = 0.85 * 0 + 0.6
+           = +0.6°F
 
-Future predictions: now +0.45°F warmer
+Future daytime heating: now +0.6°F warmer
 ```
+
+### Time-of-Day Awareness
+
+The system uses your **Sleep Schedule** settings to determine day vs night:
+
+- **Night**: Between Sleep Start and Sleep End times
+- **Day**: All other times
+
+This means if you configure:
+
+- Sleep Start: 22:00
+- Sleep End: 07:00
+
+Then adjustments made between 10 PM and 7 AM affect the `_night` offsets, and adjustments made between 7 AM and 10 PM affect the `_day` offsets.
+
+### Heating vs Cooling Detection
+
+| Trigger | Offset Updated |
+|---------|----------------|
+| You adjust `target_temp_low` (heat setpoint) | `heat_day` or `heat_night` |
+| You adjust `target_temp_high` (cool setpoint) | `cool_day` or `cool_night` |
+| Single setpoint + HVAC mode is "heat" | `heat_day` or `heat_night` |
+| Single setpoint + HVAC mode is "cool" | `cool_day` or `cool_night` |
+
+## Monitoring
+
+### Check Current Learned Preferences
+
+Go to **Developer Tools → States**, find `sensor.comfort_learning`, and look at the `variables` attribute:
+
+```yaml
+variables:
+  heat_day: 1.5
+  heat_night: 0.8
+  cool_day: -0.5
+  cool_night: -1.2
+```
+
+This example shows:
+
+- Daytime heating: +1.5°F warmer than baseline
+- Nighttime heating: +0.8°F warmer than baseline
+- Daytime cooling: -0.5°F cooler than baseline (higher setpoint)
+- Nighttime cooling: -1.2°F cooler than baseline
+
+### Debug Logs
+
+Enable **Debug Level: basic** or **verbose** to see learning in action:
+
+```text
+Manual override detected (climate_manual_change_low).
+Manual=21.7°C, Predicted=20.0°C, Error=+1.7°C.
+Learning [heat_day]: 0.50 → 0.76°F.
+Pausing for 60 min (helper set).
+```
+
+### Dashboard Card (Optional)
+
+```yaml
+type: entities
+title: Comfort Learning
+entities:
+  - entity: sensor.comfort_learning
+    name: Preferences Count
+  - type: attribute
+    entity: sensor.comfort_learning
+    attribute: variables
+    name: Current Offsets
+```
+
+## Reset Learning
+
+To reset all learned preferences:
+
+1. **Developer Tools → Events**
+2. Fire event: `clear_variables`
+3. No event data needed
+
+Or reset a single offset:
+
+```yaml
+event: remove_variable
+event_data:
+  key: heat_day
+```
+
+## Tuning Tips
+
+### Learning Rate Guide
+
+| Rate | Speed | Stability | Best For |
+|------|-------|-----------|----------|
+| 0.05 | Very Slow | Very Stable | Highly consistent preferences |
+| 0.10 | Slow | Stable | Most users |
+| **0.15** | **Moderate** | **Balanced** | **Recommended default** |
+| 0.20 | Fast | Moderate | Quickly adapting to new patterns |
+| 0.30 | Very Fast | Less Stable | Experimental/testing |
 
 ### Convergence Timeline
 
@@ -53,113 +227,41 @@ With **α = 0.15** (default):
 - After 10 adjustments: ~80% adapted
 - After 15 adjustments: ~93% adapted
 
-### Learning Rate Guide
-
-| Rate     | Speed        | Stability    | Best For                         |
-| -------- | ------------ | ------------ | -------------------------------- |
-| 0.05     | Very Slow    | Very Stable  | Highly consistent preferences    |
-| 0.10     | Slow         | Stable       | Most users                       |
-| **0.15** | **Moderate** | **Balanced** | **Recommended default**          |
-| 0.20     | Fast         | Moderate     | Quickly adapting to new patterns |
-| 0.30     | Very Fast    | Less Stable  | Experimental/testing             |
-
-## Advanced Configuration
-
-### For Colorado (Mixed-Dry Climate)
-
-Your regional presets are already set:
-
-- **Winter Bias**: +0.3°C (keeps you warmer in cold months)
-- **Summer Bias**: -0.2°C (keeps you cooler in hot months)
-- **Shoulder Bias**: 0°C (neutral in spring/fall)
-
-The learned offset **adds to** these biases, so:
-
-```text
-Final Comfort = ASHRAE-55 + Regional Bias + Learned Offset + Sleep + CO₂
-```
-
-### Without Persistence
-
-If you don't create the helper:
-
-- Learning still works during the current session
-- Offset resets to 0 when Home Assistant restarts
-- Useful for testing before committing to persistence
-
-## Monitoring Learning
-
-### Debug Logs
-
-Enable **Debug Level: basic** or **verbose** to see:
-
-```text
-Manual override detected (climate_manual_change).
-Manual=21.7°C, Predicted=20.0°C, Error=+1.7°C.
-Learned offset: +0.5°C → +0.76°C.
-Pausing for 60 min.
-```
-
-### Dashboard Card (Optional)
-
-Add to your dashboard to visualize:
-
-```yaml
-type: entities
-entities:
-  - entity: input_number.adaptive_comfort_learned_offset
-    name: Learned Temperature Offset
-```
-
-## Tuning Tips
-
-### Too Aggressive?
-
-- Reduce learning rate to 0.10 or 0.05
-- Increases stability, slower adaptation
-
-### Too Slow?
-
-- Increase learning rate to 0.20 or 0.25
-- Faster adaptation, slightly less stable
-
-### Reset Learning
-
-Set the helper to `0` to start fresh.
-
 ## FAQ
 
-**Q: Does this replace seasonal adaptation?**  
-No! Learned offset adds to your Colorado regional biases. Both work together.
+**Q: What if I don't set up the sensor?**
+Learning still works during the current session but resets when Home Assistant restarts.
 
-**Q: What if I make random adjustments?**  
+**Q: Does this replace seasonal adaptation?**
+No! Learned offsets add to your regional/seasonal biases. Both work together:
+
+```text
+Final Comfort = ASHRAE-55 + Regional Bias + Seasonal Bias + Learned Offset + Sleep Bias + CO₂ Bias
+```
+
+**Q: What if I make random adjustments?**
 The exponential average smooths out noise. Consistent patterns emerge over time.
 
-**Q: Can I disable learning temporarily?**  
-Yes, just toggle "Learn from Manual Adjustments" to off in the blueprint config.
-
-**Q: Does it learn time-of-day preferences?**  
-Not yet. Current implementation learns a single global offset. Future versions could add contextual learning (morning vs evening, etc.).
-
-**Q: What happens during sleep mode?**  
-Sleep bias is separate and still applied. Learning tracks your general preference across all modes.
+**Q: Can I have different learning for different rooms?**
+Yes! Create multiple sensors (e.g., `sensor.comfort_learning_bedroom`, `sensor.comfort_learning_living`) and configure each automation to use its own sensor.
 
 ## Troubleshooting
 
 **Learning not working:**
 
 1. Check "Learn from Manual Adjustments" is enabled
-2. Verify helper entity is selected and exists
+2. Verify sensor entity exists (`sensor.comfort_learning`)
 3. Ensure manual changes exceed tolerance (default: 1.0°)
-4. Check debug logs for offset updates
+4. Check debug logs for learning messages
 
-**Helper value not changing:**
+**Sensor not updating:**
 
-- Check helper minimum/maximum range (-10 to +10 recommended)
-- Verify no conflicting automations writing to the same helper
+1. Verify the YAML configuration is correct
+2. Check Home Assistant logs for template errors
+3. Try firing a test event manually in Developer Tools
 
-**Offset seems wrong:**
+**Offset values seem wrong:**
 
-- Reset helper to 0 and let it re-learn
-- Reduce learning rate for more conservative updates
-- Check debug logs to see error calculations
+1. Fire `clear_variables` event to reset
+2. Reduce learning rate for more conservative updates
+3. Check that sleep schedule is correctly configured for day/night detection

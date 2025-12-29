@@ -1,3 +1,19 @@
+## [4.22.0] — 2025-12-29
+
+### Added
+
+- **Time-of-day aware learning**: Learning now stores 4 separate offsets (`heat_day`, `heat_night`, `cool_day`, `cool_night`) instead of a single global offset. The system learns your preferences separately for daytime vs nighttime (based on sleep schedule) and heating vs cooling adjustments.
+- **Trigger-based template sensor storage**: Replaced `input_number` helper with a trigger-based template sensor for storing learned preferences. This provides persistent JSON storage that survives restarts and can hold multiple values in a single entity. See updated `LEARNING_SETUP.md` for setup instructions.
+- **Correct heat/cool learning direction**: Fixed learning to correctly compare manual adjustments against the appropriate setpoint. When you adjust `target_temp_low` (heating), it now compares against `target_low_cli`; when you adjust `target_temp_high` (cooling), it compares against `target_high_cli`. Previously, both were compared against an average, causing incorrect learning direction.
+
+### Fixed
+
+- **Heating setpoint always at minimum comfort**: Fixed `t_adapt_c_guard` clamping that was forcing the adaptive target to stay above `min_c + tol_c`, which caused the heating setpoint (`band_min_c`) to always equal the minimum comfort temperature. The guard now allows the full comfort range, so heating setpoints can properly vary based on the adaptive calculation and learned preferences.
+
+### Changed
+
+- **Input renamed**: `learned_offset_helper` (input_number) replaced with `learned_prefs_sensor` (sensor entity) to support the new multi-value learning system.
+
 ## [4.21.2] — 2025-12-28
 
 ### Fixed
