@@ -1,3 +1,9 @@
+## [4.22.1] — 2025-12-29
+
+### Fixed
+
+- **`_is_night_now` undefined variable error**: Made `_is_night_now` self-contained by computing time values inline instead of referencing `_now_m`, `_st_m`, `_en_m` which are defined later in the variables section.
+
 ## [4.22.0] — 2025-12-29
 
 ### Added
