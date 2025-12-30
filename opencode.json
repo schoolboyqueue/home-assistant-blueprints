@@ -5,6 +5,7 @@
     "~/.claude/rules/python.md",
     "~/.claude/rules/markdown.md",
     "~/.claude/rules/conventional-commits.md",
-    "~/.claude/rules/no-summaries.md"
+    "~/.claude/rules/no-summaries.md",
+    "~/.claude/rules/typescript.md"
   ]
 }

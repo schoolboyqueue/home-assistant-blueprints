@@ -12,10 +12,10 @@ This repository contains production-ready Home Assistant Blueprints for home aut
 
 ```bash
 # Validate a single blueprint
-python3 scripts/validate-blueprint.py <path/to/blueprint.yaml>
+python3 scripts/validate-blueprint/validate-blueprint.py <path/to/blueprint.yaml>
 
 # Validate all blueprints in the repository
-python3 scripts/validate-blueprint.py --all
+python3 scripts/validate-blueprint/validate-blueprint.py --all
 ```
 
 The validator checks:

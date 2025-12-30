@@ -6,10 +6,10 @@ This directory contains tools for validating Home Assistant blueprints before pu
 
 ```bash
 # Validate a single blueprint
-python3 scripts/validate-blueprint.py <path/to/blueprint.yaml>
+python3 scripts/validate-blueprint/validate-blueprint.py <path/to/blueprint.yaml>
 
 # Validate all blueprints in the repository
-python3 scripts/validate-blueprint.py --all
+python3 scripts/validate-blueprint/validate-blueprint.py --all
 ```
 
 ## validate-blueprint.py
@@ -76,10 +76,10 @@ python3 scripts/validate-blueprint.py adaptive-comfort-control/adaptive_comfort_
 
 ```bash
 # Check all blueprints
-python3 scripts/validate-blueprint.py --all
+python3 scripts/validate-blueprint/validate-blueprint.py --all
 
 # Only commit if validation passes
-python3 scripts/validate-blueprint.py --all && git commit -m "..."
+python3 scripts/validate-blueprint/validate-blueprint.py --all && git commit -m "..."
 ```
 
 **Add to pre-commit hook:**
@@ -87,7 +87,7 @@ python3 scripts/validate-blueprint.py --all && git commit -m "..."
 ```bash
 # .git/hooks/pre-commit
 #!/bin/bash
-python3 scripts/validate-blueprint.py --all || exit 1
+python3 scripts/validate-blueprint/validate-blueprint.py --all || exit 1
 ```
 
 ### Exit Codes
@@ -177,9 +177,9 @@ variables:
 ### Recommended Workflow
 
 1. **Edit blueprint** - Make changes to YAML
-2. **Validate locally** - `python3 scripts/validate-blueprint.py <file>`
+2. **Validate locally** - `python3 scripts/validate-blueprint/validate-blueprint.py <file>`
 3. **Fix errors** - Address any issues found
-4. **Validate all** - `python3 scripts/validate-blueprint.py --all`
+4. **Validate all** - `python3 scripts/validate-blueprint/validate-blueprint.py --all`
 5. **Commit & push** - Changes are safe to publish
 
 ### VS Code Integration (Optional)
@@ -195,7 +195,7 @@ Add to `.vscode/tasks.json`:
       "type": "shell",
       "command": "python3",
       "args": [
-        "scripts/validate-blueprint.py",
+        "scripts/validate-blueprint/validate-blueprint.py",
         "${file}"
       ],
       "presentation": {
@@ -209,7 +209,7 @@ Add to `.vscode/tasks.json`:
       "type": "shell",
       "command": "python3",
       "args": [
-        "scripts/validate-blueprint.py",
+        "scripts/validate-blueprint/validate-blueprint.py",
         "--all"
       ],
       "presentation": {
