@@ -17,6 +17,7 @@ This script performs comprehensive validation of Home Assistant blueprint files:
 13. Bare boolean literal detection (true/false outputting strings instead of booleans)
 14. Entity ID boolean context detection (unreliable string truthiness in conditions)
 15. Python-style list method detection (e.g., [a,b].min() should be [a,b] | min)
+16. Variable dependency chain detection (helper variables that may cause UndefinedError)
 
 Usage:
     python3 validate-blueprint.py <blueprint.yaml>
@@ -338,6 +339,9 @@ class BlueprintValidator:
         defined_vars: set[str] = set()
         var_order = list(variables.keys())
 
+        # Check for variable dependency chains that may cause evaluation issues
+        self._check_variable_dependency_chains(variables)
+
         # Pre-pass: collect variables that have non-zero defaults
         # These are safe to divide by even when used in other variables
         self.nonzero_default_vars: set[str] = set()
@@ -385,6 +389,187 @@ class BlueprintValidator:
         # Check for blueprint_version
         if "blueprint_version" not in variables:
             self.warnings.append("No 'blueprint_version' variable defined")
+
+    def _check_variable_dependency_chains(self, variables: dict[str, Any]) -> None:
+        """Check for variable dependency chains that may cause runtime evaluation issues.
+
+        In Home Assistant blueprints, variables that reference other variables
+        can fail with "UndefinedError" at runtime, even when the definition order
+        appears correct in YAML. This happens because:
+
+        1. Each variable's template is evaluated separately
+        2. Multi-line YAML blocks (>) return strings that may need re-parsing
+        3. The evaluation order can differ from the definition order
+
+        This check warns about patterns that are known to cause issues:
+        - Multiple intermediate variables that are only used by one other variable
+        - Variables forming chains: A -> B -> C where B is only used by C
+
+        Args:
+            variables: Dictionary of variable definitions.
+        """
+        # Build a dependency graph: which variables reference which others
+        var_refs: dict[str, set[str]] = {}  # var_name -> set of vars it references
+        var_used_by: dict[str, set[str]] = {}  # var_name -> set of vars that use it
+
+        var_names = set(variables.keys())
+
+        # Jinja2 builtins to ignore
+        jinja_builtins = {
+            "true",
+            "false",
+            "none",
+            "True",
+            "False",
+            "None",
+            "now",
+            "utcnow",
+            "as_timestamp",
+            "states",
+            "is_state",
+            "state_attr",
+            "has_value",
+            "expand",
+            "device_entities",
+            "area_entities",
+            "integration_entities",
+            "device_attr",
+            "area_name",
+            "area_id",
+            "relative_time",
+            "timedelta",
+            "strptime",
+            "as_datetime",
+            "as_local",
+            "today_at",
+            "trigger",
+            "this",
+            "repeat",
+            "context",
+            "set",
+            "if",
+            "else",
+            "elif",
+            "endif",
+            "for",
+            "endfor",
+            "in",
+            "not",
+            "and",
+            "or",
+            "is",
+            "defined",
+            "undefined",
+            "number",
+            "string",
+            "mapping",
+            "iterable",
+            "int",
+            "float",
+            "round",
+            "abs",
+            "default",
+            "length",
+            "log",
+            "min",
+            "max",
+        }
+
+        for var_name, value in variables.items():
+            if not isinstance(value, str):
+                continue
+
+            var_refs[var_name] = set()
+            for other_var in var_names:
+                if other_var == var_name or other_var in jinja_builtins:
+                    continue
+
+                # Check if this variable references other_var inside a Jinja block
+                pattern = rf"\b{re.escape(other_var)}\b"
+                for match in re.finditer(pattern, value):
+                    pos = match.start()
+
+                    # Skip if the match is inside a string literal (quoted)
+                    before_match = value[:pos]
+                    in_string = False
+                    for quote in ["'", '"']:
+                        quote_positions = [
+                            i for i, c in enumerate(before_match) if c == quote
+                        ]
+                        if len(quote_positions) % 2 == 1:
+                            after_match = value[match.end() :]
+                            if quote in after_match:
+                                in_string = True
+                                break
+
+                    if in_string:
+                        continue
+
+                    before = value[:pos]
+                    last_expr_open = before.rfind("{{")
+                    last_ctrl_open = before.rfind("{%")
+                    last_open = max(last_expr_open, last_ctrl_open)
+
+                    if last_open == -1:
+                        continue
+
+                    between = value[last_open:pos]
+                    if "}}" in between or "%}" in between:
+                        continue
+
+                    # Found a reference to other_var inside a Jinja block
+                    var_refs[var_name].add(other_var)
+                    if other_var not in var_used_by:
+                        var_used_by[other_var] = set()
+                    var_used_by[other_var].add(var_name)
+                    break
+
+        # Find variables that are only used by one other variable and start with _
+        # These are "helper" variables that could potentially be inlined
+        helper_chains: list[tuple[str, str]] = []
+        for var_name, used_by in var_used_by.items():
+            if (
+                len(used_by) == 1
+                and var_name.startswith("_")
+                and var_name
+                not in (
+                    "_raw_",
+                    "_is_",
+                    "_has_",
+                )  # Common prefixes for persistent helpers
+            ):
+                user = list(used_by)[0]
+                # Check if the helper is also using other helpers
+                helper_refs = var_refs.get(var_name, set())
+                other_helpers = [
+                    ref
+                    for ref in helper_refs
+                    if ref.startswith("_")
+                    and ref in var_used_by
+                    and len(var_used_by[ref]) == 1
+                ]
+                if other_helpers:
+                    # This helper depends on other single-use helpers - potential chain
+                    helper_chains.append((var_name, user))
+
+        # Warn about chains of helper variables
+        if helper_chains:
+            # Group by the final user
+            chains_by_user: dict[str, list[str]] = {}
+            for helper, user in helper_chains:
+                if user not in chains_by_user:
+                    chains_by_user[user] = []
+                chains_by_user[user].append(helper)
+
+            for user, helpers in chains_by_user.items():
+                if len(helpers) >= 2:
+                    self.warnings.append(
+                        f"Variable '{user}' depends on a chain of helper variables "
+                        f"({', '.join(helpers)}). Consider consolidating into a single "
+                        f"self-contained template to avoid potential 'UndefinedError' "
+                        f"at runtime. See: variables evaluated separately may fail "
+                        f"when referencing each other."
+                    )
 
     def _check_variable_ordering(
         self, var_name: str, value: str, defined_vars: set[str], var_order: list[str]
@@ -479,6 +664,30 @@ class BlueprintValidator:
                 in_jinja_block = False
                 for match in re.finditer(pattern, value):
                     pos = match.start()
+
+                    # Skip if the match is inside a string literal (quoted)
+                    # Check if preceded by an odd number of quotes (inside a string)
+                    before_match = value[:pos]
+                    # Count single and double quotes to detect if we're in a string
+                    # This is a heuristic - look for 'word' or "word" patterns
+                    # where our match would be inside the quotes
+                    in_string = False
+                    for quote in ["'", '"']:
+                        # Find all quote positions before our match
+                        quote_positions = [
+                            i for i, c in enumerate(before_match) if c == quote
+                        ]
+                        # If odd number of quotes, we're inside a string
+                        if len(quote_positions) % 2 == 1:
+                            # Verify the string continues past our match
+                            after_match = value[match.end() :]
+                            if quote in after_match:
+                                in_string = True
+                                break
+
+                    if in_string:
+                        continue
+
                     # Look backwards for {{ or {%
                     before = value[:pos]
                     # Find the last Jinja opener
