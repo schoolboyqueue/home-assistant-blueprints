@@ -18,7 +18,7 @@ export function getYamlModule(): YamlModule {
   if (yamlModule === null) {
     // Dynamic require for yaml - only loaded when blueprint-inputs command is used
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    yamlModule = require('/config/.claude/node_modules/js-yaml') as YamlModule;
+    yamlModule = require('js-yaml') as YamlModule;
   }
   return yamlModule;
 }
