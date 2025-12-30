@@ -152,6 +152,9 @@ HVAC-aware ceiling fan automation with EN 16798 adaptive comfort model, heat ind
 │       ├── CHANGELOG.md
 │       └── README.md
 ├── scripts/
+│   ├── ha-ws-client/
+│   │   ├── ha-ws-client.ts
+│   │   └── README.md
 │   ├── validate-blueprint/
 │   │   └── validate-blueprint.py
 │   └── README.md
