@@ -1,5 +1,5 @@
 blueprint:
-    name: "Adaptive Comfort Control Pro v4.22.1"
+    name: "Adaptive Comfort Control Pro v4.22.2"
     description: >
         Adaptive comfort control + HVAC pause with unit awareness (°C/°F), seasonal bias,
         built-in psychrometrics (dew point, absolute humidity, enthalpy), optional RMOT,
@@ -918,7 +918,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.22.1"
+    blueprint_version: "4.22.2"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
@@ -1528,28 +1528,15 @@ variables:
     sleep_tighten_c: "{{ (sleep_tighten_sys_in|float * 5/9) if is_imperial else (sleep_tighten_sys_in|float) }}"
 
     # Time-window evaluation with wrap-around support (e.g., 22:00 → 07:00)
-    _now_m: "{{ now().hour*60 + now().minute }}"
-    # Parse time strings safely - handles HH:MM and HH:MM:SS formats, with fallbacks for invalid input
-    _st_parts: >
-        {% set parts = (sleep_start_str.split(':') if (sleep_start_str and ':' in sleep_start_str) else ['22','0']) %}
-        {{ parts if parts|length >= 2 else ['22','0'] }}
-    _en_parts: >
-        {% set parts = (sleep_end_str.split(':') if (sleep_end_str and ':' in sleep_end_str) else ['7','0']) %}
-        {{ parts if parts|length >= 2 else ['7','0'] }}
-    _st_m: >
-        {% set h = (_st_parts[0]|int(22) if _st_parts|length > 0 else 22) %}
-        {% set m = (_st_parts[1]|int(0) if _st_parts|length > 1 else 0) %}
-        {{ h*60 + m }}
-    _en_m: >
-        {% set h = (_en_parts[0]|int(7) if _en_parts|length > 0 else 7) %}
-        {% set m = (_en_parts[1]|int(0) if _en_parts|length > 1 else 0) %}
-        {{ h*60 + m }}
+    # Self-contained to avoid cross-variable dependency issues during evaluation
     _time_active: >
-        {% set nowm = _now_m|int %}
-        {% set s = _st_m|int %}
-        {% set e = _en_m|int %}
+        {% set nowm = now().hour * 60 + now().minute %}
+        {% set st_parts = (sleep_start_str.split(':') if (sleep_start_str and ':' in sleep_start_str) else ['22','0']) %}
+        {% set en_parts = (sleep_end_str.split(':') if (sleep_end_str and ':' in sleep_end_str) else ['7','0']) %}
+        {% set s = (st_parts[0] | int(22)) * 60 + (st_parts[1] | int(0)) %}
+        {% set e = (en_parts[0] | int(7)) * 60 + (en_parts[1] | int(0)) %}
         {% if s <= e %}{{ (nowm >= s) and (nowm < e) }}
-        {% else %}{{ (nowm >= s) or  (nowm < e) }}{% endif %}
+        {% else %}{{ (nowm >= s) or (nowm < e) }}{% endif %}
 
     _sleep_switch: >
         {% if sleep_entity_id %}{{ is_state(sleep_entity_id, 'on') }}{% else %}false{% endif %}

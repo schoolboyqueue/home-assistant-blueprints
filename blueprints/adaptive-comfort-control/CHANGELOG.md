@@ -1,3 +1,9 @@
+## [4.22.2] — 2025-12-30
+
+### Fixed
+
+- **`_now_m` undefined variable error**: Made `_time_active` self-contained by computing time values inline instead of referencing `_now_m`, `_st_m`, `_en_m`, `_st_parts`, and `_en_parts` helper variables. This mirrors the fix applied to `_is_night_now` in v4.22.1 and eliminates cross-variable dependency issues during template evaluation.
+
 ## [4.22.1] — 2025-12-29
 
 ### Fixed
