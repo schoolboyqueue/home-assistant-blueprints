@@ -1,5 +1,5 @@
 blueprint:
-  name: Ceiling Fan Climate Control Pro v2.2.4
+  name: Ceiling Fan Climate Control Pro v2.2.5
   description: >
     HVAC-aware ceiling fan automation with adaptive comfort control. Uses the
     EN 16798 / ASHRAE 55 adaptive comfort model to dynamically adjust fan behavior
@@ -332,7 +332,7 @@ blueprint:
               custom_value: false
 
 variables:
-  blueprint_version: "2.2.4"
+  blueprint_version: "2.2.5"
   fan_entity: !input fan_entity
   temp_sensor: !input temp_sensor
   humidity_sensor_input: !input humidity_sensor
@@ -396,8 +396,53 @@ variables:
   temp_off_threshold: "{{ temp_off_threshold_input | float(72 if is_imperial else 22.2) }}"
 
   # Get indoor temperature in system units
-  t_in_raw: "{{ states(temp_sensor) | float(70 if is_imperial else 21) }}"
+  # Rate-of-change filter: reject readings that change too fast (sensor glitch detection)
+  # Max realistic indoor temp change is ~2-3°F/min; we use 10°F as a generous threshold
+  # to catch spikes like 72°F → 212°F while allowing any realistic scenario
+  _t_in_max_delta_f: 10
+  _t_in_state: "{{ states(temp_sensor) }}"
+  _t_in_unavailable: "{{ _t_in_state in ['unavailable', 'unknown', 'none'] or _t_in_state is none }}"
+  t_in_raw: "{{ _t_in_state | float(70 if is_imperial else 21) }}"
   _t_in_unit: "{{ state_attr(temp_sensor, 'unit_of_measurement') | default('', true) | string }}"
+  # Get previous state from trigger (only available on temp_changed trigger)
+  _t_in_prev_state: "{{ trigger.from_state.state | default('unknown', true) if trigger is defined and trigger.id == 'temp_changed' else 'unknown' }}"
+  _t_in_prev_unavailable: "{{ _t_in_prev_state in ['unavailable', 'unknown', 'none'] or _t_in_prev_state is none }}"
+  _t_in_prev_raw: "{{ _t_in_prev_state | float(0) if not _t_in_prev_unavailable else 0 }}"
+  # Convert both to Fahrenheit for consistent delta calculation
+  _t_in_raw_f: >
+    {% set v = t_in_raw | float %}
+    {% set u = _t_in_unit | lower %}
+    {% if u in ['°c', 'c', 'celsius'] %}
+      {{ v * 9/5 + 32 }}
+    {% else %}
+      {{ v }}
+    {% endif %}
+  _t_in_prev_f: >
+    {% set v = _t_in_prev_raw | float %}
+    {% set u = _t_in_unit | lower %}
+    {% if u in ['°c', 'c', 'celsius'] %}
+      {{ v * 9/5 + 32 }}
+    {% else %}
+      {{ v }}
+    {% endif %}
+  _t_in_delta_f: "{{ (_t_in_raw_f | float - _t_in_prev_f | float) | abs }}"
+  # Validation logic:
+  # - If current reading is unavailable → invalid
+  # - If this is a temp_changed trigger AND we have a valid previous reading:
+  #     → Use rate-of-change check (reject if delta > threshold)
+  # - Otherwise (other triggers or no valid previous):
+  #     → Accept the reading (no rate check possible, trust the sensor)
+  _t_in_has_prev: "{{ trigger is defined and trigger.id == 'temp_changed' and not _t_in_prev_unavailable }}"
+  _t_in_rate_ok: "{{ not _t_in_has_prev or _t_in_delta_f <= _t_in_max_delta_f }}"
+  t_in_valid: "{{ not _t_in_unavailable and _t_in_rate_ok }}"
+  _t_in_reject_reason: >
+    {% if _t_in_unavailable %}
+      unavailable
+    {% elif not _t_in_rate_ok %}
+      rate_exceeded
+    {% else %}
+      none
+    {% endif %}
   t_in_sys: >
     {% set v = t_in_raw %}
     {% set u = _t_in_unit | lower %}
@@ -638,6 +683,31 @@ trigger:
 condition: []
 
 action:
+  # Early exit: Skip if temperature reading is invalid (sensor glitch, unavailable, or out of range)
+  # This prevents reacting to bogus spikes like 212°F from malfunctioning sensors
+  - if:
+      - condition: template
+        value_template: "{{ not t_in_valid }}"
+    then:
+      - if:
+          - condition: template
+            value_template: "{{ debug_level_v in ['basic', 'verbose'] }}"
+        then:
+          - service: logbook.log
+            data:
+              name: "Fan Climate Pro"
+              entity_id: "{{ fan_entity }}"
+              message: >
+                Skipped ({{ _t_in_reject_reason }}) |
+                {% if _t_in_reject_reason == 'rate_exceeded' %}
+                Reading: {{ _t_in_raw_f | round(1) }}°F | Previous: {{ _t_in_prev_f | round(1) }}°F |
+                Delta: {{ _t_in_delta_f | round(1) }}°F (max: {{ _t_in_max_delta_f }}°F) |
+                Likely sensor glitch
+                {% else %}
+                State: {{ _t_in_state }} | Sensor unavailable
+                {% endif %}
+      - stop: "Invalid temperature reading - ignoring"
+
   # Early exit: Skip entirely if fan is already in the desired state
   # This prevents redundant RF commands to devices like Bond that make audible sounds
   - if:

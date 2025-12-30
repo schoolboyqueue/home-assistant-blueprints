@@ -1,5 +1,11 @@
 # Ceiling Fan Climate Control Pro - Changelog
 
+## [2.2.5] - 2025-12-30
+
+### Fixed
+
+- **Sensor glitch protection**: Added rate-of-change filter to reject impossible temperature spikes. When triggered by a temperature change, rejects readings that jump more than 10°F from the previous value (e.g., 72°F → 212°F). This catches sensor glitches like malfunctioning Ecobee sensors reporting boiling point before going offline, without blocking legitimate readings from saunas, sunrooms, or other extreme-but-real environments. Also rejects unavailable/unknown states. Invalid readings are logged with details and ignored.
+
 ## [2.2.4] - 2025-12-27
 
 ### Fixed
