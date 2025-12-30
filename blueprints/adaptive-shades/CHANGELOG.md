@@ -1,5 +1,11 @@
 # Adaptive Shades Pro - Changelog
 
+## [1.13.10] - 2025-12-30
+
+### Fixed
+
+- **Helper timestamp updated on every trigger**: The `last_command_helper` timestamp was being updated at the start of every automation run (including sun state changes), even when no shade movement occurred. This caused the grace period logic to be ineffective because the timestamp kept refreshing. Now the helper timestamp is only updated immediately before actually sending a command to the cover.
+
 ## [1.13.9] - 2025-12-28
 
 ### Fixed
