@@ -1,5 +1,17 @@
 # Bathroom Light & Fan Control Pro - Changelog
 
+## [1.10.11] - 2025-12-30
+
+### Fixed
+
+- **Deprecated `color_temp` parameter**: Changed `color_temp` (mireds) to `color_temp_kelvin` in `light.turn_on` service calls. The `color_temp` argument is deprecated and will break in Home Assistant 2026.1.
+
+### Changed
+
+- **Night Mode Color Temperature input**: Changed from mireds to Kelvin with a proper `color_temp` selector. Default changed from 400 mireds to 2500K (equivalent warm white). The selector now shows a visual color temperature slider.
+
+---
+
 ## [1.10.10] - 2025-12-28
 
 ### Fixed

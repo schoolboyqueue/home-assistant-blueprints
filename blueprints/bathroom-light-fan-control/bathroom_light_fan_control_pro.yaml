@@ -1,5 +1,5 @@
 blueprint:
-  name: "Bathroom Light Fan Control Pro v1.10.10"
+  name: "Bathroom Light Fan Control Pro v1.10.11"
   description: >-
     Smart bathroom controller for lights and exhaust fan.
     Lights: Turns on from motion or door activity (Wasp-in-a-Box), respects presence and optional lux threshold, supports Night Mode (dim and color temperature), and shuts off after vacancy with a grace period. Includes a manual-off override window to prevent auto-on.
@@ -291,15 +291,14 @@ blueprint:
               min: 1
               max: 255
               step: 1
-        night_mode_color_temp:
-          name: Night Mode Color Temperature (mireds)
-          description: Color temperature in mireds when night mode is active (400 = warm white).
-          default: 400
+        night_mode_color_temp_kelvin:
+          name: Night Mode Color Temperature (Kelvin)
+          description: Color temperature in Kelvin when night mode is active (2500 = warm white, 6500 = cool daylight).
+          default: 2500
           selector:
-            number:
-              min: 153
-              max: 500
-              step: 1
+            color_temp:
+              min_mireds: 153
+              max_mireds: 500
         night_fan_delta_on_bias:
           name: Night Fan ON Bias (Δ% RH)
           description: Value added to the ON threshold during the night schedule. Negative values make the fan more aggressive at night.
@@ -397,7 +396,7 @@ variables:
   fan_min_runtime_min: !input fan_min_runtime_min
   night_mode_enabled: !input night_mode_enabled
   night_mode_brightness: !input night_mode_brightness
-  night_mode_color_temp: !input night_mode_color_temp
+  night_mode_color_temp_kelvin: !input night_mode_color_temp_kelvin
   manual_override_duration_min: !input manual_override_duration_min
   auto_fan_off_after_lights_off_min: !input auto_fan_off_after_lights_off_min
   fan_max_runtime_min: !input fan_max_runtime_min
@@ -424,7 +423,7 @@ variables:
   ror_min_on_time_min: !input ror_min_on_time_min
   ror_latch_until: !input ror_latch_until
   light_area: !input light_area
-  blueprint_version: "1.10.10"
+  blueprint_version: "1.10.11"
   area_set: >-
     {{ light_area is not none and (light_area|string) != '' }}
 
@@ -730,7 +729,7 @@ action:
                                           area_id: !input light_area
                                         data:
                                           brightness: "{{ night_mode_brightness }}"
-                                          color_temp: "{{ night_mode_color_temp }}"
+                                          color_temp_kelvin: "{{ night_mode_color_temp_kelvin }}"
                                 # Entity-based control: check capabilities and apply appropriate params
                                 default:
                                   - variables:
@@ -745,7 +744,7 @@ action:
                                               entity_id: !input light_target
                                             data:
                                               brightness: "{{ night_mode_brightness }}"
-                                              color_temp: "{{ night_mode_color_temp }}"
+                                              color_temp_kelvin: "{{ night_mode_color_temp_kelvin }}"
                                       - conditions: "{{ _has_bri and not _has_ct }}"
                                         sequence:
                                           - service: light.turn_on
@@ -759,7 +758,7 @@ action:
                                             target:
                                               entity_id: !input light_target
                                             data:
-                                              color_temp: "{{ night_mode_color_temp }}"
+                                              color_temp_kelvin: "{{ night_mode_color_temp_kelvin }}"
                                     default:
                                       - service: light.turn_on
                                         target:
