@@ -173,6 +173,14 @@ HVAC-aware ceiling fan automation with EN 16798 adaptive comfort model, heat ind
 
 Contributions are welcome!
 
+**Development setup:**
+
+```bash
+npm install  # Installs git hooks via Husky
+```
+
+This sets up pre-commit hooks that validate blueprints and enforce conventional commits.
+
 **Conventional Commits required** (examples):
 
 - `docs(readme): clarify quick start`

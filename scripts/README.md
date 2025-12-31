@@ -15,4 +15,4 @@ This directory contains tools for developing and debugging Home Assistant bluepr
 2. **Validate locally** - `python3 scripts/validate-blueprint/validate-blueprint.py <file>`
 3. **Debug with ha-ws-client** - Query states, check history, view traces
 4. **Validate all** - `python3 scripts/validate-blueprint/validate-blueprint.py --all`
-5. **Commit & push** - Changes are safe to publish
+5. **Commit & push** - Git hooks automatically validate before commit

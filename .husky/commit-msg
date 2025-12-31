@@ -1,0 +1,120 @@
+#!/bin/bash
+# Commit-msg hook for Home Assistant Blueprints repository
+# Enforces Conventional Commits format
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+COMMIT_MSG_FILE="$1"
+COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+
+# Skip validation for merge commits, revert commits, and fixup/squash commits
+if [[ "$COMMIT_MSG" =~ ^(Merge|Revert|fixup!|squash!|amend!) ]]; then
+    exit 0
+fi
+
+# Skip if it's an automated commit (e.g., from CI)
+if [[ "$COMMIT_MSG" =~ ^\[(skip\ ci|ci\ skip)\] ]]; then
+    exit 0
+fi
+
+echo -e "${BLUE}Validating commit message format...${NC}"
+
+# Conventional Commits regex pattern
+# Format: <type>[(scope)][!]: <description>
+# Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert, security
+# Scope is optional and can be any word (typically blueprint name)
+# ! indicates breaking change
+CONVENTIONAL_COMMIT_PATTERN='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert|security)(\([a-zA-Z0-9_-]+\))?(!)?: .+$'
+
+# Extract the first line (subject) of the commit message
+COMMIT_SUBJECT=$(echo "$COMMIT_MSG" | head -1)
+
+# Validate the commit message format
+if ! echo "$COMMIT_SUBJECT" | grep -qE "$CONVENTIONAL_COMMIT_PATTERN"; then
+    echo ""
+    echo -e "${RED}Invalid commit message format!${NC}"
+    echo ""
+    echo -e "Your commit message:"
+    echo -e "  ${YELLOW}$COMMIT_SUBJECT${NC}"
+    echo ""
+    echo -e "Expected format: ${GREEN}<type>(<scope>): <description>${NC}"
+    echo ""
+    echo -e "Valid types:"
+    echo -e "  ${GREEN}feat${NC}     - New feature"
+    echo -e "  ${GREEN}fix${NC}      - Bug fix"
+    echo -e "  ${GREEN}docs${NC}     - Documentation only changes"
+    echo -e "  ${GREEN}style${NC}    - Formatting, missing semi colons, etc; no code change"
+    echo -e "  ${GREEN}refactor${NC} - Code change that neither fixes a bug nor adds a feature"
+    echo -e "  ${GREEN}perf${NC}     - Performance improvement"
+    echo -e "  ${GREEN}test${NC}     - Adding missing tests"
+    echo -e "  ${GREEN}build${NC}    - Changes to build process or dependencies"
+    echo -e "  ${GREEN}ci${NC}       - CI configuration changes"
+    echo -e "  ${GREEN}chore${NC}    - Maintenance tasks"
+    echo -e "  ${GREEN}revert${NC}   - Revert a previous commit"
+    echo -e "  ${GREEN}security${NC} - Security fixes"
+    echo ""
+    echo -e "Examples:"
+    echo -e "  ${GREEN}feat(adaptive-comfort-control): add temperature offset support${NC}"
+    echo -e "  ${GREEN}fix(adaptive-fan-control): correct humidity calculation${NC}"
+    echo -e "  ${GREEN}docs: update README with new installation instructions${NC}"
+    echo -e "  ${GREEN}chore: update gitignore${NC}"
+    echo -e "  ${GREEN}feat!: breaking change example${NC}"
+    echo ""
+    exit 1
+fi
+
+# Validate subject line length (should be <= 72 characters for best display)
+SUBJECT_LENGTH=${#COMMIT_SUBJECT}
+if [[ $SUBJECT_LENGTH -gt 72 ]]; then
+    echo -e "${YELLOW}Warning: Commit subject line is $SUBJECT_LENGTH characters (recommended: <= 72)${NC}"
+fi
+
+# Validate subject doesn't end with a period
+if [[ "$COMMIT_SUBJECT" =~ \.$ ]]; then
+    echo -e "${YELLOW}Warning: Commit subject should not end with a period${NC}"
+fi
+
+# Validate subject starts with lowercase after the colon
+# Extract the description part (after the colon)
+DESCRIPTION=$(echo "$COMMIT_SUBJECT" | sed 's/^[^:]*: //')
+FIRST_CHAR=$(echo "$DESCRIPTION" | cut -c1)
+
+# Only warn if it starts with uppercase (not strict requirement)
+if [[ "$FIRST_CHAR" =~ [A-Z] ]]; then
+    echo -e "${YELLOW}Note: Consider using lowercase for the first character of description${NC}"
+fi
+
+# Check for scope when modifying blueprint files
+STAGED_BLUEPRINTS=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep -E '^blueprints/[^/]+/.*\.yaml$' || true)
+
+if [[ -n "$STAGED_BLUEPRINTS" ]]; then
+    # Extract scope from commit message if present
+    SCOPE=$(echo "$COMMIT_SUBJECT" | grep -oP '\(([a-zA-Z0-9_-]+)\)' | tr -d '()' || true)
+
+    if [[ -z "$SCOPE" ]]; then
+        # Get unique blueprint directories
+        BLUEPRINT_DIRS=$(echo "$STAGED_BLUEPRINTS" | xargs -I {} dirname {} | sort -u | xargs -I {} basename {})
+        DIR_COUNT=$(echo "$BLUEPRINT_DIRS" | wc -l | tr -d ' ')
+
+        if [[ $DIR_COUNT -eq 1 ]]; then
+            echo -e "${YELLOW}Tip: Consider adding a scope for the blueprint:${NC}"
+            echo -e "  ${GREEN}feat(${BLUEPRINT_DIRS}): your description${NC}"
+        fi
+    fi
+fi
+
+# Warn if commit message contains Claude Code references (per CLAUDE.md guidelines)
+if echo "$COMMIT_MSG" | grep -qiE 'claude|anthropic|co-authored-by.*claude|generated with claude'; then
+    echo -e "${YELLOW}Warning: Commit message contains Claude/AI references${NC}"
+    echo -e "${YELLOW}Per project guidelines, these should not be included in commits${NC}"
+fi
+
+echo -e "${GREEN}Commit message format is valid!${NC}"
+exit 0

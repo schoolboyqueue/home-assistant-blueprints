@@ -1,0 +1,14 @@
+{
+  "name": "home-assistant-blueprints",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Home Assistant automation blueprints",
+  "scripts": {
+    "prepare": "husky",
+    "validate": "python3 scripts/validate-blueprint/validate-blueprint.py --all",
+    "validate:staged": "python3 scripts/validate-blueprint/validate-blueprint.py"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
+}
