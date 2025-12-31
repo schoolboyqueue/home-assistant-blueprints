@@ -10,7 +10,11 @@ export {
   handleBlueprintInputs,
   handleContext,
   handleTrace,
+  handleTraceActions,
+  handleTraceDebug,
   handleTraces,
+  handleTraceTimeline,
+  handleTraceTrigger,
   handleTraceVars,
   handleWatch,
 } from './automation.js';
@@ -35,6 +39,7 @@ export {
   handleSyslog,
   handleTimeline,
 } from './history.js';
+export { handleAnalyze, handleMonitor, handleMonitorMulti } from './monitor.js';
 export {
   handleAreas,
   handleDevices,
@@ -46,7 +51,11 @@ import {
   handleBlueprintInputs,
   handleContext,
   handleTrace,
+  handleTraceActions,
+  handleTraceDebug,
   handleTraces,
+  handleTraceTimeline,
+  handleTraceTrigger,
   handleTraceVars,
   handleWatch,
 } from './automation.js';
@@ -71,6 +80,7 @@ import {
   handleSyslog,
   handleTimeline,
 } from './history.js';
+import { handleAnalyze, handleMonitor, handleMonitorMulti } from './monitor.js';
 import { handleAreas, handleDevices, handleEntities } from './registry.js';
 
 /**
@@ -107,8 +117,17 @@ export const commandHandlers: Record<string, CommandHandler> = {
   traces: handleTraces,
   trace: handleTrace,
   'trace-vars': handleTraceVars,
+  'trace-timeline': handleTraceTimeline,
+  'trace-trigger': handleTraceTrigger,
+  'trace-actions': handleTraceActions,
+  'trace-debug': handleTraceDebug,
   'automation-config': handleAutomationConfig,
   context: handleContext,
   'blueprint-inputs': handleBlueprintInputs,
   watch: handleWatch,
+
+  // Monitoring commands
+  monitor: handleMonitor,
+  'monitor-multi': handleMonitorMulti,
+  analyze: handleAnalyze,
 };

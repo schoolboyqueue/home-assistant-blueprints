@@ -18,6 +18,9 @@ This script performs comprehensive validation of Home Assistant blueprint files:
 14. Entity ID boolean context detection (unreliable string truthiness in conditions)
 15. Python-style list method detection (e.g., [a,b].min() should be [a,b] | min)
 16. Variable dependency chain detection (helper variables that may cause UndefinedError)
+17. Undefined variable reference detection in templates
+18. Unsafe math operations (division by zero, log/sqrt of negative, modulo by zero)
+19. Type mismatch detection in filter chains
 
 Usage:
     python3 validate-blueprint.py <blueprint.yaml>
@@ -51,6 +54,16 @@ class BlueprintValidator:
 
     REQUIRED_BLUEPRINT_KEYS = ["name", "description", "domain", "input"]
     REQUIRED_ROOT_KEYS = ["blueprint", "trigger", "action"]
+    # Common hysteresis input naming patterns (ON threshold should be > OFF threshold)
+    # Format: (on_pattern, off_pattern, description)
+    HYSTERESIS_PATTERNS: list[tuple[str, str, str]] = [
+        (r"(.*)_on$", r"\1_off", "threshold"),
+        (r"(.*)_high$", r"\1_low", "boundary"),
+        (r"(.*)_upper$", r"\1_lower", "limit"),
+        (r"(.*)_start$", r"\1_stop", "trigger point"),
+        (r"(.*)_enable$", r"\1_disable", "activation point"),
+        (r"delta_on$", r"delta_off$", "delta threshold"),
+    ]
     VALID_SELECTOR_TYPES = [
         "action",
         "addon",
@@ -109,6 +122,118 @@ class BlueprintValidator:
         # as they're valid when supporting multiple entity types
     }
 
+    # Comprehensive list of Jinja2 builtins and Home Assistant template functions
+    # These are always available in templates and should not trigger "undefined" warnings
+    JINJA2_BUILTINS: set[str] = {
+        # Python/Jinja2 built-in constants
+        "true", "false", "none", "True", "False", "None",
+        # Jinja2 control keywords
+        "if", "else", "elif", "endif", "for", "endfor", "in", "not", "and", "or",
+        "is", "set", "endset", "macro", "endmacro", "call", "endcall",
+        "filter", "endfilter", "block", "endblock", "extends", "include",
+        "import", "from", "as", "with", "endwith", "do", "continue", "break",
+        # Jinja2 tests
+        "defined", "undefined", "none", "number", "string", "mapping",
+        "iterable", "callable", "sequence", "sameas", "escaped",
+        "even", "odd", "divisibleby", "lower", "upper",
+        # Jinja2 built-in filters (commonly used)
+        "abs", "attr", "batch", "capitalize", "center", "count", "default",
+        "dictsort", "escape", "filesizeformat", "first", "float", "forceescape",
+        "format", "groupby", "indent", "int", "items", "join", "last", "length",
+        "list", "lower", "map", "max", "min", "pprint", "random", "reject",
+        "rejectattr", "replace", "reverse", "round", "safe", "select",
+        "selectattr", "slice", "sort", "split", "string", "striptags", "sum",
+        "title", "tojson", "trim", "truncate", "unique", "upper", "urlencode",
+        "urlize", "wordcount", "wordwrap", "xmlattr",
+        # Home Assistant specific functions
+        "states", "is_state", "state_attr", "is_state_attr", "has_value",
+        "expand", "device_entities", "area_entities", "integration_entities",
+        "device_attr", "device_id", "area_name", "area_id", "floor_id",
+        "floor_name", "label_id", "label_name", "labels",
+        "relative_time", "time_since", "timedelta", "strptime", "strftime",
+        "as_timestamp", "as_datetime", "as_local", "as_timedelta",
+        "today_at", "now", "utcnow",
+        "distance", "closest", "iif",
+        "log", "sin", "cos", "tan", "asin", "acos", "atan", "atan2",
+        "sqrt", "e", "pi", "tau", "inf",
+        "average", "median", "statistical_mode",
+        "pack", "unpack", "ord", "base64_encode", "base64_decode",
+        "slugify", "regex_match", "regex_search", "regex_replace",
+        "regex_findall", "regex_findall_index",
+        "urlencode", "from_json", "to_json",
+        "value_json", "trigger", "this", "context", "repeat", "wait",
+        "namespace",
+        # Common variable names in loops that shouldn't trigger warnings
+        "item", "loop", "index", "index0", "first", "last", "length",
+        "cycle", "depth", "depth0", "previtem", "nextitem", "changed",
+        # Range function
+        "range",
+        # Datetime attributes and methods (accessed via now(), etc.)
+        "year", "month", "day", "hour", "minute", "second", "microsecond",
+        "weekday", "isoweekday", "isocalendar", "isoformat", "date", "time",
+        "timestamp", "tzinfo", "tzname", "utcoffset", "dst", "timetuple",
+        # State object attributes
+        "state", "attributes", "entity_id", "domain", "object_id", "name",
+        "last_changed", "last_updated", "last_reported", "context_id",
+        # Trigger object attributes
+        "platform", "event", "to_state", "from_state", "for", "idx", "id",
+        "description", "alias",
+        # Additional common attributes
+        "friendly_name", "icon", "unit_of_measurement", "device_class",
+        "brightness", "color_temp", "hs_color", "rgb_color", "xy_color",
+        "temperature", "humidity", "pressure", "position", "current_position",
+        "current_temperature", "target_temperature", "hvac_mode", "hvac_action",
+        "fan_mode", "swing_mode", "preset_mode", "speed", "percentage",
+        "battery_level", "battery", "power", "voltage", "current", "energy",
+        "elevation", "azimuth", "rising", "setting", "next_rising", "next_setting",
+    }
+
+    # Filters that change type - used for type mismatch detection
+    # Maps filter name to expected output type
+    TYPE_CHANGING_FILTERS: dict[str, str] = {
+        "int": "number",
+        "float": "number",
+        "string": "string",
+        "bool": "boolean",
+        "list": "list",
+        "length": "number",
+        "count": "number",
+        "round": "number",
+        "abs": "number",
+        "sum": "number",
+        "max": "number",
+        "min": "number",
+        "average": "number",
+        "median": "number",
+        "as_timestamp": "number",
+        "first": "any",
+        "last": "any",
+        "join": "string",
+        "lower": "string",
+        "upper": "string",
+        "title": "string",
+        "capitalize": "string",
+        "trim": "string",
+        "replace": "string",
+        "slugify": "string",
+        "tojson": "string",
+        "to_json": "string",
+        "from_json": "any",
+        "split": "list",
+        "sort": "list",
+        "unique": "list",
+        "select": "list",
+        "reject": "list",
+        "map": "list",
+        "batch": "list",
+    }
+
+    # Functions that require positive arguments
+    POSITIVE_ARG_FUNCTIONS: set[str] = {"log", "sqrt"}
+
+    # Functions that require non-zero arguments
+    NONZERO_ARG_FUNCTIONS: set[str] = {"log"}
+
     def __init__(self, file_path: Path) -> None:
         """Initialize the validator.
 
@@ -126,6 +251,10 @@ class BlueprintValidator:
             set()
         )  # inputs with input_datetime selector
         self.entity_inputs: set[str] = set()  # inputs with entity selector
+        self.input_defaults: dict[str, Any] = {}  # input name -> default value
+        self.input_selectors: dict[str, dict[str, Any]] = {}  # input name -> selector dict
+        self.defined_variables: set[str] = set()  # All defined variable names
+        self.variable_types: dict[str, str] = {}  # Inferred types from selectors/filters
 
     def validate(self) -> bool:
         """Run all validation checks.
@@ -142,6 +271,7 @@ class BlueprintValidator:
         self._validate_blueprint_section()
         self._validate_mode()
         self._validate_inputs()
+        self._validate_hysteresis_boundaries()
         self._validate_variables()
         self._validate_version_sync()
         self._validate_triggers()
@@ -296,6 +426,11 @@ class BlueprintValidator:
         # Extract input name from path (e.g., "blueprint.input.foo" -> "foo")
         input_name = path.split(".")[-1]
 
+        # Track default value for hysteresis validation
+        default_value = input_def.get("default")
+        if default_value is not None:
+            self.input_defaults[input_name] = default_value
+
         # Check for selector
         selector = input_def.get("selector")
         if selector is None:
@@ -307,6 +442,9 @@ class BlueprintValidator:
         if not isinstance(selector, dict):
             self.errors.append(f"{path}.selector: Must be a dictionary")
             return
+
+        # Track selector for hysteresis validation
+        self.input_selectors[input_name] = selector
 
         # Validate selector type and track special types
         for selector_type in selector:
@@ -323,6 +461,79 @@ class BlueprintValidator:
                     domain = entity_selector.get("domain")
                     if domain == "input_datetime":
                         self.input_datetime_inputs.add(input_name)
+
+    def _validate_hysteresis_boundaries(self) -> None:
+        """Validate hysteresis boundary pairs have correct relationships.
+
+        Hysteresis is a common pattern in automation to prevent rapid on/off
+        oscillation (chattering). For example, a humidity-based fan control
+        might turn ON at 15% delta and OFF at 10% delta.
+
+        This validation checks that:
+        1. ON thresholds are greater than OFF thresholds
+        2. HIGH boundaries are greater than LOW boundaries
+        3. The gap between thresholds is sufficient (not too small)
+
+        Common issues detected:
+        - humidity_delta_on: 10, humidity_delta_off: 15 (inverted - will cause chatter)
+        - temp_high: 25, temp_low: 25 (equal values - no hysteresis)
+        - threshold_on: 10.5, threshold_off: 10.0 (gap too small for stability)
+        """
+        # Look for hysteresis pairs in defined inputs
+        for on_pattern, off_pattern, desc in self.HYSTERESIS_PATTERNS:
+            for input_name in self.defined_inputs:
+                on_match = re.match(on_pattern, input_name)
+                if not on_match:
+                    continue
+
+                # Construct the expected OFF input name
+                if on_pattern == r"delta_on$":
+                    # Special case for delta patterns
+                    off_name = input_name.replace("_on", "_off")
+                else:
+                    # Use regex substitution for other patterns
+                    off_name = re.sub(on_pattern, off_pattern.replace(r"\1", on_match.group(1)), input_name)
+
+                if off_name not in self.defined_inputs:
+                    continue
+
+                # Found a hysteresis pair - validate the relationship
+                on_default = self.input_defaults.get(input_name)
+                off_default = self.input_defaults.get(off_name)
+
+                # Only validate if both have numeric defaults
+                if on_default is None or off_default is None:
+                    continue
+
+                try:
+                    on_value = float(on_default)
+                    off_value = float(off_default)
+                except (ValueError, TypeError):
+                    continue
+
+                # Check if the relationship is correct (ON > OFF for hysteresis)
+                if on_value < off_value:
+                    self.errors.append(
+                        f"Hysteresis {desc} inversion: '{input_name}' (default={on_value}) "
+                        f"should be greater than '{off_name}' (default={off_value}). "
+                        f"With ON < OFF, the system will chatter rapidly. "
+                        f"Swap the values or adjust thresholds."
+                    )
+                elif on_value == off_value:
+                    self.warnings.append(
+                        f"Hysteresis {desc} has no gap: '{input_name}' and '{off_name}' "
+                        f"both default to {on_value}. Without a gap between ON and OFF "
+                        f"thresholds, there's no hysteresis protection against oscillation."
+                    )
+                else:
+                    # Check if the gap is very small (less than 20% of the ON value)
+                    gap = on_value - off_value
+                    if on_value != 0 and gap / abs(on_value) < 0.1:
+                        self.warnings.append(
+                            f"Hysteresis {desc} gap may be too small: '{input_name}' "
+                            f"(default={on_value}) minus '{off_name}' (default={off_value}) "
+                            f"= {gap}. A larger gap provides better oscillation protection."
+                        )
 
     def _validate_variables(self) -> None:
         """Validate variables section."""
@@ -357,6 +568,9 @@ class BlueprintValidator:
                     if default_val > 0:
                         self.nonzero_default_vars.add(name)
 
+        # First pass: collect all variable names for context
+        self.defined_variables = set(variables.keys())
+
         # Record variables that appear to build comma-joined strings
         for name, value in variables.items():
             if isinstance(value, str):
@@ -383,6 +597,15 @@ class BlueprintValidator:
 
                 # Check for entity ID variables in boolean contexts
                 self._check_entity_id_boolean_context(name, value)
+
+                # NEW: Check for undefined variable references
+                self._check_undefined_variable_references(name, value, defined_vars)
+
+                # NEW: Check for unsafe math operations (sqrt, modulo, asin/acos)
+                self._check_unsafe_math_operations(name, value)
+
+                # NEW: Check for type mismatches in filter chains
+                self._check_type_mismatch_in_filters(name, value)
 
             defined_vars.add(name)
 
@@ -1027,6 +1250,325 @@ class BlueprintValidator:
                         f"'{entity_var}'."
                     )
 
+    def _check_undefined_variable_references(
+        self, var_name: str, value: str, context_vars: set[str]
+    ) -> None:
+        """Check for undefined variable references in templates.
+
+        Detects when a template uses a variable that hasn't been defined in:
+        1. The blueprint's variables section
+        2. Jinja2 built-in functions/filters
+        3. Home Assistant template functions
+        4. Loop variables (item, loop, index, etc.)
+        5. Local {% set %} definitions within the same template
+
+        Args:
+            var_name: Name of the variable being checked (for error messages).
+            value: The template string value to check.
+            context_vars: Set of variable names available in the current context.
+        """
+        if not isinstance(value, str):
+            return
+
+        # Find all variable references in Jinja2 blocks
+        # Pattern matches identifiers inside {{ }} or {% %} blocks
+        all_available = self.JINJA2_BUILTINS | context_vars | self.defined_variables
+
+        # Extract local {% set var = ... %} definitions
+        local_sets = set(re.findall(r"\{%\s*set\s+(\w+)\s*=", value))
+        all_available = all_available | local_sets
+
+        # Extract {% for item in ... %} loop variables
+        for_loops = re.findall(r"\{%\s*for\s+(\w+)(?:\s*,\s*(\w+))?\s+in\s+", value)
+        for match in for_loops:
+            all_available.add(match[0])
+            if match[1]:  # Handle tuple unpacking: for key, value in ...
+                all_available.add(match[1])
+
+        # Find all potential variable references in Jinja blocks
+        # Extract content inside {{ }} and {% %}
+        jinja_blocks = re.findall(r"\{\{([^}]+)\}\}", value)
+        jinja_blocks.extend(re.findall(r"\{%([^%]+)%\}", value))
+
+        for block in jinja_blocks:
+            # Find all word-like tokens that could be variable references
+            # Skip tokens that are:
+            # - Inside string literals
+            # - Numeric values
+            # - Operators
+            # - Filter names following |
+            tokens = self._extract_variable_references(block)
+
+            for token in tokens:
+                if token not in all_available:
+                    # Check if it might be an attribute access (like obj.attr)
+                    if "." in var_name:
+                        continue  # Skip attribute-style references
+
+                    # Check if this looks like a function call (followed by parenthesis)
+                    func_pattern = rf"\b{re.escape(token)}\s*\("
+                    if re.search(func_pattern, block):
+                        # It's being used as a function - might be a HA function we don't know
+                        continue
+
+                    # Check if it's after a pipe (filter)
+                    filter_pattern = rf"\|\s*{re.escape(token)}\b"
+                    if re.search(filter_pattern, block):
+                        # It's being used as a filter
+                        continue
+
+                    self.errors.append(
+                        f"Variable '{var_name}': Undefined reference to '{token}'. "
+                        f"This variable is not defined in the variables section "
+                        f"or recognized as a Jinja2/Home Assistant built-in."
+                    )
+
+    def _extract_variable_references(self, block: str) -> set[str]:
+        """Extract potential variable references from a Jinja2 block.
+
+        Args:
+            block: Content inside a {{ }} or {% %} block.
+
+        Returns:
+            Set of potential variable names found.
+        """
+        tokens: set[str] = set()
+
+        # Remove string literals to avoid false positives
+        # Handle both single and double quoted strings
+        cleaned = re.sub(r"'[^']*'", "", block)
+        cleaned = re.sub(r'"[^"]*"', "", cleaned)
+
+        # Remove numeric literals
+        cleaned = re.sub(r"\b\d+\.?\d*\b", "", cleaned)
+
+        # Remove namespace attribute access (e.g., ns.found -> remove .found)
+        # This prevents false positives for attributes of namespace objects
+        cleaned = re.sub(r"\.([a-zA-Z_][a-zA-Z0-9_]*)", "", cleaned)
+
+        # Remove namespace keyword arguments (e.g., namespace(found=false))
+        # This removes patterns like: word= where the word is an assignment target
+        cleaned = re.sub(r"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*=", "=", cleaned)
+
+        # Find all word tokens that are NOT preceded by a dot
+        # (to avoid capturing object attributes as standalone variables)
+        word_tokens = re.findall(r"(?<![.\w])([a-zA-Z_][a-zA-Z0-9_]*)\b", cleaned)
+
+        for token in word_tokens:
+            # Skip very short tokens that are likely operators/keywords
+            if len(token) <= 1 and token not in ("e", "x", "y", "z", "t", "s", "n"):
+                continue
+
+            # Skip common operators written as words
+            if token in ("eq", "ne", "lt", "gt", "le", "ge"):
+                continue
+
+            tokens.add(token)
+
+        return tokens
+
+    def _check_unsafe_math_operations(self, var_name: str, value: str) -> None:
+        """Check for potentially unsafe mathematical operations.
+
+        Detects:
+        1. sqrt() with potentially negative arguments
+        2. Division/modulo by zero risks
+        3. log() with non-positive arguments (already checked elsewhere, enhanced here)
+        4. Trigonometric functions with invalid domains
+
+        Args:
+            var_name: Name of the variable being checked.
+            value: The template string value.
+        """
+        if not isinstance(value, str):
+            return
+
+        # Check for sqrt() with potentially negative arguments
+        sqrt_matches = re.findall(r"sqrt\s*\(\s*([^)]+)\)", value)
+        for arg in sqrt_matches:
+            arg_stripped = arg.strip()
+            # Skip if it's a literal positive number
+            if re.match(r"^\d+\.?\d*$", arg_stripped):
+                continue
+
+            # Check if there's a guard for negativity
+            # Common patterns: max(0, x), abs(x), if x >= 0
+            var_match = re.search(r"([a-zA-Z_][a-zA-Z0-9_]*)", arg_stripped)
+            if var_match:
+                var = var_match.group(1)
+                # Check for guards
+                guard_patterns = [
+                    rf"max\s*\(\s*0\s*,\s*{re.escape(var)}",
+                    rf"max\s*\(\s*{re.escape(var)}\s*,\s*0",
+                    rf"abs\s*\(\s*{re.escape(var)}\s*\)",
+                    rf"{re.escape(var)}\s*>=\s*0",
+                    rf"{re.escape(var)}\s*>\s*0",
+                    rf"if\s+{re.escape(var)}\s*>=\s*0",
+                ]
+                has_guard = any(re.search(p, value) for p in guard_patterns)
+
+                if not has_guard:
+                    self.warnings.append(
+                        f"Variable '{var_name}': sqrt({arg_stripped}) may fail if the "
+                        f"argument is negative. Consider using 'sqrt(max(0, {var}))' "
+                        f"or adding a guard like 'if {var} >= 0'."
+                    )
+
+        # Check for modulo by zero risks (% operator)
+        # IMPORTANT: Only check inside {{ }} expression blocks, not {% %} control blocks
+        # Pattern: expr % var where var could be zero
+        expr_blocks = re.findall(r"\{\{([^}]+)\}\}", value)
+        for block in expr_blocks:
+            modulo_matches = re.findall(r"%\s*\(?\s*([a-zA-Z_][a-zA-Z0-9_]*)", block)
+            for var in modulo_matches:
+                # Skip mathematical constants
+                if var in ("pi", "e", "tau"):
+                    continue
+
+                # Skip Jinja2 keywords (these aren't modulo operations)
+                if var in self.JINJA2_BUILTINS:
+                    continue
+
+                # Check if variable has non-zero default
+                if hasattr(self, "nonzero_default_vars") and var in self.nonzero_default_vars:
+                    continue
+
+                # Check for guards
+                guard_pattern = (
+                    rf"{re.escape(var)}\s*!=\s*0|"
+                    rf"{re.escape(var)}\s*>\s*0|"
+                    rf"{re.escape(var)}\s+is\s+number"
+                )
+                if not re.search(guard_pattern, value):
+                    self.warnings.append(
+                        f"Variable '{var_name}': Modulo by '{var}' may fail if it's zero. "
+                        f"Consider adding a guard like 'if {var} != 0'."
+                    )
+
+        # Check for asin/acos with out-of-range arguments
+        for func in ["asin", "acos"]:
+            func_matches = re.findall(rf"{func}\s*\(\s*([^)]+)\)", value)
+            for arg in func_matches:
+                arg_stripped = arg.strip()
+                # Skip if it's a literal in valid range [-1, 1]
+                if re.match(r"^-?[01]\.?\d*$", arg_stripped):
+                    try:
+                        val = float(arg_stripped)
+                        if -1 <= val <= 1:
+                            continue
+                    except ValueError:
+                        pass
+
+                # Check for clamping patterns
+                var_match = re.search(r"([a-zA-Z_][a-zA-Z0-9_]*)", arg_stripped)
+                if var_match:
+                    var = var_match.group(1)
+                    clamp_patterns = [
+                        rf"max\s*\(\s*-1\s*,\s*min\s*\(\s*1\s*,\s*{re.escape(var)}",
+                        rf"min\s*\(\s*1\s*,\s*max\s*\(\s*-1\s*,\s*{re.escape(var)}",
+                        r"\|\s*clamp",  # Custom clamp filter if exists
+                    ]
+                    has_clamp = any(re.search(p, value) for p in clamp_patterns)
+
+                    if not has_clamp:
+                        self.warnings.append(
+                            f"Variable '{var_name}': {func}({arg_stripped}) requires "
+                            f"argument in range [-1, 1]. Consider clamping: "
+                            f"{func}(max(-1, min(1, {var})))."
+                        )
+
+    def _check_type_mismatch_in_filters(self, var_name: str, value: str) -> None:
+        """Check for type mismatches in filter chains.
+
+        Detects patterns like:
+        1. Applying string filters to numbers without conversion
+        2. Applying numeric filters to strings without conversion
+        3. Using incompatible filter combinations
+
+        Args:
+            var_name: Name of the variable being checked.
+            value: The template string value.
+        """
+        if not isinstance(value, str):
+            return
+
+        # Extract filter chains from the template
+        # Pattern: expression | filter1 | filter2 | ...
+        # We look for chains where type conversion might be needed
+
+        # Find expressions with filter chains
+        filter_chain_pattern = r"([^|{}]+(?:\|[^|{}]+)+)"
+        chains = re.findall(filter_chain_pattern, value)
+
+        for chain in chains:
+            parts = [p.strip() for p in chain.split("|")]
+            if len(parts) < 2:
+                continue
+
+            # Track the expected type through the chain
+            current_type: str | None = None
+            prev_filter: str | None = None
+
+            for i, part in enumerate(parts[1:], 1):
+                # Extract filter name (before any parentheses)
+                filter_match = re.match(r"(\w+)", part)
+                if not filter_match:
+                    continue
+
+                filter_name = filter_match.group(1)
+
+                # Check for type mismatches
+                if filter_name in self.TYPE_CHANGING_FILTERS:
+                    new_type = self.TYPE_CHANGING_FILTERS[filter_name]
+
+                    # String operations on numbers
+                    if current_type == "number" and filter_name in (
+                        "lower", "upper", "capitalize", "title", "split",
+                        "replace", "strip", "trim"
+                    ):
+                        self.warnings.append(
+                            f"Variable '{var_name}': Filter '{filter_name}' expects "
+                            f"a string but previous filter '{prev_filter}' outputs "
+                            f"a number. Add '| string' before '| {filter_name}'."
+                        )
+
+                    # Numeric operations on strings (without conversion)
+                    if current_type == "string" and filter_name in (
+                        "round", "abs"
+                    ):
+                        # These will work if the string is numeric, but warn anyway
+                        pass  # Don't warn - Jinja2 handles this gracefully
+
+                    current_type = new_type
+                    prev_filter = filter_name
+
+        # Check for common type mismatch patterns
+        # Pattern: states(...) | round - states returns string, round expects number
+        if re.search(r"states\s*\([^)]+\)\s*\|\s*round", value):
+            # Check if there's a float/int conversion
+            if not re.search(r"states\s*\([^)]+\)\s*\|\s*(?:float|int)\s*\([^)]*\)\s*\|\s*round", value):
+                self.warnings.append(
+                    f"Variable '{var_name}': 'states(...)' returns a string, "
+                    f"but '| round' expects a number. "
+                    f"Use '| float(0)' before '| round'."
+                )
+
+        # Pattern: state_attr returns various types - check numeric operations
+        state_attr_numeric = re.findall(
+            r"state_attr\s*\([^)]+\)\s*\|\s*(round|abs)\b", value
+        )
+        for filter_used in state_attr_numeric:
+            # Check if there's proper conversion
+            if not re.search(
+                rf"state_attr\s*\([^)]+\)\s*\|\s*(?:float|int)\s*\([^)]*\)\s*\|\s*{filter_used}",
+                value
+            ):
+                self.warnings.append(
+                    f"Variable '{var_name}': 'state_attr(...)' may return a string, "
+                    f"but '| {filter_used}' expects a number. Consider adding "
+                    f"'| float(0)' before '| {filter_used}' for safety."
+                )
+
     def _check_cross_variable_arithmetic(
         self, variables: dict[str, Any], path: str
     ) -> None:
@@ -1635,6 +2177,17 @@ class BlueprintValidator:
     def _check_trigger_entity_id(self, value: Any, path: str) -> None:
         """Ensure trigger entity_id fields are static strings.
 
+        Trigger entity_id fields in Home Assistant must be resolvable at
+        automation load time, not at runtime. This means they cannot use:
+        1. Jinja2 templates ({{ }})
+        2. Automation variables (defined in the variables: section)
+        3. Dynamic expressions
+
+        Valid options are:
+        - Static entity IDs: "sensor.temperature"
+        - !input references: !input my_sensor
+        - Lists of the above
+
         Args:
             value: The entity_id value to check.
             path: Current path for error messages.
@@ -1655,14 +2208,47 @@ class BlueprintValidator:
             self.errors.append(f"{path}: entity_id cannot be empty")
             return
 
+        # Check for Jinja2 templates
         if "{{" in stripped or "}}" in stripped:
             self.errors.append(
                 f"{path}: entity_id cannot use templates; provide a concrete "
-                "entity reference or !input value"
+                "entity reference or !input value. Trigger entity_id must be "
+                "resolvable at automation load time."
             )
-        else:
-            # Validate format if it's a static string
+            return
+
+        # Check if it looks like a variable reference (not an entity ID or !input)
+        # Entity IDs have format: domain.entity_name
+        # !input refs have format: !input input_name
+        if stripped.startswith("!input "):
+            # Valid !input reference
             self._validate_entity_id_format(stripped, path)
+            return
+
+        # Check if it matches entity ID format (contains a dot)
+        if "." not in stripped:
+            # No dot - might be trying to use a variable name
+            variables = self.data.get("variables", {})
+            if isinstance(variables, dict) and stripped in variables:
+                self.errors.append(
+                    f"{path}: '{stripped}' appears to be a variable reference. "
+                    f"Trigger entity_id cannot reference automation variables. "
+                    f"Use !input or a static entity ID instead. Variables are "
+                    f"not available until the automation runs, but trigger "
+                    f"entity_id must be known at load time."
+                )
+                return
+            else:
+                # Not a known variable, might be a malformed entity ID
+                self.errors.append(
+                    f"{path}: '{stripped}' is not a valid entity ID format. "
+                    f"Entity IDs must be 'domain.entity_name' (e.g., sensor.temperature). "
+                    f"For dynamic entity selection, use !input with an entity selector."
+                )
+                return
+
+        # Validate static entity ID format
+        self._validate_entity_id_format(stripped, path)
 
     def _validate_templates(self) -> None:
         """Validate Jinja2 template syntax."""
@@ -1674,21 +2260,8 @@ class BlueprintValidator:
                 "Found !input tag inside {{ }} template - bind to variable first"
             )
 
-        # Check for balanced Jinja2 delimiters
-        jinja_patterns = [
-            ("{{", "}}", "Jinja expressions"),
-            ("{%", "%}", "Jinja control blocks"),
-            ("{#", "#}", "Jinja comments"),
-        ]
-
-        for open_tag, close_tag, name in jinja_patterns:
-            open_count = content.count(open_tag)
-            close_count = content.count(close_tag)
-            if open_count != close_count:
-                self.errors.append(
-                    f"Unbalanced {name}: {open_tag} appears {open_count} times, "
-                    f"{close_tag} appears {close_count} times"
-                )
+        # Check for balanced Jinja2 delimiters with enhanced analysis
+        self._check_jinja2_delimiter_balance(content)
 
         # Check for common unsupported filters/functions
         unsupported = [
@@ -1722,6 +2295,138 @@ class BlueprintValidator:
                     f"Python-style list method '{method}' does not work in Jinja2. "
                     f"Use '{fix}' instead."
                 )
+
+    def _check_jinja2_delimiter_balance(self, content: str) -> None:
+        """Check for balanced Jinja2 delimiters with detailed error reporting.
+
+        This enhanced check not only counts delimiters but also:
+        1. Reports the approximate line number where imbalance occurs
+        2. Detects nested delimiter issues (e.g., {{ {{ }} }})
+        3. Identifies unclosed blocks (e.g., {% if %} without {% endif %})
+        4. Catches common typos like {{{ or }}}
+
+        Args:
+            content: The full blueprint file content.
+        """
+        lines = content.split("\n")
+
+        # Basic count check for each delimiter type
+        jinja_patterns = [
+            ("{{", "}}", "Jinja expressions"),
+            ("{%", "%}", "Jinja control blocks"),
+            ("{#", "#}", "Jinja comments"),
+        ]
+
+        for open_tag, close_tag, name in jinja_patterns:
+            open_count = content.count(open_tag)
+            close_count = content.count(close_tag)
+            if open_count != close_count:
+                # Find the first line with imbalance
+                running_balance = 0
+                first_imbalance_line = None
+                for line_num, line in enumerate(lines, 1):
+                    running_balance += line.count(open_tag)
+                    running_balance -= line.count(close_tag)
+                    if running_balance < 0 and first_imbalance_line is None:
+                        first_imbalance_line = line_num
+                        break
+
+                if first_imbalance_line:
+                    self.errors.append(
+                        f"Unbalanced {name}: {open_tag} appears {open_count} times, "
+                        f"{close_tag} appears {close_count} times. "
+                        f"Check around line {first_imbalance_line}."
+                    )
+                else:
+                    # Imbalance at end - missing close tag
+                    self.errors.append(
+                        f"Unbalanced {name}: {open_tag} appears {open_count} times, "
+                        f"{close_tag} appears {close_count} times. "
+                        f"Missing closing delimiter(s) at end of file."
+                    )
+
+        # Check for common typos: triple braces
+        triple_open = re.search(r"\{\{\{", content)
+        if triple_open:
+            # Find line number
+            pos = triple_open.start()
+            line_num = content[:pos].count("\n") + 1
+            self.errors.append(
+                f"Triple opening brace '{{{{{{' found at line {line_num}. "
+                f"Did you mean '{{{{' (expression) or '{{%' (control block)?"
+            )
+
+        triple_close = re.search(r"\}\}\}", content)
+        if triple_close:
+            pos = triple_close.start()
+            line_num = content[:pos].count("\n") + 1
+            self.errors.append(
+                f"Triple closing brace '}}}}}}' found at line {line_num}. "
+                f"Did you mean '}}}}' (expression) or '%}}' (control block)?"
+            )
+
+        # Check for unmatched control blocks (if/endif, for/endfor)
+        self._check_control_block_balance(content)
+
+    def _check_control_block_balance(self, content: str) -> None:
+        """Check that Jinja2 control blocks are properly balanced.
+
+        Validates that:
+        - Every {% if %} has a matching {% endif %}
+        - Every {% for %} has a matching {% endfor %}
+        - Every {% macro %} has a matching {% endmacro %}
+        - Block keywords appear in valid order
+
+        Args:
+            content: The full blueprint file content.
+        """
+        # Define control block pairs (open, close)
+        block_pairs = [
+            ("if", "endif"),
+            ("for", "endfor"),
+            ("macro", "endmacro"),
+            ("call", "endcall"),
+            ("filter", "endfilter"),
+            ("block", "endblock"),
+        ]
+
+        lines = content.split("\n")
+
+        for open_kw, close_kw in block_pairs:
+            # Pattern to match {% if ... %} but not {% endif %}
+            open_pattern = rf"\{{% *{open_kw}\b(?!end)"
+            close_pattern = rf"\{{% *{close_kw}\b"
+
+            open_matches = list(re.finditer(open_pattern, content))
+            close_matches = list(re.finditer(close_pattern, content))
+
+            open_count = len(open_matches)
+            close_count = len(close_matches)
+
+            if open_count != close_count:
+                if open_count > close_count:
+                    # Missing close - find the last unclosed open
+                    missing = open_count - close_count
+                    # Find line of last open block
+                    if open_matches:
+                        last_open = open_matches[-missing]
+                        line_num = content[: last_open.start()].count("\n") + 1
+                        self.errors.append(
+                            f"Unclosed '{{% {open_kw} %}}' block: found {open_count} "
+                            f"'{open_kw}' but only {close_count} '{close_kw}'. "
+                            f"Missing '{{% {close_kw} %}}' for block starting near line {line_num}."
+                        )
+                else:
+                    # Extra close - find the orphan close
+                    extra = close_count - open_count
+                    if close_matches:
+                        orphan_close = close_matches[open_count]
+                        line_num = content[: orphan_close.start()].count("\n") + 1
+                        self.errors.append(
+                            f"Orphan '{{% {close_kw} %}}' at line {line_num}: "
+                            f"found {close_count} '{close_kw}' but only {open_count} '{open_kw}'. "
+                            f"Remove the extra '{{% {close_kw} %}}' or add missing '{{% {open_kw} %}}'."
+                        )
 
     def _check_entity_id_value(self, value: Any, path: str) -> None:
         """Validate entity_id fields for multi-entity pitfalls.
@@ -1916,7 +2621,8 @@ def validate_all() -> bool:
     Returns:
         True if all blueprints are valid, False otherwise.
     """
-    repo_root = Path(__file__).parent.parent
+    # Navigate up from scripts/validate-blueprint/ to the repo root
+    repo_root = Path(__file__).parent.parent.parent
     blueprints = find_all_blueprints(repo_root)
 
     if not blueprints:

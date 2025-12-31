@@ -19,7 +19,7 @@ ha-ws-client/
 │       ├── basic.ts     # Core commands: ping, state, states, config, services, call, template
 │       ├── history.ts   # History commands: logbook, history, attrs, timeline, stats, syslog
 │       ├── registry.ts  # Registry commands: entities, devices, areas
-│       └── automation.ts # Debug commands: traces, trace, trace-vars, context, watch, blueprint-inputs
+│       └── automation.ts # Debug commands: traces, trace, trace-vars, trace-timeline, trace-trigger, trace-actions, trace-debug, context, watch, blueprint-inputs
 ```
 
 ## Development
@@ -146,6 +146,12 @@ npm run ha -- attrs climate.thermostat 12
 # Automation debugging
 npm run ha -- traces
 npm run ha -- blueprint-inputs automation.some_automation
+
+# Advanced trace debugging
+npm run ha -- trace-timeline <run_id>   # Execution timeline
+npm run ha -- trace-trigger <run_id>    # Trigger context
+npm run ha -- trace-actions <run_id>    # Action results
+npm run ha -- trace-debug <run_id>      # Comprehensive view
 ```
 
 ## Dependencies

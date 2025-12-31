@@ -99,6 +99,10 @@ Automation Debugging:
   traces [automation_id]         - List automation traces
   trace <run_id> [automation_id] - Get detailed trace for a run
   trace-vars <run_id> [auto_id]  - Show evaluated variables from trace
+  trace-timeline <run_id> [id]   - Step-by-step execution timeline
+  trace-trigger <run_id> [id]    - Show trigger context details
+  trace-actions <run_id> [id]    - Show action results
+  trace-debug <run_id> [id]      - Comprehensive debug view (all info)
   automation-config <entity_id>  - Get automation configuration
   blueprint-inputs <entity_id>   - Validate blueprint inputs vs expected
 
@@ -113,6 +117,7 @@ Examples:
   npx tsx ha-ws-client.ts watch binary_sensor.motion 30
   npx tsx ha-ws-client.ts blueprint-inputs automation.bathroom_lights
   npx tsx ha-ws-client.ts trace-vars 01KDQS4E2WHMYJYYXKC7K28XFG
+  npx tsx ha-ws-client.ts trace-debug 01KDQS4E2WHMYJYYXKC7K28XFG
   echo "{{ now() }}" | npx tsx ha-ws-client.ts template -
 `);
   process.exit(0);

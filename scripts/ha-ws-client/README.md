@@ -358,12 +358,128 @@ npx tsx .claude/ha-ws-client.ts automation-config automation.my_automation
 npx tsx .claude/ha-ws-client.ts blueprint-inputs automation.bathroom_lights
 ```
 
+### Advanced Trace Debugging
+
+```bash
+# Step-by-step execution timeline with timestamps and durations
+npx tsx .claude/ha-ws-client.ts trace-timeline <run_id>          # Chronological trace steps
+
+# Detailed trigger context showing what triggered the automation
+npx tsx .claude/ha-ws-client.ts trace-trigger <run_id>           # Trigger entity, state changes
+
+# Action results showing service call params and responses
+npx tsx .claude/ha-ws-client.ts trace-actions <run_id>           # Action params, results, errors
+
+# Comprehensive debug view combining all information
+npx tsx .claude/ha-ws-client.ts trace-debug <run_id>             # Full debug trace
+```
+
+**Example trace-debug output:**
+```
+============================================================
+AUTOMATION DEBUG TRACE
+============================================================
+
+Automation: automation.bathroom_lights
+Run ID: 01KDQS4E2WHMYJYYXKC7K28XFG
+Status: finished
+Started: 1/15/2025, 10:30:45 AM
+Duration: 234ms
+
+------------------------------------------------------------
+TRIGGER CONTEXT
+------------------------------------------------------------
+Platform: state
+Entity: binary_sensor.bathroom_motion
+From: off
+To: on
+
+------------------------------------------------------------
+EVALUATED VARIABLES
+------------------------------------------------------------
+[boolean] is_occupied: true
+[number] light_level: 45
+[string] time_of_day: morning
+
+------------------------------------------------------------
+EXECUTION TIMELINE
+------------------------------------------------------------
+
+[ok] [10:30:45] Trigger 0
+[ok] [10:30:45] Condition 0
+    humidity_above_threshold: true
+[ok] [10:30:45] Action 0
+    domain: light
+    service: turn_on
+    entity_id: light.bathroom
+
+------------------------------------------------------------
+CONTEXT
+------------------------------------------------------------
+Context ID: 01KDQS4E2WHMYJYYXKC7K28XFG
+
+============================================================
+END OF DEBUG TRACE
+============================================================
+```
+
 ### Live Monitoring
 
 ```bash
-# Watch entity state changes in real-time
+# Basic watch (simpler output)
 npx tsx .claude/ha-ws-client.ts watch binary_sensor.motion 30    # Watch for 30 seconds
 npx tsx .claude/ha-ws-client.ts watch light.kitchen 60           # Shows brightness/temp changes
+
+# Advanced monitoring with anomaly detection
+npx tsx .claude/ha-ws-client.ts monitor sensor.temperature 300   # 5 minutes with full analysis
+npx tsx .claude/ha-ws-client.ts monitor light.kitchen 60         # Track state + attributes
+
+# Monitor multiple entities simultaneously
+npx tsx .claude/ha-ws-client.ts monitor-multi 120 sensor.temp1 sensor.temp2 light.living_room
+
+# Analyze historical data for anomalies
+npx tsx .claude/ha-ws-client.ts analyze sensor.temperature 24    # Last 24 hours
+npx tsx .claude/ha-ws-client.ts analyze binary_sensor.motion 4   # Detect oscillation patterns
+```
+
+**Monitor features:**
+- Live state change tracking with timestamps
+- Rate-of-change detection for numeric sensors
+- Anomaly detection and highlighting:
+  - Values outside normal range (3+ std deviations)
+  - Rapid rate of change
+  - Oscillation/flapping detection
+  - Unavailability events
+- Summary statistics at end of monitoring
+- Attribute change tracking
+
+**Example monitor output:**
+```
+Monitoring sensor.temperature for 300 seconds...
+
+Initial state: 21.5
+  Attributes: temperature=21.5, humidity=45
+
+─── Live State Changes ───
+
+[10:30:45] (initial) → 21.6 (+0.033/s)
+[10:31:15] 21.6 → 21.8 (+0.007/s)
+[10:32:00] 21.8 → 25.2 (+0.076/s)
+         ⚠ Rapid change: +0.076/s; Value 25.20 is 3.2 std devs from mean
+
+═══ Monitoring Summary ═══
+Entity: sensor.temperature
+Duration: 5m 0.0s
+State changes: 3
+
+Numeric Statistics:
+  Min: 21.50
+  Max: 25.20
+  Mean: 22.77
+  Std Dev: 1.72
+
+Anomalies Detected: 1
+  10:32:00: 25.2 - Value 25.20 is 3.2 std devs from mean
 ```
 
 ### Attribute History

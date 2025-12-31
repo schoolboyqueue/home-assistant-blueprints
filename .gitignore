@@ -33,3 +33,6 @@ __pycache__/
 *.DS_Store
 *.env
 *.continue/
+
+# Automaker Configuration
+.automaker/

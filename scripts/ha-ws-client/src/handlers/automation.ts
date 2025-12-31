@@ -16,6 +16,8 @@ import type {
   LogbookEntry,
   TraceDetail,
   TraceInfo,
+  TraceStep,
+  TraceTrigger,
 } from '../types.js';
 import { getYamlModule } from '../utils.js';
 
@@ -678,4 +680,735 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
 
   ctx.ws.removeListener('message', eventHandler);
   console.log(`\nWatched for ${seconds}s, captured ${eventCount} state change(s).`);
+}
+
+/**
+ * Helper function to get trace detail with automatic item_id resolution.
+ *
+ * @param ctx - Command context with WebSocket and arguments
+ * @param runId - The run ID of the trace
+ * @param providedItemId - Optional item ID (will be auto-detected if not provided)
+ * @returns The trace detail
+ */
+async function getTraceDetail(
+  ctx: CommandContext,
+  runId: string,
+  providedItemId?: string
+): Promise<{ trace: TraceDetail; itemId: string }> {
+  let itemId = providedItemId;
+
+  // If no item_id provided, try to find it from traces list
+  if (!itemId) {
+    const traces = await sendMessage<TraceInfo[]>(ctx.ws, 'trace/list', { domain: 'automation' });
+    const match = traces.find((t) => t.run_id === runId);
+    if (match) {
+      itemId = match.item_id;
+    } else {
+      console.error('Could not find automation for run_id. Please provide automation_id.');
+      process.exit(1);
+    }
+  }
+
+  // Normalize item_id (remove automation. prefix if present)
+  itemId = itemId.replace('automation.', '');
+
+  const result = await sendMessage<TraceDetail>(ctx.ws, 'trace/get', {
+    domain: 'automation',
+    item_id: itemId,
+    run_id: runId,
+  });
+
+  return { trace: result, itemId };
+}
+
+/**
+ * Format a trace step path into a human-readable description.
+ *
+ * @param tracePath - The trace path (e.g., "action/0", "condition/1/if/0")
+ * @returns Human-readable description
+ */
+function formatTracePath(tracePath: string): string {
+  const parts = tracePath.split('/');
+  const descriptions: string[] = [];
+
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    const nextPart = parts[i + 1];
+
+    if (part === 'trigger' && nextPart !== undefined) {
+      descriptions.push(`Trigger ${nextPart}`);
+      i++;
+    } else if (part === 'condition' && nextPart !== undefined) {
+      descriptions.push(`Condition ${nextPart}`);
+      i++;
+    } else if (part === 'action' && nextPart !== undefined) {
+      descriptions.push(`Action ${nextPart}`);
+      i++;
+    } else if (part === 'sequence' && nextPart !== undefined) {
+      descriptions.push(`Step ${nextPart}`);
+      i++;
+    } else if (part === 'if' && nextPart !== undefined) {
+      descriptions.push(`If branch ${nextPart}`);
+      i++;
+    } else if (part === 'else' && nextPart !== undefined) {
+      descriptions.push(`Else branch ${nextPart}`);
+      i++;
+    } else if (part === 'then' && nextPart !== undefined) {
+      descriptions.push(`Then ${nextPart}`);
+      i++;
+    } else if (part === 'choose' && nextPart !== undefined) {
+      descriptions.push(`Choose option ${nextPart}`);
+      i++;
+    } else if (part === 'default' && nextPart !== undefined) {
+      descriptions.push(`Default action ${nextPart}`);
+      i++;
+    } else if (part === 'repeat' && nextPart !== undefined) {
+      descriptions.push(`Repeat ${nextPart}`);
+      i++;
+    } else if (part === 'parallel' && nextPart !== undefined) {
+      descriptions.push(`Parallel ${nextPart}`);
+      i++;
+    }
+  }
+
+  return descriptions.length > 0 ? descriptions.join(' > ') : tracePath;
+}
+
+/**
+ * Show step-by-step execution timeline for an automation trace.
+ * Displays each step with timestamps, duration, and execution results.
+ *
+ * @param ctx - Command context with WebSocket and arguments
+ *
+ * @example
+ * ```bash
+ * npx tsx ha-ws-client.ts trace-timeline 01KDQS4E2WHMYJYYXKC7K28XFG
+ * ```
+ */
+export async function handleTraceTimeline(ctx: CommandContext): Promise<void> {
+  const runId = ctx.args[1];
+  const providedItemId = ctx.args[2];
+
+  if (!runId) {
+    console.error('Usage: trace-timeline <run_id> [automation_id]');
+    console.error('  run_id: The run ID from traces command');
+    console.error('  automation_id: Optional automation ID (will auto-detect if not provided)');
+    process.exit(1);
+  }
+
+  const { trace: result, itemId } = await getTraceDetail(ctx, runId, providedItemId);
+
+  console.log(`Execution Timeline for: automation.${itemId}`);
+  console.log(`Run ID: ${runId}`);
+  console.log(`Status: ${result.script_execution ?? 'unknown'}`);
+
+  if (result.timestamp) {
+    const start = new Date(result.timestamp.start);
+    console.log(`Started: ${start.toLocaleString()}`);
+    if (result.timestamp.finish) {
+      const finish = new Date(result.timestamp.finish);
+      const durationMs = finish.getTime() - start.getTime();
+      console.log(`Duration: ${durationMs}ms`);
+    }
+  }
+
+  if (result.error) {
+    console.log(`\n[ERROR] ${result.error}`);
+  }
+
+  console.log('\n--- Execution Steps ---\n');
+
+  if (!result.trace || Object.keys(result.trace).length === 0) {
+    console.log('No trace steps recorded.');
+    return;
+  }
+
+  // Collect all steps with their paths and timestamps for sorting
+  const allSteps: Array<{ path: string; step: TraceStep; index: number }> = [];
+
+  for (const [tracePath, steps] of Object.entries(result.trace)) {
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      if (step) {
+        allSteps.push({ path: tracePath, step, index: i });
+      }
+    }
+  }
+
+  // Sort by timestamp if available
+  allSteps.sort((a, b) => {
+    const timeA = a.step.timestamp ? new Date(a.step.timestamp).getTime() : 0;
+    const timeB = b.step.timestamp ? new Date(b.step.timestamp).getTime() : 0;
+    return timeA - timeB;
+  });
+
+  let prevTime: Date | null = null;
+
+  for (const { path, step } of allSteps) {
+    const pathDesc = formatTracePath(path);
+    const timestamp = step.timestamp ? new Date(step.timestamp) : null;
+    const timeStr = timestamp
+      ? timestamp.toLocaleTimeString('en-US', { hour12: false })
+      : '??:??:??';
+
+    // Calculate delta from previous step
+    let delta = '';
+    if (timestamp && prevTime) {
+      const deltaMs = timestamp.getTime() - prevTime.getTime();
+      if (deltaMs >= 1000) {
+        delta = ` (+${(deltaMs / 1000).toFixed(2)}s)`;
+      } else {
+        delta = ` (+${deltaMs}ms)`;
+      }
+    }
+    prevTime = timestamp;
+
+    // Determine status icon
+    let statusIcon = '[ok]';
+    if (step.error) {
+      statusIcon = '[ERR]';
+    } else if (step.result?.error) {
+      statusIcon = '[ERR]';
+    } else if (step.result?.enabled === false) {
+      statusIcon = '[SKIP]';
+    }
+
+    console.log(`${statusIcon} [${timeStr}]${delta} ${pathDesc}`);
+
+    // Show errors inline
+    if (step.error) {
+      const errorStr =
+        typeof step.error === 'string' ? step.error : JSON.stringify(step.error, null, 2);
+      console.log(`     Error: ${errorStr}`);
+    }
+    if (step.result?.error) {
+      const errorStr =
+        typeof step.result.error === 'string'
+          ? step.result.error
+          : JSON.stringify(step.result.error, null, 2);
+      console.log(`     Result error: ${errorStr}`);
+    }
+
+    // Show changed variables (not full state, just what changed)
+    if (step.changed_variables && Object.keys(step.changed_variables).length > 0) {
+      const changedVars = Object.entries(step.changed_variables)
+        .filter(([k]) => !['trigger', 'this', 'context'].includes(k))
+        .slice(0, 5);
+      if (changedVars.length > 0) {
+        const varStr = changedVars.map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(', ');
+        console.log(`     Changed: ${varStr}`);
+      }
+    }
+  }
+
+  console.log('\n--- End of Timeline ---');
+}
+
+/**
+ * Display detailed trigger context for an automation trace.
+ * Shows the trigger type, triggering entity, state changes, and any trigger variables.
+ *
+ * @param ctx - Command context with WebSocket and arguments
+ *
+ * @example
+ * ```bash
+ * npx tsx ha-ws-client.ts trace-trigger 01KDQS4E2WHMYJYYXKC7K28XFG
+ * ```
+ */
+export async function handleTraceTrigger(ctx: CommandContext): Promise<void> {
+  const runId = ctx.args[1];
+  const providedItemId = ctx.args[2];
+
+  if (!runId) {
+    console.error('Usage: trace-trigger <run_id> [automation_id]');
+    console.error('  run_id: The run ID from traces command');
+    console.error('  automation_id: Optional automation ID (will auto-detect if not provided)');
+    process.exit(1);
+  }
+
+  const { trace: result, itemId } = await getTraceDetail(ctx, runId, providedItemId);
+
+  console.log(`Trigger Context for: automation.${itemId}`);
+  console.log(`Run ID: ${runId}`);
+  console.log(`Status: ${result.script_execution ?? 'unknown'}\n`);
+
+  // Look for trigger info in trace variables
+  let triggerInfo: TraceTrigger | null = null;
+
+  // First check the trace for trigger variables
+  if (result.trace) {
+    for (const steps of Object.values(result.trace)) {
+      for (const step of steps) {
+        if (step.variables?.trigger) {
+          triggerInfo = step.variables.trigger as TraceTrigger;
+          break;
+        }
+      }
+      if (triggerInfo) break;
+    }
+  }
+
+  // Also use top-level trigger info if available
+  if (result.trigger) {
+    triggerInfo = { ...triggerInfo, ...result.trigger };
+  }
+
+  if (!triggerInfo) {
+    console.log('No trigger information found in this trace.');
+    console.log('(Trigger data may not be captured for all automation types)');
+    return;
+  }
+
+  console.log('--- Trigger Details ---\n');
+
+  if (triggerInfo.platform) {
+    console.log(`Platform: ${triggerInfo.platform}`);
+  }
+
+  if (triggerInfo.id !== undefined) {
+    console.log(`Trigger ID: ${triggerInfo.id}`);
+  }
+
+  if (triggerInfo.idx !== undefined) {
+    console.log(`Trigger Index: ${triggerInfo.idx}`);
+  }
+
+  if (triggerInfo.alias) {
+    console.log(`Alias: ${triggerInfo.alias}`);
+  }
+
+  if (triggerInfo.entity_id) {
+    console.log(`Entity: ${triggerInfo.entity_id}`);
+  }
+
+  if (triggerInfo.description) {
+    console.log(`Description: ${triggerInfo.description}`);
+  }
+
+  // Show state transition
+  if (triggerInfo.from_state || triggerInfo.to_state) {
+    console.log('\n--- State Transition ---\n');
+
+    if (triggerInfo.from_state) {
+      const from = triggerInfo.from_state;
+      console.log(`From State:`);
+      console.log(`  Value: ${from.state}`);
+      if (from.last_changed) {
+        console.log(`  Changed: ${new Date(from.last_changed).toLocaleString()}`);
+      }
+      if (from.attributes && Object.keys(from.attributes).length > 0) {
+        const importantAttrs = [
+          'brightness',
+          'color_temp',
+          'temperature',
+          'hvac_action',
+          'position',
+          'percentage',
+          'friendly_name',
+        ];
+        const attrs = Object.entries(from.attributes)
+          .filter(([k]) => importantAttrs.includes(k))
+          .slice(0, 5);
+        if (attrs.length > 0) {
+          console.log(`  Attributes: ${attrs.map(([k, v]) => `${k}=${v}`).join(', ')}`);
+        }
+      }
+    }
+
+    if (triggerInfo.to_state) {
+      const to = triggerInfo.to_state;
+      console.log(`\nTo State:`);
+      console.log(`  Value: ${to.state}`);
+      if (to.last_changed) {
+        console.log(`  Changed: ${new Date(to.last_changed).toLocaleString()}`);
+      }
+      if (to.attributes && Object.keys(to.attributes).length > 0) {
+        const importantAttrs = [
+          'brightness',
+          'color_temp',
+          'temperature',
+          'hvac_action',
+          'position',
+          'percentage',
+          'friendly_name',
+        ];
+        const attrs = Object.entries(to.attributes)
+          .filter(([k]) => importantAttrs.includes(k))
+          .slice(0, 5);
+        if (attrs.length > 0) {
+          console.log(`  Attributes: ${attrs.map(([k, v]) => `${k}=${v}`).join(', ')}`);
+        }
+      }
+    }
+  }
+
+  // Show "for" duration if present
+  if (triggerInfo.for) {
+    console.log('\n--- Duration Condition ---');
+    if (typeof triggerInfo.for === 'string') {
+      console.log(`For: ${triggerInfo.for}`);
+    } else {
+      const parts: string[] = [];
+      if (triggerInfo.for.hours) parts.push(`${triggerInfo.for.hours}h`);
+      if (triggerInfo.for.minutes) parts.push(`${triggerInfo.for.minutes}m`);
+      if (triggerInfo.for.seconds) parts.push(`${triggerInfo.for.seconds}s`);
+      console.log(`For: ${parts.join(' ')}`);
+    }
+  }
+
+  // Show trigger configuration from automation config
+  if (result.config?.trigger && Array.isArray(result.config.trigger)) {
+    const idx = triggerInfo.idx !== undefined ? parseInt(triggerInfo.idx, 10) : 0;
+    const triggerConfig = result.config.trigger[idx];
+    if (triggerConfig) {
+      console.log('\n--- Trigger Configuration ---');
+      console.log(JSON.stringify(triggerConfig, null, 2));
+    }
+  }
+}
+
+/**
+ * Display action results from an automation trace.
+ * Shows each action's execution result, service calls, and any data returned.
+ *
+ * @param ctx - Command context with WebSocket and arguments
+ *
+ * @example
+ * ```bash
+ * npx tsx ha-ws-client.ts trace-actions 01KDQS4E2WHMYJYYXKC7K28XFG
+ * ```
+ */
+export async function handleTraceActions(ctx: CommandContext): Promise<void> {
+  const runId = ctx.args[1];
+  const providedItemId = ctx.args[2];
+
+  if (!runId) {
+    console.error('Usage: trace-actions <run_id> [automation_id]');
+    console.error('  run_id: The run ID from traces command');
+    console.error('  automation_id: Optional automation ID (will auto-detect if not provided)');
+    process.exit(1);
+  }
+
+  const { trace: result, itemId } = await getTraceDetail(ctx, runId, providedItemId);
+
+  console.log(`Action Results for: automation.${itemId}`);
+  console.log(`Run ID: ${runId}`);
+  console.log(`Status: ${result.script_execution ?? 'unknown'}\n`);
+
+  if (!result.trace || Object.keys(result.trace).length === 0) {
+    console.log('No trace steps recorded.');
+    return;
+  }
+
+  // Filter for action-related trace steps
+  const actionPaths = Object.entries(result.trace)
+    .filter(([path]) => path.includes('action') || path.includes('sequence'))
+    .sort(([a], [b]) => a.localeCompare(b));
+
+  if (actionPaths.length === 0) {
+    console.log('No action steps found in this trace.');
+    return;
+  }
+
+  console.log('--- Action Results ---\n');
+
+  let actionNum = 1;
+  for (const [tracePath, steps] of actionPaths) {
+    const pathDesc = formatTracePath(tracePath);
+
+    for (const step of steps) {
+      // Determine status
+      let status = '[ok]';
+      if (step.error) {
+        status = '[FAIL]';
+      } else if (step.result?.error) {
+        status = '[FAIL]';
+      } else if (step.result?.enabled === false) {
+        status = '[SKIP]';
+      }
+
+      console.log(`${status} Action ${actionNum}: ${pathDesc}`);
+
+      // Show timestamp
+      if (step.timestamp) {
+        console.log(`    Time: ${new Date(step.timestamp).toLocaleString()}`);
+      }
+
+      // Show result details
+      if (step.result) {
+        // Show parameters if present
+        if (step.result.params && Object.keys(step.result.params).length > 0) {
+          console.log(`    Params:`);
+          for (const [key, value] of Object.entries(step.result.params)) {
+            const valueStr = typeof value === 'object' ? JSON.stringify(value) : String(value);
+            const truncated = valueStr.length > 60 ? `${valueStr.substring(0, 60)}...` : valueStr;
+            console.log(`      ${key}: ${truncated}`);
+          }
+        }
+
+        // Show response if present
+        if (step.result.response !== undefined) {
+          console.log(`    Response:`);
+          const responseStr = JSON.stringify(step.result.response, null, 2);
+          const lines = responseStr.split('\n');
+          for (const line of lines.slice(0, 10)) {
+            console.log(`      ${line}`);
+          }
+          if (lines.length > 10) {
+            console.log(`      ... (${lines.length - 10} more lines)`);
+          }
+        }
+
+        // Show running_script status
+        if (step.result.running_script !== undefined) {
+          console.log(`    Running script: ${step.result.running_script}`);
+        }
+
+        // Show limit
+        if (step.result.limit !== undefined) {
+          console.log(`    Limit: ${step.result.limit}`);
+        }
+      }
+
+      // Show errors
+      if (step.error) {
+        console.log(`    Error:`);
+        const errorStr =
+          typeof step.error === 'string' ? step.error : JSON.stringify(step.error, null, 2);
+        const lines = errorStr.split('\n');
+        for (const line of lines) {
+          console.log(`      ${line}`);
+        }
+      }
+
+      if (step.result?.error) {
+        console.log(`    Result Error:`);
+        const errorStr =
+          typeof step.result.error === 'string'
+            ? step.result.error
+            : JSON.stringify(step.result.error, null, 2);
+        const lines = errorStr.split('\n');
+        for (const line of lines) {
+          console.log(`      ${line}`);
+        }
+      }
+
+      console.log('');
+      actionNum++;
+    }
+  }
+
+  // Show summary
+  const successCount = actionPaths
+    .flatMap(([, steps]) => steps)
+    .filter((s) => !s.error && !s.result?.error && s.result?.enabled !== false).length;
+  const failCount = actionPaths
+    .flatMap(([, steps]) => steps)
+    .filter((s) => s.error || s.result?.error).length;
+  const skipCount = actionPaths
+    .flatMap(([, steps]) => steps)
+    .filter((s) => s.result?.enabled === false).length;
+
+  console.log('--- Summary ---');
+  console.log(`Total actions: ${actionNum - 1}`);
+  console.log(`Successful: ${successCount}`);
+  if (failCount > 0) console.log(`Failed: ${failCount}`);
+  if (skipCount > 0) console.log(`Skipped: ${skipCount}`);
+}
+
+/**
+ * Display a comprehensive debug view of an automation trace.
+ * Combines trigger, variables, and action information in one output.
+ *
+ * @param ctx - Command context with WebSocket and arguments
+ *
+ * @example
+ * ```bash
+ * npx tsx ha-ws-client.ts trace-debug 01KDQS4E2WHMYJYYXKC7K28XFG
+ * ```
+ */
+export async function handleTraceDebug(ctx: CommandContext): Promise<void> {
+  const runId = ctx.args[1];
+  const providedItemId = ctx.args[2];
+
+  if (!runId) {
+    console.error('Usage: trace-debug <run_id> [automation_id]');
+    console.error('  run_id: The run ID from traces command');
+    console.error('  automation_id: Optional automation ID (will auto-detect if not provided)');
+    console.error('\nThis command provides a comprehensive debug view combining:');
+    console.error('  - Trigger context');
+    console.error('  - Variable values at each step');
+    console.error('  - Action results');
+    console.error('  - Any errors encountered');
+    process.exit(1);
+  }
+
+  const { trace: result, itemId } = await getTraceDetail(ctx, runId, providedItemId);
+
+  console.log('='.repeat(60));
+  console.log(`AUTOMATION DEBUG TRACE`);
+  console.log('='.repeat(60));
+  console.log(`\nAutomation: automation.${itemId}`);
+  console.log(`Run ID: ${runId}`);
+  console.log(`Status: ${result.script_execution ?? 'unknown'}`);
+
+  if (result.timestamp) {
+    const start = new Date(result.timestamp.start);
+    console.log(`Started: ${start.toLocaleString()}`);
+    if (result.timestamp.finish) {
+      const finish = new Date(result.timestamp.finish);
+      const durationMs = finish.getTime() - start.getTime();
+      console.log(`Duration: ${durationMs}ms`);
+    }
+  }
+
+  if (result.error) {
+    console.log(`\n!!! ERROR: ${result.error}`);
+  }
+
+  // Section 1: Trigger Context
+  console.log(`\n${'-'.repeat(60)}`);
+  console.log('TRIGGER CONTEXT');
+  console.log('-'.repeat(60));
+
+  let triggerInfo: TraceTrigger | null = null;
+  if (result.trace) {
+    for (const steps of Object.values(result.trace)) {
+      for (const step of steps) {
+        if (step.variables?.trigger) {
+          triggerInfo = step.variables.trigger as TraceTrigger;
+          break;
+        }
+      }
+      if (triggerInfo) break;
+    }
+  }
+
+  if (result.trigger) {
+    triggerInfo = { ...triggerInfo, ...result.trigger };
+  }
+
+  if (triggerInfo) {
+    if (triggerInfo.platform) console.log(`Platform: ${triggerInfo.platform}`);
+    if (triggerInfo.entity_id) console.log(`Entity: ${triggerInfo.entity_id}`);
+    if (triggerInfo.from_state) {
+      console.log(`From: ${triggerInfo.from_state.state}`);
+    }
+    if (triggerInfo.to_state) {
+      console.log(`To: ${triggerInfo.to_state.state}`);
+    }
+    if (triggerInfo.description) console.log(`Description: ${triggerInfo.description}`);
+  } else {
+    console.log('(No trigger information captured)');
+  }
+
+  // Section 2: Variables
+  console.log(`\n${'-'.repeat(60)}`);
+  console.log('EVALUATED VARIABLES');
+  console.log('-'.repeat(60));
+
+  const allVars = new Map<string, unknown>();
+  if (result.trace) {
+    for (const steps of Object.values(result.trace)) {
+      for (const step of steps) {
+        if (step.variables && Object.keys(step.variables).length > 0) {
+          for (const [k, v] of Object.entries(step.variables)) {
+            allVars.set(k, v);
+          }
+        }
+      }
+    }
+  }
+
+  const skipVars = new Set(['trigger', 'this', 'context']);
+  const importantVars = [...allVars.entries()].filter(([k]) => !skipVars.has(k));
+
+  if (importantVars.length > 0) {
+    for (const [key, value] of importantVars) {
+      const valueStr = typeof value === 'object' ? JSON.stringify(value) : String(value);
+      const truncated = valueStr.length > 60 ? `${valueStr.substring(0, 60)}...` : valueStr;
+      const typeStr = typeof value;
+      console.log(`[${typeStr}] ${key}: ${truncated}`);
+    }
+  } else {
+    console.log('(No variables captured - variables are captured at condition/choose steps)');
+  }
+
+  // Section 3: Execution Timeline
+  console.log(`\n${'-'.repeat(60)}`);
+  console.log('EXECUTION TIMELINE');
+  console.log('-'.repeat(60));
+
+  if (result.trace && Object.keys(result.trace).length > 0) {
+    // Collect and sort all steps
+    const allSteps: Array<{ path: string; step: TraceStep }> = [];
+    for (const [tracePath, steps] of Object.entries(result.trace)) {
+      for (const step of steps) {
+        allSteps.push({ path: tracePath, step });
+      }
+    }
+
+    allSteps.sort((a, b) => {
+      const timeA = a.step.timestamp ? new Date(a.step.timestamp).getTime() : 0;
+      const timeB = b.step.timestamp ? new Date(b.step.timestamp).getTime() : 0;
+      return timeA - timeB;
+    });
+
+    for (const { path, step } of allSteps) {
+      const pathDesc = formatTracePath(path);
+      const timeStr = step.timestamp
+        ? new Date(step.timestamp).toLocaleTimeString('en-US', { hour12: false })
+        : '??:??:??';
+
+      let statusIcon = '[ok]';
+      if (step.error || step.result?.error) {
+        statusIcon = '[ERR]';
+      } else if (step.result?.enabled === false) {
+        statusIcon = '[SKIP]';
+      }
+
+      console.log(`\n${statusIcon} [${timeStr}] ${pathDesc}`);
+
+      // Show result params
+      if (step.result?.params) {
+        const params = Object.entries(step.result.params).slice(0, 3);
+        for (const [k, v] of params) {
+          const vStr = typeof v === 'object' ? JSON.stringify(v) : String(v);
+          const truncated = vStr.length > 50 ? `${vStr.substring(0, 50)}...` : vStr;
+          console.log(`    ${k}: ${truncated}`);
+        }
+      }
+
+      // Show errors
+      if (step.error) {
+        console.log(
+          `    !!! Error: ${typeof step.error === 'string' ? step.error : JSON.stringify(step.error)}`
+        );
+      }
+      if (step.result?.error) {
+        console.log(
+          `    !!! Result error: ${typeof step.result.error === 'string' ? step.result.error : JSON.stringify(step.result.error)}`
+        );
+      }
+    }
+  } else {
+    console.log('(No trace steps recorded)');
+  }
+
+  // Section 4: Context
+  console.log(`\n${'-'.repeat(60)}`);
+  console.log('CONTEXT');
+  console.log('-'.repeat(60));
+
+  if (result.context) {
+    if (result.context.id) console.log(`Context ID: ${result.context.id}`);
+    if (result.context.parent_id) console.log(`Parent ID: ${result.context.parent_id}`);
+    if (result.context.user_id) console.log(`User ID: ${result.context.user_id}`);
+  } else {
+    console.log('(No context information)');
+  }
+
+  console.log(`\n${'='.repeat(60)}`);
+  console.log('END OF DEBUG TRACE');
+  console.log('='.repeat(60));
 }

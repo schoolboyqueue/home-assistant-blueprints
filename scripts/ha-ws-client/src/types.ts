@@ -123,26 +123,89 @@ export interface TraceInfo {
 }
 
 /**
+ * Result from an action step in an automation trace.
+ * Contains response data, state changes, and any errors.
+ */
+export interface TraceActionResult {
+  readonly error?: unknown;
+  readonly response?: unknown;
+  readonly params?: Record<string, unknown>;
+  readonly running_script?: boolean;
+  readonly limit?: number;
+  readonly enabled?: boolean;
+}
+
+/**
  * A single step within an automation trace.
  * Contains execution details, errors, and evaluated variables.
  */
 export interface TraceStep {
+  readonly path?: string;
   readonly error?: unknown;
-  readonly result?: { readonly error?: unknown };
+  readonly result?: TraceActionResult;
   readonly variables?: Record<string, unknown>;
+  readonly changed_variables?: Record<string, unknown>;
   readonly timestamp?: string;
 }
 
 /**
+ * Trigger information captured during automation execution.
+ * Contains the triggering entity, state changes, and context.
+ */
+export interface TraceTrigger {
+  readonly id?: string;
+  readonly idx?: string;
+  readonly alias?: string;
+  readonly platform?: string;
+  readonly entity_id?: string;
+  readonly from_state?: {
+    readonly entity_id?: string;
+    readonly state: string;
+    readonly attributes?: Record<string, unknown>;
+    readonly last_changed?: string;
+    readonly last_updated?: string;
+  };
+  readonly to_state?: {
+    readonly entity_id?: string;
+    readonly state: string;
+    readonly attributes?: Record<string, unknown>;
+    readonly last_changed?: string;
+    readonly last_updated?: string;
+  };
+  readonly for?:
+    | string
+    | { readonly hours?: number; readonly minutes?: number; readonly seconds?: number };
+  readonly description?: string;
+}
+
+/**
  * Detailed trace information for an automation run.
- * Contains the full execution path and evaluated values.
+ * Contains the full execution path, trigger context, and evaluated values.
  */
 export interface TraceDetail {
   readonly script_execution?: string;
   readonly error?: string;
   readonly trace?: Record<string, readonly TraceStep[]>;
-  readonly config?: { readonly trigger?: unknown };
-  readonly context?: Record<string, unknown>;
+  readonly config?: {
+    readonly id?: string;
+    readonly alias?: string;
+    readonly trigger?: readonly unknown[];
+    readonly condition?: readonly unknown[];
+    readonly action?: readonly unknown[];
+  };
+  readonly context?: {
+    readonly id?: string;
+    readonly parent_id?: string;
+    readonly user_id?: string;
+  };
+  readonly trigger?: TraceTrigger;
+  readonly run_id?: string;
+  readonly domain?: string;
+  readonly item_id?: string;
+  readonly timestamp?: {
+    readonly start: string;
+    readonly finish?: string;
+  };
 }
 
 /**
