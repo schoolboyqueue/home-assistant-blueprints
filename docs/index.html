@@ -21,6 +21,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="visualizer.css">
 </head>
 <body>
     <!-- Noise texture overlay -->
@@ -40,7 +41,8 @@
             <div class="nav-links">
                 <a href="#blueprints">Blueprints</a>
                 <a href="#features">Features</a>
-                <a href="#quick-start">Quick Start</a>
+                <a href="#visualizer">Visualizer</a>
+                <a href="#tools">Tools</a>
                 <a href="https://github.com/schoolboyqueue/home-assistant-blueprints" target="_blank" class="nav-btn nav-btn-secondary">
                     <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
                         <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
@@ -198,6 +200,20 @@
                 <h3>MIT Licensed</h3>
                 <p>Permissive licensing for personal and commercial use. Use freely, modify as needed.</p>
             </div>
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="5" r="3"/>
+                        <circle cx="5" cy="19" r="3"/>
+                        <circle cx="19" cy="19" r="3"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="12" x2="5" y2="16"/>
+                        <line x1="12" y1="12" x2="19" y2="16"/>
+                    </svg>
+                </div>
+                <h3>Visual Learning</h3>
+                <p>Interactive <a href="#visualizer" style="color: var(--accent-cyan);">decision tree visualizer</a> helps you understand how blueprints evaluate conditions and select actions.</p>
+            </div>
         </div>
     </section>
 
@@ -234,6 +250,16 @@
                         Import
                     </a>
                     <a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/adaptive-comfort-control/README.md" target="_blank" class="btn btn-docs">Docs</a>
+                    <a href="#visualizer" class="btn btn-docs" title="Visualize decision tree" onclick="if(window.selectBlueprint)selectBlueprint('adaptive-comfort-control')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <circle cx="12" cy="5" r="2"/>
+                            <circle cx="6" cy="18" r="2"/>
+                            <circle cx="18" cy="18" r="2"/>
+                            <line x1="12" y1="7" x2="12" y2="10"/>
+                            <line x1="12" y1="10" x2="6" y2="16"/>
+                            <line x1="12" y1="10" x2="18" y2="16"/>
+                        </svg>
+                    </a>
                 </div>
             </article>
 
@@ -267,6 +293,16 @@
                         Import
                     </a>
                     <a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/bathroom-light-fan-control/README.md" target="_blank" class="btn btn-docs">Docs</a>
+                    <a href="#visualizer" class="btn btn-docs" title="Visualize decision tree" onclick="if(window.selectBlueprint)selectBlueprint('bathroom-light-fan-control')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <circle cx="12" cy="5" r="2"/>
+                            <circle cx="6" cy="18" r="2"/>
+                            <circle cx="18" cy="18" r="2"/>
+                            <line x1="12" y1="7" x2="12" y2="10"/>
+                            <line x1="12" y1="10" x2="6" y2="16"/>
+                            <line x1="12" y1="10" x2="18" y2="16"/>
+                        </svg>
+                    </a>
                 </div>
             </article>
 
@@ -298,6 +334,16 @@
                         Import
                     </a>
                     <a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/multi-switch-light-control/README.md" target="_blank" class="btn btn-docs">Docs</a>
+                    <a href="#visualizer" class="btn btn-docs" title="Visualize decision tree" onclick="if(window.selectBlueprint)selectBlueprint('multi-switch-light-control')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <circle cx="12" cy="5" r="2"/>
+                            <circle cx="6" cy="18" r="2"/>
+                            <circle cx="18" cy="18" r="2"/>
+                            <line x1="12" y1="7" x2="12" y2="10"/>
+                            <line x1="12" y1="10" x2="6" y2="16"/>
+                            <line x1="12" y1="10" x2="18" y2="16"/>
+                        </svg>
+                    </a>
                 </div>
             </article>
 
@@ -329,6 +375,16 @@
                         Import
                     </a>
                     <a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/adaptive-shades/README.md" target="_blank" class="btn btn-docs">Docs</a>
+                    <a href="#visualizer" class="btn btn-docs" title="Visualize decision tree" onclick="if(window.selectBlueprint)selectBlueprint('adaptive-shades')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <circle cx="12" cy="5" r="2"/>
+                            <circle cx="6" cy="18" r="2"/>
+                            <circle cx="18" cy="18" r="2"/>
+                            <line x1="12" y1="7" x2="12" y2="10"/>
+                            <line x1="12" y1="10" x2="6" y2="16"/>
+                            <line x1="12" y1="10" x2="18" y2="16"/>
+                        </svg>
+                    </a>
                 </div>
             </article>
 
@@ -366,6 +422,16 @@
                         Import
                     </a>
                     <a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/adaptive-fan-control/README.md" target="_blank" class="btn btn-docs">Docs</a>
+                    <a href="#visualizer" class="btn btn-docs" title="Visualize decision tree" onclick="if(window.selectBlueprint)selectBlueprint('adaptive-fan-control')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <circle cx="12" cy="5" r="2"/>
+                            <circle cx="6" cy="18" r="2"/>
+                            <circle cx="18" cy="18" r="2"/>
+                            <line x1="12" y1="7" x2="12" y2="10"/>
+                            <line x1="12" y1="10" x2="6" y2="16"/>
+                            <line x1="12" y1="10" x2="18" y2="16"/>
+                        </svg>
+                    </a>
                 </div>
             </article>
         </div>
@@ -417,6 +483,328 @@
         </div>
     </section>
 
+    <!-- Visualizer Section -->
+    <section id="visualizer" class="visualizer-section">
+        <div class="section-header">
+            <h2 class="section-title">Blueprint Logic Explorer</h2>
+            <p class="section-subtitle">
+                Understand exactly what each blueprint does: see every trigger, condition, and action in plain English
+            </p>
+        </div>
+
+        <!-- Controls Section -->
+        <div class="viz-controls-inline">
+            <div class="controls-grid">
+                <!-- Blueprint Selector -->
+                <div class="control-group">
+                    <label for="blueprint-select">Select Blueprint</label>
+                    <div class="select-wrapper">
+                        <select id="blueprint-select">
+                            <option value="">Choose a blueprint...</option>
+                            <option value="adaptive-comfort-control">Adaptive Comfort Control Pro</option>
+                            <option value="bathroom-light-fan-control">Bathroom Light Fan Control Pro</option>
+                            <option value="multi-switch-light-control">Multi Switch Light Control Pro</option>
+                            <option value="adaptive-shades">Adaptive Shades Pro</option>
+                            <option value="adaptive-fan-control">Ceiling Fan Climate Control Pro</option>
+                        </select>
+                        <svg class="select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logic Matrix Container -->
+        <div class="viz-diagram-inline">
+            <div class="diagram-wrapper" id="diagram-wrapper">
+                <!-- Loading State -->
+                <div class="diagram-placeholder" id="diagram-placeholder">
+                    <svg class="placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M12 2L2 7L12 12L22 7L12 2Z"/>
+                        <path d="M2 17L12 22L22 17"/>
+                        <path d="M2 12L12 17L22 12"/>
+                    </svg>
+                    <h3>Select a Blueprint</h3>
+                    <p>Choose a blueprint from the dropdown above to see exactly how it works - what triggers it, what it checks, and what actions it takes</p>
+                </div>
+
+                <!-- Loading Spinner -->
+                <div class="diagram-loading" id="diagram-loading" style="display: none;">
+                    <div class="loading-spinner"></div>
+                    <p>Analyzing blueprint logic...</p>
+                </div>
+
+                <!-- Decision Matrix Container -->
+                <div class="matrix-content" id="matrix-content" style="display: none;">
+                    <div class="matrix-wrapper" id="decision-matrix"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Panel -->
+        <div class="viz-info-inline" id="viz-info" style="display: none;">
+            <div class="info-grid">
+                <!-- Blueprint Overview -->
+                <div class="info-card">
+                    <div class="info-card-header">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="12" y1="16" x2="12" y2="12"/>
+                            <line x1="12" y1="8" x2="12.01" y2="8"/>
+                        </svg>
+                        <h3>Blueprint Overview</h3>
+                    </div>
+                    <div class="info-card-content">
+                        <div class="info-row">
+                            <span class="info-label">Name</span>
+                            <span class="info-value" id="info-name">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Version</span>
+                            <span class="info-value" id="info-version">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Domain</span>
+                            <span class="info-value" id="info-domain">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Statistics -->
+                <div class="info-card">
+                    <div class="info-card-header">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 20V10"/>
+                            <path d="M12 20V4"/>
+                            <path d="M6 20v-6"/>
+                        </svg>
+                        <h3>Statistics</h3>
+                    </div>
+                    <div class="info-card-content">
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <span class="stat-value" id="stat-triggers">0</span>
+                                <span class="stat-label">Triggers</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-value" id="stat-conditions">0</span>
+                                <span class="stat-label">Conditions</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-value" id="stat-actions">0</span>
+                                <span class="stat-label">Actions</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-value" id="stat-branches">0</span>
+                                <span class="stat-label">Branches</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- How to Read -->
+                <div class="info-card">
+                    <div class="info-card-header">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                            <line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                        <h3>How to Read</h3>
+                    </div>
+                    <div class="info-card-content">
+                        <div class="howto-legend">
+                            <div class="legend-item">
+                                <span class="legend-icon">&#127919;</span>
+                                <span><strong>Trigger</strong> - What starts the automation</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-icon">&#10003;</span>
+                                <span><strong>Conditions</strong> - What must be true</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-icon">&#9889;</span>
+                                <span><strong>Actions</strong> - What happens next</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-icon">&#128161;</span>
+                                <span><strong>Why</strong> - The purpose of this logic</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- How It Works -->
+        <div class="viz-howto-inline">
+            <h3>Understanding Blueprint Logic</h3>
+            <div class="howto-grid">
+                <div class="howto-card">
+                    <div class="howto-icon">
+                        <span class="howto-emoji">&#127919;</span>
+                    </div>
+                    <h4>Triggers</h4>
+                    <p>Events that start the automation. Examples: motion detected, humidity changed, button pressed, or timer elapsed.</p>
+                </div>
+                <div class="howto-card">
+                    <div class="howto-icon">
+                        <span class="howto-emoji">&#10003;</span>
+                    </div>
+                    <h4>Conditions</h4>
+                    <p>Checks that must pass before actions run. Examples: "someone is home", "room is dark enough", "no manual override".</p>
+                </div>
+                <div class="howto-card">
+                    <div class="howto-icon">
+                        <span class="howto-emoji">&#9889;</span>
+                    </div>
+                    <h4>Actions</h4>
+                    <p>What the automation actually does. Examples: turn on lights, adjust fan speed, set thermostat.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Developer Tools Section -->
+    <section id="tools" class="tools-section">
+        <div class="section-header">
+            <div class="hero-badge">
+                <span class="badge-icon">&#128736;</span>
+                Developer Utilities
+            </div>
+            <h2 class="section-title">Developer Tools</h2>
+            <p class="section-subtitle">
+                Command-line utilities for blueprint development and Home Assistant debugging.
+                Validate your YAML before importing and query your HA instance in real-time.
+            </p>
+        </div>
+
+        <!-- Tools Grid -->
+        <div class="tools-grid">
+            <!-- validate-blueprint -->
+            <article class="tool-card">
+                <div class="tool-header">
+                    <div class="tool-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 11l3 3L22 4"/>
+                            <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+                        </svg>
+                    </div>
+                    <div class="tool-header-text">
+                        <h3>validate-blueprint</h3>
+                        <div class="tool-tech">
+                            <span class="tech-tag">Python</span>
+                            <span class="tech-tag">CLI</span>
+                        </div>
+                    </div>
+                </div>
+
+                <p class="tool-description">
+                    A comprehensive validator that checks blueprint YAML files for common issues <strong>before</strong> you import them into Home Assistant. Catches syntax errors, structural problems, and template issues.
+                </p>
+
+                <div class="tool-features">
+                    <h4>Key Features</h4>
+                    <ul>
+                        <li>YAML syntax and structure validation</li>
+                        <li>Trigger, input, and action validation</li>
+                        <li>Jinja2 template syntax checking</li>
+                        <li>Detection of <code>!input</code> tags inside template blocks</li>
+                        <li>Service call structure verification</li>
+                    </ul>
+                </div>
+
+                <div class="tool-usage">
+                    <div class="usage-header">
+                        <span class="usage-dot red"></span>
+                        <span class="usage-dot yellow"></span>
+                        <span class="usage-dot green"></span>
+                        <span class="usage-title">Terminal</span>
+                    </div>
+                    <pre class="usage-content"><span class="comment"># Validate a single blueprint</span>
+<span class="command">python3 scripts/validate-blueprint/validate-blueprint.py path/to/blueprint.yaml</span>
+
+<span class="comment"># Validate all blueprints</span>
+<span class="command">python3 scripts/validate-blueprint/validate-blueprint.py --all</span></pre>
+                </div>
+
+                <div class="tool-actions">
+                    <a href="https://github.com/schoolboyqueue/home-assistant-blueprints/tree/main/scripts/validate-blueprint" target="_blank" class="btn btn-github">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                        </svg>
+                        View on GitHub
+                    </a>
+                    <a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/scripts/validate-blueprint/README.md" target="_blank" class="btn btn-docs">
+                        Full Docs
+                    </a>
+                </div>
+            </article>
+
+            <!-- ha-ws-client -->
+            <article class="tool-card">
+                <div class="tool-header">
+                    <div class="tool-icon cyan">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                            <polyline points="22,6 12,13 2,6"/>
+                        </svg>
+                    </div>
+                    <div class="tool-header-text">
+                        <h3>ha-ws-client</h3>
+                        <div class="tool-tech">
+                            <span class="tech-tag">TypeScript</span>
+                            <span class="tech-tag">Node.js</span>
+                            <span class="tech-tag">WebSocket</span>
+                        </div>
+                    </div>
+                </div>
+
+                <p class="tool-description">
+                    A powerful WebSocket API client for querying Home Assistant and debugging automations from the command line. Get entity states, call services, render templates, and dive deep into automation traces.
+                </p>
+
+                <div class="tool-features">
+                    <h4>Key Features</h4>
+                    <ul>
+                        <li>Entity state queries (single, filtered, or all)</li>
+                        <li>Service calls and template rendering</li>
+                        <li>Automation trace debugging (step-by-step)</li>
+                        <li>Live monitoring with anomaly detection</li>
+                        <li>Entity, device, and area registry queries</li>
+                    </ul>
+                </div>
+
+                <div class="tool-usage">
+                    <div class="usage-header">
+                        <span class="usage-dot red"></span>
+                        <span class="usage-dot yellow"></span>
+                        <span class="usage-dot green"></span>
+                        <span class="usage-title">Terminal</span>
+                    </div>
+                    <pre class="usage-content"><span class="comment"># Get entity state</span>
+<span class="command">npx tsx scripts/ha-ws-client/ha-ws-client.ts state sun.sun</span>
+
+<span class="comment"># Debug automation trace</span>
+<span class="command">npx tsx scripts/ha-ws-client/ha-ws-client.ts trace-debug &lt;run_id&gt;</span></pre>
+                </div>
+
+                <div class="tool-actions">
+                    <a href="https://github.com/schoolboyqueue/home-assistant-blueprints/tree/main/scripts/ha-ws-client" target="_blank" class="btn btn-github">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                        </svg>
+                        View on GitHub
+                    </a>
+                    <a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/scripts/ha-ws-client/README.md" target="_blank" class="btn btn-docs">
+                        Full Docs
+                    </a>
+                </div>
+            </article>
+        </div>
+    </section>
+
     <!-- Footer -->
     <footer class="footer">
         <div class="footer-content">
@@ -430,6 +818,7 @@
             </div>
             <div class="footer-links">
                 <a href="https://github.com/schoolboyqueue/home-assistant-blueprints" target="_blank">GitHub</a>
+                <a href="#tools">Dev Tools</a>
                 <a href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/LICENSE" target="_blank">MIT License</a>
                 <a href="https://buymeacoffee.com/schoolboyqueue" target="_blank">Support</a>
             </div>
@@ -440,5 +829,9 @@
     </footer>
 
     <script src="script.js"></script>
+    <!-- js-yaml for YAML parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/js-yaml@4/dist/js-yaml.min.js"></script>
+    <!-- Visualizer script -->
+    <script src="visualizer.js"></script>
 </body>
 </html>
