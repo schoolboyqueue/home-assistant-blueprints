@@ -2,16 +2,32 @@
 
 ## Overview
 
-The learning system tracks your manual temperature adjustments and adapts to your preferences over time. It stores **4 separate offsets**:
+The learning system tracks your manual temperature adjustments and adapts to your preferences over time. It stores **16 separate offsets** organized by:
+
+- **Mode**: Heating vs Cooling
+- **Time of Day**: Day vs Night (based on sun position)
+- **Season**: Winter, Spring, Summer, or Autumn
 
 | Key | Description |
 |-----|-------------|
-| `heat_day` | Your heating preference during daytime |
-| `heat_night` | Your heating preference during nighttime (sleep hours) |
-| `cool_day` | Your cooling preference during daytime |
-| `cool_night` | Your cooling preference during nighttime |
+| `heat_day_winter` | Heating preference during winter days |
+| `heat_night_winter` | Heating preference during winter nights |
+| `cool_day_winter` | Cooling preference during winter days |
+| `cool_night_winter` | Cooling preference during winter nights |
+| `heat_day_spring` | Heating preference during spring days |
+| `heat_night_spring` | Heating preference during spring nights |
+| `cool_day_spring` | Cooling preference during spring days |
+| `cool_night_spring` | Cooling preference during spring nights |
+| `heat_day_summer` | Heating preference during summer days |
+| `heat_night_summer` | Heating preference during summer nights |
+| `cool_day_summer` | Cooling preference during summer days |
+| `cool_night_summer` | Cooling preference during summer nights |
+| `heat_day_autumn` | Heating preference during autumn days |
+| `heat_night_autumn` | Heating preference during autumn nights |
+| `cool_day_autumn` | Cooling preference during autumn days |
+| `cool_night_autumn` | Cooling preference during autumn nights |
 
-This means the system learns that you might want it warmer in the morning (heat_day) but cooler at night (cool_night), or any other combination of preferences.
+This allows the system to learn complex seasonal patterns. For example, you might prefer it cooler during summer nights but warmer during winter mornings, and these preferences will be applied automatically as conditions change.
 
 ## Setup Instructions
 
@@ -121,28 +137,40 @@ Calculation: new = 0.85 * old + 0.15 * (+4°F)
 Future daytime heating: now +0.6°F warmer
 ```
 
-### Time-of-Day Awareness
+### Time-of-Day Awareness (Sun-Based)
 
-The system uses your **Sleep Schedule** settings to determine day vs night:
+The system uses the **Sun Entity** (configured in Optional Sensors) to determine day vs night:
 
-- **Night**: Between Sleep Start and Sleep End times
-- **Day**: All other times
+- **Night**: When the sun is below the horizon
+- **Day**: When the sun is above the horizon
 
-This means if you configure:
+This automatically adapts to seasonal daylight changes. During summer, "day" is longer; during winter, "night" is longer. Your preferences are learned and applied according to actual daylight conditions, not fixed times.
 
-- Sleep Start: 22:00
-- Sleep End: 07:00
+If no sun entity is configured, the system falls back to your Sleep Schedule times.
 
-Then adjustments made between 10 PM and 7 AM affect the `_night` offsets, and adjustments made between 7 AM and 10 PM affect the `_day` offsets.
+### Seasonal Awareness
+
+The system detects the current season using either:
+
+1. **Season Entity** (if configured in Seasonal Bias & Regional Presets)
+2. **Month-based fallback**:
+   - Dec, Jan, Feb = Winter
+   - Mar, Apr, May = Spring
+   - Jun, Jul, Aug = Summer
+   - Sep, Oct, Nov = Autumn
+
+Adjustments you make are stored with the current season, so preferences learned in summer are applied in summer, winter preferences in winter, etc.
 
 ### Heating vs Cooling Detection
 
 | Trigger | Offset Updated |
 |---------|----------------|
-| You adjust `target_temp_low` (heat setpoint) | `heat_day` or `heat_night` |
-| You adjust `target_temp_high` (cool setpoint) | `cool_day` or `cool_night` |
-| Single setpoint + HVAC mode is "heat" | `heat_day` or `heat_night` |
-| Single setpoint + HVAC mode is "cool" | `cool_day` or `cool_night` |
+| You adjust `target_temp_low` (heat setpoint) | `heat_{day\|night}_{season}` |
+| You adjust `target_temp_high` (cool setpoint) | `cool_{day\|night}_{season}` |
+| Single setpoint + HVAC mode is "heat" | `heat_{day\|night}_{season}` |
+| Single setpoint + HVAC mode is "cool" | `cool_{day\|night}_{season}` |
+
+The `{day|night}` component is determined by sun position, and `{season}` is one of `summer`, `winter`, or `shoulder`.
 
 ## Monitoring
 
@@ -152,18 +180,29 @@ Go to **Developer Tools → States**, find `sensor.comfort_learning`, and look a
 
 ```yaml
 variables:
-  heat_day: 1.5
-  heat_night: 0.8
-  cool_day: -0.5
-  cool_night: -1.2
+  heat_day_winter: 1.8
+  heat_night_winter: 1.2
+  cool_day_winter: 0.0
+  cool_night_winter: -0.3
+  heat_day_spring: 1.0
+  heat_night_spring: 0.6
+  cool_day_spring: -0.5
+  cool_night_spring: -0.8
+  heat_day_summer: 0.5
+  heat_night_summer: 0.3
+  cool_day_summer: -1.2
+  cool_night_summer: -1.5
+  heat_day_autumn: 0.8
+  heat_night_autumn: 0.5
+  cool_day_autumn: -0.6
+  cool_night_autumn: -0.9
 ```
 
-This example shows:
+This example shows seasonal preferences:
 
-- Daytime heating: +1.5°F warmer than baseline
-- Nighttime heating: +0.8°F warmer than baseline
-- Daytime cooling: -0.5°F cooler than baseline (higher setpoint)
-- Nighttime cooling: -1.2°F cooler than baseline
+- **Winter**: Stronger heating offsets (+1.2 to +1.8°F) for warmth
+- **Spring/Autumn**: Moderate adjustments as weather transitions
+- **Summer**: Stronger cooling offsets (-1.2 to -1.5°F) for comfort in heat
 
 ### Debug Logs
 
@@ -172,9 +211,11 @@ Enable **Debug Level: basic** or **verbose** to see learning in action:
 ```text
 Manual override detected (climate_manual_change_low).
 Manual=21.7°C, Predicted=20.0°C, Error=+1.7°C.
-Learning [heat_day]: 0.50 → 0.76°F.
+Learning [heat_day_winter]: 0.50 → 0.76°F.
 Pausing for 60 min (helper set).
 ```
+
+The key now includes the season (e.g., `heat_day_winter`) for visibility into which seasonal slot is being updated.
 
 ### Dashboard Card (Optional)
 
@@ -239,11 +280,19 @@ No! Learned offsets add to your regional/seasonal biases. Both work together:
 Final Comfort = ASHRAE-55 + Regional Bias + Seasonal Bias + Learned Offset + Sleep Bias + CO₂ Bias
 ```
 
+The learned offset is now season-aware, so it applies the right adjustment for the current season automatically.
+
 **Q: What if I make random adjustments?**
 The exponential average smooths out noise. Consistent patterns emerge over time.
 
 **Q: Can I have different learning for different rooms?**
 Yes! Create multiple sensors (e.g., `sensor.comfort_learning_bedroom`, `sensor.comfort_learning_living`) and configure each automation to use its own sensor.
+
+**Q: How does sun-based day/night differ from the sleep schedule?**
+The sun entity tracks actual sunrise/sunset times which change throughout the year. In summer, "day" might be 5 AM to 9 PM, while in winter it might be 7 AM to 5 PM. This means your daytime preferences are applied when there's actually daylight, not at fixed times.
+
+**Q: I have old 4-key preferences from a previous version. What happens?**
+Old 4-key preferences (`heat_day`, `heat_night`, etc.) are no longer used. You'll start fresh with the 16-key system. Your new preferences will be learned as you make manual adjustments throughout the year.
 
 ## Troubleshooting
 
@@ -264,4 +313,5 @@ Yes! Create multiple sensors (e.g., `sensor.comfort_learning_bedroom`, `sensor.c
 
 1. Fire `clear_variables` event to reset
 2. Reduce learning rate for more conservative updates
-3. Check that sleep schedule is correctly configured for day/night detection
+3. Check that sun entity is configured (defaults to `sun.sun`)
+4. Verify season detection is correct (check `sensor.season` or month-based fallback)

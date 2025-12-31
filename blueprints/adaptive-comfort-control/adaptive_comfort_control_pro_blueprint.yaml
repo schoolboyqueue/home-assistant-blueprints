@@ -1,5 +1,5 @@
 blueprint:
-    name: "Adaptive Comfort Control Pro v4.22.2"
+    name: "Adaptive Comfort Control Pro v4.23.0"
     description: >
         Adaptive comfort control + HVAC pause with unit awareness (°C/°F), seasonal bias,
         built-in psychrometrics (dew point, absolute humidity, enthalpy), optional RMOT,
@@ -73,6 +73,14 @@ blueprint:
                         entity:
                             domain: ["binary_sensor"]
                             device_class: ["motion", "occupancy", "presence"]
+
+                sun_entity:
+                    name: "Sun Entity"
+                    description: "Sun entity for day/night detection in learning. Uses sun.sun by default, which tracks actual sunrise/sunset for your location. This ensures learning adapts as daylight hours change with seasons."
+                    default: sun.sun
+                    selector:
+                        entity:
+                            domain: ["sun"]
 
         comfort:
             name: Comfort & Units
@@ -918,7 +926,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.22.2"
+    blueprint_version: "4.23.0"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor
@@ -927,6 +935,7 @@ variables:
     _raw_rh_in_values: !input indoor_humidity_sensor
     _raw_rh_out_values: !input outdoor_humidity_sensor
     _raw_occupancy_values: !input occupancy_sensor
+    _raw_sun_entity_values: !input sun_entity
     _raw_co2_in_values: !input co2_indoor_sensor
     _raw_co2_out_values: !input co2_outdoor_sensor
     _raw_rmot_values: !input rmot_sensor
@@ -1037,6 +1046,12 @@ variables:
         {% set v = (e | default('', true) | string | lower) %}
         {{ e if v not in ['', 'none', 'binary_sensor.none'] else '' }}
 
+    sun_entity_id: >
+        {% set raw = _raw_sun_entity_values %}
+        {% set e = raw if raw is string else (raw[0] if (raw is iterable and raw|length > 0) else '') %}
+        {% set v = (e | default('', true) | string | lower) %}
+        {{ e if v not in ['', 'none', 'sun.none'] else 'sun.sun' }}
+
     sleep_entity_id: >
         {% set raw = _raw_sleep_entity_values %}
         {% set e = raw if raw is string else (raw[0] if (raw is iterable and raw|length > 0) else '') %}
@@ -1057,32 +1072,83 @@ variables:
           {{ (state_attr(learned_prefs_sensor_id, 'variables') or {}) }}
         {% else %}{{ {} }}{% endif %}
     
-    # Determine if it's currently "night" using the sleep schedule
-    # Self-contained calculation (doesn't depend on variables defined later)
+    # Determine if it's currently "night" using the sun entity (below horizon)
+    # This adapts automatically to seasonal daylight changes rather than fixed times
     _is_night_now: >
-        {% set nowm = now().hour * 60 + now().minute %}
-        {% set st_parts = (sleep_start_str.split(':') if (sleep_start_str and ':' in sleep_start_str) else ['22','0']) %}
-        {% set en_parts = (sleep_end_str.split(':') if (sleep_end_str and ':' in sleep_end_str) else ['7','0']) %}
-        {% set s = (st_parts[0] | int(22)) * 60 + (st_parts[1] | int(0)) %}
-        {% set e = (en_parts[0] | int(7)) * 60 + (en_parts[1] | int(0)) %}
-        {% if s <= e %}{{ (nowm >= s) and (nowm < e) }}
-        {% else %}{{ (nowm >= s) or (nowm < e) }}{% endif %}
+        {% if sun_entity_id %}
+          {{ is_state(sun_entity_id, 'below_horizon') }}
+        {% else %}
+          {# Fallback to sleep schedule if no sun entity #}
+          {% set nowm = now().hour * 60 + now().minute %}
+          {% set st_parts = (sleep_start_str.split(':') if (sleep_start_str and ':' in sleep_start_str) else ['22','0']) %}
+          {% set en_parts = (sleep_end_str.split(':') if (sleep_end_str and ':' in sleep_end_str) else ['7','0']) %}
+          {% set s = (st_parts[0] | int(22)) * 60 + (st_parts[1] | int(0)) %}
+          {% set e = (en_parts[0] | int(7)) * 60 + (en_parts[1] | int(0)) %}
+          {% if s <= e %}{{ (nowm >= s) and (nowm < e) }}
+          {% else %}{{ (nowm >= s) or (nowm < e) }}{% endif %}
+        {% endif %}
     
-    # Read the 4 learned offsets (stored in system units)
-    learned_heat_day_sys: "{{ _learned_prefs_vars.get('heat_day', 0) | float(0) }}"
-    learned_heat_night_sys: "{{ _learned_prefs_vars.get('heat_night', 0) | float(0) }}"
-    learned_cool_day_sys: "{{ _learned_prefs_vars.get('cool_day', 0) | float(0) }}"
-    learned_cool_night_sys: "{{ _learned_prefs_vars.get('cool_night', 0) | float(0) }}"
+    # Determine current season for learning (winter, spring, summer, autumn)
+    # Self-contained calculation (parses season entity inline to avoid dependency on season_entity_id which is defined later)
+    _learning_season: >
+        {% set raw = _raw_season_entity_values %}
+        {% set e = raw if raw is string else (raw[0] if (raw is iterable and raw|length > 0) else '') %}
+        {% set v = (e | default('', true) | string | lower) %}
+        {% set season_ent = e if v not in ['', 'none', 'sensor.none'] else '' %}
+        {% if season_ent %}
+          {% set s = states(season_ent) | string | lower %}
+          {% if s in ['winter'] %}winter
+          {% elif s in ['spring'] %}spring
+          {% elif s in ['summer'] %}summer
+          {% elif s in ['autumn', 'fall'] %}autumn
+          {% else %}spring{% endif %}
+        {% else %}
+          {% set m = now().month %}
+          {% if m in [12, 1, 2] %}winter
+          {% elif m in [3, 4, 5] %}spring
+          {% elif m in [6, 7, 8] %}summer
+          {% else %}autumn{% endif %}
+        {% endif %}
     
-    # Select the appropriate offset for current time of day (heating vs cooling determined by mode/trigger)
+    # Read the 16 learned offsets (stored in system units)
+    # Keys: {heat,cool}_{day,night}_{winter,spring,summer,autumn}
+    learned_heat_day_winter_sys: "{{ _learned_prefs_vars.get('heat_day_winter', 0) | float(0) }}"
+    learned_heat_night_winter_sys: "{{ _learned_prefs_vars.get('heat_night_winter', 0) | float(0) }}"
+    learned_cool_day_winter_sys: "{{ _learned_prefs_vars.get('cool_day_winter', 0) | float(0) }}"
+    learned_cool_night_winter_sys: "{{ _learned_prefs_vars.get('cool_night_winter', 0) | float(0) }}"
+    learned_heat_day_spring_sys: "{{ _learned_prefs_vars.get('heat_day_spring', 0) | float(0) }}"
+    learned_heat_night_spring_sys: "{{ _learned_prefs_vars.get('heat_night_spring', 0) | float(0) }}"
+    learned_cool_day_spring_sys: "{{ _learned_prefs_vars.get('cool_day_spring', 0) | float(0) }}"
+    learned_cool_night_spring_sys: "{{ _learned_prefs_vars.get('cool_night_spring', 0) | float(0) }}"
+    learned_heat_day_summer_sys: "{{ _learned_prefs_vars.get('heat_day_summer', 0) | float(0) }}"
+    learned_heat_night_summer_sys: "{{ _learned_prefs_vars.get('heat_night_summer', 0) | float(0) }}"
+    learned_cool_day_summer_sys: "{{ _learned_prefs_vars.get('cool_day_summer', 0) | float(0) }}"
+    learned_cool_night_summer_sys: "{{ _learned_prefs_vars.get('cool_night_summer', 0) | float(0) }}"
+    learned_heat_day_autumn_sys: "{{ _learned_prefs_vars.get('heat_day_autumn', 0) | float(0) }}"
+    learned_heat_night_autumn_sys: "{{ _learned_prefs_vars.get('heat_night_autumn', 0) | float(0) }}"
+    learned_cool_day_autumn_sys: "{{ _learned_prefs_vars.get('cool_day_autumn', 0) | float(0) }}"
+    learned_cool_night_autumn_sys: "{{ _learned_prefs_vars.get('cool_night_autumn', 0) | float(0) }}"
+    
+    # Select the appropriate offset for current time of day + season (heating vs cooling determined by mode/trigger)
     # For the adaptive target calculation, we use an average of heat and cool offsets for the current time period
     # This provides a balanced target; the specific heat/cool offsets are used in the learning update
     learned_offset_sys: >
-        {% if _is_night_now %}
-          {{ ((learned_heat_night_sys | float(0)) + (learned_cool_night_sys | float(0))) / 2 }}
+        {% set season = _learning_season %}
+        {% set time = 'night' if _is_night_now else 'day' %}
+        {% if season == 'winter' %}
+          {% set heat_val = learned_heat_day_winter_sys if time == 'day' else learned_heat_night_winter_sys %}
+          {% set cool_val = learned_cool_day_winter_sys if time == 'day' else learned_cool_night_winter_sys %}
+        {% elif season == 'spring' %}
+          {% set heat_val = learned_heat_day_spring_sys if time == 'day' else learned_heat_night_spring_sys %}
+          {% set cool_val = learned_cool_day_spring_sys if time == 'day' else learned_cool_night_spring_sys %}
+        {% elif season == 'summer' %}
+          {% set heat_val = learned_heat_day_summer_sys if time == 'day' else learned_heat_night_summer_sys %}
+          {% set cool_val = learned_cool_day_summer_sys if time == 'day' else learned_cool_night_summer_sys %}
         {% else %}
-          {{ ((learned_heat_day_sys | float(0)) + (learned_cool_day_sys | float(0))) / 2 }}
+          {% set heat_val = learned_heat_day_autumn_sys if time == 'day' else learned_heat_night_autumn_sys %}
+          {% set cool_val = learned_cool_day_autumn_sys if time == 'day' else learned_cool_night_autumn_sys %}
         {% endif %}
+        {{ ((heat_val | float(0)) + (cool_val | float(0))) / 2 }}
     learned_offset_c: "{{ (learned_offset_sys * 5/9) if is_imperial else learned_offset_sys }}"
 
     # Manual override helper parsing
@@ -2184,7 +2250,8 @@ action:
               _offset_key: >
                 {% set mode = 'heat' if _is_heat_adjustment else 'cool' %}
                 {% set time = 'night' if _is_night_now else 'day' %}
-                {{ mode ~ '_' ~ time }}
+                {% set season = _learning_season %}
+                {{ mode ~ '_' ~ time ~ '_' ~ season }}
               
               # Get the current offset for this specific key
               _old_offset_sys: "{{ _learned_prefs_vars.get(_offset_key, 0) | float(0) }}"

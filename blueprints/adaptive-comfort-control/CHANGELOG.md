@@ -1,3 +1,19 @@
+## [4.23.0] — 2025-12-30
+
+### Added
+
+- **Sun-based day/night detection for learning**: Added optional Sun Entity input (defaults to `sun.sun`) that determines day vs night based on actual sun position rather than fixed sleep schedule times. This automatically adapts to seasonal daylight changes—longer days in summer, shorter in winter—so learned preferences are applied according to real-world light conditions.
+
+- **Full seasonal learning (16-key system)**: Learning now stores 16 separate offsets organized by mode (heat/cool), time (day/night), and season (winter/spring/summer/autumn). Keys are formatted as `{mode}_{time}_{season}` (e.g., `heat_day_winter`, `cool_night_summer`). This allows the system to learn distinct preferences for each season—warmer in winter mornings, cooler in summer nights, transitional preferences in spring and autumn.
+
+### Changed
+
+- **`_is_night_now` now uses sun entity**: Day/night detection for learning uses the sun entity's `below_horizon` state instead of the sleep schedule. The sleep schedule is still used for the Sleep Bias feature but no longer affects learning time-of-day classification.
+
+### Breaking Changes
+
+- **Learning preferences reset**: The previous 4-key learning format (`heat_day`, `heat_night`, etc.) is no longer supported. Users upgrading from v4.22.x will start fresh with the new 16-key system. Preferences will be re-learned as manual adjustments are made throughout the year.
+
 ## [4.22.2] — 2025-12-30
 
 ### Fixed
