@@ -9,7 +9,18 @@
 
 ## Overview
 
-This blueprint inspects the selected device's registry entry, auto-detects the protocol (Zigbee2MQTT, ZHA, Z-Wave, or Lutron), and automatically adapts its triggers and logic. That means the same automation can control your Inovelli Zigbee switch, Zooz Z-Wave paddle, or Lutron Pico remote without copy/pasting different blueprints.
+This blueprint features **intelligent hardware auto-detection** that identifies your specific device model, auto-configures trigger mappings, and selects optimal control strategies based on device capabilities. It inspects the selected device's registry entry, detects the protocol (Zigbee2MQTT, ZHA, Z-Wave, or Lutron), and automatically adapts its triggers and logic.
+
+### Supported Device Profiles
+
+The blueprint recognizes these specific device models:
+
+| Manufacturer | Models | Protocol | Features |
+|-------------|--------|----------|----------|
+| **Zooz** | ZEN71, ZEN72, ZEN73, ZEN74, ZEN76, ZEN77 | Z-Wave | LED, 5x multi-tap, Central Scene |
+| **Inovelli Blue** | VZM31 (2-in-1), VZM35 (Fan) | Zigbee | LED, Config button, 5x multi-tap, Release detection |
+| **Inovelli Red** | LZW30, LZW31, LZW36 | Z-Wave | LED, Config button, 5x multi-tap |
+| **Lutron Pico** | 2-button, 3-button, 4-button, 5-button | Lutron | Release detection, Favorite button |
 
 Supported behaviors:
 
@@ -38,7 +49,8 @@ Supported behaviors:
 
 ## Debug & Troubleshooting
 
-- Enable **basic** or **verbose** debug to see `[Multi Switch Light Pro] Detected switch ... | type=...` showing the detected protocol (zigbee2mqtt, zwave, lutron, etc.).
+- Enable **basic** debug to see `[Multi Switch Light Pro] Detected switch ... | type=... | profile=...` showing the detected protocol and specific device profile (e.g., `zooz_zen77`, `inovelli_blue_2in1`, `lutron_pico_5button`).
+- Enable **verbose** debug to also see full device capabilities including control strategy, protocol, max multi-tap level, button count, and feature flags (LED, release detection, etc.).
 - **Zigbee switches:** The blueprint auto-detects the action sensor entity (e.g., `sensor.kitchen_switch_action`). If auto-detection fails or events aren't firing, manually select your action sensor in the "Zigbee action sensor" input. Verify Zigbee2MQTT is publishing action values correctly.
 - **Z-Wave switches:** Confirm the device sends Central Scene events. Check Developer Tools → Events for `zwave_js_event` or `zwave_js_value_notification`.
 - **Lutron Pico:** Verify `lutron_caseta_button_event` events appear when pressing buttons.

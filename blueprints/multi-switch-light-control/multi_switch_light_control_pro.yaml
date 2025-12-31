@@ -1,11 +1,12 @@
 blueprint:
-  name: "Multi Switch Light Control Pro v1.9.6"
+  name: "Multi Switch Light Control Pro v1.10.0"
   description: >
     Turn a supported switch or remote into a smart light controller. Supports Inovelli
     Zigbee switches (via Zigbee2MQTT or ZHA), Zooz/Inovelli Z-Wave switches, and Lutron
-    Pico remotes. The blueprint auto-detects the device protocol at runtime and adapts
-    triggers + logic accordingly. Logs detected manufacturer/model/type when diagnostics
-    are enabled.
+    Pico remotes. Features intelligent hardware auto-detection that identifies specific
+    device models (Zooz ZEN7x series, Inovelli Blue/Red, Lutron Pico 2/3/4/5-button) and
+    auto-configures trigger mappings and control strategies based on device capabilities.
+    Logs detected device profile with capabilities when diagnostics are enabled.
   domain: automation
   author: "Jeremy Carter"
   source_url: >
@@ -285,7 +286,7 @@ blueprint:
                 - "basic"
                 - "verbose"
 variables:
-  blueprint_version: "1.9.6"
+  blueprint_version: "1.10.0"
 
   switch_device: !input switch_device
   zigbee_action_sensor_input: !input zigbee_action_sensor
@@ -440,6 +441,261 @@ variables:
         generic
       {% endif %}
     {% endif %}
+
+  # ============================================================================
+  # HARDWARE AUTO-DETECTION: Device Capability Registry
+  # ============================================================================
+  # Identifies specific device models and provides auto-configured capabilities,
+  # trigger mappings, and control strategies based on detected hardware.
+  # ============================================================================
+
+  # Detect specific device profile based on manufacturer and model
+  device_profile: >-
+    {% set manu = detected_manufacturer | lower %}
+    {% set model = detected_model | lower %}
+    {% if 'zooz' in manu %}
+      {% if 'zen71' in model or 'zen-71' in model %}
+        zooz_zen71
+      {% elif 'zen72' in model or 'zen-72' in model %}
+        zooz_zen72
+      {% elif 'zen73' in model or 'zen-73' in model %}
+        zooz_zen73
+      {% elif 'zen74' in model or 'zen-74' in model %}
+        zooz_zen74
+      {% elif 'zen76' in model or 'zen-76' in model %}
+        zooz_zen76
+      {% elif 'zen77' in model or 'zen-77' in model %}
+        zooz_zen77
+      {% else %}
+        zooz_generic
+      {% endif %}
+    {% elif 'inovelli' in manu %}
+      {% if 'vzm31' in model or 'blue' in model or '2-in-1' in model %}
+        inovelli_blue_2in1
+      {% elif 'vzm35' in model or 'fan' in model %}
+        inovelli_blue_fan
+      {% elif 'lzw31' in model %}
+        inovelli_red_dimmer
+      {% elif 'lzw36' in model %}
+        inovelli_red_fan_light
+      {% elif 'lzw30' in model %}
+        inovelli_red_switch
+      {% elif has_action_sensor %}
+        inovelli_zigbee_generic
+      {% else %}
+        inovelli_zwave_generic
+      {% endif %}
+    {% elif 'lutron' in manu %}
+      {% if 'pj2-3brl' in model or '3-button' in model or '3 button' in model %}
+        lutron_pico_3button
+      {% elif 'pj2-4b' in model or '4-button' in model or '4 button' in model %}
+        lutron_pico_4button
+      {% elif 'pj2-2b' in model or '2-button' in model or '2 button' in model %}
+        lutron_pico_2button
+      {% else %}
+        lutron_pico_5button
+      {% endif %}
+    {% else %}
+      generic
+    {% endif %}
+
+  # Device capabilities registry - provides feature flags for each device profile
+  device_capabilities: >-
+    {% set profile = device_profile | trim %}
+    {% set caps = namespace(
+      max_multi_tap=5,
+      has_led=false,
+      has_config_button=false,
+      has_dimming=true,
+      has_scenes=true,
+      has_hold=true,
+      has_release_detection=false,
+      protocol='unknown',
+      control_strategy='standard',
+      button_count=2,
+      supports_double_tap=true,
+      supports_triple_tap=true,
+      supports_quad_tap=true,
+      supports_quint_tap=true
+    ) %}
+    {% if profile.startswith('zooz_') %}
+      {% set caps.protocol = 'zwave' %}
+      {% set caps.has_scenes = true %}
+      {% set caps.has_hold = true %}
+      {% set caps.has_release_detection = false %}
+      {% set caps.control_strategy = 'zwave_central_scene' %}
+      {% if profile in ['zooz_zen72', 'zooz_zen74', 'zooz_zen77'] %}
+        {% set caps.has_led = true %}
+        {% set caps.has_dimming = true %}
+        {% set caps.max_multi_tap = 5 %}
+      {% elif profile in ['zooz_zen71', 'zooz_zen73', 'zooz_zen76'] %}
+        {% set caps.has_led = true %}
+        {% set caps.has_dimming = false %}
+        {% set caps.max_multi_tap = 5 %}
+      {% endif %}
+    {% elif profile.startswith('inovelli_blue') %}
+      {% set caps.protocol = 'zigbee' %}
+      {% set caps.has_led = true %}
+      {% set caps.has_config_button = true %}
+      {% set caps.has_hold = true %}
+      {% set caps.has_release_detection = true %}
+      {% set caps.max_multi_tap = 5 %}
+      {% set caps.control_strategy = 'zigbee_action' %}
+      {% if profile == 'inovelli_blue_fan' %}
+        {% set caps.button_count = 4 %}
+      {% endif %}
+    {% elif profile.startswith('inovelli_red') %}
+      {% set caps.protocol = 'zwave' %}
+      {% set caps.has_led = true %}
+      {% set caps.has_config_button = true %}
+      {% set caps.has_hold = true %}
+      {% set caps.has_release_detection = false %}
+      {% set caps.max_multi_tap = 5 %}
+      {% set caps.control_strategy = 'zwave_central_scene' %}
+    {% elif profile.startswith('inovelli_zigbee') %}
+      {% set caps.protocol = 'zigbee' %}
+      {% set caps.has_led = true %}
+      {% set caps.has_hold = true %}
+      {% set caps.has_release_detection = true %}
+      {% set caps.max_multi_tap = 5 %}
+      {% set caps.control_strategy = 'zigbee_action' %}
+    {% elif profile.startswith('inovelli_zwave') %}
+      {% set caps.protocol = 'zwave' %}
+      {% set caps.has_led = true %}
+      {% set caps.has_hold = true %}
+      {% set caps.has_release_detection = false %}
+      {% set caps.max_multi_tap = 5 %}
+      {% set caps.control_strategy = 'zwave_central_scene' %}
+    {% elif profile.startswith('lutron_pico') %}
+      {% set caps.protocol = 'lutron' %}
+      {% set caps.has_led = false %}
+      {% set caps.has_hold = true %}
+      {% set caps.has_release_detection = true %}
+      {% set caps.has_dimming = true %}
+      {% set caps.max_multi_tap = 1 %}
+      {% set caps.supports_double_tap = false %}
+      {% set caps.supports_triple_tap = false %}
+      {% set caps.supports_quad_tap = false %}
+      {% set caps.supports_quint_tap = false %}
+      {% set caps.control_strategy = 'lutron_button' %}
+      {% if profile == 'lutron_pico_2button' %}
+        {% set caps.button_count = 2 %}
+      {% elif profile == 'lutron_pico_3button' %}
+        {% set caps.button_count = 3 %}
+      {% elif profile == 'lutron_pico_4button' %}
+        {% set caps.button_count = 4 %}
+      {% else %}
+        {% set caps.button_count = 5 %}
+      {% endif %}
+    {% else %}
+      {% set caps.protocol = 'unknown' %}
+      {% set caps.control_strategy = 'generic' %}
+    {% endif %}
+    {
+      "profile": "{{ profile }}",
+      "protocol": "{{ caps.protocol }}",
+      "control_strategy": "{{ caps.control_strategy }}",
+      "max_multi_tap": {{ caps.max_multi_tap }},
+      "button_count": {{ caps.button_count }},
+      "has_led": {{ caps.has_led | lower }},
+      "has_config_button": {{ caps.has_config_button | lower }},
+      "has_dimming": {{ caps.has_dimming | lower }},
+      "has_scenes": {{ caps.has_scenes | lower }},
+      "has_hold": {{ caps.has_hold | lower }},
+      "has_release_detection": {{ caps.has_release_detection | lower }},
+      "supports_double_tap": {{ caps.supports_double_tap | lower }},
+      "supports_triple_tap": {{ caps.supports_triple_tap | lower }},
+      "supports_quad_tap": {{ caps.supports_quad_tap | lower }},
+      "supports_quint_tap": {{ caps.supports_quint_tap | lower }}
+    }
+
+  # Parse device capabilities for use in templates
+  device_caps_parsed: "{{ device_capabilities | from_json }}"
+
+  # Convenience accessors for common capability checks
+  device_has_release_detection: "{{ device_caps_parsed.has_release_detection | default(false) }}"
+  device_max_multi_tap: "{{ device_caps_parsed.max_multi_tap | default(5) | int }}"
+  device_control_strategy: "{{ device_caps_parsed.control_strategy | default('generic') }}"
+  device_has_led: "{{ device_caps_parsed.has_led | default(false) }}"
+  device_button_count: "{{ device_caps_parsed.button_count | default(2) | int }}"
+
+  # Trigger mapping registry - defines which trigger IDs are valid for each control strategy
+  trigger_mappings: >-
+    {% set strategy = device_control_strategy %}
+    {% if strategy == 'zwave_central_scene' %}
+      {
+        "on": ["up_single"],
+        "off": ["down_single"],
+        "brighten_start": ["up_hold_start"],
+        "dim_start": ["down_hold_start"],
+        "brighten_stop": ["up_release"],
+        "dim_stop": ["down_release"],
+        "double_up": ["up_double"],
+        "double_down": ["down_double"],
+        "triple_up": ["up_triple"],
+        "triple_down": ["down_triple"],
+        "quad_up": ["up_quad"],
+        "quad_down": ["down_quad"],
+        "quint_up": ["up_quint"],
+        "quint_down": ["down_quint"]
+      }
+    {% elif strategy == 'zigbee_action' %}
+      {
+        "on": ["up_single", "up_single_z2m"],
+        "off": ["down_single", "down_single_z2m"],
+        "brighten_start": ["up_held_z2m", "up_hold_start"],
+        "dim_start": ["down_held_z2m", "down_hold_start"],
+        "brighten_stop": ["up_release_z2m", "up_release"],
+        "dim_stop": ["down_release_z2m", "down_release"],
+        "double_up": ["up_double", "up_double_z2m"],
+        "double_down": ["down_double", "down_double_z2m"],
+        "triple_up": ["up_triple", "up_triple_z2m"],
+        "triple_down": ["down_triple", "down_triple_z2m"],
+        "quad_up": ["up_quad", "up_quad_z2m"],
+        "quad_down": ["down_quad", "down_quad_z2m"],
+        "quint_up": ["up_quint", "up_quint_z2m"],
+        "quint_down": ["down_quint", "down_quint_z2m"]
+      }
+    {% elif strategy == 'lutron_button' %}
+      {
+        "on": ["lutron_on"],
+        "off": ["lutron_off"],
+        "brighten_start": ["lutron_raise"],
+        "dim_start": ["lutron_lower"],
+        "brighten_stop": ["lutron_raise_release"],
+        "dim_stop": ["lutron_lower_release"],
+        "favorite": ["lutron_stop"]
+      }
+    {% else %}
+      {
+        "on": ["up_single", "up_single_z2m", "lutron_on"],
+        "off": ["down_single", "down_single_z2m", "lutron_off"],
+        "brighten_start": ["up_hold_start", "up_held_z2m", "lutron_raise"],
+        "dim_start": ["down_hold_start", "down_held_z2m", "lutron_lower"]
+      }
+    {% endif %}
+
+  # Recommended control parameters based on device type
+  recommended_step_pct: >-
+    {% set strategy = device_control_strategy %}
+    {% if strategy == 'lutron_button' %}
+      {{ 8 }}
+    {% elif strategy == 'zigbee_action' %}
+      {{ 5 }}
+    {% else %}
+      {{ 5 }}
+    {% endif %}
+
+  recommended_interval_ms: >-
+    {% set strategy = device_control_strategy %}
+    {% if strategy == 'lutron_button' %}
+      {{ 150 }}
+    {% elif strategy == 'zigbee_action' %}
+      {{ 200 }}
+    {% else %}
+      {{ 200 }}
+    {% endif %}
+
   area_set: >
     {% set a = light_area_in %}
     {{ a is string and a | length > 0 }}
@@ -931,6 +1187,22 @@ action:
           message: >
             Detected switch {{ detected_label }}
             | type={{ switch_type }}
+            | profile={{ device_profile }}
+  - if:
+      - condition: template
+        value_template: "{{ debug_verbose }}"
+    then:
+      - service: logbook.log
+        data:
+          name: "Multi Switch Light Pro"
+          entity_id: "{{ light_entity }}"
+          message: >
+            Device capabilities: strategy={{ device_control_strategy }}
+            | protocol={{ device_caps_parsed.protocol }}
+            | max_taps={{ device_max_multi_tap }}
+            | buttons={{ device_button_count }}
+            | release_detect={{ device_has_release_detection }}
+            | has_led={{ device_has_led }}
   - if:
       - condition: template
         value_template: "{{ debug_enabled }}"

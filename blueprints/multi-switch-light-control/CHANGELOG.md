@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.10.0 - 2025-12-31
+
+### Added
+
+- **Hardware auto-detection system**: New intelligent device capability registry that identifies specific device models and auto-configures trigger mappings and control strategies based on hardware capabilities.
+  - **Device profile detection**: Identifies specific models including Zooz ZEN71-77 series, Inovelli Blue/Red (VZM31, VZM35, LZW30/31/36), and Lutron Pico 2/3/4/5-button remotes
+  - **Device capabilities registry**: Provides feature flags for each device profile including:
+    - `max_multi_tap`: Maximum supported multi-tap level (1-5)
+    - `has_led`: Whether device has LED indicator support
+    - `has_config_button`: Whether device has a config button
+    - `has_dimming`: Whether device supports dimming
+    - `has_release_detection`: Whether device natively detects button releases
+    - `button_count`: Number of buttons on the device
+  - **Control strategies**: Auto-selects optimal control strategy (`zwave_central_scene`, `zigbee_action`, `lutron_button`, or `generic`) based on detected hardware
+  - **Trigger mappings registry**: Maps semantic actions (on/off/brighten/dim) to protocol-specific trigger IDs
+  - **Recommended parameters**: Provides device-optimized step percentages and interval timings
+- **Enhanced debug logging**: When verbose diagnostics enabled, logs full device capabilities including protocol, control strategy, button count, and feature support
+
+### Changed
+
+- Updated blueprint description to highlight hardware auto-detection capabilities
+
 ## 1.9.6 - 2025-12-28
 
 ### Fixed
