@@ -171,7 +171,8 @@ body {
     border-color: var(--border-glow);
 }
 
-.nav-btn-primary {
+.nav-btn-primary,
+.nav-links a.nav-btn-primary {
     color: #000;
     background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
 }
