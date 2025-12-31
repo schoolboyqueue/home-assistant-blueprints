@@ -119,3 +119,27 @@ Uses markdownlint with:
 
 - Never include Claude Code references or co-author lines in commit messages
 - Always update the root README.md when adding new blueprints (gallery entry + repository structure)
+
+### GitHub Pages Website
+
+The project website is served from `docs/` and must be kept in sync with blueprints:
+
+**Files:**
+- `docs/index.html` - Main website with blueprint gallery
+- `docs/styles.css` - Styling
+- `docs/script.js` - Interactive functionality
+- `_config.yml` - Jekyll configuration
+
+**When adding a new blueprint:**
+1. Update the blueprint count in the hero stats section (`<span class="stat-value">`)
+2. Add a new `<article class="blueprint-card">` in the blueprints gallery section
+3. Include: icon SVG, title, description, tags, import URL, and docs link
+4. Import URL format: `https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://raw.githubusercontent.com/schoolboyqueue/home-assistant-blueprints/main/blueprints/<name>/<file>.yaml`
+
+**When updating a blueprint:**
+- Update the description if features changed significantly
+- Update tags if new capabilities were added
+
+**When removing a blueprint:**
+1. Remove the blueprint card from the gallery
+2. Update the blueprint count in the hero stats
