@@ -1,5 +1,11 @@
 # Ceiling Fan Climate Control Pro - Changelog
 
+## [2.2.6] - 2025-12-31
+
+### Fixed
+
+- **Absolute bounds checking**: Added validation to reject temperatures outside 40°F-120°F (4°C-49°C) range. This catches bogus readings like 212°F when a sensor transitions from unavailable to a value, bypassing the rate-of-change filter which requires a valid previous reading. Invalid readings are logged with details and ignored.
+
 ## [2.2.5] - 2025-12-30
 
 ### Fixed

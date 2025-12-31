@@ -1,5 +1,5 @@
 blueprint:
-  name: Ceiling Fan Climate Control Pro v2.2.5
+  name: Ceiling Fan Climate Control Pro v2.2.6
   description: >
     HVAC-aware ceiling fan automation with adaptive comfort control. Uses the
     EN 16798 / ASHRAE 55 adaptive comfort model to dynamically adjust fan behavior
@@ -332,7 +332,7 @@ blueprint:
               custom_value: false
 
 variables:
-  blueprint_version: "2.2.5"
+  blueprint_version: "2.2.6"
   fan_entity: !input fan_entity
   temp_sensor: !input temp_sensor
   humidity_sensor_input: !input humidity_sensor
@@ -400,6 +400,8 @@ variables:
   # Max realistic indoor temp change is ~2-3°F/min; we use 10°F as a generous threshold
   # to catch spikes like 72°F → 212°F while allowing any realistic scenario
   _t_in_max_delta_f: 10
+  _t_in_min_valid_f: 40
+  _t_in_max_valid_f: 120
   _t_in_state: "{{ states(temp_sensor) }}"
   _t_in_unavailable: "{{ _t_in_state in ['unavailable', 'unknown', 'none'] or _t_in_state is none }}"
   t_in_raw: "{{ _t_in_state | float(70 if is_imperial else 21) }}"
@@ -425,6 +427,7 @@ variables:
     {% else %}
       {{ v }}
     {% endif %}
+  _t_in_bounds_ok: "{{ _t_in_raw_f | float >= _t_in_min_valid_f and _t_in_raw_f | float <= _t_in_max_valid_f }}"
   _t_in_delta_f: "{{ (_t_in_raw_f | float - _t_in_prev_f | float) | abs }}"
   # Validation logic:
   # - If current reading is unavailable → invalid
@@ -434,10 +437,12 @@ variables:
   #     → Accept the reading (no rate check possible, trust the sensor)
   _t_in_has_prev: "{{ trigger is defined and trigger.id == 'temp_changed' and not _t_in_prev_unavailable }}"
   _t_in_rate_ok: "{{ not _t_in_has_prev or _t_in_delta_f <= _t_in_max_delta_f }}"
-  t_in_valid: "{{ not _t_in_unavailable and _t_in_rate_ok }}"
+  t_in_valid: "{{ not _t_in_unavailable and _t_in_rate_ok and _t_in_bounds_ok }}"
   _t_in_reject_reason: >
     {% if _t_in_unavailable %}
       unavailable
+    {% elif not _t_in_bounds_ok %}
+      out_of_bounds
     {% elif not _t_in_rate_ok %}
       rate_exceeded
     {% else %}
@@ -699,7 +704,11 @@ action:
               entity_id: "{{ fan_entity }}"
               message: >
                 Skipped ({{ _t_in_reject_reason }}) |
-                {% if _t_in_reject_reason == 'rate_exceeded' %}
+                {% if _t_in_reject_reason == 'out_of_bounds' %}
+                Reading: {{ _t_in_raw_f | round(1) }}°F |
+                Valid range: {{ _t_in_min_valid_f }}°F - {{ _t_in_max_valid_f }}°F |
+                Likely sensor glitch or unavailable→value transition
+                {% elif _t_in_reject_reason == 'rate_exceeded' %}
                 Reading: {{ _t_in_raw_f | round(1) }}°F | Previous: {{ _t_in_prev_f | round(1) }}°F |
                 Delta: {{ _t_in_delta_f | round(1) }}°F (max: {{ _t_in_max_delta_f }}°F) |
                 Likely sensor glitch
