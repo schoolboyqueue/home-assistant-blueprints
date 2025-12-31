@@ -1,0 +1,606 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "version": "1.0.0",
+  "description": "Centralized repository of regional climate presets for Home Assistant blueprints",
+  "metadata": {
+    "lastUpdated": "2025-12-31",
+    "sources": [
+      "ASHRAE Standard 55-2020",
+      "IECC Climate Zone Maps",
+      "Köppen-Geiger Climate Classification"
+    ]
+  },
+
+  "climateZones": {
+    "Hot-Humid": {
+      "description": "Hot and humid climate with high moisture levels year-round",
+      "characteristics": {
+        "avgSummerTempC": 32,
+        "avgWinterTempC": 15,
+        "avgRelativeHumidity": 75,
+        "heatingDegreeDays": 500,
+        "coolingDegreeDays": 3000
+      }
+    },
+    "Hot-Dry": {
+      "description": "Hot and arid climate with low humidity and high solar exposure",
+      "characteristics": {
+        "avgSummerTempC": 38,
+        "avgWinterTempC": 10,
+        "avgRelativeHumidity": 25,
+        "heatingDegreeDays": 1000,
+        "coolingDegreeDays": 2500
+      }
+    },
+    "Marine": {
+      "description": "Mild coastal climate with moderate temperatures and humidity",
+      "characteristics": {
+        "avgSummerTempC": 22,
+        "avgWinterTempC": 10,
+        "avgRelativeHumidity": 65,
+        "heatingDegreeDays": 2500,
+        "coolingDegreeDays": 200
+      }
+    },
+    "Mixed-Humid": {
+      "description": "Mixed climate with warm humid summers and mild winters",
+      "characteristics": {
+        "avgSummerTempC": 28,
+        "avgWinterTempC": 5,
+        "avgRelativeHumidity": 70,
+        "heatingDegreeDays": 3000,
+        "coolingDegreeDays": 1500
+      }
+    },
+    "Mixed-Dry": {
+      "description": "Mixed climate with warm dry summers and cold winters",
+      "characteristics": {
+        "avgSummerTempC": 30,
+        "avgWinterTempC": 0,
+        "avgRelativeHumidity": 40,
+        "heatingDegreeDays": 4000,
+        "coolingDegreeDays": 800
+      }
+    },
+    "Cold": {
+      "description": "Cold climate with warm summers and cold winters",
+      "characteristics": {
+        "avgSummerTempC": 24,
+        "avgWinterTempC": -5,
+        "avgRelativeHumidity": 65,
+        "heatingDegreeDays": 5500,
+        "coolingDegreeDays": 500
+      }
+    },
+    "Very Cold": {
+      "description": "Very cold climate with short cool summers and long cold winters",
+      "characteristics": {
+        "avgSummerTempC": 18,
+        "avgWinterTempC": -15,
+        "avgRelativeHumidity": 60,
+        "heatingDegreeDays": 8000,
+        "coolingDegreeDays": 100
+      }
+    },
+    "Subarctic": {
+      "description": "Subarctic climate with very short summers and extremely cold winters",
+      "characteristics": {
+        "avgSummerTempC": 12,
+        "avgWinterTempC": -25,
+        "avgRelativeHumidity": 55,
+        "heatingDegreeDays": 10000,
+        "coolingDegreeDays": 0
+      }
+    }
+  },
+
+  "usStates": {
+    "AL": {"name": "Alabama", "region": "Hot-Humid", "elevation": 150, "timezone": "America/Chicago"},
+    "AK": {"name": "Alaska", "region": "Very Cold", "elevation": 580, "timezone": "America/Anchorage"},
+    "AZ": {"name": "Arizona", "region": "Hot-Dry", "elevation": 1250, "timezone": "America/Phoenix"},
+    "AR": {"name": "Arkansas", "region": "Mixed-Humid", "elevation": 200, "timezone": "America/Chicago"},
+    "CA": {"name": "California", "region": "Marine", "elevation": 880, "timezone": "America/Los_Angeles"},
+    "CO": {"name": "Colorado", "region": "Mixed-Dry", "elevation": 2000, "timezone": "America/Denver"},
+    "CT": {"name": "Connecticut", "region": "Cold", "elevation": 150, "timezone": "America/New_York"},
+    "DE": {"name": "Delaware", "region": "Mixed-Humid", "elevation": 20, "timezone": "America/New_York"},
+    "DC": {"name": "District of Columbia", "region": "Mixed-Humid", "elevation": 20, "timezone": "America/New_York"},
+    "FL": {"name": "Florida", "region": "Hot-Humid", "elevation": 30, "timezone": "America/New_York"},
+    "GA": {"name": "Georgia", "region": "Hot-Humid", "elevation": 180, "timezone": "America/New_York"},
+    "HI": {"name": "Hawaii", "region": "Hot-Humid", "elevation": 920, "timezone": "Pacific/Honolulu"},
+    "ID": {"name": "Idaho", "region": "Mixed-Dry", "elevation": 1520, "timezone": "America/Boise"},
+    "IL": {"name": "Illinois", "region": "Mixed-Humid", "elevation": 180, "timezone": "America/Chicago"},
+    "IN": {"name": "Indiana", "region": "Mixed-Humid", "elevation": 210, "timezone": "America/Indiana/Indianapolis"},
+    "IA": {"name": "Iowa", "region": "Cold", "elevation": 335, "timezone": "America/Chicago"},
+    "KS": {"name": "Kansas", "region": "Mixed-Humid", "elevation": 610, "timezone": "America/Chicago"},
+    "KY": {"name": "Kentucky", "region": "Mixed-Humid", "elevation": 230, "timezone": "America/Kentucky/Louisville"},
+    "LA": {"name": "Louisiana", "region": "Hot-Humid", "elevation": 30, "timezone": "America/Chicago"},
+    "ME": {"name": "Maine", "region": "Cold", "elevation": 180, "timezone": "America/New_York"},
+    "MD": {"name": "Maryland", "region": "Mixed-Humid", "elevation": 110, "timezone": "America/New_York"},
+    "MA": {"name": "Massachusetts", "region": "Cold", "elevation": 150, "timezone": "America/New_York"},
+    "MI": {"name": "Michigan", "region": "Cold", "elevation": 270, "timezone": "America/Detroit"},
+    "MN": {"name": "Minnesota", "region": "Cold", "elevation": 370, "timezone": "America/Chicago"},
+    "MS": {"name": "Mississippi", "region": "Hot-Humid", "elevation": 90, "timezone": "America/Chicago"},
+    "MO": {"name": "Missouri", "region": "Mixed-Humid", "elevation": 240, "timezone": "America/Chicago"},
+    "MT": {"name": "Montana", "region": "Mixed-Dry", "elevation": 1035, "timezone": "America/Denver"},
+    "NE": {"name": "Nebraska", "region": "Mixed-Dry", "elevation": 790, "timezone": "America/Chicago"},
+    "NV": {"name": "Nevada", "region": "Hot-Dry", "elevation": 1675, "timezone": "America/Los_Angeles"},
+    "NH": {"name": "New Hampshire", "region": "Cold", "elevation": 300, "timezone": "America/New_York"},
+    "NJ": {"name": "New Jersey", "region": "Mixed-Humid", "elevation": 80, "timezone": "America/New_York"},
+    "NM": {"name": "New Mexico", "region": "Hot-Dry", "elevation": 1735, "timezone": "America/Denver"},
+    "NY": {"name": "New York", "region": "Cold", "elevation": 300, "timezone": "America/New_York"},
+    "NC": {"name": "North Carolina", "region": "Mixed-Humid", "elevation": 220, "timezone": "America/New_York"},
+    "ND": {"name": "North Dakota", "region": "Mixed-Dry", "elevation": 580, "timezone": "America/Chicago"},
+    "OH": {"name": "Ohio", "region": "Mixed-Humid", "elevation": 260, "timezone": "America/New_York"},
+    "OK": {"name": "Oklahoma", "region": "Mixed-Humid", "elevation": 400, "timezone": "America/Chicago"},
+    "OR": {"name": "Oregon", "region": "Marine", "elevation": 1000, "timezone": "America/Los_Angeles"},
+    "PA": {"name": "Pennsylvania", "region": "Mixed-Humid", "elevation": 340, "timezone": "America/New_York"},
+    "RI": {"name": "Rhode Island", "region": "Cold", "elevation": 60, "timezone": "America/New_York"},
+    "SC": {"name": "South Carolina", "region": "Hot-Humid", "elevation": 110, "timezone": "America/New_York"},
+    "SD": {"name": "South Dakota", "region": "Mixed-Dry", "elevation": 670, "timezone": "America/Chicago"},
+    "TN": {"name": "Tennessee", "region": "Mixed-Humid", "elevation": 260, "timezone": "America/Chicago"},
+    "TX": {"name": "Texas", "region": "Hot-Humid", "elevation": 520, "timezone": "America/Chicago"},
+    "UT": {"name": "Utah", "region": "Hot-Dry", "elevation": 1890, "timezone": "America/Denver"},
+    "VT": {"name": "Vermont", "region": "Cold", "elevation": 300, "timezone": "America/New_York"},
+    "VA": {"name": "Virginia", "region": "Mixed-Humid", "elevation": 290, "timezone": "America/New_York"},
+    "WA": {"name": "Washington", "region": "Marine", "elevation": 520, "timezone": "America/Los_Angeles"},
+    "WV": {"name": "West Virginia", "region": "Mixed-Humid", "elevation": 460, "timezone": "America/New_York"},
+    "WI": {"name": "Wisconsin", "region": "Cold", "elevation": 320, "timezone": "America/Chicago"},
+    "WY": {"name": "Wyoming", "region": "Mixed-Dry", "elevation": 2040, "timezone": "America/Denver"}
+  },
+
+  "internationalRegions": {
+    "CA-AB": {"name": "Alberta, Canada", "region": "Very Cold", "elevation": 1045, "timezone": "America/Edmonton"},
+    "CA-BC": {"name": "British Columbia, Canada", "region": "Marine", "elevation": 500, "timezone": "America/Vancouver"},
+    "CA-MB": {"name": "Manitoba, Canada", "region": "Very Cold", "elevation": 240, "timezone": "America/Winnipeg"},
+    "CA-NB": {"name": "New Brunswick, Canada", "region": "Cold", "elevation": 130, "timezone": "America/Moncton"},
+    "CA-NL": {"name": "Newfoundland and Labrador, Canada", "region": "Cold", "elevation": 200, "timezone": "America/St_Johns"},
+    "CA-NS": {"name": "Nova Scotia, Canada", "region": "Cold", "elevation": 100, "timezone": "America/Halifax"},
+    "CA-ON": {"name": "Ontario, Canada", "region": "Cold", "elevation": 260, "timezone": "America/Toronto"},
+    "CA-PE": {"name": "Prince Edward Island, Canada", "region": "Cold", "elevation": 50, "timezone": "America/Halifax"},
+    "CA-QC": {"name": "Quebec, Canada", "region": "Cold", "elevation": 180, "timezone": "America/Montreal"},
+    "CA-SK": {"name": "Saskatchewan, Canada", "region": "Very Cold", "elevation": 520, "timezone": "America/Regina"},
+    "CA-NT": {"name": "Northwest Territories, Canada", "region": "Subarctic", "elevation": 200, "timezone": "America/Yellowknife"},
+    "CA-NU": {"name": "Nunavut, Canada", "region": "Subarctic", "elevation": 30, "timezone": "America/Iqaluit"},
+    "CA-YT": {"name": "Yukon, Canada", "region": "Subarctic", "elevation": 660, "timezone": "America/Whitehorse"},
+
+    "UK-ENG": {"name": "England, UK", "region": "Marine", "elevation": 100, "timezone": "Europe/London"},
+    "UK-SCT": {"name": "Scotland, UK", "region": "Cold", "elevation": 200, "timezone": "Europe/London"},
+    "UK-WLS": {"name": "Wales, UK", "region": "Marine", "elevation": 150, "timezone": "Europe/London"},
+    "UK-NIR": {"name": "Northern Ireland, UK", "region": "Marine", "elevation": 80, "timezone": "Europe/London"},
+    "IE": {"name": "Ireland", "region": "Marine", "elevation": 120, "timezone": "Europe/Dublin"},
+
+    "AU-NSW": {"name": "New South Wales, Australia", "region": "Mixed-Humid", "elevation": 300, "timezone": "Australia/Sydney"},
+    "AU-VIC": {"name": "Victoria, Australia", "region": "Marine", "elevation": 200, "timezone": "Australia/Melbourne"},
+    "AU-QLD": {"name": "Queensland, Australia", "region": "Hot-Humid", "elevation": 260, "timezone": "Australia/Brisbane"},
+    "AU-WA": {"name": "Western Australia", "region": "Hot-Dry", "elevation": 350, "timezone": "Australia/Perth"},
+    "AU-SA": {"name": "South Australia", "region": "Hot-Dry", "elevation": 200, "timezone": "Australia/Adelaide"},
+    "AU-TAS": {"name": "Tasmania, Australia", "region": "Marine", "elevation": 300, "timezone": "Australia/Hobart"},
+    "AU-NT": {"name": "Northern Territory, Australia", "region": "Hot-Humid", "elevation": 350, "timezone": "Australia/Darwin"},
+    "AU-ACT": {"name": "Australian Capital Territory", "region": "Mixed-Dry", "elevation": 580, "timezone": "Australia/Sydney"},
+
+    "NZ-NI": {"name": "North Island, New Zealand", "region": "Marine", "elevation": 200, "timezone": "Pacific/Auckland"},
+    "NZ-SI": {"name": "South Island, New Zealand", "region": "Marine", "elevation": 400, "timezone": "Pacific/Auckland"},
+
+    "DE": {"name": "Germany", "region": "Cold", "elevation": 260, "timezone": "Europe/Berlin"},
+    "FR": {"name": "France", "region": "Marine", "elevation": 300, "timezone": "Europe/Paris"},
+    "ES": {"name": "Spain", "region": "Mixed-Dry", "elevation": 660, "timezone": "Europe/Madrid"},
+    "IT": {"name": "Italy", "region": "Mixed-Humid", "elevation": 420, "timezone": "Europe/Rome"},
+    "NL": {"name": "Netherlands", "region": "Marine", "elevation": 10, "timezone": "Europe/Amsterdam"},
+    "BE": {"name": "Belgium", "region": "Marine", "elevation": 180, "timezone": "Europe/Brussels"},
+    "AT": {"name": "Austria", "region": "Cold", "elevation": 910, "timezone": "Europe/Vienna"},
+    "CH": {"name": "Switzerland", "region": "Cold", "elevation": 1350, "timezone": "Europe/Zurich"},
+    "SE": {"name": "Sweden", "region": "Cold", "elevation": 320, "timezone": "Europe/Stockholm"},
+    "NO": {"name": "Norway", "region": "Very Cold", "elevation": 460, "timezone": "Europe/Oslo"},
+    "DK": {"name": "Denmark", "region": "Cold", "elevation": 30, "timezone": "Europe/Copenhagen"},
+    "FI": {"name": "Finland", "region": "Very Cold", "elevation": 160, "timezone": "Europe/Helsinki"},
+    "PL": {"name": "Poland", "region": "Cold", "elevation": 175, "timezone": "Europe/Warsaw"},
+    "CZ": {"name": "Czech Republic", "region": "Cold", "elevation": 430, "timezone": "Europe/Prague"},
+    "PT": {"name": "Portugal", "region": "Marine", "elevation": 370, "timezone": "Europe/Lisbon"},
+    "GR": {"name": "Greece", "region": "Mixed-Dry", "elevation": 500, "timezone": "Europe/Athens"},
+
+    "JP": {"name": "Japan", "region": "Mixed-Humid", "elevation": 400, "timezone": "Asia/Tokyo"},
+    "KR": {"name": "South Korea", "region": "Mixed-Humid", "elevation": 280, "timezone": "Asia/Seoul"},
+    "SG": {"name": "Singapore", "region": "Hot-Humid", "elevation": 15, "timezone": "Asia/Singapore"},
+    "IN-N": {"name": "Northern India", "region": "Mixed-Dry", "elevation": 240, "timezone": "Asia/Kolkata"},
+    "IN-S": {"name": "Southern India", "region": "Hot-Humid", "elevation": 500, "timezone": "Asia/Kolkata"},
+
+    "ZA": {"name": "South Africa", "region": "Mixed-Dry", "elevation": 1200, "timezone": "Africa/Johannesburg"},
+    "EG": {"name": "Egypt", "region": "Hot-Dry", "elevation": 100, "timezone": "Africa/Cairo"},
+    "AE": {"name": "United Arab Emirates", "region": "Hot-Dry", "elevation": 50, "timezone": "Asia/Dubai"},
+    "SA": {"name": "Saudi Arabia", "region": "Hot-Dry", "elevation": 600, "timezone": "Asia/Riyadh"},
+    "IL": {"name": "Israel", "region": "Hot-Dry", "elevation": 500, "timezone": "Asia/Jerusalem"},
+
+    "MX": {"name": "Mexico", "region": "Hot-Dry", "elevation": 1100, "timezone": "America/Mexico_City"},
+    "BR-SE": {"name": "Southeast Brazil", "region": "Hot-Humid", "elevation": 750, "timezone": "America/Sao_Paulo"},
+    "BR-S": {"name": "Southern Brazil", "region": "Mixed-Humid", "elevation": 500, "timezone": "America/Sao_Paulo"},
+    "AR": {"name": "Argentina", "region": "Mixed-Humid", "elevation": 400, "timezone": "America/Argentina/Buenos_Aires"},
+    "CL": {"name": "Chile", "region": "Marine", "elevation": 570, "timezone": "America/Santiago"}
+  },
+
+  "regionalPresets": {
+    "psychrometrics": {
+      "Hot-Humid": {
+        "dewPointMaxC": 18.0,
+        "muggyDeltaC": 1.0,
+        "economizerEnthalpyDelta": 4.0,
+        "economizerAbsHumidityDelta": 3.0,
+        "co2DeltaPpm": 450,
+        "notes": "Lower dew point threshold due to persistent humidity; tight economizer control"
+      },
+      "Hot-Dry": {
+        "dewPointMaxC": 19.0,
+        "muggyDeltaC": 2.0,
+        "economizerEnthalpyDelta": 2.0,
+        "economizerAbsHumidityDelta": 1.0,
+        "co2DeltaPpm": 450,
+        "notes": "Higher dew point acceptable; aggressive economizer use due to dry conditions"
+      },
+      "Marine": {
+        "dewPointMaxC": 16.5,
+        "muggyDeltaC": 1.5,
+        "economizerEnthalpyDelta": 3.0,
+        "economizerAbsHumidityDelta": 2.0,
+        "co2DeltaPpm": 400,
+        "notes": "Mild temperatures favor natural ventilation; moderate psychrometric thresholds"
+      },
+      "Mixed-Humid": {
+        "dewPointMaxC": 17.0,
+        "muggyDeltaC": 1.5,
+        "economizerEnthalpyDelta": 3.5,
+        "economizerAbsHumidityDelta": 2.0,
+        "co2DeltaPpm": 450,
+        "notes": "Balanced thresholds for variable humidity conditions"
+      },
+      "Mixed-Dry": {
+        "dewPointMaxC": 16.0,
+        "muggyDeltaC": 1.5,
+        "economizerEnthalpyDelta": 2.5,
+        "economizerAbsHumidityDelta": 1.5,
+        "co2DeltaPpm": 450,
+        "notes": "Lower humidity thresholds; good economizer opportunities"
+      },
+      "Cold": {
+        "dewPointMaxC": 17.0,
+        "muggyDeltaC": 1.5,
+        "economizerEnthalpyDelta": 3.0,
+        "economizerAbsHumidityDelta": 2.0,
+        "co2DeltaPpm": 450,
+        "notes": "Standard thresholds; focus on heating season efficiency"
+      },
+      "Very Cold": {
+        "dewPointMaxC": 16.0,
+        "muggyDeltaC": 1.5,
+        "economizerEnthalpyDelta": 3.0,
+        "economizerAbsHumidityDelta": 2.0,
+        "co2DeltaPpm": 500,
+        "notes": "Higher CO2 threshold due to tighter building envelopes; limited cooling needs"
+      },
+      "Subarctic": {
+        "dewPointMaxC": 15.0,
+        "muggyDeltaC": 2.0,
+        "economizerEnthalpyDelta": 2.5,
+        "economizerAbsHumidityDelta": 1.5,
+        "co2DeltaPpm": 550,
+        "notes": "Very tight envelopes; minimal cooling; focus on indoor air quality"
+      }
+    },
+
+    "seasonalBias": {
+      "Hot-Humid": {
+        "winterBiasC": 0.1,
+        "summerBiasC": -0.5,
+        "shoulderBiasC": -0.2,
+        "notes": "Minimal heating bias; significant cooling bias for energy savings"
+      },
+      "Hot-Dry": {
+        "winterBiasC": 0.0,
+        "summerBiasC": -0.4,
+        "shoulderBiasC": -0.1,
+        "notes": "No heating bias; moderate cooling bias; diurnal swings considered"
+      },
+      "Marine": {
+        "winterBiasC": 0.1,
+        "summerBiasC": -0.1,
+        "shoulderBiasC": 0.0,
+        "notes": "Minimal biases due to mild year-round temperatures"
+      },
+      "Mixed-Humid": {
+        "winterBiasC": 0.3,
+        "summerBiasC": -0.3,
+        "shoulderBiasC": 0.0,
+        "notes": "Moderate biases for distinct seasonal changes"
+      },
+      "Mixed-Dry": {
+        "winterBiasC": 0.3,
+        "summerBiasC": -0.2,
+        "shoulderBiasC": 0.0,
+        "notes": "Moderate heating bias; less cooling need due to dry conditions"
+      },
+      "Cold": {
+        "winterBiasC": 0.5,
+        "summerBiasC": -0.2,
+        "shoulderBiasC": 0.2,
+        "notes": "Strong heating bias for comfort; shoulder season warmth preferred"
+      },
+      "Very Cold": {
+        "winterBiasC": 0.6,
+        "summerBiasC": -0.2,
+        "shoulderBiasC": 0.3,
+        "notes": "Maximum heating bias; limited cooling; warm shoulder seasons"
+      },
+      "Subarctic": {
+        "winterBiasC": 0.8,
+        "summerBiasC": 0.0,
+        "shoulderBiasC": 0.4,
+        "notes": "Strong heating focus; no cooling bias; extended warm preferences"
+      }
+    },
+
+    "adaptiveComfortBaselines": {
+      "Hot-Humid": {
+        "ashraeCategoryDefault": "II",
+        "comfortMinC": 22.0,
+        "comfortMaxC": 28.0,
+        "adaptiveModelWeight": 0.8,
+        "notes": "Wider upper range; occupants acclimated to warmth"
+      },
+      "Hot-Dry": {
+        "ashraeCategoryDefault": "II",
+        "comfortMinC": 21.0,
+        "comfortMaxC": 29.0,
+        "adaptiveModelWeight": 0.9,
+        "notes": "Higher max due to dry heat tolerance; strong adaptive response"
+      },
+      "Marine": {
+        "ashraeCategoryDefault": "II",
+        "comfortMinC": 19.0,
+        "comfortMaxC": 26.0,
+        "adaptiveModelWeight": 0.7,
+        "notes": "Narrower range; occupants sensitive to temperature changes"
+      },
+      "Mixed-Humid": {
+        "ashraeCategoryDefault": "II",
+        "comfortMinC": 19.0,
+        "comfortMaxC": 27.0,
+        "adaptiveModelWeight": 0.75,
+        "notes": "Standard comfort range with good adaptive potential"
+      },
+      "Mixed-Dry": {
+        "ashraeCategoryDefault": "II",
+        "comfortMinC": 18.0,
+        "comfortMaxC": 27.0,
+        "adaptiveModelWeight": 0.8,
+        "notes": "Wide range acceptable; dry conditions aid comfort adaptation"
+      },
+      "Cold": {
+        "ashraeCategoryDefault": "II",
+        "comfortMinC": 18.0,
+        "comfortMaxC": 26.0,
+        "adaptiveModelWeight": 0.6,
+        "notes": "Lower minimum tolerance; heating-focused comfort model"
+      },
+      "Very Cold": {
+        "ashraeCategoryDefault": "II",
+        "comfortMinC": 18.0,
+        "comfortMaxC": 25.0,
+        "adaptiveModelWeight": 0.5,
+        "notes": "Tighter range; reduced outdoor validity for adaptive model"
+      },
+      "Subarctic": {
+        "ashraeCategoryDefault": "I",
+        "comfortMinC": 19.0,
+        "comfortMaxC": 24.0,
+        "adaptiveModelWeight": 0.4,
+        "notes": "Strict comfort requirements; limited adaptive model applicability"
+      }
+    },
+
+    "ventilationThresholds": {
+      "Hot-Humid": {
+        "tightStates": true,
+        "ventDeltaC": 1.5,
+        "nightVentMinDeltaC": 3.0,
+        "notes": "Tight control to prevent humidity intrusion"
+      },
+      "Hot-Dry": {
+        "tightStates": false,
+        "ventDeltaC": 2.5,
+        "nightVentMinDeltaC": 5.0,
+        "notes": "Aggressive night ventilation for thermal mass cooling"
+      },
+      "Marine": {
+        "tightStates": false,
+        "ventDeltaC": 2.0,
+        "nightVentMinDeltaC": 2.5,
+        "notes": "Liberal ventilation; mild conditions favor natural cooling"
+      },
+      "Mixed-Humid": {
+        "tightStates": false,
+        "ventDeltaC": 2.0,
+        "nightVentMinDeltaC": 3.0,
+        "notes": "Moderate ventilation; humidity monitoring recommended"
+      },
+      "Mixed-Dry": {
+        "tightStates": false,
+        "ventDeltaC": 2.0,
+        "nightVentMinDeltaC": 4.0,
+        "notes": "Good ventilation opportunities; diurnal temperature swing beneficial"
+      },
+      "Cold": {
+        "tightStates": false,
+        "ventDeltaC": 1.5,
+        "nightVentMinDeltaC": 2.0,
+        "notes": "Conservative ventilation; heat recovery considerations"
+      },
+      "Very Cold": {
+        "tightStates": false,
+        "ventDeltaC": 1.5,
+        "nightVentMinDeltaC": 1.5,
+        "notes": "Minimal natural ventilation; focus on mechanical with heat recovery"
+      },
+      "Subarctic": {
+        "tightStates": false,
+        "ventDeltaC": 1.0,
+        "nightVentMinDeltaC": 1.0,
+        "notes": "Very limited ventilation windows; air quality focus via mechanical"
+      }
+    }
+  },
+
+  "thermostatProfiles": {
+    "Ecobee": {
+      "minSeparationF": 5.0,
+      "supportsHeatCool": true,
+      "hasHumidityControl": true,
+      "hasOccupancySensors": true,
+      "protocol": "wifi"
+    },
+    "Google Nest": {
+      "minSeparationF": 3.0,
+      "supportsHeatCool": true,
+      "hasHumidityControl": false,
+      "hasOccupancySensors": true,
+      "protocol": "wifi"
+    },
+    "Honeywell T-series (T5/T6/T9)": {
+      "minSeparationF": 3.0,
+      "supportsHeatCool": true,
+      "hasHumidityControl": false,
+      "hasOccupancySensors": false,
+      "protocol": "wifi"
+    },
+    "Honeywell Home/Resideo (Lyric/Prestige/VisionPRO)": {
+      "minSeparationF": 2.0,
+      "supportsHeatCool": true,
+      "hasHumidityControl": true,
+      "hasOccupancySensors": false,
+      "protocol": "wifi"
+    },
+    "Honeywell T6 Pro Z-Wave": {
+      "minSeparationF": 3.0,
+      "supportsHeatCool": true,
+      "hasHumidityControl": false,
+      "hasOccupancySensors": false,
+      "protocol": "zwave"
+    },
+    "Emerson Sensi": {
+      "minSeparationF": 2.0,
+      "supportsHeatCool": true,
+      "hasHumidityControl": false,
+      "hasOccupancySensors": false,
+      "protocol": "wifi"
+    },
+    "Carrier Infinity/Edge": {
+      "minSeparationF": 2.0,
+      "supportsHeatCool": true,
+      "hasHumidityControl": true,
+      "hasOccupancySensors": false,
+      "protocol": "wifi"
+    },
+    "Bryant Evolution": {
+      "minSeparationF": 2.0,
+      "supportsHeatCool": true,
+      "hasHumidityControl": true,
+      "hasOccupancySensors": false,
+      "protocol": "wifi"
+    },
+    "Trane/American Standard": {
+      "minSeparationF": 3.0,
+      "supportsHeatCool": true,
+      "hasHumidityControl": true,
+      "hasOccupancySensors": false,
+      "protocol": "wifi"
+    },
+    "Lennox iComfort": {
+      "minSeparationF": 3.0,
+      "supportsHeatCool": true,
+      "hasHumidityControl": true,
+      "hasOccupancySensors": false,
+      "protocol": "wifi"
+    },
+    "Bosch Connected Control": {
+      "minSeparationF": 2.0,
+      "supportsHeatCool": true,
+      "hasHumidityControl": false,
+      "hasOccupancySensors": false,
+      "protocol": "wifi"
+    },
+    "Amazon Smart Thermostat": {
+      "minSeparationF": 2.0,
+      "supportsHeatCool": true,
+      "hasHumidityControl": false,
+      "hasOccupancySensors": false,
+      "protocol": "wifi"
+    },
+    "Wyze": {
+      "minSeparationF": 5.0,
+      "supportsHeatCool": true,
+      "hasHumidityControl": false,
+      "hasOccupancySensors": false,
+      "protocol": "wifi"
+    },
+    "Tado": {
+      "minSeparationF": 3.0,
+      "supportsHeatCool": false,
+      "hasHumidityControl": false,
+      "hasOccupancySensors": true,
+      "protocol": "wifi"
+    },
+    "Netatmo": {
+      "minSeparationF": 3.0,
+      "supportsHeatCool": false,
+      "hasHumidityControl": false,
+      "hasOccupancySensors": false,
+      "protocol": "wifi"
+    },
+    "Hive": {
+      "minSeparationF": 3.0,
+      "supportsHeatCool": false,
+      "hasHumidityControl": false,
+      "hasOccupancySensors": false,
+      "protocol": "zigbee"
+    },
+    "Heatmiser Neo": {
+      "minSeparationF": 1.8,
+      "supportsHeatCool": false,
+      "hasHumidityControl": false,
+      "hasOccupancySensors": false,
+      "protocol": "wifi"
+    },
+    "Mysa (Electric Heat)": {
+      "minSeparationF": 3.0,
+      "supportsHeatCool": false,
+      "hasHumidityControl": false,
+      "hasOccupancySensors": false,
+      "protocol": "wifi"
+    },
+    "Tuya Zigbee (Generic)": {
+      "minSeparationF": 1.8,
+      "supportsHeatCool": true,
+      "hasHumidityControl": false,
+      "hasOccupancySensors": false,
+      "protocol": "zigbee"
+    },
+    "Zigbee (ZHA Generic)": {
+      "minSeparationF": 1.8,
+      "supportsHeatCool": true,
+      "hasHumidityControl": false,
+      "hasOccupancySensors": false,
+      "protocol": "zigbee"
+    },
+    "Z-Wave (ZWAVE_JS Generic)": {
+      "minSeparationF": 1.8,
+      "supportsHeatCool": true,
+      "hasHumidityControl": false,
+      "hasOccupancySensors": false,
+      "protocol": "zwave"
+    },
+    "Generic (no minimum)": {
+      "minSeparationF": 0.0,
+      "supportsHeatCool": true,
+      "hasHumidityControl": false,
+      "hasOccupancySensors": false,
+      "protocol": "unknown"
+    }
+  }
+}

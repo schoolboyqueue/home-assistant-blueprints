@@ -219,13 +219,15 @@ blueprint:
                         boolean: {}
 
                 user_state_code:
-                    name: "U.S. State (for Auto Preset)"
-                    description: "Optional. When preset is 'Auto from State', this derives your region."
+                    name: "Region (U.S. State or International)"
+                    description: "Select your region for automatic climate presets. Includes U.S. states and international regions."
                     default: ""
                     selector:
                         select:
                             options:
                                 - ""
+                                - label: "--- U.S. States ---"
+                                  value: ""
                                 - AL - Alabama
                                 - AK - Alaska
                                 - AZ - Arizona
@@ -234,6 +236,7 @@ blueprint:
                                 - CO - Colorado
                                 - CT - Connecticut
                                 - DE - Delaware
+                                - DC - District of Columbia
                                 - FL - Florida
                                 - GA - Georgia
                                 - HI - Hawaii
@@ -276,11 +279,83 @@ blueprint:
                                 - WV - West Virginia
                                 - WI - Wisconsin
                                 - WY - Wyoming
-                                - DC - District of Columbia
+                                - label: "--- Canada ---"
+                                  value: ""
+                                - CA-AB - Alberta
+                                - CA-BC - British Columbia
+                                - CA-MB - Manitoba
+                                - CA-NB - New Brunswick
+                                - CA-NL - Newfoundland and Labrador
+                                - CA-NS - Nova Scotia
+                                - CA-NT - Northwest Territories
+                                - CA-NU - Nunavut
+                                - CA-ON - Ontario
+                                - CA-PE - Prince Edward Island
+                                - CA-QC - Quebec
+                                - CA-SK - Saskatchewan
+                                - CA-YT - Yukon
+                                - label: "--- United Kingdom & Ireland ---"
+                                  value: ""
+                                - UK-ENG - England
+                                - UK-SCT - Scotland
+                                - UK-WLS - Wales
+                                - UK-NIR - Northern Ireland
+                                - IE - Ireland
+                                - label: "--- Australia & New Zealand ---"
+                                  value: ""
+                                - AU-ACT - Australian Capital Territory
+                                - AU-NSW - New South Wales
+                                - AU-NT - Northern Territory
+                                - AU-QLD - Queensland
+                                - AU-SA - South Australia
+                                - AU-TAS - Tasmania
+                                - AU-VIC - Victoria
+                                - AU-WA - Western Australia
+                                - NZ-NI - North Island, New Zealand
+                                - NZ-SI - South Island, New Zealand
+                                - label: "--- Europe ---"
+                                  value: ""
+                                - AT - Austria
+                                - BE - Belgium
+                                - CH - Switzerland
+                                - CZ - Czech Republic
+                                - DE - Germany
+                                - DK - Denmark
+                                - ES - Spain
+                                - FI - Finland
+                                - FR - France
+                                - GR - Greece
+                                - IT - Italy
+                                - NL - Netherlands
+                                - NO - Norway
+                                - PL - Poland
+                                - PT - Portugal
+                                - SE - Sweden
+                                - label: "--- Asia & Middle East ---"
+                                  value: ""
+                                - AE - United Arab Emirates
+                                - IL - Israel
+                                - IN-N - Northern India
+                                - IN-S - Southern India
+                                - JP - Japan
+                                - KR - South Korea
+                                - SA - Saudi Arabia
+                                - SG - Singapore
+                                - label: "--- Africa ---"
+                                  value: ""
+                                - EG - Egypt
+                                - ZA - South Africa
+                                - label: "--- Americas (non-U.S.) ---"
+                                  value: ""
+                                - AR - Argentina
+                                - BR-S - Southern Brazil
+                                - BR-SE - Southeast Brazil
+                                - CL - Chile
+                                - MX - Mexico
 
                 seasonal_bias_preset:
                     name: "Seasonal Bias Preset"
-                    description: "Choose a preset or 'Auto from State' (uses U.S. State) or 'None (Manual)' to use your numeric biases."
+                    description: "Choose a preset or 'Auto from Region' (uses selected region) or 'None (Manual)' to use your numeric biases."
                     default: "Auto from State"
                     selector:
                         select:
@@ -293,6 +368,7 @@ blueprint:
                                 - Mixed-Dry
                                 - Cold
                                 - Very Cold
+                                - Subarctic
                                 - None (Manual)
 
                 bias_preset_intensity:
@@ -1317,23 +1393,44 @@ variables:
     inside_half_c: "{{ (inside_half_sys|float * 5/9) if is_imperial else (inside_half_sys|float) }}"
 
     # --------- Regional presets for psychrometrics/CO₂ (base values in °C / ppm / kJ/kg / g/m³) ---------
+    # Regional profile database - maps region codes to climate zones
+    # Includes U.S. states and international regions (from blueprints/shared/regional_profiles.json)
+    _region_lut: >
+        {{ {
+          'AL': 'Hot-Humid', 'AK': 'Very Cold', 'AZ': 'Hot-Dry', 'AR': 'Mixed-Humid',
+          'CA': 'Marine', 'CO': 'Mixed-Dry', 'CT': 'Cold', 'DE': 'Mixed-Humid',
+          'DC': 'Mixed-Humid', 'FL': 'Hot-Humid', 'GA': 'Hot-Humid', 'HI': 'Hot-Humid',
+          'ID': 'Mixed-Dry', 'IL': 'Mixed-Humid', 'IN': 'Mixed-Humid', 'IA': 'Cold',
+          'KS': 'Mixed-Humid', 'KY': 'Mixed-Humid', 'LA': 'Hot-Humid', 'ME': 'Cold',
+          'MD': 'Mixed-Humid', 'MA': 'Cold', 'MI': 'Cold', 'MN': 'Cold',
+          'MS': 'Hot-Humid', 'MO': 'Mixed-Humid', 'MT': 'Mixed-Dry', 'NE': 'Mixed-Dry',
+          'NV': 'Hot-Dry', 'NH': 'Cold', 'NJ': 'Mixed-Humid', 'NM': 'Hot-Dry',
+          'NY': 'Cold', 'NC': 'Mixed-Humid', 'ND': 'Mixed-Dry', 'OH': 'Mixed-Humid',
+          'OK': 'Mixed-Humid', 'OR': 'Marine', 'PA': 'Mixed-Humid', 'RI': 'Cold',
+          'SC': 'Hot-Humid', 'SD': 'Mixed-Dry', 'TN': 'Mixed-Humid', 'TX': 'Hot-Humid',
+          'UT': 'Hot-Dry', 'VT': 'Cold', 'VA': 'Mixed-Humid', 'WA': 'Marine',
+          'WV': 'Mixed-Humid', 'WI': 'Cold', 'WY': 'Mixed-Dry',
+          'CA-AB': 'Very Cold', 'CA-BC': 'Marine', 'CA-MB': 'Very Cold', 'CA-NB': 'Cold',
+          'CA-NL': 'Cold', 'CA-NS': 'Cold', 'CA-NT': 'Subarctic', 'CA-NU': 'Subarctic',
+          'CA-ON': 'Cold', 'CA-PE': 'Cold', 'CA-QC': 'Cold', 'CA-SK': 'Very Cold', 'CA-YT': 'Subarctic',
+          'UK-ENG': 'Marine', 'UK-SCT': 'Cold', 'UK-WLS': 'Marine', 'UK-NIR': 'Marine', 'IE': 'Marine',
+          'AU-NSW': 'Mixed-Humid', 'AU-VIC': 'Marine', 'AU-QLD': 'Hot-Humid', 'AU-WA': 'Hot-Dry',
+          'AU-SA': 'Hot-Dry', 'AU-TAS': 'Marine', 'AU-NT': 'Hot-Humid', 'AU-ACT': 'Mixed-Dry',
+          'NZ-NI': 'Marine', 'NZ-SI': 'Marine',
+          'DE': 'Cold', 'FR': 'Marine', 'ES': 'Mixed-Dry', 'IT': 'Mixed-Humid',
+          'NL': 'Marine', 'BE': 'Marine', 'AT': 'Cold', 'CH': 'Cold',
+          'SE': 'Cold', 'NO': 'Very Cold', 'DK': 'Cold', 'FI': 'Very Cold',
+          'PL': 'Cold', 'CZ': 'Cold', 'PT': 'Marine', 'GR': 'Mixed-Dry',
+          'JP': 'Mixed-Humid', 'KR': 'Mixed-Humid', 'SG': 'Hot-Humid',
+          'IN-N': 'Mixed-Dry', 'IN-S': 'Hot-Humid',
+          'ZA': 'Mixed-Dry', 'EG': 'Hot-Dry', 'AE': 'Hot-Dry', 'SA': 'Hot-Dry', 'IL': 'Hot-Dry',
+          'MX': 'Hot-Dry', 'BR-SE': 'Hot-Humid', 'BR-S': 'Mixed-Humid', 'AR': 'Mixed-Humid', 'CL': 'Marine'
+        } }}
+
     _region_from_state: >
         {% set s = (state_code.split(' ')[0] if state_code else '') %}
-        {% set hot_humid = ['FL','LA','MS','AL','GA','SC','HI','TX'] %}
-        {% set hot_dry = ['AZ','NV','NM','UT'] %}
-        {% set marine = ['CA','OR','WA'] %}
-        {% set mixed_humid = ['NC','TN','KY','AR','OK','VA','MD','DC','DE','NJ','PA','MO','IL','IN','OH','KS','WV'] %}
-        {% set mixed_dry = ['CO','WY','ID','MT','ND','SD','NE'] %}
-        {% set cold = ['NY','CT','RI','MA','VT','NH','ME','MI','WI','MN','IA'] %}
-        {% set very_cold = ['AK'] %}
-        {% if s in hot_humid %} Hot-Humid
-        {% elif s in hot_dry %} Hot-Dry
-        {% elif s in marine %} Marine
-        {% elif s in mixed_humid %} Mixed-Humid
-        {% elif s in mixed_dry %} Mixed-Dry
-        {% elif s in very_cold %} Very Cold
-        {% elif s in cold %} Cold
-        {% else %} None {% endif %}
+        {% set r = _region_lut.get(s, 'None') %}
+        {{ r if r != 'None' else 'None' }}
 
     region_pick: >
         {% if not regional_defaults_enable %} None
@@ -1351,6 +1448,7 @@ variables:
         {% elif r == 'Mixed-Dry' %} 16.0
         {% elif r == 'Cold' %} 17.0
         {% elif r == 'Very Cold' %} 16.0
+        {% elif r == 'Subarctic' %} 15.0
         {% else %} {{ none }} {% endif %}
 
     _muggy_delta_c: >
@@ -1362,6 +1460,7 @@ variables:
         {% elif r == 'Mixed-Dry' %} 1.5
         {% elif r == 'Cold' %} 1.5
         {% elif r == 'Very Cold' %} 1.5
+        {% elif r == 'Subarctic' %} 2.0
         {% else %} {{ none }} {% endif %}
 
     _econ_dh: >
@@ -1373,6 +1472,7 @@ variables:
         {% elif r == 'Mixed-Dry' %} 2.5
         {% elif r == 'Cold' %} 3.0
         {% elif r == 'Very Cold' %} 3.0
+        {% elif r == 'Subarctic' %} 2.5
         {% else %} {{ none }} {% endif %}
 
     _econ_dah: >
@@ -1384,6 +1484,7 @@ variables:
         {% elif r == 'Mixed-Dry' %} 1.5
         {% elif r == 'Cold' %} 2.0
         {% elif r == 'Very Cold' %} 2.0
+        {% elif r == 'Subarctic' %} 1.5
         {% else %} {{ none }} {% endif %}
 
     _co2_delta: >
@@ -1395,6 +1496,7 @@ variables:
         {% elif r == 'Mixed-Dry' %} 450
         {% elif r == 'Cold' %} 450
         {% elif r == 'Very Cold' %} 500
+        {% elif r == 'Subarctic' %} 550
         {% else %} {{ none }} {% endif %}
 
     # Apply presets (convert to system units where needed)
@@ -1479,13 +1581,25 @@ variables:
 
     # --------- Pressure model (sensor > manual elevation > LUT by state > sea level) ---------
     # Approximate average elevations by state (meters). Values are coarse; prefer sensor/manual when available.
+    # Elevation lookup table (meters) - includes U.S. states and international regions
+    # Used for atmospheric pressure calculations when no barometer sensor is available
     _state_elev_lut: >
         {{ {
           'AL':150,'AK':580,'AZ':1250,'AR':200,'CA':880,'CO':2000,'CT':150,'DC':20,'DE':20,'FL':30,
           'GA':180,'HI':920,'ID':1520,'IL':180,'IN':210,'IA':335,'KS':610,'KY':230,'LA':30,'ME':180,
           'MD':110,'MA':150,'MI':270,'MN':370,'MS':90,'MO':240,'MT':1035,'NE':790,'NV':1675,'NH':300,
           'NJ':80,'NM':1735,'NY':300,'NC':220,'ND':580,'OH':260,'OK':400,'OR':1000,'PA':340,'RI':60,
-          'SC':110,'SD':670,'TN':260,'TX':520,'UT':1890,'VT':300,'VA':290,'WA':520,'WV':460,'WI':320,'WY':2040
+          'SC':110,'SD':670,'TN':260,'TX':520,'UT':1890,'VT':300,'VA':290,'WA':520,'WV':460,'WI':320,'WY':2040,
+          'CA-AB':1045,'CA-BC':500,'CA-MB':240,'CA-NB':130,'CA-NL':200,'CA-NS':100,'CA-NT':200,'CA-NU':30,
+          'CA-ON':260,'CA-PE':50,'CA-QC':180,'CA-SK':520,'CA-YT':660,
+          'UK-ENG':100,'UK-SCT':200,'UK-WLS':150,'UK-NIR':80,'IE':120,
+          'AU-NSW':300,'AU-VIC':200,'AU-QLD':260,'AU-WA':350,'AU-SA':200,'AU-TAS':300,'AU-NT':350,'AU-ACT':580,
+          'NZ-NI':200,'NZ-SI':400,
+          'DE':260,'FR':300,'ES':660,'IT':420,'NL':10,'BE':180,'AT':910,'CH':1350,
+          'SE':320,'NO':460,'DK':30,'FI':160,'PL':175,'CZ':430,'PT':370,'GR':500,
+          'JP':400,'KR':280,'SG':15,'IN-N':240,'IN-S':500,
+          'ZA':1200,'EG':100,'AE':50,'SA':600,'IL':500,
+          'MX':1100,'BR-SE':750,'BR-S':500,'AR':400,'CL':570
         } }}
     _state_code: "{{ (state_code.split(' ')[0] if state_code else '') }}"
     lut_elev_m: >
@@ -1622,7 +1736,8 @@ variables:
     _preset_w_c: >
         {% set r = _region_for_bias %}
         {% set intensity = bias_intensity | float(1.0) %}
-        {% if r == 'Very Cold' %} {{ 0.6 * intensity }}
+        {% if r == 'Subarctic' %} {{ 0.8 * intensity }}
+        {% elif r == 'Very Cold' %} {{ 0.6 * intensity }}
         {% elif r == 'Cold' %} {{ 0.5 * intensity }}
         {% elif r == 'Mixed-Humid' %} {{ 0.3 * intensity }}
         {% elif r == 'Mixed-Dry' %} {{ 0.3 * intensity }}
@@ -1633,7 +1748,8 @@ variables:
     _preset_s_c: >
         {% set r = _region_for_bias %}
         {% set intensity = bias_intensity | float(1.0) %}
-        {% if r == 'Very Cold' %} {{ -0.2 * intensity }}
+        {% if r == 'Subarctic' %} {{ 0.0 * intensity }}
+        {% elif r == 'Very Cold' %} {{ -0.2 * intensity }}
         {% elif r == 'Cold' %} {{ -0.2 * intensity }}
         {% elif r == 'Mixed-Humid' %} {{ -0.3 * intensity }}
         {% elif r == 'Mixed-Dry' %} {{ -0.2 * intensity }}
@@ -1644,7 +1760,8 @@ variables:
     _preset_sh_c: >
         {% set r = _region_for_bias %}
         {% set intensity = bias_intensity | float(1.0) %}
-        {% if r == 'Very Cold' %} {{ 0.3 * intensity }}
+        {% if r == 'Subarctic' %} {{ 0.4 * intensity }}
+        {% elif r == 'Very Cold' %} {{ 0.3 * intensity }}
         {% elif r == 'Cold' %} {{ 0.2 * intensity }}
         {% elif r == 'Mixed-Humid' %} {{ 0.0 * intensity }}
         {% elif r == 'Mixed-Dry' %} {{ 0.0 * intensity }}

@@ -1,0 +1,421 @@
+# Regional Profile Helpers v1.0.0
+# Jinja2 template helpers for accessing the regional profile database
+#
+# Usage: Copy the relevant variables into your blueprint's variables section
+# These provide lookup tables and helper functions for regional climate data
+#
+# Note: Home Assistant blueprints don't support external imports, so these
+# variables need to be copied into each blueprint that uses them. This file
+# serves as the single source of truth for the data.
+
+# =============================================================================
+# US STATE TO CLIMATE REGION MAPPING
+# =============================================================================
+# Maps 2-letter US state codes to their climate regions
+# Usage: {% set region = _us_state_to_region.get(state_code, 'Mixed-Humid') %}
+
+_us_state_to_region: >
+    {{ {
+      'AL': 'Hot-Humid',
+      'AK': 'Very Cold',
+      'AZ': 'Hot-Dry',
+      'AR': 'Mixed-Humid',
+      'CA': 'Marine',
+      'CO': 'Mixed-Dry',
+      'CT': 'Cold',
+      'DE': 'Mixed-Humid',
+      'DC': 'Mixed-Humid',
+      'FL': 'Hot-Humid',
+      'GA': 'Hot-Humid',
+      'HI': 'Hot-Humid',
+      'ID': 'Mixed-Dry',
+      'IL': 'Mixed-Humid',
+      'IN': 'Mixed-Humid',
+      'IA': 'Cold',
+      'KS': 'Mixed-Humid',
+      'KY': 'Mixed-Humid',
+      'LA': 'Hot-Humid',
+      'ME': 'Cold',
+      'MD': 'Mixed-Humid',
+      'MA': 'Cold',
+      'MI': 'Cold',
+      'MN': 'Cold',
+      'MS': 'Hot-Humid',
+      'MO': 'Mixed-Humid',
+      'MT': 'Mixed-Dry',
+      'NE': 'Mixed-Dry',
+      'NV': 'Hot-Dry',
+      'NH': 'Cold',
+      'NJ': 'Mixed-Humid',
+      'NM': 'Hot-Dry',
+      'NY': 'Cold',
+      'NC': 'Mixed-Humid',
+      'ND': 'Mixed-Dry',
+      'OH': 'Mixed-Humid',
+      'OK': 'Mixed-Humid',
+      'OR': 'Marine',
+      'PA': 'Mixed-Humid',
+      'RI': 'Cold',
+      'SC': 'Hot-Humid',
+      'SD': 'Mixed-Dry',
+      'TN': 'Mixed-Humid',
+      'TX': 'Hot-Humid',
+      'UT': 'Hot-Dry',
+      'VT': 'Cold',
+      'VA': 'Mixed-Humid',
+      'WA': 'Marine',
+      'WV': 'Mixed-Humid',
+      'WI': 'Cold',
+      'WY': 'Mixed-Dry'
+    } }}
+
+# =============================================================================
+# INTERNATIONAL REGION TO CLIMATE REGION MAPPING
+# =============================================================================
+# Maps international region codes to their climate regions
+# Codes use ISO 3166-1/2 format where applicable
+
+_intl_region_to_climate: >
+    {{ {
+      'CA-AB': 'Very Cold',
+      'CA-BC': 'Marine',
+      'CA-MB': 'Very Cold',
+      'CA-NB': 'Cold',
+      'CA-NL': 'Cold',
+      'CA-NS': 'Cold',
+      'CA-ON': 'Cold',
+      'CA-PE': 'Cold',
+      'CA-QC': 'Cold',
+      'CA-SK': 'Very Cold',
+      'CA-NT': 'Subarctic',
+      'CA-NU': 'Subarctic',
+      'CA-YT': 'Subarctic',
+      'UK-ENG': 'Marine',
+      'UK-SCT': 'Cold',
+      'UK-WLS': 'Marine',
+      'UK-NIR': 'Marine',
+      'IE': 'Marine',
+      'AU-NSW': 'Mixed-Humid',
+      'AU-VIC': 'Marine',
+      'AU-QLD': 'Hot-Humid',
+      'AU-WA': 'Hot-Dry',
+      'AU-SA': 'Hot-Dry',
+      'AU-TAS': 'Marine',
+      'AU-NT': 'Hot-Humid',
+      'AU-ACT': 'Mixed-Dry',
+      'NZ-NI': 'Marine',
+      'NZ-SI': 'Marine',
+      'DE': 'Cold',
+      'FR': 'Marine',
+      'ES': 'Mixed-Dry',
+      'IT': 'Mixed-Humid',
+      'NL': 'Marine',
+      'BE': 'Marine',
+      'AT': 'Cold',
+      'CH': 'Cold',
+      'SE': 'Cold',
+      'NO': 'Very Cold',
+      'DK': 'Cold',
+      'FI': 'Very Cold',
+      'PL': 'Cold',
+      'CZ': 'Cold',
+      'PT': 'Marine',
+      'GR': 'Mixed-Dry',
+      'JP': 'Mixed-Humid',
+      'KR': 'Mixed-Humid',
+      'SG': 'Hot-Humid',
+      'IN-N': 'Mixed-Dry',
+      'IN-S': 'Hot-Humid',
+      'ZA': 'Mixed-Dry',
+      'EG': 'Hot-Dry',
+      'AE': 'Hot-Dry',
+      'SA': 'Hot-Dry',
+      'IL': 'Hot-Dry',
+      'MX': 'Hot-Dry',
+      'BR-SE': 'Hot-Humid',
+      'BR-S': 'Mixed-Humid',
+      'AR': 'Mixed-Humid',
+      'CL': 'Marine'
+    } }}
+
+# =============================================================================
+# ELEVATION LOOKUP BY STATE/REGION (meters)
+# =============================================================================
+# Average elevation for atmospheric pressure calculations
+
+_state_elevation_lut: >
+    {{ {
+      'AL': 150, 'AK': 580, 'AZ': 1250, 'AR': 200, 'CA': 880,
+      'CO': 2000, 'CT': 150, 'DC': 20, 'DE': 20, 'FL': 30,
+      'GA': 180, 'HI': 920, 'ID': 1520, 'IL': 180, 'IN': 210,
+      'IA': 335, 'KS': 610, 'KY': 230, 'LA': 30, 'ME': 180,
+      'MD': 110, 'MA': 150, 'MI': 270, 'MN': 370, 'MS': 90,
+      'MO': 240, 'MT': 1035, 'NE': 790, 'NV': 1675, 'NH': 300,
+      'NJ': 80, 'NM': 1735, 'NY': 300, 'NC': 220, 'ND': 580,
+      'OH': 260, 'OK': 400, 'OR': 1000, 'PA': 340, 'RI': 60,
+      'SC': 110, 'SD': 670, 'TN': 260, 'TX': 520, 'UT': 1890,
+      'VT': 300, 'VA': 290, 'WA': 520, 'WV': 460, 'WI': 320,
+      'WY': 2040
+    } }}
+
+_intl_elevation_lut: >
+    {{ {
+      'CA-AB': 1045, 'CA-BC': 500, 'CA-MB': 240, 'CA-NB': 130,
+      'CA-NL': 200, 'CA-NS': 100, 'CA-ON': 260, 'CA-PE': 50,
+      'CA-QC': 180, 'CA-SK': 520, 'CA-NT': 200, 'CA-NU': 30, 'CA-YT': 660,
+      'UK-ENG': 100, 'UK-SCT': 200, 'UK-WLS': 150, 'UK-NIR': 80, 'IE': 120,
+      'AU-NSW': 300, 'AU-VIC': 200, 'AU-QLD': 260, 'AU-WA': 350,
+      'AU-SA': 200, 'AU-TAS': 300, 'AU-NT': 350, 'AU-ACT': 580,
+      'NZ-NI': 200, 'NZ-SI': 400,
+      'DE': 260, 'FR': 300, 'ES': 660, 'IT': 420, 'NL': 10,
+      'BE': 180, 'AT': 910, 'CH': 1350, 'SE': 320, 'NO': 460,
+      'DK': 30, 'FI': 160, 'PL': 175, 'CZ': 430, 'PT': 370, 'GR': 500,
+      'JP': 400, 'KR': 280, 'SG': 15, 'IN-N': 240, 'IN-S': 500,
+      'ZA': 1200, 'EG': 100, 'AE': 50, 'SA': 600, 'IL': 500,
+      'MX': 1100, 'BR-SE': 750, 'BR-S': 500, 'AR': 400, 'CL': 570
+    } }}
+
+# =============================================================================
+# PSYCHROMETRIC THRESHOLDS BY CLIMATE REGION
+# =============================================================================
+
+# Maximum outdoor dew point for comfortable ventilation (Celsius)
+_psychro_dp_max_c: >
+    {{ {
+      'Hot-Humid': 18.0,
+      'Hot-Dry': 19.0,
+      'Marine': 16.5,
+      'Mixed-Humid': 17.0,
+      'Mixed-Dry': 16.0,
+      'Cold': 17.0,
+      'Very Cold': 16.0,
+      'Subarctic': 15.0
+    } }}
+
+# Muggy delta threshold - max dew point difference for ventilation (Celsius)
+_psychro_muggy_delta_c: >
+    {{ {
+      'Hot-Humid': 1.0,
+      'Hot-Dry': 2.0,
+      'Marine': 1.5,
+      'Mixed-Humid': 1.5,
+      'Mixed-Dry': 1.5,
+      'Cold': 1.5,
+      'Very Cold': 1.5,
+      'Subarctic': 2.0
+    } }}
+
+# Economizer enthalpy delta threshold (kJ/kg)
+_psychro_econ_enthalpy: >
+    {{ {
+      'Hot-Humid': 4.0,
+      'Hot-Dry': 2.0,
+      'Marine': 3.0,
+      'Mixed-Humid': 3.5,
+      'Mixed-Dry': 2.5,
+      'Cold': 3.0,
+      'Very Cold': 3.0,
+      'Subarctic': 2.5
+    } }}
+
+# Economizer absolute humidity delta threshold (g/m3)
+_psychro_econ_abs_humidity: >
+    {{ {
+      'Hot-Humid': 3.0,
+      'Hot-Dry': 1.0,
+      'Marine': 2.0,
+      'Mixed-Humid': 2.0,
+      'Mixed-Dry': 1.5,
+      'Cold': 2.0,
+      'Very Cold': 2.0,
+      'Subarctic': 1.5
+    } }}
+
+# CO2 delta threshold for ventilation preference (ppm above outdoor)
+_co2_delta_ppm: >
+    {{ {
+      'Hot-Humid': 450,
+      'Hot-Dry': 450,
+      'Marine': 400,
+      'Mixed-Humid': 450,
+      'Mixed-Dry': 450,
+      'Cold': 450,
+      'Very Cold': 500,
+      'Subarctic': 550
+    } }}
+
+# =============================================================================
+# SEASONAL BIAS PRESETS BY CLIMATE REGION (Celsius)
+# =============================================================================
+# Positive bias = warmer setpoint, Negative bias = cooler setpoint
+
+_seasonal_winter_bias_c: >
+    {{ {
+      'Hot-Humid': 0.1,
+      'Hot-Dry': 0.0,
+      'Marine': 0.1,
+      'Mixed-Humid': 0.3,
+      'Mixed-Dry': 0.3,
+      'Cold': 0.5,
+      'Very Cold': 0.6,
+      'Subarctic': 0.8
+    } }}
+
+_seasonal_summer_bias_c: >
+    {{ {
+      'Hot-Humid': -0.5,
+      'Hot-Dry': -0.4,
+      'Marine': -0.1,
+      'Mixed-Humid': -0.3,
+      'Mixed-Dry': -0.2,
+      'Cold': -0.2,
+      'Very Cold': -0.2,
+      'Subarctic': 0.0
+    } }}
+
+_seasonal_shoulder_bias_c: >
+    {{ {
+      'Hot-Humid': -0.2,
+      'Hot-Dry': -0.1,
+      'Marine': 0.0,
+      'Mixed-Humid': 0.0,
+      'Mixed-Dry': 0.0,
+      'Cold': 0.2,
+      'Very Cold': 0.3,
+      'Subarctic': 0.4
+    } }}
+
+# =============================================================================
+# ADAPTIVE COMFORT BASELINES BY CLIMATE REGION
+# =============================================================================
+
+_comfort_min_c: >
+    {{ {
+      'Hot-Humid': 22.0,
+      'Hot-Dry': 21.0,
+      'Marine': 19.0,
+      'Mixed-Humid': 19.0,
+      'Mixed-Dry': 18.0,
+      'Cold': 18.0,
+      'Very Cold': 18.0,
+      'Subarctic': 19.0
+    } }}
+
+_comfort_max_c: >
+    {{ {
+      'Hot-Humid': 28.0,
+      'Hot-Dry': 29.0,
+      'Marine': 26.0,
+      'Mixed-Humid': 27.0,
+      'Mixed-Dry': 27.0,
+      'Cold': 26.0,
+      'Very Cold': 25.0,
+      'Subarctic': 24.0
+    } }}
+
+# Adaptive model weight - how much to rely on outdoor temperature adaptation
+# Lower values = more static comfort target, Higher = more adaptive
+_adaptive_weight: >
+    {{ {
+      'Hot-Humid': 0.8,
+      'Hot-Dry': 0.9,
+      'Marine': 0.7,
+      'Mixed-Humid': 0.75,
+      'Mixed-Dry': 0.8,
+      'Cold': 0.6,
+      'Very Cold': 0.5,
+      'Subarctic': 0.4
+    } }}
+
+# =============================================================================
+# VENTILATION THRESHOLDS BY CLIMATE REGION
+# =============================================================================
+
+# Maximum indoor-outdoor temperature delta for natural ventilation (Celsius)
+_vent_delta_c: >
+    {{ {
+      'Hot-Humid': 1.5,
+      'Hot-Dry': 2.5,
+      'Marine': 2.0,
+      'Mixed-Humid': 2.0,
+      'Mixed-Dry': 2.0,
+      'Cold': 1.5,
+      'Very Cold': 1.5,
+      'Subarctic': 1.0
+    } }}
+
+# Night ventilation minimum delta for thermal mass cooling (Celsius)
+_night_vent_min_delta_c: >
+    {{ {
+      'Hot-Humid': 3.0,
+      'Hot-Dry': 5.0,
+      'Marine': 2.5,
+      'Mixed-Humid': 3.0,
+      'Mixed-Dry': 4.0,
+      'Cold': 2.0,
+      'Very Cold': 1.5,
+      'Subarctic': 1.0
+    } }}
+
+# States that require tighter ventilation control (humidity risk)
+_tight_vent_states: >
+    {{ ['AZ', 'NV', 'TX', 'FL', 'LA', 'MS', 'AL', 'GA', 'SC', 'HI'] }}
+
+# States that allow looser ventilation control (drier climates)
+_loose_vent_states: >
+    {{ ['CA', 'OR', 'WA', 'CO', 'UT', 'NM'] }}
+
+# =============================================================================
+# THERMOSTAT VENDOR PROFILES
+# =============================================================================
+# Minimum heating/cooling separation in Fahrenheit
+
+_vendor_min_sep_f: >
+    {{ {
+      'Ecobee': 5.0,
+      'Google Nest': 3.0,
+      'Honeywell T-series (T5/T6/T9)': 3.0,
+      'Honeywell Home/Resideo (Lyric/Prestige/VisionPRO)': 2.0,
+      'Honeywell T6 Pro Z-Wave': 3.0,
+      'Emerson Sensi': 2.0,
+      'Carrier Infinity/Edge': 2.0,
+      'Bryant Evolution': 2.0,
+      'Trane/American Standard': 3.0,
+      'Lennox iComfort': 3.0,
+      'Bosch Connected Control': 2.0,
+      'Amazon Smart Thermostat': 2.0,
+      'Wyze': 5.0,
+      'Tado': 3.0,
+      'Netatmo': 3.0,
+      'Hive': 3.0,
+      'Heatmiser Neo': 1.8,
+      'Mysa (Electric Heat)': 3.0,
+      'Tuya Zigbee (Generic)': 1.8,
+      'Zigbee (ZHA Generic)': 1.8,
+      'Z-Wave (ZWAVE_JS Generic)': 1.8,
+      'Generic (no minimum)': 0.0
+    } }}
+
+# =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
+# Example usage patterns for blueprints
+
+# Get region from state code (handles "XX - State Name" format):
+# {% set s = (user_state_code.split(' ')[0] if user_state_code else '') %}
+# {% set region = _us_state_to_region.get(s, 'Mixed-Humid') %}
+
+# Get psychrometric threshold for a region:
+# {% set dp_max = _psychro_dp_max_c.get(region, 17.0) %}
+
+# Get seasonal bias with intensity factor:
+# {% set winter_bias = (_seasonal_winter_bias_c.get(region, 0.3) * intensity) | round(2) %}
+
+# Convert bias to Fahrenheit if needed:
+# {% set bias_f = bias_c * 9/5 %}
+
+# Get elevation for pressure calculation:
+# {% set elev = _state_elevation_lut.get(state_code, _intl_elevation_lut.get(region_code, 0)) %}
+
+# Check if state requires tight ventilation control:
+# {% set is_tight = state_code in _tight_vent_states %}
