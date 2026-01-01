@@ -1,3 +1,9 @@
+## [4.23.2] — 2026-01-01
+
+### Fixed
+
+- **Blueprint import failing with "expected str ... Got None" errors**: Fixed region selector by removing label/value separator options (e.g., "--- U.S. States ---"). Home Assistant's select selector doesn't support visual separators, and label/value options with any special formatting were causing import failures. The dropdown now uses plain string options with YAML comments to organize regions.
+
 ## [4.23.1] — 2026-01-01
 
 ### Changed

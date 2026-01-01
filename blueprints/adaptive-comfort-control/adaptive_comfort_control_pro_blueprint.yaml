@@ -1,5 +1,5 @@
 blueprint:
-    name: "Adaptive Comfort Control Pro v4.23.1"
+    name: "Adaptive Comfort Control Pro v4.23.2"
     description: >
         Adaptive comfort control + HVAC pause with unit awareness (°C/°F), seasonal bias,
         built-in psychrometrics (dew point, absolute humidity, enthalpy), optional RMOT,
@@ -221,13 +221,13 @@ blueprint:
                 user_state_code:
                     name: "Region (U.S. State or International)"
                     description: "Select your region for automatic climate presets. Includes U.S. states and international regions."
-                    default: ""
+                    default: "(none)"
                     selector:
                         select:
                             options:
-                                - ""
-                                - label: "--- U.S. States ---"
-                                  value: ""
+                                # No region selected
+                                - "(none)"
+                                # U.S. States
                                 - AL - Alabama
                                 - AK - Alaska
                                 - AZ - Arizona
@@ -279,8 +279,7 @@ blueprint:
                                 - WV - West Virginia
                                 - WI - Wisconsin
                                 - WY - Wyoming
-                                - label: "--- Canada ---"
-                                  value: ""
+                                # Canada
                                 - CA-AB - Alberta
                                 - CA-BC - British Columbia
                                 - CA-MB - Manitoba
@@ -294,15 +293,13 @@ blueprint:
                                 - CA-QC - Quebec
                                 - CA-SK - Saskatchewan
                                 - CA-YT - Yukon
-                                - label: "--- United Kingdom & Ireland ---"
-                                  value: ""
+                                # United Kingdom & Ireland
                                 - UK-ENG - England
                                 - UK-SCT - Scotland
                                 - UK-WLS - Wales
                                 - UK-NIR - Northern Ireland
                                 - IE - Ireland
-                                - label: "--- Australia & New Zealand ---"
-                                  value: ""
+                                # Australia & New Zealand
                                 - AU-ACT - Australian Capital Territory
                                 - AU-NSW - New South Wales
                                 - AU-NT - Northern Territory
@@ -313,8 +310,7 @@ blueprint:
                                 - AU-WA - Western Australia
                                 - NZ-NI - North Island, New Zealand
                                 - NZ-SI - South Island, New Zealand
-                                - label: "--- Europe ---"
-                                  value: ""
+                                # Europe
                                 - AT - Austria
                                 - BE - Belgium
                                 - CH - Switzerland
@@ -331,8 +327,7 @@ blueprint:
                                 - PL - Poland
                                 - PT - Portugal
                                 - SE - Sweden
-                                - label: "--- Asia & Middle East ---"
-                                  value: ""
+                                # Asia & Middle East
                                 - AE - United Arab Emirates
                                 - IL - Israel
                                 - IN-N - Northern India
@@ -341,12 +336,10 @@ blueprint:
                                 - KR - South Korea
                                 - SA - Saudi Arabia
                                 - SG - Singapore
-                                - label: "--- Africa ---"
-                                  value: ""
+                                # Africa
                                 - EG - Egypt
                                 - ZA - South Africa
-                                - label: "--- Americas (non-U.S.) ---"
-                                  value: ""
+                                # Americas (non-U.S.)
                                 - AR - Argentina
                                 - BR-S - Southern Brazil
                                 - BR-SE - Southeast Brazil
@@ -1002,7 +995,7 @@ blueprint:
 
 # ---------------------- VARIABLES ----------------------
 variables:
-    blueprint_version: "4.23.1"
+    blueprint_version: "4.23.2"
     # Bind inputs
     climate_entity_id: !input climate_entity
     indoor_sensor_id: !input indoor_temp_sensor

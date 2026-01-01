@@ -126,66 +126,279 @@ class BlueprintValidator:
     # These are always available in templates and should not trigger "undefined" warnings
     JINJA2_BUILTINS: set[str] = {
         # Python/Jinja2 built-in constants
-        "true", "false", "none", "True", "False", "None",
+        "true",
+        "false",
+        "none",
+        "True",
+        "False",
+        "None",
         # Jinja2 control keywords
-        "if", "else", "elif", "endif", "for", "endfor", "in", "not", "and", "or",
-        "is", "set", "endset", "macro", "endmacro", "call", "endcall",
-        "filter", "endfilter", "block", "endblock", "extends", "include",
-        "import", "from", "as", "with", "endwith", "do", "continue", "break",
+        "if",
+        "else",
+        "elif",
+        "endif",
+        "for",
+        "endfor",
+        "in",
+        "not",
+        "and",
+        "or",
+        "is",
+        "set",
+        "endset",
+        "macro",
+        "endmacro",
+        "call",
+        "endcall",
+        "filter",
+        "endfilter",
+        "block",
+        "endblock",
+        "extends",
+        "include",
+        "import",
+        "from",
+        "as",
+        "with",
+        "endwith",
+        "do",
+        "continue",
+        "break",
         # Jinja2 tests
-        "defined", "undefined", "none", "number", "string", "mapping",
-        "iterable", "callable", "sequence", "sameas", "escaped",
-        "even", "odd", "divisibleby", "lower", "upper",
+        "defined",
+        "undefined",
+        "none",
+        "number",
+        "string",
+        "mapping",
+        "iterable",
+        "callable",
+        "sequence",
+        "sameas",
+        "escaped",
+        "even",
+        "odd",
+        "divisibleby",
+        "lower",
+        "upper",
         # Jinja2 built-in filters (commonly used)
-        "abs", "attr", "batch", "capitalize", "center", "count", "default",
-        "dictsort", "escape", "filesizeformat", "first", "float", "forceescape",
-        "format", "groupby", "indent", "int", "items", "join", "last", "length",
-        "list", "lower", "map", "max", "min", "pprint", "random", "reject",
-        "rejectattr", "replace", "reverse", "round", "safe", "select",
-        "selectattr", "slice", "sort", "split", "string", "striptags", "sum",
-        "title", "tojson", "trim", "truncate", "unique", "upper", "urlencode",
-        "urlize", "wordcount", "wordwrap", "xmlattr",
+        "abs",
+        "attr",
+        "batch",
+        "capitalize",
+        "center",
+        "count",
+        "default",
+        "dictsort",
+        "escape",
+        "filesizeformat",
+        "first",
+        "float",
+        "forceescape",
+        "format",
+        "groupby",
+        "indent",
+        "int",
+        "items",
+        "join",
+        "last",
+        "length",
+        "list",
+        "lower",
+        "map",
+        "max",
+        "min",
+        "pprint",
+        "random",
+        "reject",
+        "rejectattr",
+        "replace",
+        "reverse",
+        "round",
+        "safe",
+        "select",
+        "selectattr",
+        "slice",
+        "sort",
+        "split",
+        "string",
+        "striptags",
+        "sum",
+        "title",
+        "tojson",
+        "trim",
+        "truncate",
+        "unique",
+        "upper",
+        "urlencode",
+        "urlize",
+        "wordcount",
+        "wordwrap",
+        "xmlattr",
         # Home Assistant specific functions
-        "states", "is_state", "state_attr", "is_state_attr", "has_value",
-        "expand", "device_entities", "area_entities", "integration_entities",
-        "device_attr", "device_id", "area_name", "area_id", "floor_id",
-        "floor_name", "label_id", "label_name", "labels",
-        "relative_time", "time_since", "timedelta", "strptime", "strftime",
-        "as_timestamp", "as_datetime", "as_local", "as_timedelta",
-        "today_at", "now", "utcnow",
-        "distance", "closest", "iif",
-        "log", "sin", "cos", "tan", "asin", "acos", "atan", "atan2",
-        "sqrt", "e", "pi", "tau", "inf",
-        "average", "median", "statistical_mode",
-        "pack", "unpack", "ord", "base64_encode", "base64_decode",
-        "slugify", "regex_match", "regex_search", "regex_replace",
-        "regex_findall", "regex_findall_index",
-        "urlencode", "from_json", "to_json",
-        "value_json", "trigger", "this", "context", "repeat", "wait",
+        "states",
+        "is_state",
+        "state_attr",
+        "is_state_attr",
+        "has_value",
+        "expand",
+        "device_entities",
+        "area_entities",
+        "integration_entities",
+        "device_attr",
+        "device_id",
+        "area_name",
+        "area_id",
+        "floor_id",
+        "floor_name",
+        "label_id",
+        "label_name",
+        "labels",
+        "relative_time",
+        "time_since",
+        "timedelta",
+        "strptime",
+        "strftime",
+        "as_timestamp",
+        "as_datetime",
+        "as_local",
+        "as_timedelta",
+        "today_at",
+        "now",
+        "utcnow",
+        "distance",
+        "closest",
+        "iif",
+        "log",
+        "sin",
+        "cos",
+        "tan",
+        "asin",
+        "acos",
+        "atan",
+        "atan2",
+        "sqrt",
+        "e",
+        "pi",
+        "tau",
+        "inf",
+        "average",
+        "median",
+        "statistical_mode",
+        "pack",
+        "unpack",
+        "ord",
+        "base64_encode",
+        "base64_decode",
+        "slugify",
+        "regex_match",
+        "regex_search",
+        "regex_replace",
+        "regex_findall",
+        "regex_findall_index",
+        "urlencode",
+        "from_json",
+        "to_json",
+        "value_json",
+        "trigger",
+        "this",
+        "context",
+        "repeat",
+        "wait",
         "namespace",
         # Common variable names in loops that shouldn't trigger warnings
-        "item", "loop", "index", "index0", "first", "last", "length",
-        "cycle", "depth", "depth0", "previtem", "nextitem", "changed",
+        "item",
+        "loop",
+        "index",
+        "index0",
+        "first",
+        "last",
+        "length",
+        "cycle",
+        "depth",
+        "depth0",
+        "previtem",
+        "nextitem",
+        "changed",
         # Range function
         "range",
         # Datetime attributes and methods (accessed via now(), etc.)
-        "year", "month", "day", "hour", "minute", "second", "microsecond",
-        "weekday", "isoweekday", "isocalendar", "isoformat", "date", "time",
-        "timestamp", "tzinfo", "tzname", "utcoffset", "dst", "timetuple",
+        "year",
+        "month",
+        "day",
+        "hour",
+        "minute",
+        "second",
+        "microsecond",
+        "weekday",
+        "isoweekday",
+        "isocalendar",
+        "isoformat",
+        "date",
+        "time",
+        "timestamp",
+        "tzinfo",
+        "tzname",
+        "utcoffset",
+        "dst",
+        "timetuple",
         # State object attributes
-        "state", "attributes", "entity_id", "domain", "object_id", "name",
-        "last_changed", "last_updated", "last_reported", "context_id",
+        "state",
+        "attributes",
+        "entity_id",
+        "domain",
+        "object_id",
+        "name",
+        "last_changed",
+        "last_updated",
+        "last_reported",
+        "context_id",
         # Trigger object attributes
-        "platform", "event", "to_state", "from_state", "for", "idx", "id",
-        "description", "alias",
+        "platform",
+        "event",
+        "to_state",
+        "from_state",
+        "for",
+        "idx",
+        "id",
+        "description",
+        "alias",
         # Additional common attributes
-        "friendly_name", "icon", "unit_of_measurement", "device_class",
-        "brightness", "color_temp", "hs_color", "rgb_color", "xy_color",
-        "temperature", "humidity", "pressure", "position", "current_position",
-        "current_temperature", "target_temperature", "hvac_mode", "hvac_action",
-        "fan_mode", "swing_mode", "preset_mode", "speed", "percentage",
-        "battery_level", "battery", "power", "voltage", "current", "energy",
-        "elevation", "azimuth", "rising", "setting", "next_rising", "next_setting",
+        "friendly_name",
+        "icon",
+        "unit_of_measurement",
+        "device_class",
+        "brightness",
+        "color_temp",
+        "hs_color",
+        "rgb_color",
+        "xy_color",
+        "temperature",
+        "humidity",
+        "pressure",
+        "position",
+        "current_position",
+        "current_temperature",
+        "target_temperature",
+        "hvac_mode",
+        "hvac_action",
+        "fan_mode",
+        "swing_mode",
+        "preset_mode",
+        "speed",
+        "percentage",
+        "battery_level",
+        "battery",
+        "power",
+        "voltage",
+        "current",
+        "energy",
+        "elevation",
+        "azimuth",
+        "rising",
+        "setting",
+        "next_rising",
+        "next_setting",
     }
 
     # Filters that change type - used for type mismatch detection
@@ -252,9 +465,13 @@ class BlueprintValidator:
         )  # inputs with input_datetime selector
         self.entity_inputs: set[str] = set()  # inputs with entity selector
         self.input_defaults: dict[str, Any] = {}  # input name -> default value
-        self.input_selectors: dict[str, dict[str, Any]] = {}  # input name -> selector dict
+        self.input_selectors: dict[
+            str, dict[str, Any]
+        ] = {}  # input name -> selector dict
         self.defined_variables: set[str] = set()  # All defined variable names
-        self.variable_types: dict[str, str] = {}  # Inferred types from selectors/filters
+        self.variable_types: dict[
+            str, str
+        ] = {}  # Inferred types from selectors/filters
 
     def validate(self) -> bool:
         """Run all validation checks.
@@ -462,6 +679,88 @@ class BlueprintValidator:
                     if domain == "input_datetime":
                         self.input_datetime_inputs.add(input_name)
 
+            # Validate select selector options
+            if selector_type == "select":
+                self._validate_select_options(selector.get("select", {}), path)
+
+    def _validate_select_options(
+        self, select_config: dict[str, Any] | None, path: str
+    ) -> None:
+        """Validate select selector options.
+
+        Home Assistant requires all select options to be valid strings.
+        Options can be:
+        1. Simple strings: "option1"
+        2. Label/value dicts: {"label": "Display Name", "value": "actual_value"}
+
+        For label/value dicts, the 'value' field MUST be a non-empty string.
+        Using empty strings or None for 'value' will cause import errors like:
+        "expected str @ data['blueprint']['input'][...]['selector']['options'][N]. Got None"
+
+        Args:
+            select_config: The select selector configuration dict.
+            path: Current path for error messages.
+        """
+        if not isinstance(select_config, dict):
+            return
+
+        options = select_config.get("options")
+        if options is None:
+            return
+
+        if not isinstance(options, list):
+            self.errors.append(f"{path}.selector.select.options: Must be a list")
+            return
+
+        for i, option in enumerate(options):
+            option_path = f"{path}.selector.select.options[{i}]"
+
+            if option is None:
+                self.errors.append(
+                    f"{option_path}: Option cannot be None. "
+                    f"Select options must be strings or label/value dicts with non-empty values."
+                )
+            elif isinstance(option, dict):
+                # Label/value format: {"label": "...", "value": "..."}
+                value = option.get("value")
+                label = option.get("label")
+
+                if value is None:
+                    self.errors.append(
+                        f"{option_path}: Option value is None. "
+                        f"Label/value options must have a non-empty 'value' field. "
+                        f"Label: '{label}'"
+                    )
+                elif not isinstance(value, str):
+                    self.errors.append(
+                        f"{option_path}: Option value must be a string, got {type(value).__name__}. "
+                        f"Label: '{label}'"
+                    )
+                elif value == "":
+                    # Empty string values cause "expected str ... Got None" errors in HA
+                    self.errors.append(
+                        f"{option_path}: Option value cannot be empty string. "
+                        f"Home Assistant treats empty values as None during import. "
+                        f"Label: '{label}'. Use a placeholder value like '---' or remove this option."
+                    )
+
+                if label is not None and not isinstance(label, str):
+                    self.warnings.append(
+                        f"{option_path}: Option label should be a string, got {type(label).__name__}"
+                    )
+            elif isinstance(option, str):
+                # Simple string option - valid as long as it's a string
+                # Empty strings are technically valid here but unusual
+                if option == "":
+                    self.warnings.append(
+                        f"{option_path}: Empty string option. Consider using a meaningful value."
+                    )
+            else:
+                self.errors.append(
+                    f"{option_path}: Option must be a string or label/value dict, "
+                    f"got {type(option).__name__}"
+                )
+
     def _validate_hysteresis_boundaries(self) -> None:
         """Validate hysteresis boundary pairs have correct relationships.
 
@@ -492,7 +791,11 @@ class BlueprintValidator:
                     off_name = input_name.replace("_on", "_off")
                 else:
                     # Use regex substitution for other patterns
-                    off_name = re.sub(on_pattern, off_pattern.replace(r"\1", on_match.group(1)), input_name)
+                    off_name = re.sub(
+                        on_pattern,
+                        off_pattern.replace(r"\1", on_match.group(1)),
+                        input_name,
+                    )
 
                 if off_name not in self.defined_inputs:
                     continue
@@ -1430,7 +1733,10 @@ class BlueprintValidator:
                     continue
 
                 # Check if variable has non-zero default
-                if hasattr(self, "nonzero_default_vars") and var in self.nonzero_default_vars:
+                if (
+                    hasattr(self, "nonzero_default_vars")
+                    and var in self.nonzero_default_vars
+                ):
                     continue
 
                 # Check for guards
@@ -1523,8 +1829,14 @@ class BlueprintValidator:
 
                     # String operations on numbers
                     if current_type == "number" and filter_name in (
-                        "lower", "upper", "capitalize", "title", "split",
-                        "replace", "strip", "trim"
+                        "lower",
+                        "upper",
+                        "capitalize",
+                        "title",
+                        "split",
+                        "replace",
+                        "strip",
+                        "trim",
                     ):
                         self.warnings.append(
                             f"Variable '{var_name}': Filter '{filter_name}' expects "
@@ -1533,9 +1845,7 @@ class BlueprintValidator:
                         )
 
                     # Numeric operations on strings (without conversion)
-                    if current_type == "string" and filter_name in (
-                        "round", "abs"
-                    ):
+                    if current_type == "string" and filter_name in ("round", "abs"):
                         # These will work if the string is numeric, but warn anyway
                         pass  # Don't warn - Jinja2 handles this gracefully
 
@@ -1546,7 +1856,10 @@ class BlueprintValidator:
         # Pattern: states(...) | round - states returns string, round expects number
         if re.search(r"states\s*\([^)]+\)\s*\|\s*round", value):
             # Check if there's a float/int conversion
-            if not re.search(r"states\s*\([^)]+\)\s*\|\s*(?:float|int)\s*\([^)]*\)\s*\|\s*round", value):
+            if not re.search(
+                r"states\s*\([^)]+\)\s*\|\s*(?:float|int)\s*\([^)]*\)\s*\|\s*round",
+                value,
+            ):
                 self.warnings.append(
                     f"Variable '{var_name}': 'states(...)' returns a string, "
                     f"but '| round' expects a number. "
@@ -1561,7 +1874,7 @@ class BlueprintValidator:
             # Check if there's proper conversion
             if not re.search(
                 rf"state_attr\s*\([^)]+\)\s*\|\s*(?:float|int)\s*\([^)]*\)\s*\|\s*{filter_used}",
-                value
+                value,
             ):
                 self.warnings.append(
                     f"Variable '{var_name}': 'state_attr(...)' may return a string, "
