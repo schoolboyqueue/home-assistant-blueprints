@@ -9,7 +9,7 @@ bin/
 *.dll
 *.so
 *.dylib
-ha-ws-client
+/ha-ws-client
 
 # Test binary
 *.test
