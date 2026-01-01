@@ -6,7 +6,11 @@
   "scripts": {
     "prepare": "husky",
     "validate": "python3 scripts/validate-blueprint/validate-blueprint.py --all",
-    "validate:staged": "python3 scripts/validate-blueprint/validate-blueprint.py"
+    "validate:staged": "python3 scripts/validate-blueprint/validate-blueprint.py",
+    "docs:check": "npm run check --prefix docs",
+    "docs:lint": "npm run lint --prefix docs",
+    "docs:format": "npm run format --prefix docs",
+    "docs:fix": "npm run fix --prefix docs"
   },
   "devDependencies": {
     "husky": "^9.1.7"

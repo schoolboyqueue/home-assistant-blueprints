@@ -1,0 +1,16 @@
+{
+  "name": "home-assistant-blueprints-docs",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Documentation website for Home Assistant Blueprints",
+  "type": "module",
+  "scripts": {
+    "check": "biome check .",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "fix": "biome check --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.10"
+  }
+}

@@ -66,3 +66,38 @@ export class DateParseError extends HAClientError {
     this.name = 'DateParseError';
   }
 }
+
+/**
+ * Error thrown when JSON parsing fails for a user-provided argument.
+ * Provides structured error messages with field context.
+ */
+export class JsonParseError extends HAClientError {
+  /**
+   * Create a new JsonParseError.
+   * @param fieldName - The name of the field/argument that contained invalid JSON
+   * @param originalError - The original SyntaxError from JSON.parse
+   * @param jsonString - The JSON string that failed to parse
+   */
+  constructor(fieldName: string, originalError: Error, jsonString: string) {
+    // Extract position info from the original error message if available
+    const positionMatch = originalError.message.match(/position\s+(\d+)/i);
+    const position = positionMatch?.[1] ? parseInt(positionMatch[1], 10) : null;
+
+    // Build a helpful error message
+    let message = `Invalid JSON in ${fieldName}: ${originalError.message}`;
+
+    // Add context showing where the error occurred
+    if (position !== null && jsonString.length > 0) {
+      const start = Math.max(0, position - 20);
+      const end = Math.min(jsonString.length, position + 20);
+      const snippet = jsonString.slice(start, end);
+      const pointer = `${' '.repeat(Math.min(position, 20))}^`;
+      message += `\n  Near: ...${snippet}...\n        ${pointer}`;
+    }
+
+    message += `\n  Tip: Ensure your JSON is properly quoted. Example: '{"key": "value"}'`;
+
+    super(message, 'INVALID_JSON');
+    this.name = 'JsonParseError';
+  }
+}

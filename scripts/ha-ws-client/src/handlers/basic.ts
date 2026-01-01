@@ -8,6 +8,7 @@ import type WebSocket from 'ws';
 import { HAClientError, nextId, sendMessage } from '../client.js';
 import { EntityNotFoundError } from '../errors.js';
 import type { CommandContext, HAConfig, HAMessage, HAState } from '../types.js';
+import { parseJsonArg, requireArg } from '../utils.js';
 
 /**
  * Test the WebSocket connection with a ping/pong.
@@ -40,11 +41,7 @@ export async function handlePing(ctx: CommandContext): Promise<void> {
  * ```
  */
 export async function handleState(ctx: CommandContext): Promise<void> {
-  const entityId = ctx.args[1];
-  if (!entityId) {
-    console.error('Usage: state <entity_id>');
-    process.exit(1);
-  }
+  const entityId = requireArg(ctx, 1, 'Usage: state <entity_id>');
   const states = await sendMessage<HAState[]>(ctx.ws, 'get_states');
   const entity = states.find((s) => s.entity_id === entityId);
   if (!entity) {
@@ -106,11 +103,7 @@ export async function handleStatesJson(ctx: CommandContext): Promise<void> {
  * ```
  */
 export async function handleStatesFilter(ctx: CommandContext): Promise<void> {
-  const pattern = ctx.args[1];
-  if (!pattern) {
-    console.error('Usage: states-filter <pattern>');
-    process.exit(1);
-  }
+  const pattern = requireArg(ctx, 1, 'Usage: states-filter <pattern>');
   const states = await sendMessage<HAState[]>(ctx.ws, 'get_states');
   const regex = new RegExp(pattern.replace(/\*/g, '.*'));
   const filtered = states.filter((s) => regex.test(s.entity_id));
@@ -190,16 +183,11 @@ export async function handleServices(ctx: CommandContext): Promise<void> {
  * ```
  */
 export async function handleCall(ctx: CommandContext): Promise<void> {
-  const domain = ctx.args[1];
-  const service = ctx.args[2];
+  const domain = requireArg(ctx, 1, 'Usage: call <domain> <service> [data]');
+  const service = requireArg(ctx, 2, 'Usage: call <domain> <service> [data]');
   const serviceData: Record<string, unknown> = ctx.args[3]
-    ? (JSON.parse(ctx.args[3]) as Record<string, unknown>)
+    ? parseJsonArg<Record<string, unknown>>(ctx.args[3], 'service data')
     : {};
-
-  if (!domain || !service) {
-    console.error('Usage: call <domain> <service> [data]');
-    process.exit(1);
-  }
 
   const result = await sendMessage<Record<string, unknown> | null>(ctx.ws, 'call_service', {
     domain,

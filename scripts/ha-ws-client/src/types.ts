@@ -239,6 +239,25 @@ export interface BlueprintInput {
 // =============================================================================
 
 /**
+ * Result of subscribing to a trigger.
+ * Contains the subscription ID and cleanup function.
+ */
+export interface TriggerSubscription {
+  /** The subscription ID for this trigger */
+  readonly subscriptionId: number;
+  /** Cleanup function to remove the event listener */
+  readonly cleanup: () => void;
+}
+
+/**
+ * Result of calculateTimeRange function containing start and end times.
+ */
+export interface TimeRange {
+  readonly startTime: Date;
+  readonly endTime: Date;
+}
+
+/**
  * Parsed time arguments from command line.
  * Contains optional from/to times and remaining arguments.
  */
@@ -327,6 +346,82 @@ export interface StatEntry {
   readonly min: number;
   readonly max: number;
   readonly mean?: number;
+}
+
+// =============================================================================
+// Monitoring Types
+// =============================================================================
+
+/**
+ * A recorded state change entry for historical tracking.
+ */
+export interface StateChangeRecord {
+  readonly timestamp: Date;
+  readonly state: string;
+  readonly previousState: string | null;
+  readonly attributes: Record<string, unknown>;
+  readonly previousAttributes: Record<string, unknown> | null;
+  readonly rateOfChange: number | null;
+  readonly isAnomaly: boolean;
+  readonly anomalyReason: string | null;
+}
+
+/**
+ * Configuration for anomaly detection.
+ */
+export interface AnomalyConfig {
+  /** Standard deviation threshold for numeric anomalies */
+  readonly stdDevThreshold: number;
+  /** Minimum rate of change per second to flag as rapid */
+  readonly rapidChangeThreshold: number;
+  /** Minimum time between changes (seconds) to flag as oscillating */
+  readonly oscillationWindow: number;
+  /** Number of rapid toggles in window to flag as oscillating */
+  readonly oscillationCount: number;
+}
+
+/**
+ * Statistics for monitored entity values.
+ */
+export interface EntityStats {
+  readonly count: number;
+  readonly min: number;
+  readonly max: number;
+  readonly mean: number;
+  readonly stdDev: number;
+  readonly lastValues: readonly number[];
+}
+
+// =============================================================================
+// Automation Handler Types
+// =============================================================================
+
+/**
+ * Result from the automation/config API call.
+ */
+export interface AutomationConfigResult {
+  readonly config: Record<string, unknown>;
+}
+
+/**
+ * Trigger information extracted from trace variables for trace-vars command.
+ */
+export interface TriggerInfo {
+  readonly id?: string;
+  readonly entity_id?: string;
+  readonly from_state?: { readonly state: string };
+  readonly to_state?: { readonly state: string };
+}
+
+/**
+ * Trigger variables received from watch/monitor state subscriptions.
+ */
+export interface StateTriggerVariables {
+  readonly trigger?: {
+    readonly entity_id?: string;
+    readonly from_state?: { readonly state: string; readonly attributes?: Record<string, unknown> };
+    readonly to_state?: { readonly state: string; readonly attributes?: Record<string, unknown> };
+  };
 }
 
 // =============================================================================

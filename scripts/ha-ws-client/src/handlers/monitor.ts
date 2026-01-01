@@ -5,53 +5,17 @@
  * @module handlers/monitor
  */
 
-import type WebSocket from 'ws';
-import { nextId, pendingRequests, sendMessage } from '../client.js';
-import type { CommandContext, HAMessage, HAState, HistoryState } from '../types.js';
-
-// =============================================================================
-// Types and Interfaces
-// =============================================================================
-
-/**
- * A recorded state change entry for historical tracking.
- */
-interface StateChangeRecord {
-  readonly timestamp: Date;
-  readonly state: string;
-  readonly previousState: string | null;
-  readonly attributes: Record<string, unknown>;
-  readonly previousAttributes: Record<string, unknown> | null;
-  readonly rateOfChange: number | null;
-  readonly isAnomaly: boolean;
-  readonly anomalyReason: string | null;
-}
-
-/**
- * Configuration for anomaly detection.
- */
-interface AnomalyConfig {
-  /** Standard deviation threshold for numeric anomalies */
-  readonly stdDevThreshold: number;
-  /** Minimum rate of change per second to flag as rapid */
-  readonly rapidChangeThreshold: number;
-  /** Minimum time between changes (seconds) to flag as oscillating */
-  readonly oscillationWindow: number;
-  /** Number of rapid toggles in window to flag as oscillating */
-  readonly oscillationCount: number;
-}
-
-/**
- * Statistics for monitored entity values.
- */
-interface EntityStats {
-  readonly count: number;
-  readonly min: number;
-  readonly max: number;
-  readonly mean: number;
-  readonly stdDev: number;
-  readonly lastValues: readonly number[];
-}
+import { sendMessage, subscribeToTrigger } from '../client.js';
+import type {
+  AnomalyConfig,
+  CommandContext,
+  EntityStats,
+  HAState,
+  HistoryState,
+  StateChangeRecord,
+  StateTriggerVariables,
+} from '../types.js';
+import { calculateTimeRange, requireArg } from '../utils.js';
 
 // =============================================================================
 // Constants
@@ -415,45 +379,25 @@ function printStats(
  * ```
  */
 export async function handleMonitor(ctx: CommandContext): Promise<void> {
-  const entityId = ctx.args[1];
+  const entityId = requireArg(
+    ctx,
+    1,
+    'Usage: monitor <entity_id> [seconds] [--no-details]\n' +
+      '  entity_id: Entity to monitor (e.g., sensor.temperature)\n' +
+      '  seconds: Monitoring duration (default: 300)\n' +
+      '  --no-details: Hide attribute changes\n' +
+      '\nFeatures:\n' +
+      '  - Live state change tracking\n' +
+      '  - Historical tracking of all changes\n' +
+      '  - Rate-of-change detection for numeric sensors\n' +
+      '  - Anomaly detection and highlighting\n' +
+      '  - Summary statistics at end'
+  );
   const seconds = parseInt(ctx.args[2] as string, 10) || DEFAULT_MONITOR_SECONDS;
   const showDetails = !ctx.args.includes('--no-details');
 
-  if (!entityId) {
-    console.error('Usage: monitor <entity_id> [seconds] [--no-details]');
-    console.error('  entity_id: Entity to monitor (e.g., sensor.temperature)');
-    console.error('  seconds: Monitoring duration (default: 300)');
-    console.error('  --no-details: Hide attribute changes');
-    console.error('\nFeatures:');
-    console.error('  - Live state change tracking');
-    console.error('  - Historical tracking of all changes');
-    console.error('  - Rate-of-change detection for numeric sensors');
-    console.error('  - Anomaly detection and highlighting');
-    console.error('  - Summary statistics at end');
-    process.exit(1);
-  }
-
   console.log(`${COLORS.bold}Monitoring ${entityId} for ${seconds} seconds...${COLORS.reset}`);
   console.log('Press Ctrl+C to stop early.\n');
-
-  // Subscribe to state changes
-  const subId = nextId();
-  const subPromise = new Promise<void>((resolve, reject) => {
-    pendingRequests.set(subId, { resolve: resolve as (value: unknown) => void, reject });
-  });
-
-  ctx.ws.send(
-    JSON.stringify({
-      id: subId,
-      type: 'subscribe_trigger',
-      trigger: {
-        platform: 'state',
-        entity_id: entityId,
-      },
-    })
-  );
-
-  await subPromise;
 
   // Get initial state
   const states = await sendMessage<HAState[]>(ctx.ws, 'get_states');
@@ -492,24 +436,12 @@ export async function handleMonitor(ctx: CommandContext): Promise<void> {
 
   console.log(`\n${COLORS.bold}─── Live State Changes ───${COLORS.reset}\n`);
 
-  // Event handler for state changes
-  const eventHandler = (data: WebSocket.Data): void => {
-    let msg: HAMessage;
-    try {
-      msg = JSON.parse(data.toString()) as HAMessage;
-    } catch {
-      return;
-    }
-
-    if (msg.type === 'event' && msg.event?.variables) {
-      interface StateTrigger {
-        trigger?: {
-          from_state?: { state: string; attributes?: Record<string, unknown> };
-          to_state?: { state: string; attributes?: Record<string, unknown> };
-        };
-      }
-
-      const vars = msg.event.variables as StateTrigger;
+  // Subscribe to state changes using the helper function
+  const { cleanup } = await subscribeToTrigger(
+    ctx.ws,
+    { platform: 'state', entity_id: entityId },
+    (variables) => {
+      const vars = variables as StateTriggerVariables;
       const toState = vars.trigger?.to_state;
 
       if (!toState) return;
@@ -579,15 +511,13 @@ export async function handleMonitor(ctx: CommandContext): Promise<void> {
       lastAttributes = newAttributes;
       lastTimestamp = now;
     }
-  };
-
-  ctx.ws.on('message', eventHandler);
+  );
 
   // Wait for the monitoring duration
   await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
 
-  // Clean up
-  ctx.ws.removeListener('message', eventHandler);
+  // Clean up the subscription
+  cleanup();
 
   // Print summary statistics
   const duration = Date.now() - startTime;
@@ -609,7 +539,16 @@ export async function handleMonitor(ctx: CommandContext): Promise<void> {
  * ```
  */
 export async function handleMonitorMulti(ctx: CommandContext): Promise<void> {
-  const seconds = parseInt(ctx.args[1] as string, 10) || DEFAULT_MONITOR_SECONDS;
+  const secondsArg = requireArg(
+    ctx,
+    1,
+    'Usage: monitor-multi <seconds> <entity1> <entity2> ... [--no-details]\n' +
+      '  seconds: Monitoring duration\n' +
+      '  entity1, entity2, ...: Entities to monitor\n' +
+      '\nExample:\n' +
+      '  monitor-multi 60 sensor.temp1 sensor.temp2 binary_sensor.motion'
+  );
+  const seconds = parseInt(secondsArg, 10) || DEFAULT_MONITOR_SECONDS;
   const entityIds = ctx.args.slice(2).filter((a) => !a.startsWith('--')) as string[];
 
   if (entityIds.length === 0) {
@@ -642,30 +581,7 @@ export async function handleMonitorMulti(ctx: CommandContext): Promise<void> {
     labels.set(id, `${domain}.${name}`);
   }
 
-  // Subscribe to all entities
-  const subscriptions: number[] = [];
-  for (const entityId of entityIds) {
-    const subId = nextId();
-    const subPromise = new Promise<void>((resolve, reject) => {
-      pendingRequests.set(subId, { resolve: resolve as (value: unknown) => void, reject });
-    });
-
-    ctx.ws.send(
-      JSON.stringify({
-        id: subId,
-        type: 'subscribe_trigger',
-        trigger: {
-          platform: 'state',
-          entity_id: entityId,
-        },
-      })
-    );
-
-    await subPromise;
-    subscriptions.push(subId);
-  }
-
-  // Get initial states
+  // Get initial states first
   const states = await sendMessage<HAState[]>(ctx.ws, 'get_states');
   const entityStates = new Map<string, HAState>();
   for (const entityId of entityIds) {
@@ -687,68 +603,58 @@ export async function handleMonitorMulti(ctx: CommandContext): Promise<void> {
   let totalEvents = 0;
   const startTime = Date.now();
 
-  // Event handler
-  const eventHandler = (data: WebSocket.Data): void => {
-    let msg: HAMessage;
-    try {
-      msg = JSON.parse(data.toString()) as HAMessage;
-    } catch {
-      return;
-    }
+  // Create event handler function (shared by all subscriptions)
+  const handleTriggerEvent = (variables: Record<string, unknown>): void => {
+    const vars = variables as StateTriggerVariables;
+    const triggerEntityId = vars.trigger?.entity_id;
 
-    if (msg.type === 'event' && msg.event?.variables) {
-      interface StateTrigger {
-        trigger?: {
-          entity_id?: string;
-          from_state?: { state: string; attributes?: Record<string, unknown> };
-          to_state?: { state: string; attributes?: Record<string, unknown> };
-        };
-      }
+    if (!triggerEntityId || !entityIds.includes(triggerEntityId)) return;
 
-      const vars = msg.event.variables as StateTrigger;
-      const triggerEntityId = vars.trigger?.entity_id;
+    totalEvents++;
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('en-US', { hour12: false });
+    const label = (labels.get(triggerEntityId) ?? triggerEntityId).padEnd(maxLabelLength);
+    const fromState = vars.trigger?.from_state?.state ?? '?';
+    const toState = vars.trigger?.to_state?.state ?? '?';
 
-      if (!triggerEntityId || !entityIds.includes(triggerEntityId)) return;
+    let line = `[${timeStr}] ${COLORS.cyan}${label}${COLORS.reset} `;
+    line += `${fromState} → ${COLORS.bold}${toState}${COLORS.reset}`;
 
-      totalEvents++;
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('en-US', { hour12: false });
-      const label = (labels.get(triggerEntityId) ?? triggerEntityId).padEnd(maxLabelLength);
-      const fromState = vars.trigger?.from_state?.state ?? '?';
-      const toState = vars.trigger?.to_state?.state ?? '?';
+    console.log(line);
 
-      let line = `[${timeStr}] ${COLORS.cyan}${label}${COLORS.reset} `;
-      line += `${fromState} → ${COLORS.bold}${toState}${COLORS.reset}`;
-
-      console.log(line);
-
-      // Track attribute changes if detailed
-      if (
-        showDetails &&
-        vars.trigger?.from_state?.attributes &&
-        vars.trigger?.to_state?.attributes
-      ) {
-        const attrChanges = detectAttributeChanges(
-          vars.trigger.from_state.attributes,
-          vars.trigger.to_state.attributes,
-          triggerEntityId
+    // Track attribute changes if detailed
+    if (showDetails && vars.trigger?.from_state?.attributes && vars.trigger?.to_state?.attributes) {
+      const attrChanges = detectAttributeChanges(
+        vars.trigger.from_state.attributes,
+        vars.trigger.to_state.attributes,
+        triggerEntityId
+      );
+      if (attrChanges.length > 0) {
+        console.log(
+          `${' '.repeat(timeStr.length + 3)}${COLORS.dim}${attrChanges.join(', ')}${COLORS.reset}`
         );
-        if (attrChanges.length > 0) {
-          console.log(
-            `${' '.repeat(timeStr.length + 3)}${COLORS.dim}${attrChanges.join(', ')}${COLORS.reset}`
-          );
-        }
       }
     }
   };
 
-  ctx.ws.on('message', eventHandler);
+  // Subscribe to all entities using the helper function
+  const cleanupFunctions: Array<() => void> = [];
+  for (const entityId of entityIds) {
+    const { cleanup } = await subscribeToTrigger(
+      ctx.ws,
+      { platform: 'state', entity_id: entityId },
+      handleTriggerEvent
+    );
+    cleanupFunctions.push(cleanup);
+  }
 
   // Wait for monitoring duration
   await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
 
-  // Clean up
-  ctx.ws.removeListener('message', eventHandler);
+  // Clean up all subscriptions
+  for (const cleanup of cleanupFunctions) {
+    cleanup();
+  }
 
   // Print summary
   const duration = Date.now() - startTime;
@@ -773,27 +679,25 @@ export async function handleMonitorMulti(ctx: CommandContext): Promise<void> {
  * ```
  */
 export async function handleAnalyze(ctx: CommandContext): Promise<void> {
-  const entityId = ctx.args[1];
+  const entityId = requireArg(
+    ctx,
+    1,
+    'Usage: analyze <entity_id> [hours]\n' +
+      '  entity_id: Entity to analyze\n' +
+      '  hours: Historical period to analyze (default: 24)\n' +
+      '\nAnalyzes historical state changes for:\n' +
+      '  - Rate of change patterns\n' +
+      '  - Anomalous values\n' +
+      '  - Oscillation/flapping behavior\n' +
+      '  - Unavailability periods'
+  );
   const hours = parseFloat(ctx.args[2] as string) || 24;
-
-  if (!entityId) {
-    console.error('Usage: analyze <entity_id> [hours]');
-    console.error('  entity_id: Entity to analyze');
-    console.error('  hours: Historical period to analyze (default: 24)');
-    console.error('\nAnalyzes historical state changes for:');
-    console.error('  - Rate of change patterns');
-    console.error('  - Anomalous values');
-    console.error('  - Oscillation/flapping behavior');
-    console.error('  - Unavailability periods');
-    process.exit(1);
-  }
 
   console.log(
     `${COLORS.bold}Analyzing ${entityId} for the last ${hours} hours...${COLORS.reset}\n`
   );
 
-  const endTime = new Date();
-  const startTime = new Date(endTime.getTime() - hours * 3600000);
+  const { startTime, endTime } = calculateTimeRange(null, null, hours);
 
   // Fetch history
   const result = await sendMessage<Record<string, HistoryState[]>>(

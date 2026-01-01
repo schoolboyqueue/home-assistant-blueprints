@@ -11,7 +11,7 @@ import type {
   StatEntry,
   SysLogEntry,
 } from '../types.js';
-import { formatEntityAttributes } from '../utils.js';
+import { calculateTimeRange, formatEntityAttributes, requireArg } from '../utils.js';
 
 /** Default number of hours for history queries. */
 const DEFAULT_HOURS = 24;
@@ -29,15 +29,10 @@ const DEFAULT_HOURS = 24;
  * ```
  */
 export async function handleLogbook(ctx: CommandContext): Promise<void> {
-  const entityId = ctx.args[1];
+  const entityId = requireArg(ctx, 1, 'Usage: logbook <entity_id> [hours] [--from "TIME"] [--to "TIME"]');
   const hours = parseFloat(ctx.args[2] as string) || DEFAULT_HOURS;
-  if (!entityId) {
-    console.error('Usage: logbook <entity_id> [hours] [--from "TIME"] [--to "TIME"]');
-    process.exit(1);
-  }
 
-  const endTime = ctx.toTime ?? new Date();
-  const startTime = ctx.fromTime ?? new Date(endTime.getTime() - hours * 3_600_000);
+  const { startTime, endTime } = calculateTimeRange(ctx.fromTime, ctx.toTime, hours);
 
   const result = await sendMessage<LogbookEntry[]>(ctx.ws, 'logbook/get_events', {
     start_time: startTime.toISOString(),
@@ -72,15 +67,10 @@ export async function handleLogbook(ctx: CommandContext): Promise<void> {
  * ```
  */
 export async function handleHistory(ctx: CommandContext): Promise<void> {
-  const entityId = ctx.args[1];
+  const entityId = requireArg(ctx, 1, 'Usage: history <entity_id> [hours] [--from "TIME"] [--to "TIME"]');
   const hours = parseFloat(ctx.args[2] as string) || DEFAULT_HOURS;
-  if (!entityId) {
-    console.error('Usage: history <entity_id> [hours] [--from "TIME"] [--to "TIME"]');
-    process.exit(1);
-  }
 
-  const endTime = ctx.toTime ?? new Date();
-  const startTime = ctx.fromTime ?? new Date(endTime.getTime() - hours * 3_600_000);
+  const { startTime, endTime } = calculateTimeRange(ctx.fromTime, ctx.toTime, hours);
 
   const result = await sendMessage<Record<string, HistoryState[]>>(
     ctx.ws,
@@ -122,15 +112,10 @@ export async function handleHistory(ctx: CommandContext): Promise<void> {
  * ```
  */
 export async function handleHistoryFull(ctx: CommandContext): Promise<void> {
-  const entityId = ctx.args[1];
+  const entityId = requireArg(ctx, 1, 'Usage: history-full <entity_id> [hours] [--from "TIME"] [--to "TIME"]');
   const hours = parseFloat(ctx.args[2] as string) || DEFAULT_HOURS;
-  if (!entityId) {
-    console.error('Usage: history-full <entity_id> [hours] [--from "TIME"] [--to "TIME"]');
-    process.exit(1);
-  }
 
-  const endTime = ctx.toTime ?? new Date();
-  const startTime = ctx.fromTime ?? new Date(endTime.getTime() - hours * 3_600_000);
+  const { startTime, endTime } = calculateTimeRange(ctx.fromTime, ctx.toTime, hours);
 
   const result = await sendMessage<Record<string, HistoryState[]>>(
     ctx.ws,
@@ -188,16 +173,10 @@ export async function handleHistoryFull(ctx: CommandContext): Promise<void> {
  * ```
  */
 export async function handleAttrs(ctx: CommandContext): Promise<void> {
-  const entityId = ctx.args[1];
+  const entityId = requireArg(ctx, 1, 'Usage: attrs <entity_id> [hours]');
   const hours = parseFloat(ctx.args[2] as string) || DEFAULT_HOURS;
 
-  if (!entityId) {
-    console.error('Usage: attrs <entity_id> [hours]');
-    process.exit(1);
-  }
-
-  const endTime = ctx.toTime ?? new Date();
-  const startTime = ctx.fromTime ?? new Date(endTime.getTime() - hours * 3_600_000);
+  const { startTime, endTime } = calculateTimeRange(ctx.fromTime, ctx.toTime, hours);
 
   const result = await sendMessage<Record<string, HistoryState[]>>(
     ctx.ws,
@@ -328,17 +307,22 @@ export async function handleAttrs(ctx: CommandContext): Promise<void> {
  * ```
  */
 export async function handleTimeline(ctx: CommandContext): Promise<void> {
-  const hours = parseFloat(ctx.args[1] as string);
+  const hoursArg = requireArg(
+    ctx,
+    1,
+    'Usage: timeline <hours> <entity1> <entity2> ... [--from "TIME"] [--to "TIME"]\n' +
+      'Example: timeline 2 climate.thermostat binary_sensor.door automation.hvac'
+  );
+  const hours = parseFloat(hoursArg);
   const entityIds = ctx.args.slice(2) as string[];
 
-  if (!hours || entityIds.length === 0) {
+  if (entityIds.length === 0) {
     console.error('Usage: timeline <hours> <entity1> <entity2> ... [--from "TIME"] [--to "TIME"]');
     console.error('Example: timeline 2 climate.thermostat binary_sensor.door automation.hvac');
     process.exit(1);
   }
 
-  const endTime = ctx.toTime ?? new Date();
-  const startTime = ctx.fromTime ?? new Date(endTime.getTime() - hours * 3_600_000);
+  const { startTime, endTime } = calculateTimeRange(ctx.fromTime, ctx.toTime, hours);
 
   const result = await sendMessage<LogbookEntry[]>(ctx.ws, 'logbook/get_events', {
     start_time: startTime.toISOString(),
@@ -427,14 +411,9 @@ export async function handleSyslog(ctx: CommandContext): Promise<void> {
  * ```
  */
 export async function handleStats(ctx: CommandContext): Promise<void> {
-  const entityId = ctx.args[1];
+  const entityId = requireArg(ctx, 1, 'Usage: stats <entity_id> [hours]');
   const hours = parseFloat(ctx.args[2] as string) || DEFAULT_HOURS;
-  if (!entityId) {
-    console.error('Usage: stats <entity_id> [hours]');
-    process.exit(1);
-  }
-  const endTime = new Date();
-  const startTime = new Date(endTime.getTime() - hours * 3_600_000);
+  const { startTime } = calculateTimeRange(null, null, hours);
 
   const result = await sendMessage<Record<string, StatEntry[]>>(
     ctx.ws,

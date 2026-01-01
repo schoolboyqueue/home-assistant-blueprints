@@ -5,21 +5,22 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type WebSocket from 'ws';
-import { nextId, pendingRequests, sendMessage } from '../client.js';
+import { sendMessage, subscribeToTrigger } from '../client.js';
 import type {
   AutomationConfig,
+  AutomationConfigResult,
   BlueprintInput,
   CommandContext,
-  HAMessage,
   HAState,
   LogbookEntry,
+  StateTriggerVariables,
   TraceDetail,
   TraceInfo,
   TraceStep,
   TraceTrigger,
+  TriggerInfo,
 } from '../types.js';
-import { getYamlModule } from '../utils.js';
+import { calculateTimeRange, getYamlModule, requireArg } from '../utils.js';
 
 /** Default number of hours for history queries. */
 const DEFAULT_HOURS = 24;
@@ -90,15 +91,14 @@ export async function handleTraces(ctx: CommandContext): Promise<void> {
  * ```
  */
 export async function handleTrace(ctx: CommandContext): Promise<void> {
-  const runId = ctx.args[1];
+  const runId = requireArg(
+    ctx,
+    1,
+    'Usage: trace <run_id> [automation_id]\n' +
+      '  run_id: The run ID from traces command\n' +
+      '  automation_id: Optional automation ID (will auto-detect if not provided)'
+  );
   let itemId = ctx.args[2];
-
-  if (!runId) {
-    console.error('Usage: trace <run_id> [automation_id]');
-    console.error('  run_id: The run ID from traces command');
-    console.error('  automation_id: Optional automation ID (will auto-detect if not provided)');
-    process.exit(1);
-  }
 
   // If no item_id provided, try to find it from traces list
   if (!itemId) {
@@ -170,13 +170,8 @@ export async function handleTrace(ctx: CommandContext): Promise<void> {
  * ```
  */
 export async function handleTraceVars(ctx: CommandContext): Promise<void> {
-  const runId = ctx.args[1];
+  const runId = requireArg(ctx, 1, 'Usage: trace-vars <run_id> [automation_id]');
   let itemId = ctx.args[2];
-
-  if (!runId) {
-    console.error('Usage: trace-vars <run_id> [automation_id]');
-    process.exit(1);
-  }
 
   // If no item_id provided, try to find it from traces list
   if (!itemId) {
@@ -264,12 +259,6 @@ export async function handleTraceVars(ctx: CommandContext): Promise<void> {
   }
 
   if (allVars.has('trigger')) {
-    interface TriggerInfo {
-      id?: string;
-      entity_id?: string;
-      from_state?: { state: string };
-      to_state?: { state: string };
-    }
     const trigger = allVars.get('trigger') as TriggerInfo;
     console.log('Trigger info:');
     if (trigger.id) console.log(`  id: ${trigger.id}`);
@@ -296,15 +285,8 @@ export async function handleTraceVars(ctx: CommandContext): Promise<void> {
  * ```
  */
 export async function handleAutomationConfig(ctx: CommandContext): Promise<void> {
-  const entityId = ctx.args[1];
-  if (!entityId) {
-    console.error('Usage: automation-config <entity_id>');
-    process.exit(1);
-  }
+  const entityId = requireArg(ctx, 1, 'Usage: automation-config <entity_id>');
 
-  interface AutomationConfigResult {
-    readonly config: Record<string, unknown>;
-  }
   const result = await sendMessage<AutomationConfigResult>(ctx.ws, 'automation/config', {
     entity_id: entityId.startsWith('automation.') ? entityId : `automation.${entityId}`,
   });
@@ -325,13 +307,13 @@ export async function handleAutomationConfig(ctx: CommandContext): Promise<void>
  * ```
  */
 export async function handleContext(ctx: CommandContext): Promise<void> {
-  const contextId = ctx.args[1];
-  if (!contextId) {
-    console.error('Usage: context <context_id>');
-    console.error('Example: context 01KDQS4E2WHMYJYYXKC7K28XFG');
-    console.error('\nContext IDs can be found in the "context" field of entity states');
-    process.exit(1);
-  }
+  const contextId = requireArg(
+    ctx,
+    1,
+    'Usage: context <context_id>\n' +
+      'Example: context 01KDQS4E2WHMYJYYXKC7K28XFG\n' +
+      '\nContext IDs can be found in the "context" field of entity states'
+  );
 
   const states = await sendMessage<HAState[]>(ctx.ws, 'get_states');
 
@@ -352,8 +334,7 @@ export async function handleContext(ctx: CommandContext): Promise<void> {
     }
   }
 
-  const endTime = new Date();
-  const startTime = new Date(endTime.getTime() - DEFAULT_HOURS * 3_600_000);
+  const { startTime, endTime } = calculateTimeRange(null, null, DEFAULT_HOURS);
 
   const logbookResult = await sendMessage<LogbookEntry[]>(ctx.ws, 'logbook/get_events', {
     start_time: startTime.toISOString(),
@@ -408,11 +389,7 @@ export async function handleContext(ctx: CommandContext): Promise<void> {
  * ```
  */
 export async function handleBlueprintInputs(ctx: CommandContext): Promise<void> {
-  const entityId = ctx.args[1];
-  if (!entityId) {
-    console.error('Usage: blueprint-inputs <automation_entity_id>');
-    process.exit(1);
-  }
+  const entityId = requireArg(ctx, 1, 'Usage: blueprint-inputs <automation_entity_id>');
 
   const fullEntityId = entityId.startsWith('automation.') ? entityId : `automation.${entityId}`;
 
@@ -573,36 +550,17 @@ export async function handleBlueprintInputs(ctx: CommandContext): Promise<void> 
  * ```
  */
 export async function handleWatch(ctx: CommandContext): Promise<void> {
-  const entityId = ctx.args[1];
+  const entityId = requireArg(
+    ctx,
+    1,
+    'Usage: watch <entity_id> [seconds]\n' + 'Example: watch light.kitchen 30'
+  );
   const seconds = parseInt(ctx.args[2] as string, 10) || DEFAULT_WATCH_SECONDS;
-
-  if (!entityId) {
-    console.error('Usage: watch <entity_id> [seconds]');
-    console.error('Example: watch light.kitchen 30');
-    process.exit(1);
-  }
 
   console.log(`Watching ${entityId} for ${seconds} seconds...`);
   console.log('Press Ctrl+C to stop early.\n');
 
-  const subId = nextId();
-  const subPromise = new Promise<void>((resolve, reject) => {
-    pendingRequests.set(subId, { resolve: resolve as (value: unknown) => void, reject });
-  });
-
-  ctx.ws.send(
-    JSON.stringify({
-      id: subId,
-      type: 'subscribe_trigger',
-      trigger: {
-        platform: 'state',
-        entity_id: entityId,
-      },
-    })
-  );
-
-  await subPromise;
-
+  // Get and display initial state
   const states = await sendMessage<HAState[]>(ctx.ws, 'get_states');
   const initialState = states.find((s) => s.entity_id === entityId);
   if (initialState) {
@@ -625,22 +583,14 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
   }
 
   let eventCount = 0;
-  const eventHandler = (data: WebSocket.Data): void => {
-    let msg: HAMessage;
-    try {
-      msg = JSON.parse(data.toString()) as HAMessage;
-    } catch {
-      return;
-    }
-    if (msg.type === 'event' && msg.event?.variables) {
+
+  // Subscribe to state changes using the helper function
+  const { cleanup } = await subscribeToTrigger(
+    ctx.ws,
+    { platform: 'state', entity_id: entityId },
+    (variables) => {
       eventCount++;
-      interface WatchTrigger {
-        trigger?: {
-          from_state?: { state: string; attributes?: Record<string, unknown> };
-          to_state?: { state: string; attributes?: Record<string, unknown> };
-        };
-      }
-      const vars = msg.event.variables as WatchTrigger;
+      const vars = variables as StateTriggerVariables;
       const when = new Date().toLocaleTimeString();
 
       let output = `[${when}] `;
@@ -672,13 +622,13 @@ export async function handleWatch(ctx: CommandContext): Promise<void> {
       }
       console.log(output);
     }
-  };
+  );
 
-  ctx.ws.on('message', eventHandler);
-
+  // Wait for the watch duration
   await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
 
-  ctx.ws.removeListener('message', eventHandler);
+  // Clean up the subscription
+  cleanup();
   console.log(`\nWatched for ${seconds}s, captured ${eventCount} state change(s).`);
 }
 
@@ -786,15 +736,14 @@ function formatTracePath(tracePath: string): string {
  * ```
  */
 export async function handleTraceTimeline(ctx: CommandContext): Promise<void> {
-  const runId = ctx.args[1];
+  const runId = requireArg(
+    ctx,
+    1,
+    'Usage: trace-timeline <run_id> [automation_id]\n' +
+      '  run_id: The run ID from traces command\n' +
+      '  automation_id: Optional automation ID (will auto-detect if not provided)'
+  );
   const providedItemId = ctx.args[2];
-
-  if (!runId) {
-    console.error('Usage: trace-timeline <run_id> [automation_id]');
-    console.error('  run_id: The run ID from traces command');
-    console.error('  automation_id: Optional automation ID (will auto-detect if not provided)');
-    process.exit(1);
-  }
 
   const { trace: result, itemId } = await getTraceDetail(ctx, runId, providedItemId);
 
@@ -916,15 +865,14 @@ export async function handleTraceTimeline(ctx: CommandContext): Promise<void> {
  * ```
  */
 export async function handleTraceTrigger(ctx: CommandContext): Promise<void> {
-  const runId = ctx.args[1];
+  const runId = requireArg(
+    ctx,
+    1,
+    'Usage: trace-trigger <run_id> [automation_id]\n' +
+      '  run_id: The run ID from traces command\n' +
+      '  automation_id: Optional automation ID (will auto-detect if not provided)'
+  );
   const providedItemId = ctx.args[2];
-
-  if (!runId) {
-    console.error('Usage: trace-trigger <run_id> [automation_id]');
-    console.error('  run_id: The run ID from traces command');
-    console.error('  automation_id: Optional automation ID (will auto-detect if not provided)');
-    process.exit(1);
-  }
 
   const { trace: result, itemId } = await getTraceDetail(ctx, runId, providedItemId);
 
@@ -1079,15 +1027,14 @@ export async function handleTraceTrigger(ctx: CommandContext): Promise<void> {
  * ```
  */
 export async function handleTraceActions(ctx: CommandContext): Promise<void> {
-  const runId = ctx.args[1];
+  const runId = requireArg(
+    ctx,
+    1,
+    'Usage: trace-actions <run_id> [automation_id]\n' +
+      '  run_id: The run ID from traces command\n' +
+      '  automation_id: Optional automation ID (will auto-detect if not provided)'
+  );
   const providedItemId = ctx.args[2];
-
-  if (!runId) {
-    console.error('Usage: trace-actions <run_id> [automation_id]');
-    console.error('  run_id: The run ID from traces command');
-    console.error('  automation_id: Optional automation ID (will auto-detect if not provided)');
-    process.exit(1);
-  }
 
   const { trace: result, itemId } = await getTraceDetail(ctx, runId, providedItemId);
 
@@ -1228,20 +1175,19 @@ export async function handleTraceActions(ctx: CommandContext): Promise<void> {
  * ```
  */
 export async function handleTraceDebug(ctx: CommandContext): Promise<void> {
-  const runId = ctx.args[1];
+  const runId = requireArg(
+    ctx,
+    1,
+    'Usage: trace-debug <run_id> [automation_id]\n' +
+      '  run_id: The run ID from traces command\n' +
+      '  automation_id: Optional automation ID (will auto-detect if not provided)\n' +
+      '\nThis command provides a comprehensive debug view combining:\n' +
+      '  - Trigger context\n' +
+      '  - Variable values at each step\n' +
+      '  - Action results\n' +
+      '  - Any errors encountered'
+  );
   const providedItemId = ctx.args[2];
-
-  if (!runId) {
-    console.error('Usage: trace-debug <run_id> [automation_id]');
-    console.error('  run_id: The run ID from traces command');
-    console.error('  automation_id: Optional automation ID (will auto-detect if not provided)');
-    console.error('\nThis command provides a comprehensive debug view combining:');
-    console.error('  - Trigger context');
-    console.error('  - Variable values at each step');
-    console.error('  - Action results');
-    console.error('  - Any errors encountered');
-    process.exit(1);
-  }
 
   const { trace: result, itemId } = await getTraceDetail(ctx, runId, providedItemId);
 

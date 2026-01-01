@@ -3,8 +3,11 @@
  * @module utils
  */
 
-import { DateParseError } from './errors.js';
-import type { TimeArgs, YamlModule } from './types.js';
+import { DateParseError, JsonParseError } from './errors.js';
+import type { CommandContext, TimeArgs, TimeRange, YamlModule } from './types.js';
+
+// Re-export TimeRange for convenience
+export type { TimeRange };
 
 // Lazy-loaded yaml module (only loaded when needed for blueprint-inputs command)
 let yamlModule: YamlModule | null = null;
@@ -40,6 +43,39 @@ export function getYamlModule(): YamlModule {
  * // filteredArgs: ['history', 'sensor.temp']
  * ```
  */
+/**
+ * Calculate a time range based on optional from/to times and a default hours window.
+ * This is a common pattern used across history, automation, and monitoring handlers.
+ *
+ * @param fromTime - Optional start time (if provided, overrides default calculation)
+ * @param toTime - Optional end time (if provided, uses this; otherwise uses current time)
+ * @param defaultHours - Number of hours to look back from endTime when fromTime is not provided
+ * @returns Object containing startTime and endTime as Date objects
+ *
+ * @example
+ * ```typescript
+ * // With no arguments, uses default hours from now
+ * const { startTime, endTime } = calculateTimeRange(null, null, 24);
+ * // endTime = now, startTime = 24 hours ago
+ *
+ * // With explicit times from CLI args
+ * const { startTime, endTime } = calculateTimeRange(ctx.fromTime, ctx.toTime, 24);
+ *
+ * // With only toTime specified
+ * const { startTime, endTime } = calculateTimeRange(null, new Date('2024-01-15'), 4);
+ * // endTime = 2024-01-15, startTime = 4 hours before that
+ * ```
+ */
+export function calculateTimeRange(
+  fromTime: Date | null | undefined,
+  toTime: Date | null | undefined,
+  defaultHours: number
+): TimeRange {
+  const endTime = toTime ?? new Date();
+  const startTime = fromTime ?? new Date(endTime.getTime() - defaultHours * 3_600_000);
+  return { startTime, endTime };
+}
+
 export function parseTimeArgs(argList: string[]): TimeArgs {
   let fromTime: Date | null = null;
   let toTime: Date | null = null;
@@ -184,4 +220,68 @@ export function formatEntityAttributes(entityId: string, attrs: Record<string, u
     .slice(0, 3)
     .map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`);
   return otherAttrs.length > 0 ? ` (${otherAttrs.join(', ')})` : '';
+}
+
+/**
+ * Validate that a required argument exists at the specified index.
+ * If the argument is missing, prints the usage message and exits.
+ *
+ * @param ctx - Command context with arguments
+ * @param index - The argument index to check (1-based, where 0 is the command name)
+ * @param usage - The usage message to display if validation fails
+ * @returns The argument value as a string (non-null guaranteed)
+ *
+ * @example
+ * ```typescript
+ * // Single required argument
+ * const entityId = requireArg(ctx, 1, 'Usage: state <entity_id>');
+ *
+ * // Multiple lines of usage info
+ * const runId = requireArg(ctx, 1,
+ *   'Usage: trace <run_id> [automation_id]\n' +
+ *   '  run_id: The run ID from traces command\n' +
+ *   '  automation_id: Optional automation ID'
+ * );
+ * ```
+ */
+export function requireArg(ctx: CommandContext, index: number, usage: string): string {
+  const arg = ctx.args[index];
+  if (!arg) {
+    console.error(usage);
+    process.exit(1);
+  }
+  return arg;
+}
+
+/**
+ * Parse a JSON string argument with structured error handling.
+ * Provides helpful error messages with context when parsing fails.
+ *
+ * @param arg - The JSON string to parse
+ * @param fieldName - A descriptive name for the field (used in error messages)
+ * @returns The parsed JSON value
+ * @throws {JsonParseError} If the JSON string cannot be parsed
+ *
+ * @example
+ * ```typescript
+ * // Parse service call data
+ * const data = parseJsonArg('{"entity_id":"light.kitchen"}', 'service data');
+ *
+ * // Parse with error handling
+ * try {
+ *   const payload = parseJsonArg(userInput, 'webhook payload');
+ * } catch (err) {
+ *   if (err instanceof JsonParseError) {
+ *     console.error(err.message);
+ *     // Error message includes field name, position, and helpful tip
+ *   }
+ * }
+ * ```
+ */
+export function parseJsonArg<T = unknown>(arg: string, fieldName: string): T {
+  try {
+    return JSON.parse(arg) as T;
+  } catch (err) {
+    throw new JsonParseError(fieldName, err as Error, arg);
+  }
 }
