@@ -1,0 +1,162 @@
+name: Build and Release Go Tools
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g., 1.0.0)'
+        required: true
+        default: '1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Go Binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          # Linux builds
+          - goos: linux
+            goarch: amd64
+            suffix: linux-amd64
+          - goos: linux
+            goarch: arm64
+            suffix: linux-arm64
+          - goos: linux
+            goarch: arm
+            goarm: 7
+            suffix: linux-armv7
+          - goos: linux
+            goarch: arm
+            goarm: 6
+            suffix: linux-armv6
+          # macOS builds
+          - goos: darwin
+            goarch: amd64
+            suffix: darwin-amd64
+          - goos: darwin
+            goarch: arm64
+            suffix: darwin-arm64
+          # Windows builds
+          - goos: windows
+            goarch: amd64
+            suffix: windows-amd64
+            ext: .exe
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            # Extract version from tag (remove 'v' prefix)
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build validate-blueprint
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+          CGO_ENABLED: 0
+        run: |
+          cd scripts/validate-blueprint-go
+          go build -ldflags "-s -w -X main.Version=${{ steps.version.outputs.VERSION }} -X main.BuildTime=$(date -u '+%Y-%m-%d_%H:%M:%S') -X main.GitCommit=${GITHUB_SHA::7}" -o ../../dist/validate-blueprint-${{ matrix.suffix }}${{ matrix.ext }} .
+
+      - name: Build ha-ws-client
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+          CGO_ENABLED: 0
+        run: |
+          cd scripts/ha-ws-client-go
+          go build -ldflags "-s -w -X main.Version=${{ steps.version.outputs.VERSION }} -X main.BuildTime=$(date -u '+%Y-%m-%d_%H:%M:%S') -X main.GitCommit=${GITHUB_SHA::7}" -o ../../dist/ha-ws-client-${{ matrix.suffix }}${{ matrix.ext }} ./cmd/ha-ws-client
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.suffix }}
+          path: dist/
+          retention-days: 1
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: binaries-*
+          merge-multiple: true
+
+      - name: Get version
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Create checksums
+        run: |
+          cd artifacts
+          sha256sum * > checksums.txt
+          cat checksums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release v${{ steps.version.outputs.VERSION }}
+          body: |
+            ## Go Tools Release v${{ steps.version.outputs.VERSION }}
+
+            ### Downloads
+
+            | Platform | validate-blueprint | ha-ws-client |
+            |----------|-------------------|--------------|
+            | Linux x86_64 | `validate-blueprint-linux-amd64` | `ha-ws-client-linux-amd64` |
+            | Linux ARM64 (Pi 4) | `validate-blueprint-linux-arm64` | `ha-ws-client-linux-arm64` |
+            | Linux ARMv7 (Pi 2/3) | `validate-blueprint-linux-armv7` | `ha-ws-client-linux-armv7` |
+            | Linux ARMv6 (Pi Zero/1) | `validate-blueprint-linux-armv6` | `ha-ws-client-linux-armv6` |
+            | macOS Intel | `validate-blueprint-darwin-amd64` | `ha-ws-client-darwin-amd64` |
+            | macOS Apple Silicon | `validate-blueprint-darwin-arm64` | `ha-ws-client-darwin-arm64` |
+            | Windows x86_64 | `validate-blueprint-windows-amd64.exe` | `ha-ws-client-windows-amd64.exe` |
+
+            ### Installation
+
+            1. Download the appropriate binary for your platform
+            2. Make it executable: `chmod +x <binary-name>`
+            3. Move to your PATH: `mv <binary-name> /usr/local/bin/`
+
+            ### Verify Download
+
+            ```bash
+            # Check version
+            ./validate-blueprint --version
+            ./ha-ws-client --version
+            ```
+
+            See [CHANGELOG](https://github.com/jeremiah-k/home-assistant-blueprints/blob/main/scripts/validate-blueprint-go/CHANGELOG.md) for details.
+          files: |
+            artifacts/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true

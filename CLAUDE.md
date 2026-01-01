@@ -12,10 +12,14 @@ This repository contains production-ready Home Assistant Blueprints for home aut
 
 ```bash
 # Validate a single blueprint
-python3 scripts/validate-blueprint/validate-blueprint.py <path/to/blueprint.yaml>
+./scripts/validate-blueprint-go/validate-blueprint <path/to/blueprint.yaml>
 
 # Validate all blueprints in the repository
-python3 scripts/validate-blueprint/validate-blueprint.py --all
+./scripts/validate-blueprint-go/validate-blueprint --all
+
+# Or use npm scripts
+npm run validate          # Validate all blueprints
+npm run validate:single <path>  # Validate a single file
 ```
 
 The validator checks:
@@ -108,6 +112,25 @@ Each blueprint has its own semantic version in:
 3. `CHANGELOG.md` - Add entry for new version
 
 The blueprint name and variable must stay in sync.
+
+### Go Tool Versioning
+
+The Go tools (ha-ws-client-go and validate-blueprint-go) each have their own semantic version:
+
+1. **Makefile VERSION**: Set `VERSION=X.Y.Z` or pass via `make build VERSION=X.Y.Z`
+2. **CHANGELOG.md**: Add entry for each release following Keep a Changelog format
+3. **Version flag**: Run `--version` to check current version
+
+When updating Go tools:
+1. Update the VERSION in Makefile (or rely on git tag for releases)
+2. Add entry to CHANGELOG.md with date and changes
+3. Keep both tools' versions synchronized when making coordinated changes
+4. GitHub Actions will automatically build and release binaries on version tags
+
+**Pre-commit hook checks for Go tools:**
+- CHANGELOG.md must exist for both tools
+- Makefile VERSION must match latest CHANGELOG.md version entry
+- Warning if tool versions are not synchronized (not blocking)
 
 ### Markdown
 

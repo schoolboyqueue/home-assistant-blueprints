@@ -1,0 +1,95 @@
+name: CI Go Tools
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/validate-blueprint-go/**'
+      - 'scripts/ha-ws-client-go/**'
+      - '.github/workflows/ci-go-tools.yml'
+  pull_request:
+    paths:
+      - 'scripts/validate-blueprint-go/**'
+      - 'scripts/ha-ws-client-go/**'
+      - '.github/workflows/ci-go-tools.yml'
+
+jobs:
+  lint-and-test:
+    name: Lint and Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        tool:
+          - validate-blueprint-go
+          - ha-ws-client-go
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Install golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.62.2
+          working-directory: scripts/${{ matrix.tool }}
+          args: --timeout=5m
+
+      - name: Run tests
+        working-directory: scripts/${{ matrix.tool }}
+        run: go test -race -v ./...
+
+      - name: Check formatting
+        working-directory: scripts/${{ matrix.tool }}
+        run: |
+          go install mvdan.cc/gofumpt@v0.7.0
+          test -z "$(gofumpt -l .)"
+
+  build:
+    name: Build Test
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    strategy:
+      matrix:
+        tool:
+          - validate-blueprint-go
+          - ha-ws-client-go
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+        exclude:
+          - goos: windows
+            goarch: arm64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Build validate-blueprint
+        if: matrix.tool == 'validate-blueprint-go'
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          cd scripts/validate-blueprint-go
+          go build -ldflags "-s -w" -o /dev/null .
+
+      - name: Build ha-ws-client
+        if: matrix.tool == 'ha-ws-client-go'
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          cd scripts/ha-ws-client-go
+          go build -ldflags "-s -w" -o /dev/null ./cmd/ha-ws-client

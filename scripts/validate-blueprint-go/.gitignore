@@ -1,0 +1,68 @@
+# Build artifacts
+build/
+dist/
+bin/
+
+# Go binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+validate-blueprint
+
+# Test binary
+*.test
+
+# Coverage and profiling
+*.out
+*.prof
+coverage.html
+cpu.prof
+mem.prof
+trace.out
+
+# Dependency graph
+deps.png
+
+# Go workspace (Go 1.18+)
+go.work
+go.work.sum
+
+# Vendor directory (if using vendoring)
+vendor/
+
+# Debug files
+*.log
+debug.test
+
+# IDE and editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# golangci-lint cache
+.golangci-lint/
+
+# Air live reload
+tmp/
+
+# Delve debugger
+__debug_bin
+__debug_bin*

@@ -850,7 +850,7 @@
 
       <!-- Tools Grid -->
       <div class="tools-grid">
-        <!-- validate-blueprint -->
+        <!-- validate-blueprint-go -->
         <article class="tool-card">
           <div class="tool-header">
             <div class="tool-icon">
@@ -862,14 +862,14 @@
             <div class="tool-header-text">
               <h3>validate-blueprint</h3>
               <div class="tool-tech">
-                <span class="tech-tag">Python</span>
+                <span class="tech-tag">Go</span>
                 <span class="tech-tag">CLI</span>
               </div>
             </div>
           </div>
 
           <p class="tool-description">
-            A comprehensive validator that checks blueprint YAML files for common issues <strong>before</strong>you
+            A fast, compiled validator that checks blueprint YAML files for common issues <strong>before</strong>you
             import them into Home Assistant. Catches syntax errors, structural problems, and template issues.
           </p>
 
@@ -882,7 +882,8 @@
               <li>
                 Detection of <code>!input</code>tags inside template blocks
               </li>
-              <li>Service call structure verification</li>
+              <li>Hysteresis boundary validation</li>
+              <li>~16x faster than Python version</li>
             </ul>
           </div>
 
@@ -894,15 +895,15 @@
               <span class="usage-title">Terminal</span>
             </div>
             <pre class="usage-content"><span class="comment"># Validate a single blueprint</span>
-<span class="command">python3 scripts/validate-blueprint/validate-blueprint.py path/to/blueprint.yaml</span>
+<span class="command">./scripts/validate-blueprint-go/validate-blueprint path/to/blueprint.yaml</span>
 
 <span class="comment"># Validate all blueprints</span>
-<span class="command">python3 scripts/validate-blueprint/validate-blueprint.py --all</span></pre>
+<span class="command">./scripts/validate-blueprint-go/validate-blueprint --all</span></pre>
           </div>
 
           <div class="tool-actions">
             <a
-              href="https://github.com/schoolboyqueue/home-assistant-blueprints/tree/main/scripts/validate-blueprint"
+              href="https://github.com/schoolboyqueue/home-assistant-blueprints/tree/main/scripts/validate-blueprint-go"
               target="_blank"
               class="btn btn-github"
             >
@@ -914,7 +915,7 @@
               View on GitHub
             </a>
             <a
-              href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/scripts/validate-blueprint/README.md"
+              href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/scripts/validate-blueprint-go/README.md"
               target="_blank"
               class="btn btn-docs"
             >
@@ -923,7 +924,7 @@
           </div>
         </article>
 
-        <!-- ha-ws-client -->
+        <!-- ha-ws-client-go -->
         <article class="tool-card">
           <div class="tool-header">
             <div class="tool-icon cyan">
@@ -935,26 +936,27 @@
             <div class="tool-header-text">
               <h3>ha-ws-client</h3>
               <div class="tool-tech">
-                <span class="tech-tag">TypeScript</span>
-                <span class="tech-tag">Node.js</span>
+                <span class="tech-tag">Go</span>
+                <span class="tech-tag">CLI</span>
                 <span class="tech-tag">WebSocket</span>
               </div>
             </div>
           </div>
 
           <p class="tool-description">
-            A powerful WebSocket API client for querying Home Assistant and debugging automations from the command line.
-            Get entity states, call services, render templates, and dive deep into automation traces.
+            A high-performance WebSocket API client for querying Home Assistant and debugging automations. Written in Go
+            for fast startup (~10ms), low memory (~5-10MB), and easy deployment as a single static binary—optimized for
+            Raspberry Pi.
           </p>
 
           <div class="tool-features">
             <h4>Key Features</h4>
             <ul>
-              <li>Entity state queries (single, filtered, or all)</li>
-              <li>Service calls and template rendering</li>
+              <li>Zero runtime dependencies—single static binary</li>
+              <li>Cross-compiled for all Raspberry Pi variants</li>
               <li>Automation trace debugging (step-by-step)</li>
               <li>Live monitoring with anomaly detection</li>
-              <li>Entity, device, and area registry queries</li>
+              <li>Multiple output formats (JSON, compact, default)</li>
             </ul>
           </div>
 
@@ -966,15 +968,15 @@
               <span class="usage-title">Terminal</span>
             </div>
             <pre class="usage-content"><span class="comment"># Get entity state</span>
-<span class="command">npx tsx scripts/ha-ws-client/ha-ws-client.ts state sun.sun</span>
+<span class="command">ha-ws-client state sun.sun</span>
 
 <span class="comment"># Debug automation trace</span>
-<span class="command">npx tsx scripts/ha-ws-client/ha-ws-client.ts trace-debug &lt;run_id&gt;</span></pre>
+<span class="command">ha-ws-client trace-debug &lt;run_id&gt;</span></pre>
           </div>
 
           <div class="tool-actions">
             <a
-              href="https://github.com/schoolboyqueue/home-assistant-blueprints/tree/main/scripts/ha-ws-client"
+              href="https://github.com/schoolboyqueue/home-assistant-blueprints/tree/main/scripts/ha-ws-client-go"
               target="_blank"
               class="btn btn-github"
             >
@@ -986,7 +988,7 @@
               View on GitHub
             </a>
             <a
-              href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/scripts/ha-ws-client/README.md"
+              href="https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/scripts/ha-ws-client-go/README.md"
               target="_blank"
               class="btn btn-docs"
             >
