@@ -1,0 +1,80 @@
+name: Auto-tag Go Tools on Version Bump
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/validate-blueprint-go/Makefile'
+      - 'scripts/validate-blueprint-go/CHANGELOG.md'
+      - 'scripts/ha-ws-client-go/Makefile'
+      - 'scripts/ha-ws-client-go/CHANGELOG.md'
+
+permissions:
+  contents: write
+
+jobs:
+  check-and-tag:
+    name: Check versions and create tags
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check validate-blueprint-go version
+        id: validate-version
+        run: |
+          VERSION=$(grep -E '^VERSION\s*(\?=|:=|=)' scripts/validate-blueprint-go/Makefile | head -1 | sed 's/.*[?:]\?=\s*//' | tr -d ' ')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          if git tag -l "validate-blueprint-go/v$VERSION" | grep -q .; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check ha-ws-client-go version
+        id: client-version
+        run: |
+          VERSION=$(grep -E '^VERSION\s*(\?=|:=|=)' scripts/ha-ws-client-go/Makefile | head -1 | sed 's/.*[?:]\?=\s*//' | tr -d ' ')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          if git tag -l "ha-ws-client-go/v$VERSION" | grep -q .; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create validate-blueprint-go tag
+        if: steps.validate-version.outputs.exists == 'false'
+        env:
+          VERSION: ${{ steps.validate-version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "validate-blueprint-go/v$VERSION" -m "Release validate-blueprint-go v$VERSION"
+          git push origin "validate-blueprint-go/v$VERSION"
+
+      - name: Create ha-ws-client-go tag
+        if: steps.client-version.outputs.exists == 'false'
+        env:
+          VERSION: ${{ steps.client-version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "ha-ws-client-go/v$VERSION" -m "Release ha-ws-client-go v$VERSION"
+          git push origin "ha-ws-client-go/v$VERSION"
+
+      - name: Create combined release tag
+        if: steps.validate-version.outputs.exists == 'false' || steps.client-version.outputs.exists == 'false'
+        env:
+          VERSION: ${{ steps.validate-version.outputs.version }}
+        run: |
+          if git tag -l "v$VERSION" | grep -q .; then
+            echo "Combined tag v$VERSION already exists, skipping"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag -a "v$VERSION" -m "Release Go Tools v$VERSION"
+            git push origin "v$VERSION"
+          fi
