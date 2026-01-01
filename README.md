@@ -151,15 +151,19 @@ HVAC-aware ceiling fan automation with EN 16798 adaptive comfort model, heat ind
 │       ├── multi_switch_light_control_pro.yaml
 │       ├── CHANGELOG.md
 │       └── README.md
+├── .github/
+│   └── workflows/
+│       ├── ci-go-tools.yml
+│       └── release-go-tools.yml
 ├── scripts/
-│   ├── ha-ws-client/
-│   │   ├── ha-ws-client.ts
-│   │   └── README.md
 │   ├── ha-ws-client-go/
-│   │   ├── main.go
+│   │   ├── cmd/ha-ws-client/main.go
+│   │   ├── internal/
+│   │   ├── Makefile
 │   │   └── README.md
 │   ├── validate-blueprint-go/
 │   │   ├── main.go
+│   │   ├── Makefile
 │   │   └── README.md
 │   └── README.md
 └── README.md (this file)
