@@ -29,7 +29,11 @@ const DEFAULT_HOURS = 24;
  * ```
  */
 export async function handleLogbook(ctx: CommandContext): Promise<void> {
-  const entityId = requireArg(ctx, 1, 'Usage: logbook <entity_id> [hours] [--from "TIME"] [--to "TIME"]');
+  const entityId = requireArg(
+    ctx,
+    1,
+    'Usage: logbook <entity_id> [hours] [--from "TIME"] [--to "TIME"]'
+  );
   const hours = parseFloat(ctx.args[2] as string) || DEFAULT_HOURS;
 
   const { startTime, endTime } = calculateTimeRange(ctx.fromTime, ctx.toTime, hours);
@@ -67,7 +71,11 @@ export async function handleLogbook(ctx: CommandContext): Promise<void> {
  * ```
  */
 export async function handleHistory(ctx: CommandContext): Promise<void> {
-  const entityId = requireArg(ctx, 1, 'Usage: history <entity_id> [hours] [--from "TIME"] [--to "TIME"]');
+  const entityId = requireArg(
+    ctx,
+    1,
+    'Usage: history <entity_id> [hours] [--from "TIME"] [--to "TIME"]'
+  );
   const hours = parseFloat(ctx.args[2] as string) || DEFAULT_HOURS;
 
   const { startTime, endTime } = calculateTimeRange(ctx.fromTime, ctx.toTime, hours);
@@ -112,7 +120,11 @@ export async function handleHistory(ctx: CommandContext): Promise<void> {
  * ```
  */
 export async function handleHistoryFull(ctx: CommandContext): Promise<void> {
-  const entityId = requireArg(ctx, 1, 'Usage: history-full <entity_id> [hours] [--from "TIME"] [--to "TIME"]');
+  const entityId = requireArg(
+    ctx,
+    1,
+    'Usage: history-full <entity_id> [hours] [--from "TIME"] [--to "TIME"]'
+  );
   const hours = parseFloat(ctx.args[2] as string) || DEFAULT_HOURS;
 
   const { startTime, endTime } = calculateTimeRange(ctx.fromTime, ctx.toTime, hours);
@@ -297,13 +309,14 @@ export async function handleAttrs(ctx: CommandContext): Promise<void> {
 
 /**
  * Show a chronological timeline of multiple entities.
- * Displays events from multiple entities sorted by time.
+ * Displays state changes from multiple entities sorted by time.
+ * Uses the history API to capture all state changes including sensors.
  *
  * @param ctx - Command context with WebSocket and arguments
  *
  * @example
  * ```bash
- * npx tsx ha-ws-client.ts timeline 2 climate.thermostat binary_sensor.door automation.hvac
+ * npx tsx ha-ws-client.ts timeline 2 climate.thermostat binary_sensor.door sensor.temperature
  * ```
  */
 export async function handleTimeline(ctx: CommandContext): Promise<void> {
@@ -311,34 +324,60 @@ export async function handleTimeline(ctx: CommandContext): Promise<void> {
     ctx,
     1,
     'Usage: timeline <hours> <entity1> <entity2> ... [--from "TIME"] [--to "TIME"]\n' +
-      'Example: timeline 2 climate.thermostat binary_sensor.door automation.hvac'
+      'Example: timeline 2 climate.thermostat binary_sensor.door sensor.temperature'
   );
   const hours = parseFloat(hoursArg);
   const entityIds = ctx.args.slice(2) as string[];
 
   if (entityIds.length === 0) {
     console.error('Usage: timeline <hours> <entity1> <entity2> ... [--from "TIME"] [--to "TIME"]');
-    console.error('Example: timeline 2 climate.thermostat binary_sensor.door automation.hvac');
+    console.error('Example: timeline 2 climate.thermostat binary_sensor.door sensor.temperature');
     process.exit(1);
   }
 
   const { startTime, endTime } = calculateTimeRange(ctx.fromTime, ctx.toTime, hours);
 
-  const result = await sendMessage<LogbookEntry[]>(ctx.ws, 'logbook/get_events', {
-    start_time: startTime.toISOString(),
-    end_time: endTime.toISOString(),
-    entity_ids: entityIds,
-  });
+  // Use history API instead of logbook to capture all state changes including sensors
+  const result = await sendMessage<Record<string, HistoryState[]>>(
+    ctx.ws,
+    'history/history_during_period',
+    {
+      start_time: startTime.toISOString(),
+      end_time: endTime.toISOString(),
+      entity_ids: entityIds,
+      minimal_response: true,
+      significant_changes_only: true,
+    }
+  );
 
-  const allEntries = result
-    .map((entry) => ({
-      when: entry.when * 1000,
-      entity_id: entry.entity_id,
-      state: entry.state,
-      message: entry.message,
-      context_id: entry.context_id,
-    }))
-    .sort((a, b) => a.when - b.when);
+  // Collect all entries from all entities
+  interface TimelineEntry {
+    when: number;
+    entity_id: string;
+    state: string;
+  }
+
+  const allEntries: TimelineEntry[] = [];
+  for (const entityId of entityIds) {
+    const states = result[entityId] ?? [];
+    for (const s of states) {
+      const timestamp = s.lu
+        ? s.lu * 1000
+        : s.last_updated
+          ? new Date(s.last_updated).getTime()
+          : 0;
+      if (timestamp > 0) {
+        allEntries.push({
+          when: timestamp,
+          entity_id: entityId,
+          state: s.s ?? s.state ?? 'unknown',
+        });
+      }
+    }
+  }
+
+  // Sort by timestamp
+  allEntries.sort((a, b) => a.when - b.when);
 
   const timeDesc = ctx.fromTime
     ? `${startTime.toLocaleString()} to ${endTime.toLocaleString()}`
@@ -348,27 +387,16 @@ export async function handleTimeline(ctx: CommandContext): Promise<void> {
   if (allEntries.length === 0) {
     console.log('  No events found');
   } else {
-    // Create shortened labels for display
-    const labels = new Map<string, string>();
-    for (const id of entityIds) {
-      const parts = id.split('.');
-      const domain = (parts[0] ?? '').substring(0, 3);
-      const name = parts[1]?.substring(0, 15) ?? '';
-      labels.set(id, `${domain}.${name}`);
-    }
-
-    const labelValues = [...labels.values()];
-    const maxLen = labelValues.length > 0 ? Math.max(...labelValues.map((l) => l.length)) : 0;
+    // Calculate max entity_id length for alignment
+    const maxLen = Math.max(...entityIds.map((id) => id.length));
 
     for (const entry of allEntries) {
       const when = new Date(entry.when).toLocaleString();
-      const entityKey = entry.entity_id ?? '';
-      const label = (labels.get(entityKey) ?? entityKey.substring(0, 20)).padEnd(maxLen);
-      const stateOrMsg = entry.state ?? entry.message ?? 'event';
-      console.log(`  ${when}  ${label}  ${stateOrMsg}`);
+      const label = entry.entity_id.padEnd(maxLen);
+      console.log(`  ${when}  ${label}  ${entry.state}`);
     }
 
-    console.log(`\nTotal: ${allEntries.length} events across ${entityIds.length} entities`);
+    console.log(`\nTotal: ${allEntries.length} state changes across ${entityIds.length} entities`);
   }
 }
 

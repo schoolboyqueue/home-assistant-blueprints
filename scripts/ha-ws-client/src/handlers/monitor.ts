@@ -35,19 +35,6 @@ const DEFAULT_ANOMALY_CONFIG: AnomalyConfig = {
   oscillationCount: 5,
 };
 
-/** ANSI color codes for terminal output */
-const COLORS = {
-  reset: '\x1b[0m',
-  red: '\x1b[31m',
-  green: '\x1b[32m',
-  yellow: '\x1b[33m',
-  blue: '\x1b[34m',
-  magenta: '\x1b[35m',
-  cyan: '\x1b[36m',
-  dim: '\x1b[2m',
-  bold: '\x1b[1m',
-} as const;
-
 // =============================================================================
 // Utility Functions
 // =============================================================================
@@ -274,24 +261,20 @@ function formatStateChange(
   let mainLine = `[${timeStr}] `;
 
   if (record.isAnomaly) {
-    mainLine += `${COLORS.red}${COLORS.bold}[!]${COLORS.reset} `;
+    mainLine += `[!] `;
   }
 
-  mainLine += `${record.previousState ?? '(initial)'} → ${COLORS.cyan}${record.state}${COLORS.reset}`;
+  mainLine += `${record.previousState ?? '(initial)'} → ${record.state}`;
 
   if (record.rateOfChange !== null) {
-    const rateColor =
-      Math.abs(record.rateOfChange) > DEFAULT_ANOMALY_CONFIG.rapidChangeThreshold
-        ? COLORS.yellow
-        : COLORS.dim;
-    mainLine += ` ${rateColor}(${formatRateOfChange(record.rateOfChange)})${COLORS.reset}`;
+    mainLine += ` (${formatRateOfChange(record.rateOfChange)})`;
   }
 
   lines.push(mainLine);
 
   // Anomaly reason
   if (record.isAnomaly && record.anomalyReason) {
-    lines.push(`         ${COLORS.red}⚠ ${record.anomalyReason}${COLORS.reset}`);
+    lines.push(`         ⚠ ${record.anomalyReason}`);
   }
 
   // Attribute changes
@@ -302,7 +285,7 @@ function formatStateChange(
       entityId
     );
     if (attrChanges.length > 0) {
-      lines.push(`         ${COLORS.dim}Attributes: ${attrChanges.join(', ')}${COLORS.reset}`);
+      lines.push(`         Attributes: ${attrChanges.join(', ')}`);
     }
   }
 
@@ -318,13 +301,13 @@ function printStats(
   stats: EntityStats,
   duration: number
 ): void {
-  console.log(`\n${COLORS.bold}═══ Monitoring Summary ═══${COLORS.reset}`);
+  console.log(`\nSummary:`);
   console.log(`Entity: ${entityId}`);
   console.log(`Duration: ${formatDuration(duration)}`);
   console.log(`State changes: ${history.length}`);
 
   if (stats.count > 0) {
-    console.log(`\n${COLORS.bold}Numeric Statistics:${COLORS.reset}`);
+    console.log(`\nNumeric Statistics:`);
     console.log(`  Min: ${stats.min.toFixed(2)}`);
     console.log(`  Max: ${stats.max.toFixed(2)}`);
     console.log(`  Mean: ${stats.mean.toFixed(2)}`);
@@ -333,9 +316,7 @@ function printStats(
 
   const anomalies = history.filter((r) => r.isAnomaly);
   if (anomalies.length > 0) {
-    console.log(
-      `\n${COLORS.red}${COLORS.bold}Anomalies Detected: ${anomalies.length}${COLORS.reset}`
-    );
+    console.log(`\nAnomalies Detected: ${anomalies.length}`);
     for (const a of anomalies.slice(-5)) {
       console.log(`  ${a.timestamp.toLocaleTimeString()}: ${a.state} - ${a.anomalyReason}`);
     }
@@ -351,7 +332,7 @@ function printStats(
   }
 
   if (stateCounts.size > 1) {
-    console.log(`\n${COLORS.bold}State Distribution:${COLORS.reset}`);
+    console.log(`\nState Distribution:`);
     const sorted = [...stateCounts.entries()].sort((a, b) => b[1] - a[1]);
     for (const [state, count] of sorted.slice(0, 10)) {
       const pct = ((count / history.length) * 100).toFixed(1);
@@ -396,8 +377,7 @@ export async function handleMonitor(ctx: CommandContext): Promise<void> {
   const seconds = parseInt(ctx.args[2] as string, 10) || DEFAULT_MONITOR_SECONDS;
   const showDetails = !ctx.args.includes('--no-details');
 
-  console.log(`${COLORS.bold}Monitoring ${entityId} for ${seconds} seconds...${COLORS.reset}`);
-  console.log('Press Ctrl+C to stop early.\n');
+  console.log(`Monitoring ${entityId} for ${seconds} seconds...`);
 
   // Get initial state
   const states = await sendMessage<HAState[]>(ctx.ws, 'get_states');
@@ -417,14 +397,14 @@ export async function handleMonitor(ctx: CommandContext): Promise<void> {
   const startTime = Date.now();
 
   // Display initial state
-  console.log(`${COLORS.bold}Initial state:${COLORS.reset} ${initialState.state}`);
+  console.log(`Initial state: ${initialState.state}`);
   const trackedAttrs = getTrackedAttributes(entityId);
   if (trackedAttrs.length > 0) {
     const attrValues = trackedAttrs
       .filter((a) => lastAttributes[a] !== undefined)
       .map((a) => `${a}=${formatAttributeValue(a, lastAttributes[a])}`);
     if (attrValues.length > 0) {
-      console.log(`${COLORS.dim}  Attributes: ${attrValues.join(', ')}${COLORS.reset}`);
+      console.log(`  Attributes: ${attrValues.join(', ')}`);
     }
   }
 
@@ -434,7 +414,7 @@ export async function handleMonitor(ctx: CommandContext): Promise<void> {
     numericValues.push(initialNumeric);
   }
 
-  console.log(`\n${COLORS.bold}─── Live State Changes ───${COLORS.reset}\n`);
+  console.log(`Changes:`);
 
   // Subscribe to state changes using the helper function
   const { cleanup } = await subscribeToTrigger(
@@ -523,8 +503,6 @@ export async function handleMonitor(ctx: CommandContext): Promise<void> {
   const duration = Date.now() - startTime;
   const finalStats = calculateStats(numericValues);
   printStats(entityId, history, finalStats, duration);
-
-  console.log(`\n${COLORS.green}Monitoring complete.${COLORS.reset}`);
 }
 
 /**
@@ -562,23 +540,16 @@ export async function handleMonitorMulti(ctx: CommandContext): Promise<void> {
 
   const showDetails = !ctx.args.includes('--no-details');
 
-  console.log(
-    `${COLORS.bold}Monitoring ${entityIds.length} entities for ${seconds} seconds...${COLORS.reset}`
-  );
+  console.log(`Monitoring ${entityIds.length} entities for ${seconds} seconds...`);
   console.log('Entities:');
   for (const id of entityIds) {
     console.log(`  - ${id}`);
   }
-  console.log('Press Ctrl+C to stop early.\n');
 
-  // Create labels for compact display
+  // Create labels for display (use full entity names)
   const labels = new Map<string, string>();
-  const maxLabelLength = 15;
   for (const id of entityIds) {
-    const parts = id.split('.');
-    const domain = (parts[0] ?? '').substring(0, 3);
-    const name = (parts[1] ?? '').substring(0, maxLabelLength - 4);
-    labels.set(id, `${domain}.${name}`);
+    labels.set(id, id);
   }
 
   // Get initial states first
@@ -592,12 +563,12 @@ export async function handleMonitorMulti(ctx: CommandContext): Promise<void> {
   }
 
   // Display initial states
-  console.log(`${COLORS.bold}Initial states:${COLORS.reset}`);
+  console.log(`Initial states:`);
   for (const [entityId, state] of entityStates) {
     console.log(`  ${labels.get(entityId)}: ${state.state}`);
   }
 
-  console.log(`\n${COLORS.bold}─── Live State Changes ───${COLORS.reset}\n`);
+  console.log(`Changes:`);
 
   // Track changes
   let totalEvents = 0;
@@ -613,12 +584,13 @@ export async function handleMonitorMulti(ctx: CommandContext): Promise<void> {
     totalEvents++;
     const now = new Date();
     const timeStr = now.toLocaleTimeString('en-US', { hour12: false });
-    const label = (labels.get(triggerEntityId) ?? triggerEntityId).padEnd(maxLabelLength);
+    const maxLen = Math.max(...entityIds.map((id) => id.length));
+    const label = (labels.get(triggerEntityId) ?? triggerEntityId).padEnd(maxLen);
     const fromState = vars.trigger?.from_state?.state ?? '?';
     const toState = vars.trigger?.to_state?.state ?? '?';
 
-    let line = `[${timeStr}] ${COLORS.cyan}${label}${COLORS.reset} `;
-    line += `${fromState} → ${COLORS.bold}${toState}${COLORS.reset}`;
+    let line = `[${timeStr}] ${label} `;
+    line += `${fromState} → ${toState}`;
 
     console.log(line);
 
@@ -630,9 +602,7 @@ export async function handleMonitorMulti(ctx: CommandContext): Promise<void> {
         triggerEntityId
       );
       if (attrChanges.length > 0) {
-        console.log(
-          `${' '.repeat(timeStr.length + 3)}${COLORS.dim}${attrChanges.join(', ')}${COLORS.reset}`
-        );
+        console.log(`${' '.repeat(timeStr.length + 3)}${attrChanges.join(', ')}`);
       }
     }
   };
@@ -658,12 +628,10 @@ export async function handleMonitorMulti(ctx: CommandContext): Promise<void> {
 
   // Print summary
   const duration = Date.now() - startTime;
-  console.log(`\n${COLORS.bold}═══ Monitoring Summary ═══${COLORS.reset}`);
+  console.log(`\nSummary:`);
   console.log(`Duration: ${formatDuration(duration)}`);
   console.log(`Total state changes: ${totalEvents}`);
   console.log(`Entities monitored: ${entityIds.length}`);
-
-  console.log(`\n${COLORS.green}Monitoring complete.${COLORS.reset}`);
 }
 
 /**
@@ -693,9 +661,7 @@ export async function handleAnalyze(ctx: CommandContext): Promise<void> {
   );
   const hours = parseFloat(ctx.args[2] as string) || 24;
 
-  console.log(
-    `${COLORS.bold}Analyzing ${entityId} for the last ${hours} hours...${COLORS.reset}\n`
-  );
+  console.log(`Analyzing ${entityId} for the last ${hours} hours...\n`);
 
   const { startTime, endTime } = calculateTimeRange(null, null, hours);
 
@@ -789,13 +755,13 @@ export async function handleAnalyze(ctx: CommandContext): Promise<void> {
   const stats = calculateStats(numericValues);
 
   // Report findings
-  console.log(`${COLORS.bold}═══ Analysis Results ═══${COLORS.reset}`);
+  console.log(`Analysis:`);
   console.log(`\nPeriod: ${startTime.toLocaleString()} to ${endTime.toLocaleString()}`);
   console.log(`Total state changes: ${history.length}`);
 
   // Numeric statistics
   if (stats.count > 0) {
-    console.log(`\n${COLORS.bold}Numeric Statistics:${COLORS.reset}`);
+    console.log(`\nNumeric Statistics:`);
     console.log(`  Samples: ${stats.count}`);
     console.log(`  Min: ${stats.min.toFixed(2)}`);
     console.log(`  Max: ${stats.max.toFixed(2)}`);
@@ -807,10 +773,7 @@ export async function handleAnalyze(ctx: CommandContext): Promise<void> {
   // Anomalies
   const anomalies = history.filter((r) => r.isAnomaly);
   if (anomalies.length > 0) {
-    console.log(
-      `\n${COLORS.red}${COLORS.bold}Anomalies Detected: ${anomalies.length}${COLORS.reset}`
-    );
-    console.log('');
+    console.log(`\nAnomalies Detected: ${anomalies.length}`);
 
     // Group by type
     const byReason = new Map<string, StateChangeRecord[]>();
@@ -822,7 +785,7 @@ export async function handleAnalyze(ctx: CommandContext): Promise<void> {
     }
 
     for (const [reason, records] of byReason) {
-      console.log(`${COLORS.yellow}${reason}:${COLORS.reset} ${records.length} occurrences`);
+      console.log(`${reason}: ${records.length} occurrences`);
       for (const r of records.slice(0, 3)) {
         console.log(`  - ${r.timestamp.toLocaleString()}: ${r.previousState ?? '?'} → ${r.state}`);
       }
@@ -831,7 +794,7 @@ export async function handleAnalyze(ctx: CommandContext): Promise<void> {
       }
     }
   } else {
-    console.log(`\n${COLORS.green}No anomalies detected.${COLORS.reset}`);
+    console.log(`\nNo anomalies detected.`);
   }
 
   // State distribution
@@ -841,13 +804,13 @@ export async function handleAnalyze(ctx: CommandContext): Promise<void> {
   }
 
   if (stateCounts.size > 1) {
-    console.log(`\n${COLORS.bold}State Distribution:${COLORS.reset}`);
+    console.log(`\nState Distribution:`);
     const sorted = [...stateCounts.entries()].sort((a, b) => b[1] - a[1]);
     for (const [state, count] of sorted.slice(0, 10)) {
       const pct = ((count / history.length) * 100).toFixed(1);
       const bar = '█'.repeat(Math.ceil(parseFloat(pct) / 5));
       console.log(
-        `  ${state.padEnd(20)} ${count.toString().padStart(5)} (${pct.padStart(5)}%) ${COLORS.dim}${bar}${COLORS.reset}`
+        `  ${state.padEnd(20)} ${count.toString().padStart(5)} (${pct.padStart(5)}%) ${bar}`
       );
     }
   }
@@ -855,9 +818,7 @@ export async function handleAnalyze(ctx: CommandContext): Promise<void> {
   // Unavailability analysis
   const unavailable = history.filter((r) => r.state === 'unavailable' || r.state === 'unknown');
   if (unavailable.length > 0) {
-    console.log(
-      `\n${COLORS.yellow}${COLORS.bold}Unavailability Events: ${unavailable.length}${COLORS.reset}`
-    );
+    console.log(`\nUnavailability Events: ${unavailable.length}`);
     for (const u of unavailable.slice(0, 5)) {
       console.log(`  - ${u.timestamp.toLocaleString()}: became ${u.state}`);
     }
@@ -865,6 +826,4 @@ export async function handleAnalyze(ctx: CommandContext): Promise<void> {
       console.log(`  ... and ${unavailable.length - 5} more`);
     }
   }
-
-  console.log(`\n${COLORS.green}Analysis complete.${COLORS.reset}`);
 }

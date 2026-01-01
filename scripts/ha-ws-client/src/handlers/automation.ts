@@ -765,7 +765,7 @@ export async function handleTraceTimeline(ctx: CommandContext): Promise<void> {
     console.log(`\n[ERROR] ${result.error}`);
   }
 
-  console.log('\n--- Execution Steps ---\n');
+  console.log('\nSteps:');
 
   if (!result.trace || Object.keys(result.trace).length === 0) {
     console.log('No trace steps recorded.');
@@ -849,8 +849,6 @@ export async function handleTraceTimeline(ctx: CommandContext): Promise<void> {
       }
     }
   }
-
-  console.log('\n--- End of Timeline ---');
 }
 
 /**
@@ -883,10 +881,16 @@ export async function handleTraceTrigger(ctx: CommandContext): Promise<void> {
   // Look for trigger info in trace variables
   let triggerInfo: TraceTrigger | null = null;
 
-  // First check the trace for trigger variables
+  // First check the trace for trigger variables (check both variables and changed_variables)
   if (result.trace) {
     for (const steps of Object.values(result.trace)) {
       for (const step of steps) {
+        // Check changed_variables first (where trigger info usually appears)
+        if (step.changed_variables?.trigger) {
+          triggerInfo = step.changed_variables.trigger as TraceTrigger;
+          break;
+        }
+        // Also check variables as fallback
         if (step.variables?.trigger) {
           triggerInfo = step.variables.trigger as TraceTrigger;
           break;
@@ -896,8 +900,8 @@ export async function handleTraceTrigger(ctx: CommandContext): Promise<void> {
     }
   }
 
-  // Also use top-level trigger info if available
-  if (result.trigger) {
+  // Also use top-level trigger info if available (merge with found info)
+  if (result.trigger && typeof result.trigger === 'object') {
     triggerInfo = { ...triggerInfo, ...result.trigger };
   }
 
@@ -907,7 +911,7 @@ export async function handleTraceTrigger(ctx: CommandContext): Promise<void> {
     return;
   }
 
-  console.log('--- Trigger Details ---\n');
+  console.log('Details:');
 
   if (triggerInfo.platform) {
     console.log(`Platform: ${triggerInfo.platform}`);
@@ -935,7 +939,7 @@ export async function handleTraceTrigger(ctx: CommandContext): Promise<void> {
 
   // Show state transition
   if (triggerInfo.from_state || triggerInfo.to_state) {
-    console.log('\n--- State Transition ---\n');
+    console.log('\nState change:');
 
     if (triggerInfo.from_state) {
       const from = triggerInfo.from_state;
@@ -992,7 +996,7 @@ export async function handleTraceTrigger(ctx: CommandContext): Promise<void> {
 
   // Show "for" duration if present
   if (triggerInfo.for) {
-    console.log('\n--- Duration Condition ---');
+    console.log('\nDuration:');
     if (typeof triggerInfo.for === 'string') {
       console.log(`For: ${triggerInfo.for}`);
     } else {
@@ -1009,7 +1013,7 @@ export async function handleTraceTrigger(ctx: CommandContext): Promise<void> {
     const idx = triggerInfo.idx !== undefined ? parseInt(triggerInfo.idx, 10) : 0;
     const triggerConfig = result.config.trigger[idx];
     if (triggerConfig) {
-      console.log('\n--- Trigger Configuration ---');
+      console.log('\nConfig:');
       console.log(JSON.stringify(triggerConfig, null, 2));
     }
   }
@@ -1057,7 +1061,7 @@ export async function handleTraceActions(ctx: CommandContext): Promise<void> {
     return;
   }
 
-  console.log('--- Action Results ---\n');
+  console.log('Actions:');
 
   let actionNum = 1;
   for (const [tracePath, steps] of actionPaths) {
@@ -1156,7 +1160,7 @@ export async function handleTraceActions(ctx: CommandContext): Promise<void> {
     .flatMap(([, steps]) => steps)
     .filter((s) => s.result?.enabled === false).length;
 
-  console.log('--- Summary ---');
+  console.log('Summary:');
   console.log(`Total actions: ${actionNum - 1}`);
   console.log(`Successful: ${successCount}`);
   if (failCount > 0) console.log(`Failed: ${failCount}`);
@@ -1191,10 +1195,7 @@ export async function handleTraceDebug(ctx: CommandContext): Promise<void> {
 
   const { trace: result, itemId } = await getTraceDetail(ctx, runId, providedItemId);
 
-  console.log('='.repeat(60));
-  console.log(`AUTOMATION DEBUG TRACE`);
-  console.log('='.repeat(60));
-  console.log(`\nAutomation: automation.${itemId}`);
+  console.log(`Trace: automation.${itemId}`);
   console.log(`Run ID: ${runId}`);
   console.log(`Status: ${result.script_execution ?? 'unknown'}`);
 
@@ -1213,14 +1214,18 @@ export async function handleTraceDebug(ctx: CommandContext): Promise<void> {
   }
 
   // Section 1: Trigger Context
-  console.log(`\n${'-'.repeat(60)}`);
-  console.log('TRIGGER CONTEXT');
-  console.log('-'.repeat(60));
+  console.log(`\nTrigger:`);
 
   let triggerInfo: TraceTrigger | null = null;
   if (result.trace) {
     for (const steps of Object.values(result.trace)) {
       for (const step of steps) {
+        // Check changed_variables first (where trigger info usually appears)
+        if (step.changed_variables?.trigger) {
+          triggerInfo = step.changed_variables.trigger as TraceTrigger;
+          break;
+        }
+        // Also check variables as fallback
         if (step.variables?.trigger) {
           triggerInfo = step.variables.trigger as TraceTrigger;
           break;
@@ -1230,7 +1235,7 @@ export async function handleTraceDebug(ctx: CommandContext): Promise<void> {
     }
   }
 
-  if (result.trigger) {
+  if (result.trigger && typeof result.trigger === 'object') {
     triggerInfo = { ...triggerInfo, ...result.trigger };
   }
 
@@ -1249,9 +1254,7 @@ export async function handleTraceDebug(ctx: CommandContext): Promise<void> {
   }
 
   // Section 2: Variables
-  console.log(`\n${'-'.repeat(60)}`);
-  console.log('EVALUATED VARIABLES');
-  console.log('-'.repeat(60));
+  console.log(`\nVariables:`);
 
   const allVars = new Map<string, unknown>();
   if (result.trace) {
@@ -1281,9 +1284,7 @@ export async function handleTraceDebug(ctx: CommandContext): Promise<void> {
   }
 
   // Section 3: Execution Timeline
-  console.log(`\n${'-'.repeat(60)}`);
-  console.log('EXECUTION TIMELINE');
-  console.log('-'.repeat(60));
+  console.log(`\nTimeline:`);
 
   if (result.trace && Object.keys(result.trace).length > 0) {
     // Collect and sort all steps
@@ -1342,9 +1343,7 @@ export async function handleTraceDebug(ctx: CommandContext): Promise<void> {
   }
 
   // Section 4: Context
-  console.log(`\n${'-'.repeat(60)}`);
-  console.log('CONTEXT');
-  console.log('-'.repeat(60));
+  console.log(`\nContext:`);
 
   if (result.context) {
     if (result.context.id) console.log(`Context ID: ${result.context.id}`);
@@ -1353,8 +1352,4 @@ export async function handleTraceDebug(ctx: CommandContext): Promise<void> {
   } else {
     console.log('(No context information)');
   }
-
-  console.log(`\n${'='.repeat(60)}`);
-  console.log('END OF DEBUG TRACE');
-  console.log('='.repeat(60));
 }
