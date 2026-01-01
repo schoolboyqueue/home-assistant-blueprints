@@ -1,3 +1,9 @@
+## [4.23.1] — 2026-01-01
+
+### Changed
+
+- Standardized logbook message format to use consistent pipe-separated key=value style for improved readability and easier log parsing.
+
 ## [4.23.0] — 2025-12-30
 
 ### Added

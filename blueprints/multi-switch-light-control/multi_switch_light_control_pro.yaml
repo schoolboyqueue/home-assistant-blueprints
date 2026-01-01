@@ -1,5 +1,5 @@
 blueprint:
-  name: "Multi Switch Light Control Pro v1.10.0"
+  name: "Multi Switch Light Control Pro v1.10.1"
   description: >
     Turn a supported switch or remote into a smart light controller. Supports Inovelli
     Zigbee switches (via Zigbee2MQTT or ZHA), Zooz/Inovelli Z-Wave switches, and Lutron
@@ -286,7 +286,7 @@ blueprint:
                 - "basic"
                 - "verbose"
 variables:
-  blueprint_version: "1.10.0"
+  blueprint_version: "1.10.1"
 
   switch_device: !input switch_device
   zigbee_action_sensor_input: !input zigbee_action_sensor

@@ -1,5 +1,11 @@
 # Ceiling Fan Climate Control Pro - Changelog
 
+## [2.2.7] - 2026-01-01
+
+### Changed
+
+- Standardized logbook message format to use consistent pipe-separated key=value style for improved readability and easier log parsing.
+
 ## [2.2.6] - 2025-12-31
 
 ### Fixed

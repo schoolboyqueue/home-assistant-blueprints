@@ -1,5 +1,11 @@
 # Bathroom Light & Fan Control Pro - Changelog
 
+## [1.10.12] - 2026-01-01
+
+### Changed
+
+- Standardized logbook message format to use consistent pipe-separated key=value style for improved readability and easier log parsing.
+
 ## [1.10.11] - 2025-12-30
 
 ### Fixed
