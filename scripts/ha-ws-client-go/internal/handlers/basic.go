@@ -284,29 +284,36 @@ func HandleTemplate(ctx *Context) error {
 		return errors.New("usage: template <template>\n  Or pipe template via stdin")
 	}
 
-	// NOTE: render_template is a subscription-based endpoint, but we use a simpler
-	// approach with direct message sending for now
-	resp, err := ctx.Client.SendMessage("render_template", map[string]any{
-		"template": template,
-	})
+	// render_template is subscription-based - we subscribe and wait for the first result
+	resultChan := make(chan string, 1)
+	errChan := make(chan error, 1)
+
+	_, cleanup, err := ctx.Client.SubscribeToTemplate(template, func(result string) {
+		select {
+		case resultChan <- result:
+		default:
+		}
+	}, 5*time.Second)
 	if err != nil {
 		return err
 	}
+	defer cleanup()
 
-	result := ""
-	if resp.Event != nil && resp.Event.Result != nil {
-		result = fmt.Sprintf("%v", resp.Event.Result)
-	} else if resp.Result != nil {
-		result = fmt.Sprintf("%v", resp.Result)
-	}
-
-	if output.IsJSON() {
-		output.Data(map[string]any{
-			"template": template,
-			"result":   result,
-		}, output.WithCommand("template"))
-	} else {
-		output.Message(result)
+	// Wait for result or timeout
+	select {
+	case result := <-resultChan:
+		if output.IsJSON() {
+			output.Data(map[string]any{
+				"template": template,
+				"result":   result,
+			}, output.WithCommand("template"))
+		} else {
+			output.Message(result)
+		}
+	case err := <-errChan:
+		return err
+	case <-time.After(5 * time.Second):
+		return errors.New("template render timeout")
 	}
 
 	return nil

@@ -252,6 +252,88 @@ func (c *Client) SubscribeToTrigger(trigger map[string]any, callback func(map[st
 	return id, cleanupFn, nil
 }
 
+// SubscribeToTemplate subscribes to template rendering and calls the callback with results.
+func (c *Client) SubscribeToTemplate(template string, callback func(string), timeout time.Duration) (subscriptionID int, cleanup func(), err error) {
+	id := c.NextID()
+
+	msg := map[string]any{
+		"id":       id,
+		"type":     "render_template",
+		"template": template,
+	}
+
+	respCh := make(chan *types.HAMessage, 1)
+	c.pendingMu.Lock()
+	c.pending[id] = respCh
+	c.pendingMu.Unlock()
+
+	msgBytes, err := json.Marshal(msg)
+	if err != nil {
+		c.pendingMu.Lock()
+		delete(c.pending, id)
+		c.pendingMu.Unlock()
+		return 0, nil, fmt.Errorf("failed to marshal message: %w", err)
+	}
+
+	if err := c.conn.WriteMessage(websocket.TextMessage, msgBytes); err != nil {
+		c.pendingMu.Lock()
+		delete(c.pending, id)
+		c.pendingMu.Unlock()
+		return 0, nil, fmt.Errorf("failed to send message: %w", err)
+	}
+
+	// Wait for subscription confirmation
+	select {
+	case resp, ok := <-respCh:
+		if !ok {
+			return 0, nil, errors.New("connection closed")
+		}
+		if resp.Success != nil && !*resp.Success {
+			errMsg := "subscription failed"
+			if resp.Error != nil {
+				errMsg = resp.Error.Message
+			}
+			return 0, nil, errors.New(errMsg)
+		}
+		// render_template returns the result immediately in the response
+		if resp.Result != nil {
+			if resultMap, ok := resp.Result.(map[string]any); ok {
+				if result, ok := resultMap["result"].(string); ok {
+					callback(result)
+				}
+			}
+		}
+	case <-time.After(5 * time.Second):
+		c.pendingMu.Lock()
+		delete(c.pending, id)
+		c.pendingMu.Unlock()
+		return 0, nil, errors.New("subscription timeout")
+	}
+
+	// Clean up pending request channel
+	c.pendingMu.Lock()
+	delete(c.pending, id)
+	c.pendingMu.Unlock()
+
+	// Register handler for subsequent events (template may update on state changes)
+	c.subscriptionMu.Lock()
+	c.subscriptions[id] = func(vars map[string]any) {
+		if result, ok := vars["result"].(string); ok {
+			callback(result)
+		}
+	}
+	c.subscriptionMu.Unlock()
+
+	// Create cleanup function
+	cleanupFn := func() {
+		c.subscriptionMu.Lock()
+		delete(c.subscriptions, id)
+		c.subscriptionMu.Unlock()
+	}
+
+	return id, cleanupFn, nil
+}
+
 // Close closes the WebSocket connection.
 func (c *Client) Close() error {
 	return c.conn.Close()

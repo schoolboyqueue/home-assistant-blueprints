@@ -23,15 +23,10 @@ func HandleTraces(ctx *Context) error {
 		data["item_id"] = id
 	}
 
-	traces, err := client.SendMessageTyped[map[string][]types.TraceInfo](ctx.Client, "trace/list", data)
+	// HA returns traces as an array of TraceInfo, not a map
+	allTraces, err := client.SendMessageTyped[[]types.TraceInfo](ctx.Client, "trace/list", data)
 	if err != nil {
 		return err
-	}
-
-	// Flatten the traces map
-	var allTraces []types.TraceInfo
-	for _, traceList := range traces {
-		allTraces = append(allTraces, traceList...)
 	}
 
 	output.List(allTraces,
@@ -71,19 +66,14 @@ func HandleTrace(ctx *Context) error {
 	// If automation_id not provided, we need to find it
 	if automationID == "" {
 		// List all traces and find the one with matching run_id
-		traces, lookupErr := client.SendMessageTyped[map[string][]types.TraceInfo](ctx.Client, "trace/list", map[string]any{"domain": "automation"})
+		traces, lookupErr := client.SendMessageTyped[[]types.TraceInfo](ctx.Client, "trace/list", map[string]any{"domain": "automation"})
 		if lookupErr != nil {
 			return lookupErr
 		}
 
-		for itemID, traceList := range traces {
-			for _, t := range traceList {
-				if t.RunID == runID {
-					automationID = itemID
-					break
-				}
-			}
-			if automationID != "" {
+		for _, t := range traces {
+			if t.RunID == runID {
+				automationID = t.ItemID
 				break
 			}
 		}
@@ -287,15 +277,23 @@ func HandleAutomationConfig(ctx *Context) error {
 		return err
 	}
 
-	// Clean up entity ID
-	id := strings.TrimPrefix(entityID, "automation.")
+	// Ensure entity_id has automation. prefix
+	if !strings.HasPrefix(entityID, "automation.") {
+		entityID = "automation." + entityID
+	}
 
-	result, err := client.SendMessageTyped[types.AutomationConfig](ctx.Client, "config/automation/config/"+id, nil)
+	// Use automation/config WebSocket message type
+	type configResponse struct {
+		Config types.AutomationConfig `json:"config"`
+	}
+	result, err := client.SendMessageTyped[configResponse](ctx.Client, "automation/config", map[string]any{
+		"entity_id": entityID,
+	})
 	if err != nil {
 		return err
 	}
 
-	output.Data(result, output.WithCommand("automation-config"))
+	output.Data(result.Config, output.WithCommand("automation-config"))
 	return nil
 }
 
@@ -306,22 +304,30 @@ func HandleBlueprintInputs(ctx *Context) error {
 		return err
 	}
 
-	// Clean up entity ID
-	id := strings.TrimPrefix(entityID, "automation.")
+	// Ensure entity_id has automation. prefix
+	if !strings.HasPrefix(entityID, "automation.") {
+		entityID = "automation." + entityID
+	}
 
-	config, err := client.SendMessageTyped[types.AutomationConfig](ctx.Client, "config/automation/config/"+id, nil)
+	// Use automation/config WebSocket message type
+	type configResponse struct {
+		Config types.AutomationConfig `json:"config"`
+	}
+	result, err := client.SendMessageTyped[configResponse](ctx.Client, "automation/config", map[string]any{
+		"entity_id": entityID,
+	})
 	if err != nil {
 		return err
 	}
 
-	if config.UseBlueprint == nil {
+	if result.Config.UseBlueprint == nil {
 		output.Message("This automation does not use a blueprint")
 		return nil
 	}
 
 	output.Data(map[string]any{
-		"blueprint_path": config.UseBlueprint.Path,
-		"inputs":         config.UseBlueprint.Input,
+		"blueprint_path": result.Config.UseBlueprint.Path,
+		"inputs":         result.Config.UseBlueprint.Input,
 	}, output.WithCommand("blueprint-inputs"))
 	return nil
 }
@@ -335,19 +341,14 @@ func getTraceDetail(ctx *Context, runID string) (*types.TraceDetail, error) {
 
 	// If automation_id not provided, we need to find it
 	if automationID == "" {
-		traces, lookupErr := client.SendMessageTyped[map[string][]types.TraceInfo](ctx.Client, "trace/list", map[string]any{"domain": "automation"})
+		traces, lookupErr := client.SendMessageTyped[[]types.TraceInfo](ctx.Client, "trace/list", map[string]any{"domain": "automation"})
 		if lookupErr != nil {
 			return nil, lookupErr
 		}
 
-		for itemID, traceList := range traces {
-			for _, t := range traceList {
-				if t.RunID == runID {
-					automationID = itemID
-					break
-				}
-			}
-			if automationID != "" {
+		for _, t := range traces {
+			if t.RunID == runID {
+				automationID = t.ItemID
 				break
 			}
 		}

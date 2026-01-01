@@ -214,17 +214,53 @@ type AreaEntry struct {
 
 // SysLogEntry represents a system log entry.
 type SysLogEntry struct {
-	Level   string   `json:"level,omitempty"`
-	Source  []string `json:"source,omitempty"`
-	Message string   `json:"message,omitempty"`
+	Level     string   `json:"level,omitempty"`
+	Source    []string `json:"source,omitempty"`
+	Message   any      `json:"message,omitempty"` // Can be string or []string
+	Name      string   `json:"name,omitempty"`
+	Timestamp float64  `json:"timestamp,omitempty"`
+	FirstOccurred float64 `json:"first_occurred,omitempty"`
+	Count     int      `json:"count,omitempty"`
+}
+
+// GetMessage returns the message as a string.
+func (e *SysLogEntry) GetMessage() string {
+	switch m := e.Message.(type) {
+	case string:
+		return m
+	case []any:
+		if len(m) > 0 {
+			if s, ok := m[0].(string); ok {
+				return s
+			}
+		}
+		return ""
+	default:
+		return ""
+	}
 }
 
 // StatEntry represents a statistics entry for a sensor.
 type StatEntry struct {
-	Start string  `json:"start"`
+	Start any     `json:"start"` // Can be float64 (Unix timestamp) or string (ISO format)
+	End   any     `json:"end,omitempty"`
 	Min   float64 `json:"min"`
 	Max   float64 `json:"max"`
 	Mean  float64 `json:"mean,omitempty"`
+	Sum   float64 `json:"sum,omitempty"`
+	State float64 `json:"state,omitempty"`
+}
+
+// GetStartTime returns the start time as a formatted string.
+func (s *StatEntry) GetStartTime() string {
+	switch v := s.Start.(type) {
+	case float64:
+		return time.Unix(int64(v), 0).Format(time.RFC3339)
+	case string:
+		return v
+	default:
+		return ""
+	}
 }
 
 // CommandContext contains context for command execution.

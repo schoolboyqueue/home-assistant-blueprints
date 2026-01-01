@@ -44,8 +44,10 @@ func HandleLogbook(ctx *Context) error {
 
 	timeRange := calculateTimeRange(ctx, 24)
 
-	entries, err := client.SendMessageTyped[[]types.LogbookEntry](ctx.Client, "logbook/period/"+timeRange.StartTime.Format(time.RFC3339), map[string]any{
+	// Use logbook/get_events WebSocket message type
+	entries, err := client.SendMessageTyped[[]types.LogbookEntry](ctx.Client, "logbook/get_events", map[string]any{
 		"entity_ids": []string{entityID},
+		"start_time": timeRange.StartTime.Format(time.RFC3339),
 		"end_time":   timeRange.EndTime.Format(time.RFC3339),
 	})
 	if err != nil {
@@ -75,9 +77,11 @@ func HandleHistory(ctx *Context) error {
 
 	timeRange := calculateTimeRange(ctx, 24)
 
-	// History returns a nested array [[state1, state2, ...]]
-	result, err := client.SendMessageTyped[[][]types.HistoryState](ctx.Client, "history/period/"+timeRange.StartTime.Format(time.RFC3339), map[string]any{
-		"filter_entity_id":         entityID,
+	// Use history/history_during_period WebSocket message type
+	// Returns map[entity_id][]HistoryState
+	result, err := client.SendMessageTyped[map[string][]types.HistoryState](ctx.Client, "history/history_during_period", map[string]any{
+		"entity_ids":               []string{entityID},
+		"start_time":               timeRange.StartTime.Format(time.RFC3339),
 		"end_time":                 timeRange.EndTime.Format(time.RFC3339),
 		"minimal_response":         true,
 		"no_attributes":            true,
@@ -87,10 +91,7 @@ func HandleHistory(ctx *Context) error {
 		return err
 	}
 
-	var states []types.HistoryState
-	if len(result) > 0 {
-		states = result[0]
-	}
+	states := result[entityID]
 
 	output.Timeline(states,
 		output.TimelineTitle[types.HistoryState](fmt.Sprintf("History for %s", entityID)),
@@ -116,8 +117,10 @@ func HandleHistoryFull(ctx *Context) error {
 
 	timeRange := calculateTimeRange(ctx, 24)
 
-	result, err := client.SendMessageTyped[[][]types.HistoryState](ctx.Client, "history/period/"+timeRange.StartTime.Format(time.RFC3339), map[string]any{
-		"filter_entity_id": entityID,
+	// Use history/history_during_period WebSocket message type
+	result, err := client.SendMessageTyped[map[string][]types.HistoryState](ctx.Client, "history/history_during_period", map[string]any{
+		"entity_ids":       []string{entityID},
+		"start_time":       timeRange.StartTime.Format(time.RFC3339),
 		"end_time":         timeRange.EndTime.Format(time.RFC3339),
 		"minimal_response": false,
 		"no_attributes":    false,
@@ -126,10 +129,7 @@ func HandleHistoryFull(ctx *Context) error {
 		return err
 	}
 
-	var states []types.HistoryState
-	if len(result) > 0 {
-		states = result[0]
-	}
+	states := result[entityID]
 
 	output.Timeline(states,
 		output.TimelineTitle[types.HistoryState](fmt.Sprintf("Full history for %s", entityID)),
@@ -147,8 +147,10 @@ func HandleAttrs(ctx *Context) error {
 
 	timeRange := calculateTimeRange(ctx, 24)
 
-	result, err := client.SendMessageTyped[[][]types.HistoryState](ctx.Client, "history/period/"+timeRange.StartTime.Format(time.RFC3339), map[string]any{
-		"filter_entity_id": entityID,
+	// Use history/history_during_period WebSocket message type
+	result, err := client.SendMessageTyped[map[string][]types.HistoryState](ctx.Client, "history/history_during_period", map[string]any{
+		"entity_ids":       []string{entityID},
+		"start_time":       timeRange.StartTime.Format(time.RFC3339),
 		"end_time":         timeRange.EndTime.Format(time.RFC3339),
 		"minimal_response": false,
 		"no_attributes":    false,
@@ -157,10 +159,7 @@ func HandleAttrs(ctx *Context) error {
 		return err
 	}
 
-	var states []types.HistoryState
-	if len(result) > 0 {
-		states = result[0]
-	}
+	states := result[entityID]
 
 	// Format as attribute changes
 	type AttrChange struct {
@@ -198,7 +197,7 @@ func HandleAttrs(ctx *Context) error {
 // HandleTimeline shows multi-entity chronological timeline.
 func HandleTimeline(ctx *Context) error {
 	if len(ctx.Args) < 3 {
-		return errors.New("usage: timeline <hours> <entity>")
+		return errors.New("usage: timeline <hours> <entity>...")
 	}
 
 	hours, err := strconv.Atoi(ctx.Args[1])
@@ -218,25 +217,25 @@ func HandleTimeline(ctx *Context) error {
 
 	var allEntries []TimelineEntry
 
-	for _, entityID := range entities {
-		result, err := client.SendMessageTyped[[][]types.HistoryState](ctx.Client, "history/period/"+startTime.Format(time.RFC3339), map[string]any{
-			"filter_entity_id": entityID,
-			"end_time":         endTime.Format(time.RFC3339),
-			"minimal_response": true,
-			"no_attributes":    true,
-		})
-		if err != nil {
-			continue
-		}
+	// Use history/history_during_period with multiple entity_ids
+	result, err := client.SendMessageTyped[map[string][]types.HistoryState](ctx.Client, "history/history_during_period", map[string]any{
+		"entity_ids":       entities,
+		"start_time":       startTime.Format(time.RFC3339),
+		"end_time":         endTime.Format(time.RFC3339),
+		"minimal_response": true,
+		"no_attributes":    true,
+	})
+	if err != nil {
+		return err
+	}
 
-		if len(result) > 0 {
-			for _, s := range result[0] {
-				allEntries = append(allEntries, TimelineEntry{
-					Time:     s.GetLastUpdated(),
-					EntityID: entityID,
-					State:    s.GetState(),
-				})
-			}
+	for entityID, states := range result {
+		for _, s := range states {
+			allEntries = append(allEntries, TimelineEntry{
+				Time:     s.GetLastUpdated(),
+				EntityID: entityID,
+				State:    s.GetState(),
+			})
 		}
 	}
 
@@ -273,10 +272,11 @@ func HandleSyslog(ctx *Context) error {
 			if len(e.Source) > 0 {
 				source = e.Source[0]
 			}
+			msg := e.GetMessage()
 			if output.IsCompact() {
-				return fmt.Sprintf("[%s] %s: %s", e.Level, source, e.Message)
+				return fmt.Sprintf("[%s] %s: %s", e.Level, source, msg)
 			}
-			return fmt.Sprintf("[%s] %s\n  %s", e.Level, source, e.Message)
+			return fmt.Sprintf("[%s] %s\n  %s", e.Level, source, msg)
 		}),
 	)
 	return nil
@@ -311,10 +311,11 @@ func HandleStats(ctx *Context) error {
 		output.TimelineTitle[types.StatEntry](fmt.Sprintf("Statistics for %s", entityID)),
 		output.TimelineCommand[types.StatEntry]("stats"),
 		output.TimelineFormatter(func(s types.StatEntry) string {
+			startTime := s.GetStartTime()
 			if output.IsCompact() {
-				return fmt.Sprintf("%s min=%.2f max=%.2f mean=%.2f", s.Start, s.Min, s.Max, s.Mean)
+				return fmt.Sprintf("%s min=%.2f max=%.2f mean=%.2f", startTime, s.Min, s.Max, s.Mean)
 			}
-			return fmt.Sprintf("%s: min=%.2f, max=%.2f, mean=%.2f", s.Start, s.Min, s.Max, s.Mean)
+			return fmt.Sprintf("%s: min=%.2f, max=%.2f, mean=%.2f", startTime, s.Min, s.Max, s.Mean)
 		}),
 	)
 	return nil

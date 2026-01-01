@@ -70,11 +70,28 @@ func HandleMonitor(ctx *Context) error {
 // HandleMonitorMulti monitors multiple entities.
 func HandleMonitorMulti(ctx *Context) error {
 	if len(ctx.Args) < 2 {
-		return errors.New("usage: monitor-multi <entity>")
+		return errors.New("usage: monitor-multi <entity>... [seconds]")
 	}
 
-	entities := ctx.Args[1:]
+	// Check if the last argument is a number (duration)
+	args := ctx.Args[1:]
 	seconds := 60
+	var entities []string
+
+	if len(args) > 1 {
+		if parsed, parseErr := strconv.Atoi(args[len(args)-1]); parseErr == nil {
+			seconds = parsed
+			entities = args[:len(args)-1]
+		} else {
+			entities = args
+		}
+	} else {
+		entities = args
+	}
+
+	if len(entities) == 0 {
+		return errors.New("usage: monitor-multi <entity>... [seconds]")
+	}
 
 	output.Message(fmt.Sprintf("Monitoring %d entities for %d seconds...", len(entities), seconds))
 
@@ -256,8 +273,10 @@ func getStates(ctx *Context) ([]struct {
 }
 
 func getHistory(ctx *Context, entityID string, timeRange TimeRange) ([]HistoryState, error) {
-	resp, err := ctx.Client.SendMessage("history/period/"+timeRange.StartTime.Format(time.RFC3339), map[string]any{
-		"filter_entity_id": entityID,
+	// Use history/history_during_period WebSocket message type
+	resp, err := ctx.Client.SendMessage("history/history_during_period", map[string]any{
+		"entity_ids":       []string{entityID},
+		"start_time":       timeRange.StartTime.Format(time.RFC3339),
 		"end_time":         timeRange.EndTime.Format(time.RFC3339),
 		"minimal_response": true,
 		"no_attributes":    true,
@@ -266,13 +285,13 @@ func getHistory(ctx *Context, entityID string, timeRange TimeRange) ([]HistorySt
 		return nil, err
 	}
 
-	// Convert result to history states
-	resultArr, ok := resp.Result.([]any)
-	if !ok || len(resultArr) == 0 {
+	// Convert result to history states - response is map[entity_id][]state
+	resultMap, ok := resp.Result.(map[string]any)
+	if !ok {
 		return nil, nil
 	}
 
-	statesArr, ok := resultArr[0].([]any)
+	statesArr, ok := resultMap[entityID].([]any)
 	if !ok {
 		return nil, nil
 	}
