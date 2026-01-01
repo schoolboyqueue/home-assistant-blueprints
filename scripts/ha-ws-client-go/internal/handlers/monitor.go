@@ -215,7 +215,6 @@ func getStates(ctx *Context) ([]struct {
 }, error,
 ) {
 	resp, err := ctx.Client.SendMessage("get_states", nil)
-
 	if err != nil {
 		return nil, err
 	}

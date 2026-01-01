@@ -10,7 +10,12 @@
     "docs:check": "npm run check --prefix docs",
     "docs:lint": "npm run lint --prefix docs",
     "docs:format": "npm run format --prefix docs",
-    "docs:fix": "npm run fix --prefix docs"
+    "docs:fix": "npm run fix --prefix docs",
+    "go:tools": "cd scripts/validate-blueprint-go && make tools && cd ../ha-ws-client-go && make tools",
+    "go:lint": "export PATH=\"$HOME/go/bin:$PATH\" && cd scripts/validate-blueprint-go && make lint && cd ../ha-ws-client-go && make lint",
+    "go:format": "export PATH=\"$HOME/go/bin:$PATH\" && cd scripts/validate-blueprint-go && make format && cd ../ha-ws-client-go && make format",
+    "go:test": "cd scripts/validate-blueprint-go && make test && cd ../ha-ws-client-go && make test",
+    "go:build": "cd scripts/validate-blueprint-go && make build && cd ../ha-ws-client-go && make build"
   },
   "devDependencies": {
     "husky": "^9.1.7"

@@ -443,11 +443,12 @@ func (v *BlueprintValidator) validateSelectOptions(selectConfig map[string]inter
 	for i, option := range optionsList {
 		optionPath := fmt.Sprintf("%s.selector.select.options[%d]", path, i)
 
-		if option == nil {
+		switch opt := option.(type) {
+		case nil:
 			v.Errors = append(v.Errors, fmt.Sprintf("%s: Option cannot be None. Select options must be strings or label/value dicts with non-empty values.", optionPath))
-		} else if optionMap, ok := option.(map[string]interface{}); ok {
-			value := optionMap["value"]
-			label := optionMap["label"]
+		case map[string]interface{}:
+			value := opt["value"]
+			label := opt["label"]
 
 			if value == nil {
 				v.Errors = append(v.Errors, fmt.Sprintf("%s: Option value is None. Label/value options must have a non-empty 'value' field. Label: '%v'", optionPath, label))
@@ -456,11 +457,11 @@ func (v *BlueprintValidator) validateSelectOptions(selectConfig map[string]inter
 			} else if valueStr == "" {
 				v.Errors = append(v.Errors, fmt.Sprintf("%s: Option value cannot be empty string. Home Assistant treats empty values as None during import. Label: '%v'", optionPath, label))
 			}
-		} else if optionStr, ok := option.(string); ok {
-			if optionStr == "" {
+		case string:
+			if opt == "" {
 				v.Warnings = append(v.Warnings, fmt.Sprintf("%s: Empty string option. Consider using a meaningful value.", optionPath))
 			}
-		} else {
+		default:
 			v.Errors = append(v.Errors, fmt.Sprintf("%s: Option must be a string or label/value dict", optionPath))
 		}
 	}
@@ -502,15 +503,16 @@ func (v *BlueprintValidator) validateHysteresisBoundaries() {
 				continue
 			}
 
-			if onValue < offValue {
+			switch {
+			case onValue < offValue:
 				v.Errors = append(v.Errors, fmt.Sprintf(
 					"Hysteresis %s inversion: '%s' (default=%v) should be greater than '%s' (default=%v). With ON < OFF, the system will chatter rapidly.",
 					pattern.Description, inputName, onValue, offName, offValue))
-			} else if onValue == offValue {
+			case onValue == offValue:
 				v.Warnings = append(v.Warnings, fmt.Sprintf(
 					"Hysteresis %s has no gap: '%s' and '%s' both default to %v. Without a gap between ON and OFF thresholds, there's no hysteresis protection against oscillation.",
 					pattern.Description, inputName, offName, onValue))
-			} else {
+			default:
 				gap := onValue - offValue
 				if onValue != 0 && gap/abs(onValue) < 0.1 {
 					v.Warnings = append(v.Warnings, fmt.Sprintf(
@@ -650,11 +652,15 @@ func (v *BlueprintValidator) validateSingleTrigger(trigger map[string]interface{
 		return
 	}
 
-	platformStr := ""
+	var platformStr string
 	if hasPlatform {
-		platformStr, _ = platform.(string)
+		if str, ok := platform.(string); ok {
+			platformStr = str
+		}
 	} else if hasTrigger {
-		platformStr, _ = triggerType.(string)
+		if str, ok := triggerType.(string); ok {
+			platformStr = str
+		}
 	}
 
 	// Check for template triggers using variables
@@ -769,8 +775,11 @@ func (v *BlueprintValidator) validateSingleAction(action map[string]interface{},
 	// Check for service call
 	if service, ok := action["service"].(string); ok {
 		// Validate service format (skip templates and !input references)
-		if !strings.Contains(service, ".") && !strings.HasPrefix(service, "!input") &&
-			!strings.Contains(service, "{{") && !strings.Contains(service, "{%") {
+		isValidFormat := strings.Contains(service, ".") ||
+			strings.HasPrefix(service, "!input") ||
+			strings.Contains(service, "{{") ||
+			strings.Contains(service, "{%")
+		if !isValidFormat {
 			v.Warnings = append(v.Warnings, fmt.Sprintf("%s: Service '%s' should be in 'domain.service' format", path, service))
 		}
 
@@ -996,10 +1005,11 @@ func (v *BlueprintValidator) collectInputRefsFromMap(m map[string]interface{}) {
 			v.collectInputRefsFromMap(val)
 		case []interface{}:
 			for _, item := range val {
-				if itemStr, ok := item.(string); ok {
-					v.collectInputRefs(itemStr)
-				} else if itemMap, ok := item.(map[string]interface{}); ok {
-					v.collectInputRefsFromMap(itemMap)
+				switch itemVal := item.(type) {
+				case string:
+					v.collectInputRefs(itemVal)
+				case map[string]interface{}:
+					v.collectInputRefsFromMap(itemVal)
 				}
 			}
 		}
@@ -1179,9 +1189,9 @@ func findAllBlueprints(basePath string) ([]string, error) {
 		".git": true, "node_modules": true, "venv": true, ".venv": true, "__pycache__": true,
 	}
 
-	err := filepath.Walk(basePath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil // Skip errors
+	err := filepath.Walk(basePath, func(path string, info os.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return walkErr // Return the actual error instead of nil
 		}
 
 		// Skip excluded directories
@@ -1195,7 +1205,11 @@ func findAllBlueprints(basePath string) ([]string, error) {
 
 		// Check if file matches any pattern
 		for _, pattern := range patterns {
-			if matched, _ := filepath.Match(pattern, info.Name()); matched {
+			matched, matchErr := filepath.Match(pattern, info.Name())
+			if matchErr != nil {
+				continue // Skip invalid patterns
+			}
+			if matched {
 				blueprints = append(blueprints, path)
 				break
 			}
@@ -1203,7 +1217,6 @@ func findAllBlueprints(basePath string) ([]string, error) {
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -1224,28 +1237,35 @@ func validateAll() bool {
 	execPath, err := os.Executable()
 	if err != nil {
 		// Fall back to current directory
-		execPath, _ = os.Getwd()
+		cwd, cwdErr := os.Getwd()
+		if cwdErr != nil {
+			execPath = "."
+		} else {
+			execPath = cwd
+		}
 	}
 
 	// Try to find repo root by looking for common markers
 	repoRoot := filepath.Dir(filepath.Dir(filepath.Dir(execPath)))
 
 	// If running from source, use relative path
-	if _, err := os.Stat(filepath.Join(repoRoot, "blueprints")); os.IsNotExist(err) {
+	if _, statErr := os.Stat(filepath.Join(repoRoot, "blueprints")); os.IsNotExist(statErr) {
 		// Try current working directory
-		cwd, _ := os.Getwd()
-		if _, err := os.Stat(filepath.Join(cwd, "blueprints")); err == nil {
-			repoRoot = cwd
-		} else {
-			// Go up directories looking for blueprints folder
-			for range 5 {
-				parent := filepath.Dir(repoRoot)
-				if parent == repoRoot {
-					break
-				}
-				repoRoot = parent
-				if _, err := os.Stat(filepath.Join(repoRoot, "blueprints")); err == nil {
-					break
+		cwd, cwdErr := os.Getwd()
+		if cwdErr == nil {
+			if _, checkErr := os.Stat(filepath.Join(cwd, "blueprints")); checkErr == nil {
+				repoRoot = cwd
+			} else {
+				// Go up directories looking for blueprints folder
+				for range 5 {
+					parent := filepath.Dir(repoRoot)
+					if parent == repoRoot {
+						break
+					}
+					repoRoot = parent
+					if _, lookupErr := os.Stat(filepath.Join(repoRoot, "blueprints")); lookupErr == nil {
+						break
+					}
 				}
 			}
 		}
@@ -1295,8 +1315,8 @@ func validateAll() bool {
 	red := color.New(color.FgRed).SprintFunc()
 
 	for _, r := range results {
-		relPath, _ := filepath.Rel(repoRoot, r.path)
-		if relPath == "" {
+		relPath, relErr := filepath.Rel(repoRoot, r.path)
+		if relErr != nil || relPath == "" {
 			relPath = r.path
 		}
 		if r.success {
@@ -1337,7 +1357,6 @@ func main() {
 
 	if success {
 		os.Exit(0)
-	} else {
-		os.Exit(1)
 	}
+	os.Exit(1)
 }
