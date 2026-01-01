@@ -2311,8 +2311,8 @@ action:
                 sequence:
                   - service: logbook.log
                     data:
-                      name: "HVAC Pro"
-                      message: "Sensor invalid (Tin={{ t_in_c }}, Tout={{ t_out_c }}). Skipping control run."
+                      name: "Adaptive Comfort"
+                      message: "Skipped: sensor invalid | t_in={{ t_in_c }}°C | t_out={{ t_out_c }}°C"
           - stop: "Sensor invalid - aborting run"
 
   # If manual override detected, pause and exit
@@ -2391,8 +2391,8 @@ action:
                 sequence:
                   - service: logbook.log
                     data:
-                      name: "HVAC Pro"
-                      message: "Learning: {{ _offset_key }} {{ _old_offset_sys | round(2) }} → {{ _new_offset_sys | round(2) }}{{ unit_sym }} (error={{ _error_c | round(2) }}°C)"
+                      name: "Adaptive Comfort"
+                      message: "Learning: key={{ _offset_key }} | old={{ _old_offset_sys | round(2) }}{{ unit_sym }} | new={{ _new_offset_sys | round(2) }}{{ unit_sym }} | error={{ _error_c | round(2) }}°C"
                   - event: set_variable
                     event_data:
                       key: "{{ _offset_key }}"
@@ -2421,8 +2421,8 @@ action:
                         sequence:
                           - service: logbook.log
                             data:
-                              name: "HVAC Pro"
-                              message: "DEBUG: Set override helper {{ manual_override_until_id }} to timestamp {{ _override_until_ts }} ({{ _override_until_ts | timestamp_custom('%Y-%m-%d %H:%M:%S') }})"
+                              name: "Adaptive Comfort"
+                              message: "Debug: override helper set | helper={{ manual_override_until_id }} | timestamp={{ _override_until_ts }} | datetime={{ _override_until_ts | timestamp_custom('%Y-%m-%d %H:%M:%S') }}"
 
           # Log override
           - choose:
@@ -2432,13 +2432,9 @@ action:
                 sequence:
                   - service: logbook.log
                     data:
-                      name: "HVAC Pro"
+                      name: "Adaptive Comfort"
                       message: >
-                        Manual override detected ({{ trigger.id }}). Manual={{ _manual_temp_c | round(1) }}°C, Predicted={{ _predicted_temp_c | round(1) }}°C, Error={{ _error_c | round(2) }}°C. 
-                        {% if learn_from_overrides and learned_prefs_sensor_id %}
-                        Learned [{{ _offset_key }}]: {{ _old_offset_sys | round(2) }} → {{ _new_offset_sys | round(2) }}{{ unit_sym }}.
-                        {% endif %}
-                        Pausing for {{ manual_override_duration_min }} min{{ ' (helper set)' if manual_override_until_id else ' (WARNING: no helper - will NOT persist!)' }}.
+                        Manual override: trigger={{ trigger.id }} | manual={{ _manual_temp_c | round(1) }}°C | predicted={{ _predicted_temp_c | round(1) }}°C | error={{ _error_c | round(2) }}°C{% if learn_from_overrides and learned_prefs_sensor_id %} | learned={{ _offset_key }}:{{ _old_offset_sys | round(2) }}|{{ _new_offset_sys | round(2) }}{{ unit_sym }}{% endif %} | pause={{ manual_override_duration_min }}min{% if not manual_override_until_id %} | WARNING: no helper{% endif %}
 
           # Run custom override action (only when override is enabled and duration > 0)
           - choose:
@@ -2464,12 +2460,9 @@ action:
         sequence:
           - service: logbook.log
             data:
-              name: "HVAC Pro"
+              name: "Adaptive Comfort"
               message: >
-                DEBUG override check: helper={{ manual_override_until_id }}, 
-                until_ts={{ state_attr(manual_override_until_id, 'timestamp') }}, 
-                now_ts={{ as_timestamp(now()) | int }}, 
-                is_active={{ is_override_active }}
+                Debug: override check | helper={{ manual_override_until_id }} | until_ts={{ state_attr(manual_override_until_id, 'timestamp') }} | now_ts={{ as_timestamp(now()) | int }} | active={{ is_override_active }}
   - choose:
       - conditions:
           - condition: template
@@ -2482,8 +2475,8 @@ action:
                 sequence:
                   - service: logbook.log
                     data:
-                      name: "HVAC Pro"
-                      message: "Manual override still active (expires {{ states(manual_override_until_id) }}). Skipping automation run."
+                      name: "Adaptive Comfort"
+                      message: "Skipped: manual override active | expires={{ states(manual_override_until_id) }}"
           - stop: "Manual override active - skipping this run"
 
   # ---------- Verbose/basic logging ----------
@@ -2497,7 +2490,7 @@ action:
                 {{ dbg_prefix }} Band={{ band_min_sys | round(3) }}-{{ band_max_sys | round(3) }}{{ unit_sym }}; Set={{ t_adapt_sys | round(1) }}{{ unit_sym }}; In={{ t_in_sys | round(2) }}{{ unit_sym }}; Out={{ ((t_out_c * 9/5 + 32) if is_imperial else t_out_c) | round(2) }}{{ unit_sym }}; Trigger={{ (trigger.id if trigger is defined) if (trigger is defined) else 'unknown' }} ; sep_enforce={{ sep_needed > 0 }} sep_min={{ sep_cli_min | round(1) }}{{ climate_unit_sym }}; step={{ cli_step }} bounds={{ safety_min_sys_in }}–{{ safety_max_sys_in }}
           - service: logbook.log
             data:
-              name: "HVAC Pro"
+              name: "Adaptive Comfort"
               message: "{{ _dbg_basic }}"
       - conditions:
           - condition: template
@@ -2508,7 +2501,7 @@ action:
                 {{ dbg_prefix }} Band={{ band_min_sys | round(3) }}-{{ band_max_sys | round(3) }}{{ unit_sym }}; Set={{ t_adapt_sys | round(1) }}{{ unit_sym }}; In={{ t_in_sys | round(2) }}{{ unit_sym }}; Out={{ ((t_out_c * 9/5 + 32) if is_imperial else t_out_c) | round(2) }}{{ unit_sym }}; dp_out={{ dp_out_c | default(none) | round(1) if dp_out_c is not none else 'n/a' }}C, dp_in={{ dp_in_c | default(none) | round(1) if dp_in_c is not none else 'n/a' }}C, AH_out={{ ah_out | default(none) if ah_out is not none else 'n/a' }} g/m³, AH_in={{ ah_in | default(none) if ah_in is not none else 'n/a' }} g/m³, h_out={{ h_out | default(none) if h_out is not none else 'n/a' }} kJ/kg, h_in={{ h_in | default(none) if h_in is not none else 'n/a' }} kJ/kg; Trigger={{ (trigger.id if trigger is defined) if (trigger is defined) else 'unknown' }} ; sep_enforce={{ sep_needed > 0 }} sep_min={{ sep_cli_min | round(1) }}{{ climate_unit_sym }}; step={{ cli_step }} bounds={{ safety_min_sys_in }}–{{ safety_max_sys_in }}
           - service: logbook.log
             data:
-              name: "HVAC Pro"
+              name: "Adaptive Comfort"
               message: "{{ _dbg_verbose }}"
 
   # ---------- Dynamic pause status & guard override ----------
@@ -2649,8 +2642,8 @@ action:
                         sequence:
                           - service: logbook.log
                             data:
-                              name: "HVAC Pro"
-                              message: "Natural ventilation preferred; HVAC kept off."
+                              name: "Adaptive Comfort"
+                              message: "Natural ventilation: HVAC off | conditions favorable"
                   - stop: "Natural ventilation active - skipping HVAC control"
 
           # Otherwise enforce targets (only if values changed)
@@ -2677,16 +2670,16 @@ action:
                                 sequence:
                                   - service: logbook.log
                                     data:
-                                      name: "HVAC Pro"
-                                      message: "Mode changed: {{ hvac_mode_now }} → {{ preferred_dual_mode }}"
+                                      name: "Adaptive Comfort"
+                                      message: "Mode change: old={{ hvac_mode_now }} | new={{ preferred_dual_mode }}"
                       - conditions:
                           - condition: template
                             value_template: "{{ not is_in_dual_mode and not mode_switch_allowed and dbg in ['basic','verbose'] }}"
                         sequence:
                           - service: logbook.log
                             data:
-                              name: "HVAC Pro"
-                              message: "Mode change to {{ preferred_dual_mode }} blocked by cooldown ({{ cooldown_min }} min)."
+                              name: "Adaptive Comfort"
+                              message: "Mode change blocked: cooldown | target={{ preferred_dual_mode }} | wait={{ cooldown_min }}min"
                   # Set temperature if needed
                   - choose:
                       - conditions:
@@ -2706,8 +2699,8 @@ action:
                                 sequence:
                                   - service: logbook.log
                                     data:
-                                      name: "HVAC Pro"
-                                      message: "Temps updated: {{ temp_low_now_sys | round(1) }}/{{ temp_high_now_sys | round(1) }}{{ climate_unit_sym }} → {{ target_low_cli | round(1) }}/{{ target_high_cli | round(1) }}{{ climate_unit_sym }}"
+                                      name: "Adaptive Comfort"
+                                      message: "Temps updated: old={{ temp_low_now_sys | round(1) }}/{{ temp_high_now_sys | round(1) }}{{ climate_unit_sym }} | new={{ target_low_cli | round(1) }}/{{ target_high_cli | round(1) }}{{ climate_unit_sym }}"
                     default:
                       - choose:
                           - conditions:
@@ -2716,8 +2709,8 @@ action:
                             sequence:
                               - service: logbook.log
                                 data:
-                                  name: "HVAC Pro"
-                                  message: "Setpoints unchanged ({{ target_low_cli | round(1) }}/{{ target_high_cli | round(1) }}{{ climate_unit_sym }}), skipping update"
+                                  name: "Adaptive Comfort"
+                                  message: "Skipped: setpoints unchanged | current={{ target_low_cli | round(1) }}/{{ target_high_cli | round(1) }}{{ climate_unit_sym }}"
               - conditions:
                   - condition: template
                     value_template: "{{ hvac_mode_now in ['cool','heat'] }}"
@@ -2740,8 +2733,8 @@ action:
                                 sequence:
                                   - service: logbook.log
                                     data:
-                                      name: "HVAC Pro"
-                                      message: "Temp updated: {{ temp_now_sys | round(1) }}{{ climate_unit_sym }} → {{ t_adapt_cli_q | round(1) }}{{ climate_unit_sym }}"
+                                      name: "Adaptive Comfort"
+                                      message: "Temp updated: old={{ temp_now_sys | round(1) }}{{ climate_unit_sym }} | new={{ t_adapt_cli_q | round(1) }}{{ climate_unit_sym }}"
                     default:
                       - choose:
                           - conditions:
@@ -2750,8 +2743,8 @@ action:
                             sequence:
                               - service: logbook.log
                                 data:
-                                  name: "HVAC Pro"
-                                  message: "Setpoint unchanged ({{ t_adapt_cli_q | round(1) }}{{ climate_unit_sym }}), skipping update"
+                                  name: "Adaptive Comfort"
+                                  message: "Skipped: setpoint unchanged | current={{ t_adapt_cli_q | round(1) }}{{ climate_unit_sym }}"
           # -------- Adaptive fan control --------
           - choose:
               - conditions:
@@ -2773,8 +2766,8 @@ action:
                         sequence:
                           - service: logbook.log
                             data:
-                              name: "HVAC Pro"
-                              message: "Fan mode updated: {{ fan_now }} → {{ fan_target_mode }}"
+                              name: "Adaptive Comfort"
+                              message: "Fan mode updated: old={{ fan_now }} | new={{ fan_target_mode }}"
           # Turn on climate when not explicitly in hvac_mode 'off',
           # or when safety guards are enabled and we are approaching guard thresholds (safety-first).
           # Skip if natural ventilation is preferred.

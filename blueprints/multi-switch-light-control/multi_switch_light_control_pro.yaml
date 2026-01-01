@@ -43,7 +43,7 @@ blueprint:
             OPTIONAL. For Z-Wave switches: Create a UNIQUE input_boolean helper for THIS automation
             to enable release detection during hold-to-dim. Without this, dim loops run until brightness
             limits. With this helper, releasing the button stops dimming immediately.
-            Create via Settings → Devices & Services → Helpers → Toggle (e.g., input_boolean.kitchen_dimming_release).
+            Create via Settings | Devices & Services | Helpers | Toggle (e.g., input_boolean.kitchen_dimming_release).
             IMPORTANT: Each automation instance needs its own dedicated helper - do not share helpers across rooms.
             Leave at placeholder for Zigbee/Lutron (they have native release detection).
           default: input_boolean.placeholder_hold_release
@@ -252,7 +252,7 @@ blueprint:
           name: "Mirror switch state with lights"
           description: >
             When enabled, the blueprint watches the target lights and keeps the selected switch/light entity in
-            sync (lights > 0% → switch on, all lights off → switch off). Useful when the physical switch controls
+            sync (lights > 0% | switch on, all lights off | switch off). Useful when the physical switch controls
             smart lights via automations instead of a direct load.
           default: false
           selector:
@@ -1182,39 +1182,30 @@ action:
     then:
       - service: logbook.log
         data:
-          name: "Multi Switch Light Pro"
+          name: "Multi Switch Light"
           entity_id: "{{ light_entity }}"
           message: >
-            Detected switch {{ detected_label }}
-            | type={{ switch_type }}
-            | profile={{ device_profile }}
+            Device detected: {{ detected_label }} | type={{ switch_type }} | profile={{ device_profile }}
   - if:
       - condition: template
         value_template: "{{ debug_verbose }}"
     then:
       - service: logbook.log
         data:
-          name: "Multi Switch Light Pro"
+          name: "Multi Switch Light"
           entity_id: "{{ light_entity }}"
           message: >
-            Device capabilities: strategy={{ device_control_strategy }}
-            | protocol={{ device_caps_parsed.protocol }}
-            | max_taps={{ device_max_multi_tap }}
-            | buttons={{ device_button_count }}
-            | release_detect={{ device_has_release_detection }}
-            | has_led={{ device_has_led }}
+            Device capabilities: strategy={{ device_control_strategy }} | protocol={{ device_caps_parsed.protocol }} | max_taps={{ device_max_multi_tap }} | buttons={{ device_button_count }} | release_detect={{ device_has_release_detection }} | has_led={{ device_has_led }}
   - if:
       - condition: template
         value_template: "{{ debug_enabled }}"
     then:
       - service: logbook.log
         data:
-          name: "Multi Switch Light Pro"
+          name: "Multi Switch Light"
           entity_id: "{{ light_entity }}"
           message: >
-            Trigger fired: id={{ trigger.id | default('unknown') }}
-            | platform={{ trigger.platform | default('unknown') }}
-            | switch_type={{ switch_type }}
+            Trigger fired: id={{ trigger.id | default('unknown') }} | platform={{ trigger.platform | default('unknown') }} | switch_type={{ switch_type }}
   - if:
       - condition: template
         value_template: >
@@ -1226,10 +1217,10 @@ action:
         then:
           - service: logbook.log
             data:
-              name: "Multi Switch Light Pro"
+              name: "Multi Switch Light"
               entity_id: "{{ light_entity }}"
               message: >
-                Release detected → setting {{ hold_release_helper_input }} to on
+                Release detected: setting {{ hold_release_helper_input }}=on
       - service: input_boolean.turn_on
         target:
           entity_id: "{{ hold_release_helper_input }}"
@@ -1255,11 +1246,10 @@ action:
         then:
           - service: logbook.log
             data:
-              name: "Multi Switch Light Pro"
+              name: "Multi Switch Light"
               entity_id: "{{ light_entity }}"
               message: >
-                State sync → switch {{ state_sync_switch_entity }}
-                set to {{ 'on' if state_sync_any_light_on else 'off' }}
+                State sync: switch={{ state_sync_switch_entity }} | state={{ 'on' if state_sync_any_light_on else 'off' }}
       - stop: "state sync completed"
   - if:
       - condition: template
@@ -1273,10 +1263,10 @@ action:
     then:
       - service: logbook.log
         data:
-          name: "Multi Switch Light Pro"
+          name: "Multi Switch Light"
           entity_id: "{{ light_entity }}"
           message: >
-            Event data: {{ trigger.event.data | tojson }}
+            Debug: event_data={{ trigger.event.data | tojson }}
   - if:
       - condition: template
         value_template: >
@@ -1284,11 +1274,10 @@ action:
     then:
       - service: logbook.log
         data:
-          name: "Multi Switch Light Pro"
+          name: "Multi Switch Light"
           entity_id: "{{ light_entity }}"
           message: >
-            WARNING: Detected Zigbee action sensor candidate {{ action_sensor_hint }}.
-            Set the "Zigbee action sensor" input so Zigbee triggers can run.
+            Warning: Zigbee action sensor candidate detected | sensor={{ action_sensor_hint }} | Set "Zigbee action sensor" input to enable triggers
   - if:
       - condition: template
         value_template: >
@@ -1300,9 +1289,9 @@ action:
         then:
           - service: logbook.log
             data:
-              name: "Multi Switch Light Pro"
+              name: "Multi Switch Light"
               entity_id: "{{ light_entity }}"
-              message: "lutron_on → light.turn_on"
+              message: "Action: lutron_on | light.turn_on"
       - if:
           - condition: template
             value_template: "{{ area_set }}"
@@ -1334,9 +1323,9 @@ action:
         then:
           - service: logbook.log
             data:
-              name: "Multi Switch Light Pro"
+              name: "Multi Switch Light"
               entity_id: "{{ light_entity }}"
-              message: "lutron_raise → hold brighten"
+              message: "Action: lutron_raise | hold brighten"
       - repeat:
           sequence:
             - if:
@@ -1380,9 +1369,9 @@ action:
                   then:
                     - service: logbook.log
                       data:
-                        name: "Multi Switch Light Pro"
+                        name: "Multi Switch Light"
                         entity_id: "{{ light_entity }}"
-                        message: "lutron_raise release → stop brighten"
+                        message: "Action: lutron_raise release | stop brighten"
                 - stop:
           until:
             - condition: template
@@ -1398,9 +1387,9 @@ action:
         then:
           - service: logbook.log
             data:
-              name: "Multi Switch Light Pro"
+              name: "Multi Switch Light"
               entity_id: "{{ light_entity }}"
-              message: "lutron_stop → favorite button"
+              message: "Action: lutron_stop | favorite button"
       - if:
           - condition: template
             value_template: >
@@ -1444,9 +1433,9 @@ action:
         then:
           - service: logbook.log
             data:
-              name: "Multi Switch Light Pro"
+              name: "Multi Switch Light"
               entity_id: "{{ light_entity }}"
-              message: "lutron_lower → hold dim"
+              message: "Action: lutron_lower | hold dim"
       - repeat:
           sequence:
             - if:
@@ -1490,9 +1479,9 @@ action:
                   then:
                     - service: logbook.log
                       data:
-                        name: "Multi Switch Light Pro"
+                        name: "Multi Switch Light"
                         entity_id: "{{ light_entity }}"
-                        message: "lutron_lower release → stop dim"
+                        message: "Action: lutron_lower release | stop dim"
                 - stop:
           until:
             - condition: template
@@ -1508,9 +1497,9 @@ action:
         then:
           - service: logbook.log
             data:
-              name: "Multi Switch Light Pro"
+              name: "Multi Switch Light"
               entity_id: "{{ light_entity }}"
-              message: "lutron_off → light.turn_off"
+              message: "Action: lutron_off | light.turn_off"
       - if:
           - condition: template
             value_template: "{{ area_set }}"
@@ -1544,9 +1533,9 @@ action:
             then:
               - service: logbook.log
                 data:
-                  name: "Multi Switch Light Pro"
+                  name: "Multi Switch Light"
                   entity_id: "{{ light_entity }}"
-                  message: "up_single → custom action"
+                  message: "Action: up_single | custom action"
           - sequence: !input up_press_1_action
         else:
           - if:
@@ -1555,9 +1544,9 @@ action:
             then:
               - service: logbook.log
                 data:
-                  name: "Multi Switch Light Pro"
+                  name: "Multi Switch Light"
                   entity_id: "{{ light_entity }}"
-                  message: "up_single → light.turn_on (100% brightness)"
+                  message: "Action: up_single | light.turn_on | brightness=100%"
           - if:
               - condition: template
                 value_template: "{{ area_set }}"
@@ -1593,9 +1582,9 @@ action:
             then:
               - service: logbook.log
                 data:
-                  name: "Multi Switch Light Pro"
+                  name: "Multi Switch Light"
                   entity_id: "{{ light_entity }}"
-                  message: "down_single → custom action"
+                  message: "Action: down_single | custom action"
           - sequence: !input down_press_1_action
         else:
           - if:
@@ -1604,9 +1593,9 @@ action:
             then:
               - service: logbook.log
                 data:
-                  name: "Multi Switch Light Pro"
+                  name: "Multi Switch Light"
                   entity_id: "{{ light_entity }}"
-                  message: "down_single → light.turn_off"
+                  message: "Action: down_single | light.turn_off"
           - if:
               - condition: template
                 value_template: "{{ area_set }}"
@@ -1636,9 +1625,9 @@ action:
         then:
           - service: logbook.log
             data:
-              name: "Multi Switch Light Pro"
+              name: "Multi Switch Light"
               entity_id: "{{ light_entity }}"
-              message: "up_hold_start"
+              message: "Action: up_hold_start | begin brighten"
       - if:
           - condition: template
             value_template: "{{ hold_release_helper_enabled }}"
@@ -1660,9 +1649,9 @@ action:
             then:
               - service: logbook.log
                 data:
-                  name: "Multi Switch Light Pro"
+                  name: "Multi Switch Light"
                   entity_id: "{{ light_entity }}"
-                  message: "Light is off → turn_on to min_on_brightness_pct={{ min_on_brightness_pct_v | int }}%"
+                  message: "Light OFF: starting at min_on_brightness={{ min_on_brightness_pct_v | int }}%"
           - if:
               - condition: template
                 value_template: "{{ area_set }}"
@@ -1708,9 +1697,9 @@ action:
                   then:
                     - service: logbook.log
                       data:
-                        name: "Multi Switch Light Pro"
+                        name: "Multi Switch Light"
                         entity_id: "{{ light_entity }}"
-                        message: "Release helper triggered → stop brighten"
+                        message: "Release detected: stop brighten"
                 - stop: "Button released"
             - if:
                 - condition: template
@@ -1740,9 +1729,9 @@ action:
               then:
                 - service: logbook.log
                   data:
-                    name: "Multi Switch Light Pro"
+                    name: "Multi Switch Light"
                     entity_id: "{{ light_entity }}"
-                    message: "brighten step to {{ target_brightness }}/255 | current={{ current_brightness }}/255 cap={{ max_abs_brightness }}"
+                    message: "Brighten step: target={{ target_brightness }}/255 | current={{ current_brightness }}/255 | cap={{ max_abs_brightness }}"
             - delay:
                 milliseconds: "{{ interval_ms }}"
           until:
@@ -1760,9 +1749,9 @@ action:
         then:
           - service: logbook.log
             data:
-              name: "Multi Switch Light Pro"
+              name: "Multi Switch Light"
               entity_id: "{{ light_entity }}"
-              message: "down_hold_start"
+              message: "Action: down_hold_start | begin dim"
       - if:
           - condition: template
             value_template: "{{ hold_release_helper_enabled }}"
@@ -1788,9 +1777,9 @@ action:
                   then:
                     - service: logbook.log
                       data:
-                        name: "Multi Switch Light Pro"
+                        name: "Multi Switch Light"
                         entity_id: "{{ light_entity }}"
-                        message: "Release helper triggered → stop dim"
+                        message: "Release detected: stop dim"
                 - stop: "Button released"
             - if:
                 - condition: template
@@ -1824,9 +1813,9 @@ action:
                   then:
                     - service: logbook.log
                       data:
-                        name: "Multi Switch Light Pro"
+                        name: "Multi Switch Light"
                         entity_id: "{{ light_entity }}"
-                        message: "dim step to {{ target_brightness }}/255 | current={{ current_brightness }}/255 min={{ min_abs_brightness }}"
+                        message: "Dim step: target={{ target_brightness }}/255 | current={{ current_brightness }}/255 | min={{ min_abs_brightness }}"
               else:
                 - if:
                     - condition: template
@@ -1834,9 +1823,9 @@ action:
                   then:
                     - service: logbook.log
                       data:
-                        name: "Multi Switch Light Pro"
+                        name: "Multi Switch Light"
                         entity_id: "{{ light_entity }}"
-                        message: "brightness <= min clamp → light.turn_off"
+                        message: "Dim complete: brightness<=min_clamp | light.turn_off"
                 - if:
                     - condition: template
                       value_template: "{{ area_set }}"
@@ -1873,9 +1862,9 @@ action:
             then:
               - service: logbook.log
                 data:
-                  name: "Multi Switch Light Pro"
+                  name: "Multi Switch Light"
                   entity_id: "{{ light_entity }}"
-                  message: "up_double → custom action"
+                  message: "Action: up_double | custom action"
           - sequence: !input up_press_2_action
         else:
           - if:
@@ -1884,9 +1873,9 @@ action:
             then:
               - service: logbook.log
                 data:
-                  name: "Multi Switch Light Pro"
+                  name: "Multi Switch Light"
                   entity_id: "{{ light_entity }}"
-                  message: "up_double → run custom action"
+                  message: "Action: up_double | run custom action"
   - if:
       - condition: template
         value_template: >
@@ -1902,9 +1891,9 @@ action:
             then:
               - service: logbook.log
                 data:
-                  name: "Multi Switch Light Pro"
+                  name: "Multi Switch Light"
                   entity_id: "{{ light_entity }}"
-                  message: "down_double → custom action"
+                  message: "Action: down_double | custom action"
           - sequence: !input down_press_2_action
         else:
           - if:
@@ -1913,9 +1902,9 @@ action:
             then:
               - service: logbook.log
                 data:
-                  name: "Multi Switch Light Pro"
+                  name: "Multi Switch Light"
                   entity_id: "{{ light_entity }}"
-                  message: "down_double → run custom action"
+                  message: "Action: down_double | run custom action"
   - if:
       - condition: template
         value_template: >
@@ -1931,9 +1920,9 @@ action:
             then:
               - service: logbook.log
                 data:
-                  name: "Multi Switch Light Pro"
+                  name: "Multi Switch Light"
                   entity_id: "{{ light_entity }}"
-                  message: "up_triple → custom action"
+                  message: "Action: up_triple | custom action"
           - sequence: !input up_press_3_action
         else:
           - if:
@@ -1942,9 +1931,9 @@ action:
             then:
               - service: logbook.log
                 data:
-                  name: "Multi Switch Light Pro"
+                  name: "Multi Switch Light"
                   entity_id: "{{ light_entity }}"
-                  message: "up_triple → run custom action"
+                  message: "Action: up_triple | run custom action"
   - if:
       - condition: template
         value_template: >
@@ -1960,9 +1949,9 @@ action:
             then:
               - service: logbook.log
                 data:
-                  name: "Multi Switch Light Pro"
+                  name: "Multi Switch Light"
                   entity_id: "{{ light_entity }}"
-                  message: "down_triple → custom action"
+                  message: "Action: down_triple | custom action"
           - sequence: !input down_press_3_action
         else:
           - if:
@@ -1971,9 +1960,9 @@ action:
             then:
               - service: logbook.log
                 data:
-                  name: "Multi Switch Light Pro"
+                  name: "Multi Switch Light"
                   entity_id: "{{ light_entity }}"
-                  message: "down_triple → run custom action"
+                  message: "Action: down_triple | run custom action"
   - if:
       - condition: template
         value_template: >
@@ -1989,9 +1978,9 @@ action:
             then:
               - service: logbook.log
                 data:
-                  name: "Multi Switch Light Pro"
+                  name: "Multi Switch Light"
                   entity_id: "{{ light_entity }}"
-                  message: "up_quad → custom action"
+                  message: "Action: up_quad | custom action"
           - sequence: !input up_press_4_action
         else:
           - if:
@@ -2000,9 +1989,9 @@ action:
             then:
               - service: logbook.log
                 data:
-                  name: "Multi Switch Light Pro"
+                  name: "Multi Switch Light"
                   entity_id: "{{ light_entity }}"
-                  message: "up_quad → no action defined"
+                  message: "Action: up_quad | no action defined"
   - if:
       - condition: template
         value_template: >
@@ -2018,9 +2007,9 @@ action:
             then:
               - service: logbook.log
                 data:
-                  name: "Multi Switch Light Pro"
+                  name: "Multi Switch Light"
                   entity_id: "{{ light_entity }}"
-                  message: "down_quad → custom action"
+                  message: "Action: down_quad | custom action"
           - sequence: !input down_press_4_action
         else:
           - if:
@@ -2029,9 +2018,9 @@ action:
             then:
               - service: logbook.log
                 data:
-                  name: "Multi Switch Light Pro"
+                  name: "Multi Switch Light"
                   entity_id: "{{ light_entity }}"
-                  message: "down_quad → no action defined"
+                  message: "Action: down_quad | no action defined"
   - if:
       - condition: template
         value_template: >
@@ -2047,9 +2036,9 @@ action:
             then:
               - service: logbook.log
                 data:
-                  name: "Multi Switch Light Pro"
+                  name: "Multi Switch Light"
                   entity_id: "{{ light_entity }}"
-                  message: "up_quint → custom action"
+                  message: "Action: up_quint | custom action"
           - sequence: !input up_press_5_action
         else:
           - if:
@@ -2058,9 +2047,9 @@ action:
             then:
               - service: logbook.log
                 data:
-                  name: "Multi Switch Light Pro"
+                  name: "Multi Switch Light"
                   entity_id: "{{ light_entity }}"
-                  message: "up_quint → no action defined"
+                  message: "Action: up_quint | no action defined"
   - if:
       - condition: template
         value_template: >
@@ -2076,9 +2065,9 @@ action:
             then:
               - service: logbook.log
                 data:
-                  name: "Multi Switch Light Pro"
+                  name: "Multi Switch Light"
                   entity_id: "{{ light_entity }}"
-                  message: "down_quint → custom action"
+                  message: "Action: down_quint | custom action"
           - sequence: !input down_press_5_action
         else:
           - if:
@@ -2087,6 +2076,6 @@ action:
             then:
               - service: logbook.log
                 data:
-                  name: "Multi Switch Light Pro"
+                  name: "Multi Switch Light"
                   entity_id: "{{ light_entity }}"
-                  message: "down_quint → no action defined"
+                  message: "Action: down_quint | no action defined"

@@ -997,8 +997,7 @@ action:
             data:
               name: "Adaptive Shades"
               message: >-
-                Manual adjustment detected on {{ triggered_cover_entity }}.
-                Pausing automation for {{ manual_timeout_minutes }} minutes. (v{{ blueprint_version }})
+                Paused: manual adjustment detected | cover={{ triggered_cover_entity }} | pause={{ manual_timeout_minutes }}min (v{{ blueprint_version }})
               domain: cover
           - stop: "Manual change detected, pausing automation"
       - conditions: "{{ manual_override_active }}"
@@ -1008,7 +1007,7 @@ action:
           - service: logbook.log
             data:
               name: "Adaptive Shades"
-              message: "Paused: manual override is ON. (v{{ blueprint_version }})"
+              message: "Paused: manual override ON (v{{ blueprint_version }})"
               domain: cover
           - stop: "Manual override active"
       - conditions: "{{ in_quiet_hours }}"
@@ -1018,7 +1017,7 @@ action:
           - service: logbook.log
             data:
               name: "Adaptive Shades"
-              message: "Paused during quiet hours. (v{{ blueprint_version }})"
+              message: "Paused: quiet hours active (v{{ blueprint_version }})"
               domain: cover
           - stop: "Quiet hours active"
       - conditions: "{{ not presence_ok }}"
@@ -1028,7 +1027,7 @@ action:
           - service: logbook.log
             data:
               name: "Adaptive Shades"
-              message: "Skipped: presence requirement not met. (v{{ blueprint_version }})"
+              message: "Skipped: presence requirement not met (v{{ blueprint_version }})"
               domain: cover
           - stop: "Presence requirement not met"
   - repeat:
@@ -1154,7 +1153,7 @@ action:
                         - service: logbook.log
                           data:
                             name: "Adaptive Shades"
-                            message: "Paused for manual adjustment timeout on {{ this_cover }}. (v{{ blueprint_version }})"
+                            message: "Paused: manual adjustment timeout | cover={{ this_cover }} (v{{ blueprint_version }})"
                             domain: cover
         # Skip remaining actions for this cover if manual override active
         - condition: template
@@ -1171,10 +1170,7 @@ action:
                   data:
                     name: "Adaptive Shades"
                     message: >-
-                      No movement for {{ this_cover }}: target_position is none
-                      (sun_on_window={{ sun_on_window }},
-                      direct_sun={{ direct_sun_detected }},
-                      mode_temp={{ mode_temp }}). (v{{ blueprint_version }})
+                      No movement: target=none | cover={{ this_cover }} | sun_on_window={{ sun_on_window }} | direct_sun={{ direct_sun_detected }} | mode_temp={{ mode_temp }} (v{{ blueprint_version }})
                     domain: cover
 
         - choose:
@@ -1193,8 +1189,7 @@ action:
                   data:
                     name: "Adaptive Shades"
                     message: >-
-                      No movement for {{ this_cover }}: change below hysteresis
-                      (current={{ this_current_position }}, target={{ this_target_position }}). (v{{ blueprint_version }})
+                      No movement: below hysteresis | cover={{ this_cover }} | current={{ this_current_position }} | target={{ this_target_position }} (v{{ blueprint_version }})
                     domain: cover
 
         - condition: template
@@ -1215,7 +1210,7 @@ action:
                 - service: logbook.log
                   data:
                     name: "Adaptive Shades"
-                    message: "Cover {{ this_cover }} unavailable; no movement. (v{{ blueprint_version }})"
+                    message: "No movement: cover unavailable | cover={{ this_cover }} (v{{ blueprint_version }})"
                     domain: cover
             - conditions:
                 - condition: template
@@ -1229,7 +1224,7 @@ action:
                         - service: logbook.log
                           data:
                             name: "Adaptive Shades"
-                            message: "Cover {{ this_cover }} is moving; waiting for it to stop. (v{{ blueprint_version }})"
+                            message: "Waiting: cover is moving | cover={{ this_cover }} (v{{ blueprint_version }})"
                             domain: cover
             - conditions: []
               sequence:
@@ -1263,9 +1258,7 @@ action:
                   data:
                     name: "Adaptive Shades"
                     message: >-
-                      Set shade {{ this_cover }} to {{ this_target_position | int }}% (sun_on_window={{ sun_on_window }},
-                      heating_needed={{ heating_needed }}, cooling_needed={{ cooling_needed }},
-                      glare={{ glare_detected }}, az={{ sun_azimuth | round(1) }}°, el={{ sun_elevation | round(1) }}°). (v{{ blueprint_version }})
+                      Shade set: {{ this_cover }}={{ this_target_position | int }}% | sun_on_window={{ sun_on_window }} | heating={{ heating_needed }} | cooling={{ cooling_needed }} | glare={{ glare_detected }} | az={{ sun_azimuth | round(1) }}° | el={{ sun_elevation | round(1) }}° (v{{ blueprint_version }})
                     domain: cover
 
 mode: restart

@@ -398,7 +398,7 @@ variables:
   # Get indoor temperature in system units
   # Rate-of-change filter: reject readings that change too fast (sensor glitch detection)
   # Max realistic indoor temp change is ~2-3°F/min; we use 10°F as a generous threshold
-  # to catch spikes like 72°F → 212°F while allowing any realistic scenario
+  # to catch spikes like 72°F | 212°F while allowing any realistic scenario
   _t_in_max_delta_f: 10
   _t_in_min_valid_f: 40
   _t_in_max_valid_f: 120
@@ -430,11 +430,11 @@ variables:
   _t_in_bounds_ok: "{{ _t_in_raw_f | float >= _t_in_min_valid_f and _t_in_raw_f | float <= _t_in_max_valid_f }}"
   _t_in_delta_f: "{{ (_t_in_raw_f | float - _t_in_prev_f | float) | abs }}"
   # Validation logic:
-  # - If current reading is unavailable → invalid
+  # - If current reading is unavailable | invalid
   # - If this is a temp_changed trigger AND we have a valid previous reading:
-  #     → Use rate-of-change check (reject if delta > threshold)
+  #     | Use rate-of-change check (reject if delta > threshold)
   # - Otherwise (other triggers or no valid previous):
-  #     → Accept the reading (no rate check possible, trust the sensor)
+  #     | Accept the reading (no rate check possible, trust the sensor)
   _t_in_has_prev: "{{ trigger is defined and trigger.id == 'temp_changed' and not _t_in_prev_unavailable }}"
   _t_in_rate_ok: "{{ not _t_in_has_prev or _t_in_delta_f <= _t_in_max_delta_f }}"
   t_in_valid: "{{ not _t_in_unavailable and _t_in_rate_ok and _t_in_bounds_ok }}"
@@ -700,21 +700,10 @@ action:
         then:
           - service: logbook.log
             data:
-              name: "Fan Climate Pro"
+              name: "Adaptive Fan Control"
               entity_id: "{{ fan_entity }}"
               message: >
-                Skipped ({{ _t_in_reject_reason }}) |
-                {% if _t_in_reject_reason == 'out_of_bounds' %}
-                Reading: {{ _t_in_raw_f | round(1) }}°F |
-                Valid range: {{ _t_in_min_valid_f }}°F - {{ _t_in_max_valid_f }}°F |
-                Likely sensor glitch or unavailable→value transition
-                {% elif _t_in_reject_reason == 'rate_exceeded' %}
-                Reading: {{ _t_in_raw_f | round(1) }}°F | Previous: {{ _t_in_prev_f | round(1) }}°F |
-                Delta: {{ _t_in_delta_f | round(1) }}°F (max: {{ _t_in_max_delta_f }}°F) |
-                Likely sensor glitch
-                {% else %}
-                State: {{ _t_in_state }} | Sensor unavailable
-                {% endif %}
+                Skipped: {{ _t_in_reject_reason }} | {% if _t_in_reject_reason == 'out_of_bounds' %}reading={{ _t_in_raw_f | round(1) }}°F | valid_range={{ _t_in_min_valid_f }}°F-{{ _t_in_max_valid_f }}°F{% elif _t_in_reject_reason == 'rate_exceeded' %}reading={{ _t_in_raw_f | round(1) }}°F | prev={{ _t_in_prev_f | round(1) }}°F | delta={{ _t_in_delta_f | round(1) }}°F | max={{ _t_in_max_delta_f }}°F{% else %}state={{ _t_in_state }} | sensor unavailable{% endif %}
       - stop: "Invalid temperature reading - ignoring"
 
   # Early exit: Skip entirely if fan is already in the desired state
@@ -729,11 +718,10 @@ action:
         then:
           - service: logbook.log
             data:
-              name: "Fan Climate Pro"
+              name: "Adaptive Fan Control"
               entity_id: "{{ fan_entity }}"
               message: >
-                Skipped (no change needed) | Fan: {{ 'on' if fan_is_on else 'off' }} @ {{ fan_current_pct }}% |
-                Desired: {{ desired_fan_state }} @ {{ desired_speed }}%
+                Skipped: no change needed | fan={{ 'on' if fan_is_on else 'off' }} | current={{ fan_current_pct }}% | desired={{ desired_fan_state }} | desired_speed={{ desired_speed }}%
       - stop: "No change needed"
 
   # Always log on basic or verbose - use logbook for visibility
@@ -743,15 +731,10 @@ action:
     then:
       - service: logbook.log
         data:
-          name: "Fan Climate Pro"
+          name: "Adaptive Fan Control"
           entity_id: "{{ fan_entity }}"
           message: >
-            Trigger: {{ trigger.id | default('unknown') }} |
-            Indoor: {{ t_in_sys | round(1) }}° {% if has_humidity %}(HI: {{ t_effective_sys | round(1) }}°, RH: {{ rh_in | round(0) }}%){% endif %} |
-            {% if has_outdoor_temp %}Outdoor: {{ t_out_c | round(1) }}°C | {% endif %}
-            Comfort: {{ effective_lower_sys | round(1) }}° - {{ effective_upper_sys | round(1) }}° |
-            Above: {{ is_above_comfort }} | Below: {{ is_below_comfort }} | Dev: {{ comfort_deviation }}° |
-            HVAC: {{ hvac_action }} | Occupied: {{ is_occupied }}
+            Trigger: {{ trigger.id | default('unknown') }} | indoor={{ t_in_sys | round(1) }}°{% if has_humidity %} | HI={{ t_effective_sys | round(1) }}° | RH={{ rh_in | round(0) }}%{% endif %}{% if has_outdoor_temp %} | outdoor={{ t_out_c | round(1) }}°C{% endif %} | comfort={{ effective_lower_sys | round(1) }}°-{{ effective_upper_sys | round(1) }}° | above={{ is_above_comfort }} | below={{ is_below_comfort }} | dev={{ comfort_deviation }}° | hvac={{ hvac_action }} | occupied={{ is_occupied }}
 
   - choose:
       # HVAC is heating
@@ -773,9 +756,9 @@ action:
                     then:
                       - service: logbook.log
                         data:
-                          name: "Fan Climate Pro"
+                          name: "Adaptive Fan Control"
                           entity_id: "{{ fan_entity }}"
-                          message: "HVAC heating + occupied → fan REVERSE at {{ heating_speed_pct }}%"
+                          message: "Fan ON: HVAC heating + occupied | direction=reverse | speed={{ heating_speed_pct }}%"
                   - if:
                       - condition: template
                         value_template: "{{ fan_current_direction != 'reverse' }}"
@@ -805,9 +788,9 @@ action:
                     then:
                       - service: logbook.log
                         data:
-                          name: "Fan Climate Pro"
+                          name: "Adaptive Fan Control"
                           entity_id: "{{ fan_entity }}"
-                          message: "HVAC heating → fan OFF (no drafts)"
+                          message: "Fan OFF: HVAC heating | no drafts"
                   - service: fan.turn_off
                     target:
                       entity_id: "{{ fan_entity }}"
@@ -827,9 +810,9 @@ action:
                 then:
                   - service: logbook.log
                     data:
-                      name: "Fan Climate Pro"
+                      name: "Adaptive Fan Control"
                       entity_id: "{{ fan_entity }}"
-                      message: "HVAC cooling + occupied → fan FORWARD at {{ calculated_speed }}%"
+                      message: "Fan ON: HVAC cooling + occupied | direction=forward | speed={{ calculated_speed }}%"
               - if:
                   - condition: template
                     value_template: "{{ supports_direction and fan_current_direction != 'forward' }}"
@@ -871,9 +854,9 @@ action:
                 then:
                   - service: logbook.log
                     data:
-                      name: "Fan Climate Pro"
+                      name: "Adaptive Fan Control"
                       entity_id: "{{ fan_entity }}"
-                      message: "Season changed to {{ current_season }} → direction {{ calculated_direction }}"
+                      message: "Direction change: season={{ current_season }} | direction={{ calculated_direction }}"
               - service: fan.set_direction
                 target:
                   entity_id: "{{ fan_entity }}"
@@ -899,9 +882,9 @@ action:
                 then:
                   - service: logbook.log
                     data:
-                      name: "Fan Climate Pro"
+                      name: "Adaptive Fan Control"
                       entity_id: "{{ fan_entity }}"
-                      message: "Above comfort ({{ t_effective_sys | round(1) }}° > {{ effective_upper_sys | round(1) }}°) → fan at {{ calculated_speed }}% {{ calculated_direction }}"
+                      message: "Fan ON: above comfort | temp={{ t_effective_sys | round(1) }}° | upper={{ effective_upper_sys | round(1) }}° | speed={{ calculated_speed }}% | direction={{ calculated_direction }}"
               - if:
                   - condition: template
                     value_template: "{{ supports_direction and fan_current_direction != calculated_direction }}"
@@ -942,9 +925,9 @@ action:
                 then:
                   - service: logbook.log
                     data:
-                      name: "Fan Climate Pro"
+                      name: "Adaptive Fan Control"
                       entity_id: "{{ fan_entity }}"
-                      message: "{{ 'Below comfort (' ~ (t_effective_sys | round(1)) ~ '° < ' ~ (effective_lower_sys | round(1)) ~ '°)' if is_below_comfort else 'Unoccupied' }} → fan OFF"
+                      message: "Fan OFF: {{ 'below comfort | temp=' ~ (t_effective_sys | round(1)) ~ '° | lower=' ~ (effective_lower_sys | round(1)) ~ '°' if is_below_comfort else 'unoccupied' }}"
               - service: fan.turn_off
                 target:
                   entity_id: "{{ fan_entity }}"
@@ -967,9 +950,9 @@ action:
             then:
               - service: logbook.log
                 data:
-                  name: "Fan Climate Pro"
+                  name: "Adaptive Fan Control"
                   entity_id: "{{ fan_entity }}"
-                  message: "Within comfort band ({{ effective_lower_sys | round(1) }}° - {{ effective_upper_sys | round(1) }}°) → fan OFF"
+                  message: "Fan OFF: within comfort | range={{ effective_lower_sys | round(1) }}°-{{ effective_upper_sys | round(1) }}°"
           - service: fan.turn_off
             target:
               entity_id: "{{ fan_entity }}"
@@ -995,9 +978,9 @@ action:
                     then:
                       - service: logbook.log
                         data:
-                          name: "Fan Climate Pro"
+                          name: "Adaptive Fan Control"
                           entity_id: "{{ fan_entity }}"
-                          message: "HVAC stopped → still above comfort, fan at {{ calculated_speed }}% {{ calculated_direction }}"
+                          message: "Fan ON: HVAC stopped, above comfort | speed={{ calculated_speed }}% | direction={{ calculated_direction }}"
                   - if:
                       - condition: template
                         value_template: "{{ supports_direction and fan_current_direction != calculated_direction }}"
@@ -1027,9 +1010,9 @@ action:
                     then:
                       - service: logbook.log
                         data:
-                          name: "Fan Climate Pro"
+                          name: "Adaptive Fan Control"
                           entity_id: "{{ fan_entity }}"
-                          message: "HVAC stopped → within/below comfort or unoccupied, fan OFF"
+                          message: "Fan OFF: HVAC stopped | comfort=ok or unoccupied"
                   - service: fan.turn_off
                     target:
                       entity_id: "{{ fan_entity }}"
@@ -1042,6 +1025,6 @@ action:
         then:
           - service: logbook.log
             data:
-              name: "Fan Climate Pro"
+              name: "Adaptive Fan Control"
               entity_id: "{{ fan_entity }}"
-              message: "No action taken - fan {{ states(fan_entity) }}, comfort {{ 'above' if is_above_comfort else ('below' if is_below_comfort else 'within') }}, HVAC {{ hvac_action }}, occupied {{ is_occupied }}"
+              message: "No action: fan={{ states(fan_entity) }} | comfort={{ 'above' if is_above_comfort else ('below' if is_below_comfort else 'within') }} | hvac={{ hvac_action }} | occupied={{ is_occupied }}"

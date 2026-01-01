@@ -583,9 +583,9 @@ action:
         sequence:
           - service: logbook.log
             data:
-              name: Bathroom Light & Fan Control
+              name: Bathroom Light Fan
               message: >-
-                Triggered: id={{ trigger.id if trigger is defined else 'undefined' }}, entity={{ trigger.entity_id if (trigger is defined and trigger.entity_id is defined) else 'n/a' }}, from={{ trigger.from_state.state if (trigger is defined and trigger.from_state is defined) else 'n/a' }} to={{ trigger.to_state.state if (trigger is defined and trigger.to_state is defined) else 'n/a' }} (v{{ blueprint_version }})
+                Trigger fired: id={{ trigger.id if trigger is defined else 'undefined' }} | entity={{ trigger.entity_id if (trigger is defined and trigger.entity_id is defined) else 'n/a' }} | from={{ trigger.from_state.state if (trigger is defined and trigger.from_state is defined) else 'n/a' }} | to={{ trigger.to_state.state if (trigger is defined and trigger.to_state is defined) else 'n/a' }} (v{{ blueprint_version }})
 
   - choose:
       # --- Home Assistant start: check if fan should be off at startup ---
@@ -610,8 +610,8 @@ action:
                         sequence:
                           - service: logbook.log
                             data:
-                              name: Bathroom Light & Fan Control
-                              message: "Startup check: Fan turned OFF due to low delta ({{ humidity_delta | round(1) }}%). (v{{ blueprint_version }})"
+                              name: Bathroom Light Fan
+                              message: "Fan OFF: startup check | delta={{ humidity_delta | round(1) }}% below threshold (v{{ blueprint_version }})"
           # Light startup sanity check: allow sensors to settle, then if lights are on with motion off and door open/unknown, treat as vacancy
           - delay:
               seconds: 30
@@ -675,14 +675,14 @@ action:
                         sequence:
                           - service: logbook.log
                             data:
-                              name: Bathroom Light & Fan Control
-                              message: "Startup check: Light OFF after {{ lights_off_delay_min }}min grace (motion off, door open/unknown). (v{{ blueprint_version }})"
+                              name: Bathroom Light Fan
+                              message: "Light OFF: startup check | grace={{ lights_off_delay_min }}min | motion=off, door=open (v{{ blueprint_version }})"
                       - conditions: "{{ debug_level == 'verbose' }}"
                         sequence:
                           - service: logbook.log
                             data:
-                              name: Bathroom Light & Fan Control
-                              message: "Startup check: Light OFF after {{ lights_off_delay_min }}min grace (motion={{ is_state(motion_sensor, 'off') }}, door={{ states(door_sensor) }}, light={{ states(light_target) }}). (v{{ blueprint_version }})"
+                              name: Bathroom Light Fan
+                              message: "Light OFF: startup check | grace={{ lights_off_delay_min }}min | motion={{ is_state(motion_sensor, 'off') }} | door={{ states(door_sensor) }} | light={{ states(light_target) }} (v{{ blueprint_version }})"
 
       # --- Wasp-in-a-Box: manage light directly based on motion/door ---
       - conditions:
@@ -698,9 +698,9 @@ action:
                 sequence:
                   - service: logbook.log
                     data:
-                      name: Bathroom Light & Fan Control
+                      name: Bathroom Light Fan
                       message: >-
-                        Conditions Check: should_turn_on={{ should_turn_on_light }}, light_off={{ is_state(light_target,'off') }}, presence_ok={{ presence_ok }} (entities={{ presence_entities | length }} count, states={{ presence_entities | map('states') | list }}), override_ok={{ override_ok }}, lux_ok={{ lux_ok }} (v{{ blueprint_version }})
+                        Conditions: should_turn_on={{ should_turn_on_light }} | light_off={{ is_state(light_target,'off') }} | presence_ok={{ presence_ok }} (count={{ presence_entities | length }}) | override_ok={{ override_ok }} | lux_ok={{ lux_ok }} (v{{ blueprint_version }})
 
           - choose:
               # Motion or Door opened: unified light ON logic
@@ -783,16 +783,16 @@ action:
                             sequence:
                               - service: logbook.log
                                 data:
-                                  name: Bathroom Light & Fan Control
+                                  name: Bathroom Light Fan
                                   message: >-
-                                    Light ON: trigger={{ trigger.id }}, night_mode={{ night_mode_active }}, presence={{ presence_ok }}, lux_ok={{ lux_ok }} (v{{ blueprint_version }})
+                                    Light ON: trigger={{ trigger.id }} | night_mode={{ night_mode_active }} | presence={{ presence_ok }} | lux_ok={{ lux_ok }} (v{{ blueprint_version }})
                           - conditions: "{{ debug_level == 'verbose' }}"
                             sequence:
                               - service: logbook.log
                                 data:
-                                  name: Bathroom Light & Fan Control
+                                  name: Bathroom Light Fan
                                   message: >-
-                                    Light ON: trigger={{ trigger.id }}, night_mode={{ night_mode_active }} (enabled={{ night_mode_enabled }}, schedule={{ in_night_schedule }}), presence={{ presence_ok }}, lux={{ states(illuminance_sensor) if illuminance_sensor else 'n/a' }} (ok={{ lux_ok }}), area={{ area_set }} (v{{ blueprint_version }})
+                                    Light ON: trigger={{ trigger.id }} | night_mode={{ night_mode_active }} (enabled={{ night_mode_enabled }}, schedule={{ in_night_schedule }}) | presence={{ presence_ok }} | lux={{ states(illuminance_sensor) if illuminance_sensor else 'n/a' }} (ok={{ lux_ok }}) | area={{ area_set }} (v{{ blueprint_version }})
                     else:
                       # Debug: log why light didn't turn on
                       - choose:
@@ -800,9 +800,9 @@ action:
                             sequence:
                               - service: logbook.log
                                 data:
-                                  name: Bathroom Light & Fan Control
+                                  name: Bathroom Light Fan
                                   message: >-
-                                    Light NOT turned on: trigger={{ trigger.id }}, light_already_on={{ is_state(light_target, 'on') }}, presence_ok={{ presence_ok }}, override_ok={{ override_ok }}, lux_ok={{ lux_ok }} (v{{ blueprint_version }})
+                                    Light skipped: trigger={{ trigger.id }} | light_already_on={{ is_state(light_target, 'on') }} | presence_ok={{ presence_ok }} | override_ok={{ override_ok }} | lux_ok={{ lux_ok }} (v{{ blueprint_version }})
 
               # Wasp-in-a-Box: Compute vacancy conditions to turn off light
               # Vacancy requires motion clear AND (door open OR door left open too long)
@@ -818,9 +818,9 @@ action:
                         sequence:
                           - service: logbook.log
                             data:
-                              name: Bathroom Light & Fan Control
+                              name: Bathroom Light Fan
                               message: >-
-                                Clear trigger: id={{ trigger.id }}, motion={{ is_state(motion_sensor, 'off') }}, door={{ is_state(door_sensor, 'on') }} (v{{ blueprint_version }})
+                                Clear trigger: id={{ trigger.id }} | motion={{ is_state(motion_sensor, 'off') }} | door={{ is_state(door_sensor, 'on') }} (v{{ blueprint_version }})
 
                   - choose:
                       - conditions:
@@ -877,14 +877,14 @@ action:
                                 sequence:
                                   - service: logbook.log
                                     data:
-                                      name: Bathroom Light & Fan Control
-                                      message: "Light OFF: trigger={{ trigger.id }}, vacancy detected after {{ lights_off_delay_min }}min grace (v{{ blueprint_version }})"
+                                      name: Bathroom Light Fan
+                                      message: "Light OFF: vacancy | trigger={{ trigger.id }} | grace={{ lights_off_delay_min }}min (v{{ blueprint_version }})"
                               - conditions: "{{ debug_level == 'verbose' }}"
                                 sequence:
                                   - service: logbook.log
                                     data:
-                                      name: Bathroom Light & Fan Control
-                                      message: "Light OFF: trigger={{ trigger.id }}, vacancy detected after {{ lights_off_delay_min }}min grace, motion={{ is_state(motion_sensor, 'off') }}, door={{ is_state(door_sensor, 'off') }} (v{{ blueprint_version }})"
+                                      name: Bathroom Light Fan
+                                      message: "Light OFF: vacancy | trigger={{ trigger.id }} | grace={{ lights_off_delay_min }}min | motion={{ is_state(motion_sensor, 'off') }} | door={{ is_state(door_sensor, 'off') }} (v{{ blueprint_version }})"
                       # Case B: motion cleared AND door closed but closed after motion cleared (edge case)
                       - conditions:
                           - condition: and
@@ -941,14 +941,14 @@ action:
                                 sequence:
                                   - service: logbook.log
                                     data:
-                                      name: Bathroom Light & Fan Control
-                                      message: "Light OFF: trigger={{ trigger.id }}, vacancy detected after {{ lights_off_delay_min }}min grace (v{{ blueprint_version }})"
+                                      name: Bathroom Light Fan
+                                      message: "Light OFF: vacancy | trigger={{ trigger.id }} | grace={{ lights_off_delay_min }}min (v{{ blueprint_version }})"
                               - conditions: "{{ debug_level == 'verbose' }}"
                                 sequence:
                                   - service: logbook.log
                                     data:
-                                      name: Bathroom Light & Fan Control
-                                      message: "Light OFF: trigger={{ trigger.id }}, vacancy detected after {{ lights_off_delay_min }}min grace, motion={{ is_state(motion_sensor, 'off') }}, door={{ is_state(door_sensor, 'off') }} (v{{ blueprint_version }})"
+                                      name: Bathroom Light Fan
+                                      message: "Light OFF: vacancy | trigger={{ trigger.id }} | grace={{ lights_off_delay_min }}min | motion={{ is_state(motion_sensor, 'off') }} | door={{ is_state(door_sensor, 'off') }} (v{{ blueprint_version }})"
                       # Case C: door left open for too long AND motion is off
                       - conditions:
                           - condition: and
@@ -995,14 +995,14 @@ action:
                                 sequence:
                                   - service: logbook.log
                                     data:
-                                      name: Bathroom Light & Fan Control
-                                      message: "Light OFF: trigger={{ trigger.id }}, vacancy detected after {{ lights_off_delay_min }}min grace (v{{ blueprint_version }})"
+                                      name: Bathroom Light Fan
+                                      message: "Light OFF: vacancy | trigger={{ trigger.id }} | grace={{ lights_off_delay_min }}min (v{{ blueprint_version }})"
                               - conditions: "{{ debug_level == 'verbose' }}"
                                 sequence:
                                   - service: logbook.log
                                     data:
-                                      name: Bathroom Light & Fan Control
-                                      message: "Light OFF: trigger={{ trigger.id }}, vacancy detected after {{ lights_off_delay_min }}min grace, motion={{ is_state(motion_sensor, 'off') }}, door={{ is_state(door_sensor, 'off') }} (v{{ blueprint_version }})"
+                                      name: Bathroom Light Fan
+                                      message: "Light OFF: vacancy | trigger={{ trigger.id }} | grace={{ lights_off_delay_min }}min | motion={{ is_state(motion_sensor, 'off') }} | door={{ is_state(door_sensor, 'off') }} (v{{ blueprint_version }})"
           - stop: "WITB branch completed"
 
       # Manual override: user turned off lights, suspend auto-on
@@ -1035,16 +1035,16 @@ action:
                     sequence:
                       - service: logbook.log
                         data:
-                          name: Bathroom Light & Fan Control
-                          message: "Manual override activated, suspending auto-on for {{ manual_override_duration_min }} minutes. (v{{ blueprint_version }})"
+                          name: Bathroom Light Fan
+                          message: "Manual override: activated | suspend={{ manual_override_duration_min }}min (v{{ blueprint_version }})"
             else:
               - choose:
                   - conditions: "{{ debug_level in ['basic','verbose'] }}"
                     sequence:
                       - service: logbook.log
                         data:
-                          name: Bathroom Light & Fan Control
-                          message: "Manual override detected but no helper configured. Auto-on will resume normally. (v{{ blueprint_version }})"
+                          name: Bathroom Light Fan
+                          message: "Manual override: detected but no helper | auto-on will resume (v{{ blueprint_version }})"
 
       # Fan: Humidity delta crossed above ON threshold
       - conditions:
@@ -1094,23 +1094,23 @@ action:
                         sequence:
                           - service: logbook.log
                             data:
-                              name: Bathroom Light & Fan Control
-                              message: "ROR latch set: fan must stay on for {{ ror_min_on_time_min }} minutes. (v{{ blueprint_version }})"
+                              name: Bathroom Light Fan
+                              message: "ROR latch: set | min_on={{ ror_min_on_time_min }}min (v{{ blueprint_version }})"
           - choose:
               - conditions: "{{ debug_level == 'basic' }}"
                 sequence:
                   - service: logbook.log
                     data:
-                      name: Bathroom Light & Fan Control
+                      name: Bathroom Light Fan
                       message: >-
-                        Fan ON: {{ 'ROR boost' if _ror_triggered else 'delta' }}; delta={{ humidity_delta | round(1) }}% (threshold={{ fan_delta_on_effective | round(1) }}%) (v{{ blueprint_version }})
+                        Fan ON: {{ 'ROR boost' if _ror_triggered else 'delta' }} | delta={{ humidity_delta | round(1) }}% | threshold={{ fan_delta_on_effective | round(1) }}% (v{{ blueprint_version }})
               - conditions: "{{ debug_level == 'verbose' }}"
                 sequence:
                   - service: logbook.log
                     data:
-                      name: Bathroom Light & Fan Control
+                      name: Bathroom Light Fan
                       message: >-
-                        Fan ON: {{ 'ROR boost' if _ror_triggered else 'delta' }}; bath={{ states(bathroom_humidity_sensor) }}%, home={{ states(home_humidity_sensor) }}%, delta={{ humidity_delta | round(1) }}% (threshold={{ fan_delta_on_effective | round(1) }}%, night_bias={{ night_fan_delta_on_bias }}), in_night={{ in_night_schedule }} (v{{ blueprint_version }})
+                        Fan ON: {{ 'ROR boost' if _ror_triggered else 'delta' }} | bath={{ states(bathroom_humidity_sensor) }}% | home={{ states(home_humidity_sensor) }}% | delta={{ humidity_delta | round(1) }}% | threshold={{ fan_delta_on_effective | round(1) }}% | night_bias={{ night_fan_delta_on_bias }} | in_night={{ in_night_schedule }} (v{{ blueprint_version }})
           - service: "{{ turn_fan_on }}"
             target:
               entity_id: !input fan_target
@@ -1182,14 +1182,14 @@ action:
                 sequence:
                   - service: logbook.log
                     data:
-                      name: Bathroom Light & Fan Control
-                      message: "Fan OFF: delta={{ humidity_delta | round(1) }}% below threshold ({{ humidity_delta_off }}%); min runtime and ROR latch met. (v{{ blueprint_version }})"
+                      name: Bathroom Light Fan
+                      message: "Fan OFF: delta below threshold | delta={{ humidity_delta | round(1) }}% | threshold={{ humidity_delta_off }}% | min_runtime=ok | ror_latch=cleared (v{{ blueprint_version }})"
               - conditions: "{{ debug_level == 'verbose' }}"
                 sequence:
                   - service: logbook.log
                     data:
-                      name: Bathroom Light & Fan Control
-                      message: "Fan OFF: bath={{ states(bathroom_humidity_sensor) }}%, home={{ states(home_humidity_sensor) }}%, delta={{ humidity_delta | round(1) }}% below threshold ({{ humidity_delta_off }}%); min runtime={{ fan_min_runtime_min }}min, ROR latch cleared (v{{ blueprint_version }})"
+                      name: Bathroom Light Fan
+                      message: "Fan OFF: delta below threshold | bath={{ states(bathroom_humidity_sensor) }}% | home={{ states(home_humidity_sensor) }}% | delta={{ humidity_delta | round(1) }}% | threshold={{ humidity_delta_off }}% | min_runtime={{ fan_min_runtime_min }}min | ror_latch=cleared (v{{ blueprint_version }})"
 
       # Auto fan off when lights have been off for specified duration and humidity is below off threshold
       - conditions:
@@ -1209,8 +1209,8 @@ action:
                 sequence:
                   - service: logbook.log
                     data:
-                      name: Bathroom Light & Fan Control
-                      message: "Fan OFF: lights off for {{ auto_fan_off_after_lights_off_min }}min + delta below threshold. (v{{ blueprint_version }})"
+                      name: Bathroom Light Fan
+                      message: "Fan OFF: lights off timeout | lights_off={{ auto_fan_off_after_lights_off_min }}min | delta below threshold (v{{ blueprint_version }})"
 
       # Fan max runtime expired - force fan off
       - conditions:
@@ -1228,5 +1228,5 @@ action:
                 sequence:
                   - service: logbook.log
                     data:
-                      name: Bathroom Light & Fan Control
-                      message: "Fan OFF: max runtime ({{ fan_max_runtime_min }}min) expired. (v{{ blueprint_version }})"
+                      name: Bathroom Light Fan
+                      message: "Fan OFF: max runtime expired | max={{ fan_max_runtime_min }}min (v{{ blueprint_version }})"
