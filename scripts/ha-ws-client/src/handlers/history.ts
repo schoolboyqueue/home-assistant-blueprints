@@ -4,6 +4,7 @@
  */
 
 import { sendMessage } from '../client.js';
+import { getOutputConfig, isJsonOutput, output, outputList, outputMessage } from '../output.js';
 import type {
   CommandContext,
   HistoryState,
@@ -45,16 +46,31 @@ export async function handleLogbook(ctx: CommandContext): Promise<void> {
   });
 
   const timeDesc = ctx.fromTime
-    ? `${startTime.toLocaleString()} to ${endTime.toLocaleString()}`
+    ? `${startTime.toISOString()} to ${endTime.toISOString()}`
     : `last ${hours}h`;
-  console.log(`Logbook entries for ${entityId} (${timeDesc}):`);
-  if (result.length === 0) {
-    console.log('  No entries found');
-  } else {
-    for (const entry of result) {
+
+  if (isJsonOutput()) {
+    output(
+      {
+        entity_id: entityId,
+        time_range: { start: startTime.toISOString(), end: endTime.toISOString() },
+        entries: result,
+      },
+      { command: 'logbook', count: result.length }
+    );
+    return;
+  }
+
+  outputList(result, {
+    title: `Logbook entries for ${entityId} (${timeDesc})`,
+    command: 'logbook',
+    itemFormatter: (entry) => {
       const when = new Date(entry.when * 1000).toLocaleString();
-      console.log(`  ${when}: ${entry.state ?? entry.message ?? 'event'}`);
-    }
+      return `  ${when}: ${entry.state ?? entry.message ?? 'event'}`;
+    },
+  });
+  if (result.length === 0) {
+    outputMessage('  No entries found');
   }
 }
 
@@ -94,17 +110,36 @@ export async function handleHistory(ctx: CommandContext): Promise<void> {
 
   const states = result[entityId] ?? [];
   const timeDesc = ctx.fromTime
-    ? `${startTime.toLocaleString()} to ${endTime.toLocaleString()}`
+    ? `${startTime.toISOString()} to ${endTime.toISOString()}`
     : `last ${hours}h`;
-  console.log(`State history for ${entityId} (${timeDesc}):`);
-  if (states.length === 0) {
-    console.log('  No state changes found');
-  } else {
-    for (const s of states) {
+
+  if (isJsonOutput()) {
+    output(
+      {
+        entity_id: entityId,
+        time_range: { start: startTime.toISOString(), end: endTime.toISOString() },
+        states: states.map((s) => ({
+          timestamp: s.lu ? new Date(s.lu * 1000).toISOString() : null,
+          state: s.s,
+        })),
+      },
+      { command: 'history', count: states.length }
+    );
+    return;
+  }
+
+  outputList(states, {
+    title: `State history for ${entityId} (${timeDesc})`,
+    command: 'history',
+    itemFormatter: (s) => {
       const when = new Date((s.lu ?? 0) * 1000).toLocaleString();
-      console.log(`  ${when}: ${s.s}`);
-    }
-    console.log(`\nTotal: ${states.length} state changes`);
+      return `  ${when}: ${s.s}`;
+    },
+  });
+  if (states.length === 0) {
+    outputMessage('  No state changes found');
+  } else {
+    outputMessage(`\nTotal: ${states.length} state changes`);
   }
 }
 
@@ -144,31 +179,49 @@ export async function handleHistoryFull(ctx: CommandContext): Promise<void> {
 
   const states = result[entityId] ?? [];
   const timeDesc = ctx.fromTime
-    ? `${startTime.toLocaleString()} to ${endTime.toLocaleString()}`
+    ? `${startTime.toISOString()} to ${endTime.toISOString()}`
     : `last ${hours}h`;
-  console.log(`Full state history for ${entityId} (${timeDesc}):`);
-  if (states.length === 0) {
-    console.log('  No state changes found');
-  } else {
-    for (const s of states) {
-      let when: string;
-      if (s.lu) {
-        when = new Date(s.lu * 1000).toLocaleString();
-      } else if (s.last_updated) {
-        when = new Date(s.last_updated).toLocaleString();
-      } else if (s.lc) {
-        when = new Date(s.lc * 1000).toLocaleString();
-      } else if (s.last_changed) {
-        when = new Date(s.last_changed).toLocaleString();
-      } else {
-        when = 'unknown time';
-      }
+
+  // Helper to get timestamp from state entry
+  const getTimestamp = (s: HistoryState): string => {
+    if (s.lu) return new Date(s.lu * 1000).toISOString();
+    if (s.last_updated) return s.last_updated;
+    if (s.lc) return new Date(s.lc * 1000).toISOString();
+    if (s.last_changed) return s.last_changed;
+    return '';
+  };
+
+  if (isJsonOutput()) {
+    output(
+      {
+        entity_id: entityId,
+        time_range: { start: startTime.toISOString(), end: endTime.toISOString() },
+        states: states.map((s) => ({
+          timestamp: getTimestamp(s),
+          state: s.state ?? s.s,
+          attributes: s.attributes ?? s.a ?? {},
+        })),
+      },
+      { command: 'history-full', count: states.length }
+    );
+    return;
+  }
+
+  outputList(states, {
+    title: `Full state history for ${entityId} (${timeDesc})`,
+    command: 'history-full',
+    itemFormatter: (s) => {
+      const when = getTimestamp(s) ? new Date(getTimestamp(s)).toLocaleString() : 'unknown time';
       const state = s.state ?? s.s;
       const attrs = s.attributes ?? s.a ?? {};
       const attrStr = formatEntityAttributes(entityId, attrs);
-      console.log(`  ${when}: ${state}${attrStr}`);
-    }
-    console.log(`\nTotal: ${states.length} state changes`);
+      return `  ${when}: ${state}${attrStr}`;
+    },
+  });
+  if (states.length === 0) {
+    outputMessage('  No state changes found');
+  } else {
+    outputMessage(`\nTotal: ${states.length} state changes`);
   }
 }
 
@@ -205,15 +258,8 @@ export async function handleAttrs(ctx: CommandContext): Promise<void> {
 
   const states = result[entityId] ?? [];
   const timeDesc = ctx.fromTime
-    ? `${startTime.toLocaleString()} to ${endTime.toLocaleString()}`
+    ? `${startTime.toISOString()} to ${endTime.toISOString()}`
     : `last ${hours}h`;
-
-  console.log(`Attribute history for ${entityId} (${timeDesc}):\n`);
-
-  if (states.length === 0) {
-    console.log('  No state changes found');
-    return;
-  }
 
   // Determine which attributes to track based on entity type
   let trackAttrs: string[] = [];
@@ -262,49 +308,94 @@ export async function handleAttrs(ctx: CommandContext): Promise<void> {
     trackAttrs = [...allAttrs].filter((a) => !noise.has(a));
   }
 
+  // Helper to get timestamp
+  const getTimestamp = (s: HistoryState): string => {
+    if (s.lu) return new Date(s.lu * 1000).toISOString();
+    if (s.last_updated) return s.last_updated;
+    return '';
+  };
+
+  // Build attribute change records
+  interface AttrChange {
+    timestamp: string;
+    state: string;
+    changes: Record<string, unknown>;
+  }
+
+  const attrChanges: AttrChange[] = [];
   let prevAttrs: Record<string, unknown> = {};
+
   for (const s of states) {
-    let when: string;
-    if (s.lu) {
-      when = new Date(s.lu * 1000).toLocaleString();
-    } else if (s.last_updated) {
-      when = new Date(s.last_updated).toLocaleString();
-    } else {
-      when = 'unknown';
-    }
-
-    const state = s.state ?? s.s;
+    const state = s.state ?? s.s ?? '';
     const attrs = s.attributes ?? s.a ?? {};
+    const changes: Record<string, unknown> = {};
 
-    const changes: string[] = [];
     for (const attr of trackAttrs) {
       const prev = prevAttrs[attr];
       const curr = attrs[attr];
       if (curr !== undefined && JSON.stringify(prev) !== JSON.stringify(curr)) {
-        if (attr === 'brightness' && typeof curr === 'number') {
-          changes.push(`brightness=${Math.round(curr / 2.55)}%`);
-        } else if (attr === 'color_temp_kelvin' && typeof curr === 'number') {
-          changes.push(`color_temp=${curr}K`);
-        } else if (attr === 'color_temp' && typeof curr === 'number') {
-          changes.push(`color_temp=${curr}mired`);
-        } else if (typeof curr === 'object') {
-          changes.push(`${attr}=${JSON.stringify(curr)}`);
-        } else {
-          changes.push(`${attr}=${curr}`);
-        }
+        changes[attr] = curr;
       }
     }
 
-    let line = `  ${when}: ${state}`;
-    if (changes.length > 0) {
-      line += ` (${changes.join(', ')})`;
-    }
-    console.log(line);
+    attrChanges.push({
+      timestamp: getTimestamp(s),
+      state,
+      changes,
+    });
 
     prevAttrs = { ...attrs };
   }
 
-  console.log(`\nTotal: ${states.length} state changes`);
+  if (isJsonOutput()) {
+    output(
+      {
+        entity_id: entityId,
+        time_range: { start: startTime.toISOString(), end: endTime.toISOString() },
+        tracked_attributes: trackAttrs,
+        changes: attrChanges,
+      },
+      { command: 'attrs', count: states.length }
+    );
+    return;
+  }
+
+  // Default/compact output
+  const { showHeaders } = getOutputConfig();
+  if (showHeaders) {
+    outputMessage(`Attribute history for ${entityId} (${timeDesc}):\n`);
+  }
+
+  if (states.length === 0) {
+    outputMessage('  No state changes found');
+    return;
+  }
+
+  for (const change of attrChanges) {
+    const when = change.timestamp ? new Date(change.timestamp).toLocaleString() : 'unknown';
+    const changeList = Object.entries(change.changes)
+      .map(([attr, curr]) => {
+        if (attr === 'brightness' && typeof curr === 'number') {
+          return `brightness=${Math.round(curr / 2.55)}%`;
+        } else if (attr === 'color_temp_kelvin' && typeof curr === 'number') {
+          return `color_temp=${curr}K`;
+        } else if (attr === 'color_temp' && typeof curr === 'number') {
+          return `color_temp=${curr}mired`;
+        } else if (typeof curr === 'object') {
+          return `${attr}=${JSON.stringify(curr)}`;
+        }
+        return `${attr}=${curr}`;
+      })
+      .join(', ');
+
+    let line = `  ${when}: ${change.state}`;
+    if (changeList) {
+      line += ` (${changeList})`;
+    }
+    console.log(line);
+  }
+
+  outputMessage(`\nTotal: ${states.length} state changes`);
 }
 
 /**
@@ -352,7 +443,7 @@ export async function handleTimeline(ctx: CommandContext): Promise<void> {
 
   // Collect all entries from all entities
   interface TimelineEntry {
-    when: number;
+    timestamp: string;
     entity_id: string;
     state: string;
   }
@@ -362,13 +453,13 @@ export async function handleTimeline(ctx: CommandContext): Promise<void> {
     const states = result[entityId] ?? [];
     for (const s of states) {
       const timestamp = s.lu
-        ? s.lu * 1000
+        ? new Date(s.lu * 1000).toISOString()
         : s.last_updated
-          ? new Date(s.last_updated).getTime()
-          : 0;
-      if (timestamp > 0) {
+          ? s.last_updated
+          : '';
+      if (timestamp) {
         allEntries.push({
-          when: timestamp,
+          timestamp,
           entity_id: entityId,
           state: s.s ?? s.state ?? 'unknown',
         });
@@ -377,26 +468,44 @@ export async function handleTimeline(ctx: CommandContext): Promise<void> {
   }
 
   // Sort by timestamp
-  allEntries.sort((a, b) => a.when - b.when);
+  allEntries.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
   const timeDesc = ctx.fromTime
-    ? `${startTime.toLocaleString()} to ${endTime.toLocaleString()}`
+    ? `${startTime.toISOString()} to ${endTime.toISOString()}`
     : `last ${hours}h`;
-  console.log(`Timeline for ${entityIds.length} entities (${timeDesc}):\n`);
+
+  if (isJsonOutput()) {
+    output(
+      {
+        entities: entityIds,
+        time_range: { start: startTime.toISOString(), end: endTime.toISOString() },
+        events: allEntries,
+      },
+      { command: 'timeline', count: allEntries.length }
+    );
+    return;
+  }
+
+  const { showHeaders } = getOutputConfig();
+  if (showHeaders) {
+    outputMessage(`Timeline for ${entityIds.length} entities (${timeDesc}):\n`);
+  }
 
   if (allEntries.length === 0) {
-    console.log('  No events found');
+    outputMessage('  No events found');
   } else {
     // Calculate max entity_id length for alignment
     const maxLen = Math.max(...entityIds.map((id) => id.length));
 
     for (const entry of allEntries) {
-      const when = new Date(entry.when).toLocaleString();
+      const when = new Date(entry.timestamp).toLocaleString();
       const label = entry.entity_id.padEnd(maxLen);
       console.log(`  ${when}  ${label}  ${entry.state}`);
     }
 
-    console.log(`\nTotal: ${allEntries.length} state changes across ${entityIds.length} entities`);
+    outputMessage(
+      `\nTotal: ${allEntries.length} state changes across ${entityIds.length} entities`
+    );
   }
 }
 
@@ -413,17 +522,31 @@ export async function handleTimeline(ctx: CommandContext): Promise<void> {
  */
 export async function handleSyslog(ctx: CommandContext): Promise<void> {
   const result = await sendMessage<SysLogEntry[]>(ctx.ws, 'system_log/list');
-  console.log(`System log (${result.length} entries):\n`);
-  for (const entry of result.slice(0, 20)) {
+  const { format, maxItems } = getOutputConfig();
+  const limit = maxItems > 0 ? maxItems : 20;
+
+  if (format === 'json') {
+    output(result.slice(0, limit), { command: 'syslog', count: result.length });
+    return;
+  }
+
+  outputMessage(`System log (${result.length} entries):\n`);
+  for (const entry of result.slice(0, limit)) {
     const level = entry.level ?? 'INFO';
     const source = entry.source?.[0] ?? 'unknown';
     const msg = entry.message?.slice(0, 100) ?? '';
-    console.log(`[${level.toUpperCase()}] ${source}`);
-    console.log(`  ${msg}${entry.message && entry.message.length > 100 ? '...' : ''}`);
-    console.log('');
+    if (format === 'compact') {
+      console.log(
+        `[${level.toUpperCase()}] ${source}: ${msg}${entry.message && entry.message.length > 100 ? '...' : ''}`
+      );
+    } else {
+      console.log(`[${level.toUpperCase()}] ${source}`);
+      console.log(`  ${msg}${entry.message && entry.message.length > 100 ? '...' : ''}`);
+      console.log('');
+    }
   }
-  if (result.length > 20) {
-    console.log(`... and ${result.length - 20} more entries`);
+  if (result.length > limit) {
+    outputMessage(`... and ${result.length - limit} more entries`);
   }
 }
 
@@ -454,9 +577,27 @@ export async function handleStats(ctx: CommandContext): Promise<void> {
   );
 
   const stats = result[entityId] ?? [];
-  console.log(`Statistics for ${entityId} (last ${hours}h):`);
+
+  if (isJsonOutput()) {
+    output(
+      {
+        entity_id: entityId,
+        period: hours > DEFAULT_HOURS ? 'day' : 'hour',
+        statistics: stats.map((s) => ({
+          start: s.start,
+          min: s.min,
+          max: s.max,
+          mean: s.mean,
+        })),
+      },
+      { command: 'stats', count: stats.length }
+    );
+    return;
+  }
+
+  outputMessage(`Statistics for ${entityId} (last ${hours}h):`);
   if (stats.length === 0) {
-    console.log('  No statistics found (entity may not record statistics)');
+    outputMessage('  No statistics found (entity may not record statistics)');
   } else {
     for (const s of stats) {
       const when = new Date(s.start).toLocaleString();

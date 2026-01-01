@@ -493,6 +493,54 @@ npx tsx .claude/ha-ws-client.ts attrs cover.blinds 24            # Position chan
 
 ---
 
+## Output Formats
+
+All commands support output format flags for AI agent context efficiency:
+
+```bash
+# Format flags
+--json              # Machine-readable JSON (most context-efficient)
+--compact           # Reduced verbosity, single-line entries
+(default)           # Human-readable with formatting
+
+# Additional flags
+--no-headers        # Suppress headers/separators
+--no-timestamps     # Suppress timestamps
+--max-items=N       # Limit output to N items
+```
+
+**Examples:**
+```bash
+npx tsx ha-ws-client.ts states --json                    # All states as JSON
+npx tsx ha-ws-client.ts history sensor.temp 4 --compact  # Compact history
+npx tsx ha-ws-client.ts traces --json --max-items=10     # Last 10 traces
+```
+
+**JSON output structure:**
+```json
+{"success": true, "data": [...], "count": 42, "command": "states"}
+{"success": true, "message": "pong"}
+{"success": false, "error": "Entity not found: light.kitchen", "code": "ENTITY_NOT_FOUND"}
+```
+
+**Error codes:** `ENTITY_NOT_FOUND`, `AUTH_FAILED`, `INVALID_DATE`, `INVALID_JSON`
+
+---
+
+## Design Patterns
+
+The codebase uses modern TypeScript patterns. See `CLAUDE.md` for developer details.
+
+| Pattern | Module | Purpose |
+|---------|--------|---------|
+| Result Type | `types.ts` | Explicit error handling via `Result<T, E>` |
+| Branded Types | `types.ts` | Nominal typing for `EntityId`, `ContextId`, etc. |
+| Schema Validation | `types.ts` | Runtime validation with `Schema.object()`, etc. |
+| Option Type | `types.ts` | Safe optional values with `Option<T>` |
+| Output Strategy | `output.ts` | Pluggable output adapters (json/compact/default) |
+
+---
+
 ## Sources
 
 - [WebSocket API Developer Docs](https://developers.home-assistant.io/docs/api/websocket/)

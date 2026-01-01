@@ -6,6 +6,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { sendMessage, subscribeToTrigger } from '../client.js';
+import { getOutputConfig, isJsonOutput, output, outputList, outputMessage } from '../output.js';
 import type {
   AutomationConfig,
   AutomationConfigResult,
@@ -63,18 +64,41 @@ export async function handleTraces(ctx: CommandContext): Promise<void> {
     );
   }
 
-  console.log(
-    `Automation traces${automationId ? ` for ${automationId}` : ''}: ${filtered.length}\n`
-  );
-  for (const t of filtered.slice(0, 15)) {
-    const when = new Date(t.timestamp.start).toLocaleString();
-    const state = t.state ?? 'unknown';
-    const error = t.script_execution === 'error' ? ' [ERROR]' : '';
-    console.log(`  [${when}] ${t.item_id}: ${state}${error}`);
-    if (t.run_id) console.log(`    run_id: ${t.run_id}`);
+  const { format, maxItems } = getOutputConfig();
+  const limit = maxItems > 0 ? maxItems : 15;
+
+  if (format === 'json') {
+    output(
+      filtered.slice(0, limit).map((t) => ({
+        item_id: t.item_id,
+        run_id: t.run_id,
+        state: t.state,
+        script_execution: t.script_execution,
+        timestamp: t.timestamp.start,
+        context_id: t.context?.id,
+      })),
+      { command: 'traces', count: filtered.length }
+    );
+    return;
   }
-  if (filtered.length > 15) {
-    console.log(`\n  ... and ${filtered.length - 15} more traces`);
+
+  outputList(filtered.slice(0, limit), {
+    title: `Automation traces${automationId ? ` for ${automationId}` : ''}`,
+    command: 'traces',
+    itemFormatter: (t) => {
+      const when = new Date(t.timestamp.start).toLocaleString();
+      const state = t.state ?? 'unknown';
+      const error = t.script_execution === 'error' ? ' [ERROR]' : '';
+      if (format === 'compact') {
+        return `${t.item_id} ${t.run_id} ${state}${error}`;
+      }
+      let line = `  [${when}] ${t.item_id}: ${state}${error}`;
+      if (t.run_id) line += `\n    run_id: ${t.run_id}`;
+      return line;
+    },
+  });
+  if (filtered.length > limit) {
+    outputMessage(`\n  ... and ${filtered.length - limit} more traces`);
   }
 }
 
@@ -121,12 +145,29 @@ export async function handleTrace(ctx: CommandContext): Promise<void> {
     run_id: runId,
   });
 
-  console.log(`Trace for run: ${runId}`);
-  console.log(`Automation: ${itemId}`);
-  console.log(`State: ${result.script_execution ?? 'unknown'}`);
+  if (isJsonOutput()) {
+    output(
+      {
+        run_id: runId,
+        automation_id: itemId,
+        state: result.script_execution,
+        error: result.error,
+        trace: result.trace,
+        trigger: result.trigger,
+        context: result.context,
+        timestamp: result.timestamp,
+      },
+      { command: 'trace' }
+    );
+    return;
+  }
+
+  outputMessage(`Trace for run: ${runId}`);
+  outputMessage(`Automation: ${itemId}`);
+  outputMessage(`State: ${result.script_execution ?? 'unknown'}`);
 
   if (result.error) {
-    console.log('\nERROR:', result.error);
+    outputMessage(`\nERROR: ${result.error}`);
   }
 
   // Look for errors and variables in trace steps
@@ -134,27 +175,29 @@ export async function handleTrace(ctx: CommandContext): Promise<void> {
     for (const [tracePath, steps] of Object.entries(result.trace)) {
       for (const step of steps) {
         if (step.error) {
-          console.log(`\nError at ${tracePath}:`);
+          outputMessage(`\nError at ${tracePath}:`);
           console.log(JSON.stringify(step.error, null, 2));
         }
         if (step.result?.error) {
-          console.log(`\nResult error at ${tracePath}:`);
+          outputMessage(`\nResult error at ${tracePath}:`);
           console.log(JSON.stringify(step.result.error, null, 2));
         }
         const varKeys = step.variables ? Object.keys(step.variables) : [];
         if (varKeys.length > 0 && varKeys.length < 20) {
-          console.log(`\nVariables at ${tracePath}:`, varKeys.join(', '));
+          outputMessage(`\nVariables at ${tracePath}: ${varKeys.join(', ')}`);
         }
       }
     }
   }
 
   if (result.config?.trigger) {
-    console.log('\nTrigger config:', JSON.stringify(result.config.trigger, null, 2));
+    outputMessage('\nTrigger config:');
+    console.log(JSON.stringify(result.config.trigger, null, 2));
   }
 
   if (result.context) {
-    console.log('\nContext:', JSON.stringify(result.context, null, 2));
+    outputMessage('\nContext:');
+    console.log(JSON.stringify(result.context, null, 2));
   }
 }
 
@@ -291,7 +334,12 @@ export async function handleAutomationConfig(ctx: CommandContext): Promise<void>
     entity_id: entityId.startsWith('automation.') ? entityId : `automation.${entityId}`,
   });
 
-  console.log(`Configuration for ${entityId}:\n`);
+  if (isJsonOutput()) {
+    output({ entity_id: entityId, config: result.config }, { command: 'automation-config' });
+    return;
+  }
+
+  outputMessage(`Configuration for ${entityId}:\n`);
   console.log(JSON.stringify(result.config, null, 2));
 }
 

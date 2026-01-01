@@ -2,24 +2,27 @@
 
 ## Overview
 
-This is a TypeScript CLI tool for interacting with Home Assistant's WebSocket API. It runs within a Home Assistant add-on environment and provides commands for querying entity states, calling services, viewing history, debugging automations, and more.
+TypeScript CLI for Home Assistant WebSocket API. Runs in HA add-on environment. Commands for entity states, services, history, and automation debugging.
 
 ## Architecture
 
 ```
 ha-ws-client/
-├── ha-ws-client.ts      # Entry point - CLI parsing, WebSocket connection, message routing
+├── ha-ws-client.ts      # Entry point - CLI parsing, WebSocket, routing
 ├── src/
-│   ├── client.ts        # WebSocket request/response handling, message ID management
-│   ├── errors.ts        # Custom error classes (HAClientError, EntityNotFoundError, etc.)
-│   ├── types.ts         # TypeScript interfaces for all data structures
-│   ├── utils.ts         # Date parsing, attribute formatting, YAML module loading
+│   ├── client.ts        # WebSocket request/response, message IDs
+│   ├── errors.ts        # Custom errors (HAClientError, EntityNotFoundError)
+│   ├── types.ts         # All TypeScript interfaces + Result/Option types + Schema validation
+│   ├── utils.ts         # Date parsing, attribute formatting, YAML loading
+│   ├── output.ts        # Output formatting with strategy pattern (json/compact/default adapters)
+│   ├── index.ts         # Barrel exports
 │   └── handlers/
-│       ├── index.ts     # Command handler registry and exports
-│       ├── basic.ts     # Core commands: ping, state, states, config, services, call, template
-│       ├── history.ts   # History commands: logbook, history, attrs, timeline, stats, syslog
-│       ├── registry.ts  # Registry commands: entities, devices, areas
-│       └── automation.ts # Debug commands: traces, trace, trace-vars, trace-timeline, trace-trigger, trace-actions, trace-debug, context, watch, blueprint-inputs
+│       ├── index.ts     # Command handler registry
+│       ├── basic.ts     # ping, state, states, config, services, call, template
+│       ├── history.ts   # logbook, history, attrs, timeline, stats, syslog
+│       ├── registry.ts  # entities, devices, areas
+│       ├── automation.ts # traces, trace, trace-vars, trace-timeline, trace-debug, etc.
+│       └── monitor.ts   # watch, monitor, monitor-multi, analyze
 ```
 
 ## Development
@@ -161,3 +164,54 @@ npm run ha -- trace-debug <run_id>      # Comprehensive view
 - `tsx` - TypeScript execution
 - `@biomejs/biome` - Linting and formatting
 - `typescript` - Type checking
+
+## Output Formats
+
+All commands support output format flags for context-efficient AI consumption:
+
+| Flag | Format | Use Case |
+|------|--------|----------|
+| `--json` | JSON | Machine-readable, most context-efficient |
+| `--compact` | Compact | Reduced verbosity, single-line entries |
+| (default) | Default | Human-readable with formatting |
+
+**Additional flags:**
+- `--no-headers` - Suppress headers/separators
+- `--no-timestamps` - Suppress timestamps
+- `--max-items=N` - Limit output items
+
+**Examples:**
+```bash
+npm run ha -- states --json              # JSON array of all states
+npm run ha -- history sensor.temp 4 --compact  # One-line-per-entry
+npm run ha -- traces --json --max-items=5     # Last 5 traces as JSON
+```
+
+**JSON output structure:**
+```json
+{"success": true, "data": [...], "count": 42, "command": "states"}
+{"success": true, "message": "pong"}
+{"success": false, "error": "Entity not found: light.kitchen", "code": "ENTITY_NOT_FOUND"}
+```
+
+**Error codes:** `ENTITY_NOT_FOUND`, `AUTH_FAILED`, `INVALID_DATE`, `INVALID_JSON`
+
+## Key Type Patterns
+
+**Result type** - Explicit error handling (no exceptions):
+```typescript
+import { Result, ok, err, isOk } from './src/types.js';
+// Return Result<T, E> instead of throwing
+```
+
+**Branded types** - Nominal typing for entity_id, context_id, etc.:
+```typescript
+import { EntityId, entityId } from './src/types.js';
+const id: EntityId = entityId('light.kitchen');  // Type-safe
+```
+
+**Schema validation** - Runtime validation without dependencies:
+```typescript
+import { Schema, HAStateSchema } from './src/types.js';
+const result = HAStateSchema.validate(unknownData);
+```

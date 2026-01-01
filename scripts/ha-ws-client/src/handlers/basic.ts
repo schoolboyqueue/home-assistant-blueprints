@@ -7,6 +7,7 @@ import * as fs from 'node:fs';
 import type WebSocket from 'ws';
 import { HAClientError, nextId, sendMessage } from '../client.js';
 import { EntityNotFoundError } from '../errors.js';
+import { getOutputConfig, isJsonOutput, output, outputList, outputMessage } from '../output.js';
 import type { CommandContext, HAConfig, HAMessage, HAState } from '../types.js';
 import { parseJsonArg, requireArg } from '../utils.js';
 
@@ -25,7 +26,13 @@ import { parseJsonArg, requireArg } from '../utils.js';
 export async function handlePing(ctx: CommandContext): Promise<void> {
   const start = Date.now();
   await sendMessage(ctx.ws, 'ping');
-  console.log(`Pong! (${Date.now() - start}ms)`);
+  const latency = Date.now() - start;
+
+  if (isJsonOutput()) {
+    output({ latency_ms: latency }, { command: 'ping' });
+  } else {
+    outputMessage(`Pong! (${latency}ms)`);
+  }
 }
 
 /**
@@ -47,7 +54,7 @@ export async function handleState(ctx: CommandContext): Promise<void> {
   if (!entity) {
     throw new EntityNotFoundError(entityId);
   }
-  console.log(JSON.stringify(entity, null, 2));
+  output(entity, { command: 'state' });
 }
 
 /**
@@ -67,10 +74,20 @@ export async function handleState(ctx: CommandContext): Promise<void> {
  */
 export async function handleStates(ctx: CommandContext): Promise<void> {
   const states = await sendMessage<HAState[]>(ctx.ws, 'get_states');
-  console.log(`Total entities: ${states.length}`);
-  console.log('\nSample entities:');
-  for (const s of states.slice(0, 10)) {
-    console.log(`  ${s.entity_id}: ${s.state}`);
+  const { format, maxItems } = getOutputConfig();
+  const limit = maxItems > 0 ? maxItems : 10;
+
+  if (format === 'json') {
+    output(
+      { total: states.length, sample: states.slice(0, limit) },
+      { command: 'states', count: states.length }
+    );
+  } else {
+    outputList(states.slice(0, limit), {
+      title: `Total entities: ${states.length}\nSample`,
+      command: 'states',
+      itemFormatter: (s) => `  ${s.entity_id}: ${s.state}`,
+    });
   }
 }
 
@@ -87,7 +104,7 @@ export async function handleStates(ctx: CommandContext): Promise<void> {
  */
 export async function handleStatesJson(ctx: CommandContext): Promise<void> {
   const states = await sendMessage<HAState[]>(ctx.ws, 'get_states');
-  console.log(JSON.stringify(states, null, 2));
+  output(states, { command: 'states-json', count: states.length });
 }
 
 /**
@@ -107,10 +124,12 @@ export async function handleStatesFilter(ctx: CommandContext): Promise<void> {
   const states = await sendMessage<HAState[]>(ctx.ws, 'get_states');
   const regex = new RegExp(pattern.replace(/\*/g, '.*'));
   const filtered = states.filter((s) => regex.test(s.entity_id));
-  for (const s of filtered) {
-    console.log(`${s.entity_id}: ${s.state}`);
-  }
-  console.log(`\nFound ${filtered.length} matching entities`);
+
+  outputList(filtered, {
+    title: `Found ${filtered.length} matching entities`,
+    command: 'states-filter',
+    itemFormatter: (s) => `${s.entity_id}: ${s.state}`,
+  });
 }
 
 /**
@@ -126,20 +145,15 @@ export async function handleStatesFilter(ctx: CommandContext): Promise<void> {
  */
 export async function handleConfig(ctx: CommandContext): Promise<void> {
   const config = await sendMessage<HAConfig>(ctx.ws, 'get_config');
-  console.log(
-    JSON.stringify(
-      {
-        version: config.version,
-        location_name: config.location_name,
-        time_zone: config.time_zone,
-        unit_system: config.unit_system,
-        state: config.state,
-        components_count: config.components.length,
-      },
-      null,
-      2
-    )
-  );
+  const summary = {
+    version: config.version,
+    location_name: config.location_name,
+    time_zone: config.time_zone,
+    unit_system: config.unit_system,
+    state: config.state,
+    components_count: config.components.length,
+  };
+  output(summary, { command: 'config' });
 }
 
 /**
@@ -162,11 +176,24 @@ export async function handleServices(ctx: CommandContext): Promise<void> {
     'get_services'
   );
   const domains = Object.keys(services).sort();
-  console.log(`Domains: ${domains.length}`);
-  for (const domain of domains) {
-    const domainServices = services[domain];
-    const svcList = domainServices ? Object.keys(domainServices).join(', ') : '';
-    console.log(`  ${domain}: ${svcList}`);
+  const { format } = getOutputConfig();
+
+  if (format === 'json') {
+    const data = domains.map((domain) => ({
+      domain,
+      services: Object.keys(services[domain] ?? {}),
+    }));
+    output(data, { command: 'services', count: domains.length });
+  } else {
+    outputList(domains, {
+      title: `Domains`,
+      command: 'services',
+      itemFormatter: (domain) => {
+        const domainServices = services[domain];
+        const svcList = domainServices ? Object.keys(domainServices).join(', ') : '';
+        return `  ${domain}: ${svcList}`;
+      },
+    });
   }
 }
 
@@ -194,9 +221,23 @@ export async function handleCall(ctx: CommandContext): Promise<void> {
     service,
     service_data: serviceData,
   });
-  console.log('Service called successfully');
-  if (result && Object.keys(result).length > 0) {
-    console.log('Response:', JSON.stringify(result, null, 2));
+
+  const { format } = getOutputConfig();
+  if (format === 'json') {
+    output(
+      {
+        domain,
+        service,
+        service_data: serviceData,
+        response: result,
+      },
+      { command: 'call', summary: 'Service called successfully' }
+    );
+  } else {
+    outputMessage('Service called successfully');
+    if (result && Object.keys(result).length > 0) {
+      output(result, { summary: 'Response:' });
+    }
   }
 }
 
@@ -279,5 +320,10 @@ export async function handleTemplate(ctx: CommandContext): Promise<void> {
   );
 
   const result = await resultPromise;
-  console.log(result);
+
+  if (isJsonOutput()) {
+    output({ template, result }, { command: 'template' });
+  } else {
+    outputMessage(result);
+  }
 }

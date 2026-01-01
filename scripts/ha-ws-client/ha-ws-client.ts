@@ -28,6 +28,7 @@ import WebSocket from 'ws';
 import { pendingRequests } from './src/client.js';
 import { HAClientError } from './src/errors.js';
 import { commandHandlers } from './src/handlers/index.js';
+import { outputError, parseOutputArgs } from './src/output.js';
 // Local module imports
 import type { CommandContext, HAMessage } from './src/types.js';
 import { parseTimeArgs } from './src/utils.js';
@@ -57,8 +58,15 @@ if (!TOKEN) {
 // Command Line Parsing
 // =============================================================================
 
-const args = process.argv.slice(2);
-const { fromTime: globalFromTime, toTime: globalToTime, filteredArgs } = parseTimeArgs(args);
+const rawArgs = process.argv.slice(2);
+// Parse output format flags first (--output=json, --compact, --json, etc.)
+const argsAfterOutput = parseOutputArgs(rawArgs);
+// Then parse time args
+const {
+  fromTime: globalFromTime,
+  toTime: globalToTime,
+  filteredArgs,
+} = parseTimeArgs(argsAfterOutput);
 const command = filteredArgs[0];
 
 // =============================================================================
@@ -109,6 +117,16 @@ Automation Debugging:
 Time Filtering Options (for logbook, history, history-full, attrs, timeline):
   --from "YYYY-MM-DD HH:MM"      - Start time (instead of hours ago)
   --to "YYYY-MM-DD HH:MM"        - End time (default: now)
+
+Output Format Options (for AI agent context efficiency):
+  --output=json                  - Machine-readable JSON (most context-efficient)
+  --output=compact               - Reduced verbosity, single-line entries
+  --output=default               - Human-readable formatted output
+  --json                         - Shorthand for --output=json
+  --compact                      - Shorthand for --output=compact
+  --no-headers                   - Hide section headers/titles
+  --no-timestamps                - Hide timestamps in output
+  --max-items=N                  - Limit output to N items
 
 Examples:
   npx tsx ha-ws-client.ts state sun.sun
@@ -169,9 +187,9 @@ async function main(): Promise<void> {
           await executeCommand(ws);
         } catch (err) {
           if (err instanceof HAClientError) {
-            console.error(`Error [${err.code}]:`, err.message);
+            outputError(err.message, err.code);
           } else {
-            console.error('Error:', err instanceof Error ? err.message : String(err));
+            outputError(err instanceof Error ? err.message : String(err));
           }
         }
         clearTimeout(timeoutId);
