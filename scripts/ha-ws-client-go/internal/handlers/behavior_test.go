@@ -37,15 +37,6 @@ func captureOutput(t *testing.T, fn func()) string {
 	return buf.String()
 }
 
-// resetOutputConfig resets the global output config to default.
-func resetOutputConfig(t *testing.T) func() {
-	t.Helper()
-	original := output.GetConfig()
-	return func() {
-		output.SetConfig(original)
-	}
-}
-
 // =============================================================================
 // HandleState Behavior Tests
 // =============================================================================
