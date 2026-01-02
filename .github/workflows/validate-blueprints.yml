@@ -40,6 +40,11 @@ jobs:
           PASSED=0
 
           for blueprint in blueprints/*/*.yaml; do
+            # Skip shared directory (contains partial templates, not full blueprints)
+            if [[ "$blueprint" == *"/shared/"* ]]; then
+              continue
+            fi
+
             if [[ -f "$blueprint" ]]; then
               echo -n "  $blueprint ... "
               if ./scripts/validate-blueprint-go/validate-blueprint "$blueprint" > /tmp/output.txt 2>&1; then
@@ -70,6 +75,11 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
 
           for blueprint in blueprints/*/*.yaml; do
+            # Skip shared directory
+            if [[ "$blueprint" == *"/shared/"* ]]; then
+              continue
+            fi
+
             if [[ -f "$blueprint" ]]; then
               name=$(basename $(dirname "$blueprint"))
               if ./scripts/validate-blueprint-go/validate-blueprint "$blueprint" > /dev/null 2>&1; then
