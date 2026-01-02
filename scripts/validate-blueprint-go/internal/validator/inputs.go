@@ -1,22 +1,24 @@
 package validator
 
-import "fmt"
+import (
+	"github.com/home-assistant-blueprints/validate-blueprint-go/internal/common"
+)
 
 // ValidateInputs validates input definitions
 func (v *BlueprintValidator) ValidateInputs() {
-	blueprint, ok := v.Data["blueprint"].(map[string]interface{})
+	blueprint, ok := common.TryGetMap(v.Data, "blueprint")
 	if !ok {
 		return
 	}
 
-	inputs, ok := blueprint["input"]
-	if !ok {
+	inputs, hasInput := blueprint["input"]
+	if !hasInput {
 		return
 	}
 
-	inputsMap, ok := inputs.(map[string]interface{})
+	inputsMap, ok, errMsg := common.GetMap(inputs, "blueprint.input")
 	if !ok {
-		v.AddError("'blueprint.input' must be a dictionary")
+		v.AddError(errMsg)
 		return
 	}
 
@@ -24,22 +26,23 @@ func (v *BlueprintValidator) ValidateInputs() {
 }
 
 // validateInputDict recursively validates input definitions
+// Uses common path building utilities for consistency.
 func (v *BlueprintValidator) validateInputDict(inputs map[string]interface{}, path string) {
 	for key, value := range inputs {
-		currentPath := fmt.Sprintf("%s.%s", path, key)
+		currentPath := common.KeyPath(path, key)
 
-		valueMap, ok := value.(map[string]interface{})
+		valueMap, ok, errMsg := common.GetMap(value, currentPath)
 		if !ok {
-			v.AddErrorf("%s: Input must be a dictionary", currentPath)
+			v.AddError(errMsg)
 			continue
 		}
 
 		// Check if this is an input group or actual input
 		if nestedInput, hasNested := valueMap["input"]; hasNested {
 			// This is a group
-			nestedMap, ok := nestedInput.(map[string]interface{})
+			nestedMap, ok, errMsg := common.GetMap(nestedInput, common.JoinPath(currentPath, "input"))
 			if !ok {
-				v.AddErrorf("%s.input: Must be a dictionary", currentPath)
+				v.AddError(errMsg)
 			} else {
 				v.validateInputDict(nestedMap, currentPath)
 			}
@@ -52,6 +55,7 @@ func (v *BlueprintValidator) validateInputDict(inputs map[string]interface{}, pa
 }
 
 // validateSingleInput validates a single input definition
+// Uses common type extraction and validation patterns.
 func (v *BlueprintValidator) validateSingleInput(inputDef map[string]interface{}, path, inputName string) {
 	// Track default value
 	if defaultVal, ok := inputDef["default"]; ok {
@@ -65,9 +69,10 @@ func (v *BlueprintValidator) validateSingleInput(inputDef map[string]interface{}
 		return
 	}
 
-	selectorMap, ok := selector.(map[string]interface{})
+	selectorPath := common.JoinPath(path, "selector")
+	selectorMap, ok, errMsg := common.GetMap(selector, selectorPath)
 	if !ok {
-		v.AddErrorf("%s.selector: Must be a dictionary", path)
+		v.AddError(errMsg)
 		return
 	}
 
@@ -76,15 +81,16 @@ func (v *BlueprintValidator) validateSingleInput(inputDef map[string]interface{}
 
 	// Validate selector type
 	for selectorType := range selectorMap {
-		if !ValidSelectorTypes[selectorType] {
-			v.AddWarningf("%s.selector: Unknown selector type '%s'", path, selectorType)
+		// Use common selector validation
+		if warnMsg := common.ValidateSelector(selectorType, ValidSelectorTypes, selectorPath); warnMsg != "" {
+			v.AddWarning(warnMsg)
 		}
 
 		// Track entity selector inputs
 		if selectorType == "entity" {
 			v.EntityInputs[inputName] = true
-			if entitySelector, ok := selectorMap["entity"].(map[string]interface{}); ok {
-				if domain, ok := entitySelector["domain"].(string); ok && domain == "input_datetime" {
+			if entitySelector, ok := common.TryGetMap(selectorMap, "entity"); ok {
+				if domain, ok := common.TryGetString(entitySelector, "domain"); ok && domain == "input_datetime" {
 					v.InputDatetimeInputs[inputName] = true
 				}
 			}
@@ -92,7 +98,7 @@ func (v *BlueprintValidator) validateSingleInput(inputDef map[string]interface{}
 
 		// Validate select selector options
 		if selectorType == "select" {
-			if selectConfig, ok := selectorMap["select"].(map[string]interface{}); ok {
+			if selectConfig, ok := common.TryGetMap(selectorMap, "select"); ok {
 				v.validateSelectOptions(selectConfig, path)
 			}
 		}
@@ -100,20 +106,22 @@ func (v *BlueprintValidator) validateSingleInput(inputDef map[string]interface{}
 }
 
 // validateSelectOptions validates select selector options
+// Uses common path building and type checking utilities.
 func (v *BlueprintValidator) validateSelectOptions(selectConfig map[string]interface{}, path string) {
 	options, ok := selectConfig["options"]
 	if !ok {
 		return
 	}
 
-	optionsList, ok := options.([]interface{})
+	optionsPath := common.JoinPath(path, "selector.select.options")
+	optionsList, ok, errMsg := common.GetList(options, optionsPath)
 	if !ok {
-		v.AddErrorf("%s.selector.select.options: Must be a list", path)
+		v.AddError(errMsg)
 		return
 	}
 
 	for i, option := range optionsList {
-		optionPath := fmt.Sprintf("%s.selector.select.options[%d]", path, i)
+		optionPath := common.IndexPath(optionsPath, i)
 
 		switch opt := option.(type) {
 		case nil:

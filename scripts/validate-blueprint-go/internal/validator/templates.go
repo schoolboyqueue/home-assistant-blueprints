@@ -1,9 +1,7 @@
 package validator
 
 import (
-	"fmt"
-	"regexp"
-	"strings"
+	"github.com/home-assistant-blueprints/validate-blueprint-go/internal/common"
 )
 
 // ValidateTemplates validates Jinja2 templates throughout the blueprint
@@ -12,42 +10,26 @@ func (v *BlueprintValidator) ValidateTemplates() {
 }
 
 // validateTemplatesInValue recursively validates templates in a value
+// Uses common.TraverseValue for consistent traversal and common path building.
 func (v *BlueprintValidator) validateTemplatesInValue(value interface{}, path string) {
-	switch val := value.(type) {
-	case string:
-		v.validateTemplateString(val, path)
-	case map[string]interface{}:
-		for k, v2 := range val {
-			newPath := path
-			if newPath == "" {
-				newPath = k
-			} else {
-				newPath = fmt.Sprintf("%s.%s", path, k)
-			}
-			v.validateTemplatesInValue(v2, newPath)
+	common.TraverseValue(value, path, func(val interface{}, currentPath string) bool {
+		if s, ok := val.(string); ok {
+			v.validateTemplateString(s, currentPath)
 		}
-	case []interface{}:
-		for i, v2 := range val {
-			v.validateTemplatesInValue(v2, fmt.Sprintf("%s[%d]", path, i))
-		}
-	}
+		return true
+	})
 }
 
 // validateTemplateString validates a template string
+// Uses common validation functions for consistency.
 func (v *BlueprintValidator) validateTemplateString(template, path string) {
 	// Check for !input inside {{ }} blocks
-	inputInTemplatePattern := regexp.MustCompile(`\{\{[^}]*!input[^}]*\}\}`)
-	if inputInTemplatePattern.MatchString(template) {
-		v.AddErrorf(
-			"%s: Cannot use !input tags inside {{ }} blocks. Assign the input to a variable first.",
-			path)
+	if err := common.ValidateNoInputInTemplate(template, path); err != "" {
+		v.AddError(err)
 	}
 
 	// Check for balanced Jinja2 delimiters
-	if strings.Count(template, "{{") != strings.Count(template, "}}") {
-		v.AddErrorf("%s: Unbalanced {{ }} delimiters", path)
-	}
-	if strings.Count(template, "{%") != strings.Count(template, "%}") {
-		v.AddErrorf("%s: Unbalanced {%% %%} delimiters", path)
+	for _, err := range common.ValidateBalancedDelimiters(template, path) {
+		v.AddError(err)
 	}
 }

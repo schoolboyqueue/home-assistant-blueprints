@@ -1,8 +1,9 @@
 package validator
 
 import (
-	"fmt"
 	"slices"
+
+	"github.com/home-assistant-blueprints/validate-blueprint-go/internal/common"
 )
 
 // ValidateConditions validates condition definitions
@@ -16,11 +17,12 @@ func (v *BlueprintValidator) ValidateConditions() {
 }
 
 // validateConditionList validates a list of conditions
+// Uses common path building for consistency.
 func (v *BlueprintValidator) validateConditionList(conditions interface{}, path string) {
 	switch cond := conditions.(type) {
 	case []interface{}:
 		for i, c := range cond {
-			v.validateConditionList(c, fmt.Sprintf("%s[%d]", path, i))
+			v.validateConditionList(c, common.IndexPath(path, i))
 		}
 	case map[string]interface{}:
 		v.validateSingleCondition(cond, path)
@@ -28,6 +30,7 @@ func (v *BlueprintValidator) validateConditionList(conditions interface{}, path 
 }
 
 // validateSingleCondition validates a single condition
+// Uses common enum validation for condition types.
 func (v *BlueprintValidator) validateSingleCondition(condition map[string]interface{}, path string) {
 	// Check for condition type
 	condType, hasCondition := condition["condition"].(string)
@@ -40,7 +43,7 @@ func (v *BlueprintValidator) validateSingleCondition(condition map[string]interf
 		return
 	}
 
-	// Validate condition type
+	// Validate condition type using common enum validation pattern
 	isValid := slices.Contains(ValidConditionTypes, condType)
 	if !isValid {
 		v.AddWarningf("%s: Unknown condition type '%s'", path, condType)
@@ -49,7 +52,7 @@ func (v *BlueprintValidator) validateSingleCondition(condition map[string]interf
 	// Validate nested conditions for and/or/not
 	if condType == "and" || condType == "or" || condType == "not" {
 		if conditions, ok := condition["conditions"]; ok {
-			v.validateConditionList(conditions, fmt.Sprintf("%s.conditions", path))
+			v.validateConditionList(conditions, common.JoinPath(path, "conditions"))
 		}
 	}
 }

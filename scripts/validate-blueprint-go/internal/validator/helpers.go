@@ -2,9 +2,9 @@ package validator
 
 import (
 	"fmt"
-	"regexp"
 	"strconv"
-	"strings"
+
+	"github.com/home-assistant-blueprints/validate-blueprint-go/internal/common"
 )
 
 // ToFloat converts various types to float64
@@ -34,42 +34,73 @@ func Abs(x float64) float64 {
 }
 
 // ContainsVariableRef checks if template contains variable references (not !input)
+// Delegates to common.ContainsVariableRef for consistency.
 func ContainsVariableRef(template string) bool {
-	varPattern := regexp.MustCompile(`\{\{[^}]*\b[a-z_][a-z0-9_]*\b[^}]*\}\}`)
-	return varPattern.MatchString(template)
+	return common.ContainsVariableRef(template)
 }
 
 // ContainsInputRef checks if template contains !input references
+// Delegates to common.ContainsInputRef for consistency.
 func ContainsInputRef(template string) bool {
-	return strings.Contains(template, "!input")
+	return common.ContainsInputRef(template)
 }
 
 // CollectInputRefs collects !input references from a string
 func (v *BlueprintValidator) CollectInputRefs(value string) {
-	if after, ok := strings.CutPrefix(value, "!input "); ok {
-		inputName := after
-		inputName = strings.TrimSpace(inputName)
+	if inputName := common.ExtractInputRef(value); inputName != "" {
 		v.UsedInputs[inputName] = true
 	}
 }
 
 // CollectInputRefsFromMap recursively collects !input references from a map
+// Uses common.TraverseValue for consistent traversal.
 func (v *BlueprintValidator) CollectInputRefsFromMap(m map[string]interface{}) {
-	for _, value := range m {
-		switch val := value.(type) {
-		case string:
-			v.CollectInputRefs(val)
-		case map[string]interface{}:
-			v.CollectInputRefsFromMap(val)
-		case []interface{}:
-			for _, item := range val {
-				switch itemVal := item.(type) {
-				case string:
-					v.CollectInputRefs(itemVal)
-				case map[string]interface{}:
-					v.CollectInputRefsFromMap(itemVal)
-				}
+	common.TraverseValue(m, "", func(value interface{}, _ string) bool {
+		if s, ok := value.(string); ok {
+			if inputName := common.ExtractInputRef(s); inputName != "" {
+				v.UsedInputs[inputName] = true
 			}
 		}
+		return true
+	})
+}
+
+// MergeValidationResult merges validation issues from a common.ValidationResult
+// into the BlueprintValidator's error/warning slices.
+func (v *BlueprintValidator) MergeValidationResult(result *common.ValidationResult) {
+	if result == nil {
+		return
+	}
+	for _, issue := range result.Issues {
+		if issue.IsError() {
+			v.AddError(issue.String())
+		} else {
+			v.AddWarning(issue.String())
+		}
+	}
+}
+
+// AddValidationIssue adds a single validation issue to the appropriate slice.
+func (v *BlueprintValidator) AddValidationIssue(issue common.ValidationIssue) {
+	if issue.IsError() {
+		v.AddError(issue.String())
+	} else {
+		v.AddWarning(issue.String())
+	}
+}
+
+// AddIssueFromError adds an error string as a validation error if non-empty.
+// This is a helper for integrating common validation functions that return error strings.
+func (v *BlueprintValidator) AddIssueFromError(errMsg string) {
+	if errMsg != "" {
+		v.AddError(errMsg)
+	}
+}
+
+// AddIssueFromWarning adds a warning string as a validation warning if non-empty.
+// This is a helper for integrating common validation functions that return warning strings.
+func (v *BlueprintValidator) AddIssueFromWarning(warnMsg string) {
+	if warnMsg != "" {
+		v.AddWarning(warnMsg)
 	}
 }

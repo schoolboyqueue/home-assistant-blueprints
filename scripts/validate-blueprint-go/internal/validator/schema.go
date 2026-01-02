@@ -3,11 +3,13 @@ package validator
 import (
 	"fmt"
 	"regexp"
-	"slices"
 	"strings"
+
+	"github.com/home-assistant-blueprints/validate-blueprint-go/internal/common"
 )
 
 // ValidateStructure validates root-level structure
+// Uses common required key validation patterns.
 func (v *BlueprintValidator) ValidateStructure() {
 	// Check required root keys
 	for _, key := range RequiredRootKeys {
@@ -17,7 +19,7 @@ func (v *BlueprintValidator) ValidateStructure() {
 	}
 
 	// Warn about variables not at root level
-	if blueprint, ok := v.Data["blueprint"].(map[string]interface{}); ok {
+	if blueprint, ok := common.TryGetMap(v.Data, "blueprint"); ok {
 		if _, hasVars := blueprint["variables"]; hasVars {
 			v.AddError("'variables' must be at root level, not nested under 'blueprint'")
 		}
@@ -32,15 +34,16 @@ func (v *BlueprintValidator) ValidateStructure() {
 }
 
 // ValidateBlueprintSection validates blueprint metadata section
+// Uses common type extraction and enum validation.
 func (v *BlueprintValidator) ValidateBlueprintSection() {
 	blueprint, ok := v.Data["blueprint"]
 	if !ok {
 		return
 	}
 
-	blueprintMap, ok := blueprint.(map[string]interface{})
+	blueprintMap, ok, errMsg := common.GetMap(blueprint, "blueprint")
 	if !ok {
-		v.AddError("'blueprint' must be a dictionary")
+		v.AddError(errMsg)
 		return
 	}
 
@@ -51,32 +54,32 @@ func (v *BlueprintValidator) ValidateBlueprintSection() {
 		}
 	}
 
-	// Validate domain
-	if domain, ok := blueprintMap["domain"].(string); ok {
+	// Validate domain using common enum validation
+	if domain, ok := common.TryGetString(blueprintMap, "domain"); ok {
 		validDomains := []string{"automation", "script"}
-		isValid := slices.Contains(validDomains, domain)
-		if !isValid {
-			v.AddErrorf("Invalid domain '%s', must be one of: %v", domain, validDomains)
+		if errMsg := common.ValidateEnumValue(domain, validDomains, "blueprint", "domain"); errMsg != "" {
+			v.AddError(errMsg)
 		}
 	}
 }
 
 // ValidateMode validates automation mode
+// Uses common type extraction and enum validation.
 func (v *BlueprintValidator) ValidateMode() {
 	mode, ok := v.Data["mode"]
 	if !ok {
 		return // Default mode is 'single', which is valid
 	}
 
-	modeStr, ok := mode.(string)
+	modeStr, ok, errMsg := common.GetString(mode, "mode")
 	if !ok {
-		v.AddError("'mode' must be a string")
+		v.AddError(errMsg)
 		return
 	}
 
-	isValid := slices.Contains(ValidModes, modeStr)
-	if !isValid {
-		v.AddErrorf("Invalid mode '%s', must be one of: %v", modeStr, ValidModes)
+	// Validate mode using common enum validation
+	if errMsg := common.ValidateEnumValue(modeStr, ValidModes, "", "mode"); errMsg != "" {
+		v.AddError(errMsg)
 	}
 
 	// Check for max when using queued/parallel
@@ -90,14 +93,15 @@ func (v *BlueprintValidator) ValidateMode() {
 }
 
 // ValidateVersionSync validates version sync between name and blueprint_version
+// Uses common type extraction utilities.
 func (v *BlueprintValidator) ValidateVersionSync() {
-	blueprint, ok := v.Data["blueprint"].(map[string]interface{})
+	blueprint, ok := common.TryGetMap(v.Data, "blueprint")
 	if !ok {
 		return
 	}
 
-	name, hasName := blueprint["name"].(string)
-	variables, hasVars := v.Data["variables"].(map[string]interface{})
+	name, hasName := common.TryGetString(blueprint, "name")
+	variables, hasVars := common.TryGetMap(v.Data, "variables")
 
 	if !hasName || !hasVars {
 		return

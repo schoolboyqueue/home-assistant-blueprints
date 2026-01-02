@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/home-assistant-blueprints/validate-blueprint-go/internal/common"
 )
 
 // ValidateHysteresisBoundaries validates hysteresis boundary pairs
@@ -65,6 +67,7 @@ func (v *BlueprintValidator) ValidateHysteresisBoundaries() {
 }
 
 // ValidateVariables validates variables section
+// Uses common type extraction utilities.
 func (v *BlueprintValidator) ValidateVariables() {
 	variables, ok := v.Data["variables"]
 	if !ok {
@@ -72,9 +75,9 @@ func (v *BlueprintValidator) ValidateVariables() {
 		return
 	}
 
-	variablesMap, ok := variables.(map[string]interface{})
+	variablesMap, ok, errMsg := common.GetMap(variables, "variables")
 	if !ok {
-		v.AddError("'variables' must be a dictionary")
+		v.AddError(errMsg)
 		return
 	}
 
@@ -127,6 +130,7 @@ func (v *BlueprintValidator) ValidateVariables() {
 }
 
 // CheckBareBooleanLiterals checks for bare boolean literals in templates
+// Uses common template detection utilities.
 func (v *BlueprintValidator) CheckBareBooleanLiterals(varName, value string) {
 	lines := strings.Split(value, "\n")
 	foundBareTrue := false
@@ -142,8 +146,8 @@ func (v *BlueprintValidator) CheckBareBooleanLiterals(varName, value string) {
 			continue
 		}
 
-		// Skip if inside {{ }} blocks
-		if strings.Contains(line, "{{") && strings.Contains(line, "}}") {
+		// Skip if inside {{ }} blocks using common template detection
+		if common.ContainsTemplate(line) {
 			continue
 		}
 

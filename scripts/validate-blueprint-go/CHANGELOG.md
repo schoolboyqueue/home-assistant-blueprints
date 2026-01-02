@@ -5,6 +5,14 @@ All notable changes to validate-blueprint-go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-01-02
+
+### Changed
+
+- Extract shared validation helpers into internal/common package
+- Refactor validator files to use common.TraverseValue for consistent traversal
+- Add MergeValidationResult helper for integrating common validators
+
 ## [1.1.0] - 2026-01-02
 
 ### Changed
