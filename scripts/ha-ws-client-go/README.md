@@ -179,6 +179,38 @@ ha-ws-client history sensor.temp 48
 ha-ws-client history sensor.temp --from "2024-01-15 10:00" --to "2024-01-15 18:00"
 ```
 
+## Home Assistant Add-on Deployment
+
+This tool is designed to work seamlessly with the [Claude Terminal add-on](https://github.com/heytcass/home-assistant-addons) for Home Assistant.
+
+### Binary Location
+
+When using the Claude Terminal add-on, place the `ha-ws-client` binary in one of these directories:
+
+- `/config/ha-ws-client` - Directly in the HA config directory
+- `/config/.claude/ha-ws-client` - In a dedicated Claude tools subdirectory (recommended)
+
+### Setup
+
+```bash
+# Download the appropriate binary (usually linux-amd64 for HA OS)
+# Place in /config/.claude/
+mkdir -p /config/.claude
+mv ha-ws-client-linux-amd64 /config/.claude/ha-ws-client
+chmod +x /config/.claude/ha-ws-client
+
+# The SUPERVISOR_TOKEN is automatically available in the add-on environment
+/config/.claude/ha-ws-client ping
+```
+
+### Why This Location?
+
+- The `/config` directory persists across add-on restarts and updates
+- The `.claude` subdirectory keeps your tools organized alongside other Claude Code configurations
+- Both paths are accessible from within the Claude Terminal add-on
+
+> **Shoutout**: Thanks to [@heytcass](https://github.com/heytcass) for creating the excellent [Claude Terminal add-on](https://github.com/heytcass/home-assistant-addons) that makes running Claude Code directly in Home Assistant possible!
+
 ## Raspberry Pi Deployment
 
 ### For Pi 4 (64-bit Raspberry Pi OS)

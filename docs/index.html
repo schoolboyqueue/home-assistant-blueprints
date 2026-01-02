@@ -946,7 +946,15 @@
           <p class="tool-description">
             A high-performance WebSocket API client for querying Home Assistant and debugging automations. Written in Go
             for fast startup (~10ms), low memory (~5-10MB), and easy deployment as a single static binary—optimized for
-            Raspberry Pi.
+            Raspberry Pi and
+            <a
+              href="https://github.com/heytcass/home-assistant-addons"
+              target="_blank"
+              style="color: var(--accent-cyan);"
+              >Claude Terminal add-on</a
+            >
+            environments. Place the binary in <code>/config</code>or <code>/config/.claude</code>for seamless
+            integration.
           </p>
 
           <div class="tool-features">
@@ -954,6 +962,15 @@
             <ul>
               <li>Zero runtime dependencies—single static binary</li>
               <li>Cross-compiled for all Raspberry Pi variants</li>
+              <li>
+                HA Add-on ready—works with
+                <a
+                  href="https://github.com/heytcass/home-assistant-addons"
+                  target="_blank"
+                  style="color: var(--accent-cyan);"
+                  >Claude Terminal</a
+                >
+              </li>
               <li>Automation trace debugging (step-by-step)</li>
               <li>Live monitoring with anomaly detection</li>
               <li>Multiple output formats (JSON, compact, default)</li>
