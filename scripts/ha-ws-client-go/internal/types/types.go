@@ -123,11 +123,64 @@ type TraceDetail struct {
 	Trace           map[string][]TraceStep `json:"trace,omitempty"`
 	Config          *AutomationConfig      `json:"config,omitempty"`
 	Context         *HAContext             `json:"context,omitempty"`
-	Trigger         *TraceTrigger          `json:"trigger,omitempty"`
+	Trigger         any                    `json:"trigger,omitempty"` // Can be string or TraceTrigger object
 	RunID           string                 `json:"run_id,omitempty"`
 	Domain          string                 `json:"domain,omitempty"`
 	ItemID          string                 `json:"item_id,omitempty"`
 	Timestamp       *Timestamp             `json:"timestamp,omitempty"`
+}
+
+// GetTrigger returns the trigger as a TraceTrigger if available.
+func (t *TraceDetail) GetTrigger() *TraceTrigger {
+	if t.Trigger == nil {
+		return nil
+	}
+	switch v := t.Trigger.(type) {
+	case map[string]any:
+		trigger := &TraceTrigger{}
+		if id, ok := v["id"].(string); ok {
+			trigger.ID = id
+		}
+		if idx, ok := v["idx"].(string); ok {
+			trigger.Idx = idx
+		}
+		if alias, ok := v["alias"].(string); ok {
+			trigger.Alias = alias
+		}
+		if platform, ok := v["platform"].(string); ok {
+			trigger.Platform = platform
+		}
+		if entityID, ok := v["entity_id"].(string); ok {
+			trigger.EntityID = entityID
+		}
+		if desc, ok := v["description"].(string); ok {
+			trigger.Description = desc
+		}
+		return trigger
+	default:
+		return nil
+	}
+}
+
+// GetTriggerDescription returns a string description of the trigger.
+func (t *TraceDetail) GetTriggerDescription() string {
+	if t.Trigger == nil {
+		return ""
+	}
+	switch v := t.Trigger.(type) {
+	case string:
+		return v
+	case map[string]any:
+		if desc, ok := v["description"].(string); ok {
+			return desc
+		}
+		if platform, ok := v["platform"].(string); ok {
+			return platform
+		}
+		return "trigger"
+	default:
+		return ""
+	}
 }
 
 // TraceStep represents a single step in an automation trace.
@@ -217,7 +270,7 @@ type AreaEntry struct {
 // SysLogEntry represents a system log entry.
 type SysLogEntry struct {
 	Level         string  `json:"level,omitempty"`
-	Source        any     `json:"source,omitempty"` // Can be []string or []any (file, line)
+	Source        any     `json:"source,omitempty"`  // Can be []string or []any (file, line)
 	Message       any     `json:"message,omitempty"` // Can be string or []string
 	Name          string  `json:"name,omitempty"`
 	Timestamp     float64 `json:"timestamp,omitempty"`
@@ -277,7 +330,12 @@ type StatEntry struct {
 func (s *StatEntry) GetStartTime() string {
 	switch v := s.Start.(type) {
 	case float64:
-		return time.Unix(int64(v), 0).Format(time.RFC3339)
+		ts := int64(v)
+		// HA returns milliseconds for statistics timestamps
+		if ts > 1e12 {
+			ts = ts / 1000
+		}
+		return time.Unix(ts, 0).Format(time.RFC3339)
 	case string:
 		return v
 	default:

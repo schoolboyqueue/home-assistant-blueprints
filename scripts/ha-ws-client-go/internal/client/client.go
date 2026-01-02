@@ -95,8 +95,15 @@ func (c *Client) handleMessage(msg *types.HAMessage) {
 		c.subscriptionMu.RLock()
 		handler, ok := c.subscriptions[msg.ID]
 		c.subscriptionMu.RUnlock()
-		if ok && msg.Event != nil && msg.Event.Variables != nil {
-			handler(msg.Event.Variables)
+		if ok && msg.Event != nil {
+			vars := msg.Event.Variables
+			// render_template uses Event.Result, not Event.Variables
+			if vars == nil && msg.Event.Result != nil {
+				vars = map[string]any{"result": msg.Event.Result}
+			}
+			if vars != nil {
+				handler(vars)
+			}
 		}
 	}
 }
