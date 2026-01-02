@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/output"
+	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
 
 // HandleMonitor monitors entity state changes.
@@ -191,11 +192,7 @@ func HandleAnalyze(ctx *Context) error {
 	}
 
 	// Get recent history
-	typesTimeRange := calculateTimeRange(ctx, 24)
-	timeRange := TimeRange{
-		StartTime: typesTimeRange.StartTime,
-		EndTime:   typesTimeRange.EndTime,
-	}
+	timeRange := calculateTimeRange(ctx, 24)
 
 	result, err := getHistory(ctx, entityID, timeRange)
 	if err != nil {
@@ -272,7 +269,7 @@ func getStates(ctx *Context) ([]struct {
 	return states, nil
 }
 
-func getHistory(ctx *Context, entityID string, timeRange TimeRange) ([]HistoryState, error) {
+func getHistory(ctx *Context, entityID string, timeRange types.TimeRange) ([]types.HistoryState, error) {
 	// Use history/history_during_period WebSocket message type
 	resp, err := ctx.Client.SendMessage("history/history_during_period", map[string]any{
 		"entity_ids":       []string{entityID},
@@ -296,14 +293,14 @@ func getHistory(ctx *Context, entityID string, timeRange TimeRange) ([]HistorySt
 		return nil, nil
 	}
 
-	states := make([]HistoryState, 0, len(statesArr))
+	states := make([]types.HistoryState, 0, len(statesArr))
 	for _, s := range statesArr {
 		stateMap, ok := s.(map[string]any)
 		if !ok {
 			continue
 		}
 
-		hs := HistoryState{}
+		hs := types.HistoryState{}
 		if lu, ok := stateMap["lu"].(float64); ok {
 			hs.LU = int64(lu)
 		}
@@ -321,26 +318,4 @@ func getHistory(ctx *Context, entityID string, timeRange TimeRange) ([]HistorySt
 	}
 
 	return states, nil
-}
-
-// TimeRange is a helper struct for history queries.
-type TimeRange struct {
-	StartTime time.Time
-	EndTime   time.Time
-}
-
-// HistoryState is a helper struct for history data.
-type HistoryState struct {
-	LU          int64
-	S           string
-	State       string
-	LastUpdated string
-}
-
-// GetState returns the state value.
-func (h *HistoryState) GetState() string {
-	if h.S != "" {
-		return h.S
-	}
-	return h.State
 }

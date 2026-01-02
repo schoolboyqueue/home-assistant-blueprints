@@ -214,13 +214,13 @@ type AreaEntry struct {
 
 // SysLogEntry represents a system log entry.
 type SysLogEntry struct {
-	Level     string   `json:"level,omitempty"`
-	Source    []string `json:"source,omitempty"`
-	Message   any      `json:"message,omitempty"` // Can be string or []string
-	Name      string   `json:"name,omitempty"`
-	Timestamp float64  `json:"timestamp,omitempty"`
-	FirstOccurred float64 `json:"first_occurred,omitempty"`
-	Count     int      `json:"count,omitempty"`
+	Level         string   `json:"level,omitempty"`
+	Source        []string `json:"source,omitempty"`
+	Message       any      `json:"message,omitempty"` // Can be string or []string
+	Name          string   `json:"name,omitempty"`
+	Timestamp     float64  `json:"timestamp,omitempty"`
+	FirstOccurred float64  `json:"first_occurred,omitempty"`
+	Count         int      `json:"count,omitempty"`
 }
 
 // GetMessage returns the message as a string.
@@ -261,13 +261,6 @@ func (s *StatEntry) GetStartTime() string {
 	default:
 		return ""
 	}
-}
-
-// CommandContext contains context for command execution.
-type CommandContext struct {
-	Args     []string
-	FromTime *time.Time
-	ToTime   *time.Time
 }
 
 // TimeRange represents a time range for history queries.

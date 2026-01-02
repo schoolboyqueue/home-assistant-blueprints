@@ -331,6 +331,14 @@ func (c *Client) SubscribeToTemplate(template string, callback func(string), tim
 		c.subscriptionMu.Unlock()
 	}
 
+	// Auto-cleanup after timeout if specified
+	if timeout > 0 {
+		go func() {
+			time.Sleep(timeout)
+			cleanupFn()
+		}()
+	}
+
 	return id, cleanupFn, nil
 }
 

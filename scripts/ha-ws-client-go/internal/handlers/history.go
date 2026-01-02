@@ -197,7 +197,7 @@ func HandleAttrs(ctx *Context) error {
 // HandleTimeline shows multi-entity chronological timeline.
 func HandleTimeline(ctx *Context) error {
 	if len(ctx.Args) < 3 {
-		return errors.New("usage: timeline <hours> <entity>...")
+		return errors.New("missing arguments: timeline <hours> <entity>")
 	}
 
 	hours, err := strconv.Atoi(ctx.Args[1])
