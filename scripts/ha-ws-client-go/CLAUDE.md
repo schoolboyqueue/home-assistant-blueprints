@@ -97,7 +97,10 @@ func parseTimeArgs(args []string) (filtered []string, fromTime, toTime *time.Tim
 2. Export from handler file (public function name)
 3. Register in `commandRegistry` map in `cmd/ha-ws-client/main.go`
 4. Update help text in `showHelp()` function
-5. Update `README.md` CLI documentation
+5. **Update `README.md`** - Add command to appropriate table section:
+   - Basic Commands, Diagnostic Commands, Log Commands, Registry Commands, Automation Debugging, or Monitoring Commands
+   - Include command syntax with all arguments and flags
+   - Write a concise description
 
 Handler signature:
 ```go
@@ -113,12 +116,17 @@ func HandleMyCommand(ctx *Context) error {
 
 ### Before Committing
 
-**1. Bump version (for any code changes):**
+**1. Bump version (for code changes only, not documentation):**
 - Update `VERSION` in `Makefile` (e.g., `1.0.4` → `1.0.5`)
 - Add entry to `CHANGELOG.md` with the new version and date
 - Use semantic versioning: patch for fixes, minor for features, major for breaking changes
+- Skip version bump for documentation-only changes (README.md, CLAUDE.md, comments)
 
-**2. Run formatter and linter:**
+**2. Update documentation (for new features/commands):**
+- Update `README.md` command tables if adding new commands or flags
+- Ensure command syntax and descriptions are accurate
+
+**3. Run formatter and linter:**
 
 ```bash
 # In the HA add-on environment (no make available):
@@ -130,7 +138,7 @@ PATH=/config/.gopath/bin:$PATH GOPATH=/config/.gopath GOCACHE=/config/.gopath/ca
 make pre-commit   # Runs format, lint-fix, and tests
 ```
 
-**3. Build and test** before committing to verify changes work.
+**4. Build and test** before committing to verify changes work.
 
 **Common linter issues to watch for:**
 - Repeated string literals → extract to constants

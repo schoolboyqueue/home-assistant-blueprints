@@ -86,12 +86,18 @@ ha-ws-client monitor-multi light.kitchen light.living_room
 | `state <entity_id>` | Get single entity state |
 | `states` | Get all entity states (summary) |
 | `states-json` | Get all states as JSON array |
-| `states-filter <pattern>` | Filter states by entity_id pattern |
+| `states-filter <pattern> [--show-age]` | Filter states by entity_id pattern (--show-age shows staleness) |
 | `config` | Get HA configuration |
 | `services` | List all services |
 | `call <domain> <service> [data]` | Call a service (data as JSON) |
 | `template <template>` | Render a Jinja template |
 | `ping` | Test connection |
+
+### Diagnostic Commands
+| Command | Description |
+|---------|-------------|
+| `device-health <entity_id>` | Check device responsiveness and stale detection |
+| `compare <entity1> <entity2>` | Side-by-side entity comparison with attribute diffs |
 
 ### Log Commands
 | Command | Description |
@@ -116,8 +122,10 @@ ha-ws-client monitor-multi light.kitchen light.living_room
 ### Automation Debugging
 | Command | Description |
 |---------|-------------|
-| `traces [automation_id]` | List automation traces |
-| `trace <run_id> [automation_id]` | Get detailed trace |
+| `traces [automation_id] [--from]` | List automation traces (supports time filtering) |
+| `trace <automation_id> <run_id>` | Get detailed trace |
+| `trace-latest <automation_id>` | Get most recent trace without listing first |
+| `trace-summary <automation_id>` | Quick overview of recent automation runs |
 | `trace-vars <run_id>` | Show evaluated variables |
 | `trace-timeline <run_id>` | Step-by-step execution timeline |
 | `trace-trigger <run_id>` | Show trigger context details |
