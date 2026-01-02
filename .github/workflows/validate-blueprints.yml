@@ -1,0 +1,81 @@
+name: Validate Blueprints
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'blueprints/**/*.yaml'
+      - 'scripts/validate-blueprint-go/**'
+      - '.github/workflows/validate-blueprints.yml'
+  pull_request:
+    paths:
+      - 'blueprints/**/*.yaml'
+      - 'scripts/validate-blueprint-go/**'
+      - '.github/workflows/validate-blueprints.yml'
+
+jobs:
+  validate:
+    name: Validate All Blueprints
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: scripts/validate-blueprint-go/go.sum
+
+      - name: Build validator
+        working-directory: scripts/validate-blueprint-go
+        run: go build -o validate-blueprint .
+
+      - name: Validate all blueprints
+        run: |
+          echo "Validating all blueprints..."
+          FAILED=0
+          PASSED=0
+
+          for blueprint in blueprints/*/*.yaml; do
+            if [[ -f "$blueprint" ]]; then
+              echo -n "  $blueprint ... "
+              if ./scripts/validate-blueprint-go/validate-blueprint "$blueprint" > /tmp/output.txt 2>&1; then
+                echo "✓"
+                ((PASSED++))
+              else
+                echo "✗"
+                cat /tmp/output.txt
+                ((FAILED++))
+              fi
+            fi
+          done
+
+          echo ""
+          echo "Results: $PASSED passed, $FAILED failed"
+
+          if [[ $FAILED -gt 0 ]]; then
+            echo "::error::$FAILED blueprint(s) failed validation"
+            exit 1
+          fi
+
+          echo "::notice::All $PASSED blueprints validated successfully"
+
+      - name: Create validation summary
+        if: always()
+        run: |
+          echo "## Blueprint Validation Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          for blueprint in blueprints/*/*.yaml; do
+            if [[ -f "$blueprint" ]]; then
+              name=$(basename $(dirname "$blueprint"))
+              if ./scripts/validate-blueprint-go/validate-blueprint "$blueprint" > /dev/null 2>&1; then
+                echo "- ✅ **$name**" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "- ❌ **$name**" >> $GITHUB_STEP_SUMMARY
+              fi
+            fi
+          done

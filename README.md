@@ -2,6 +2,9 @@
   <h1>Home Assistant Blueprints</h1>
   <p><em>Pro‑grade automation templates for real homes</em></p>
   <p>
+    <a href="https://github.com/schoolboyqueue/home-assistant-blueprints/actions/workflows/validate-blueprints.yml">
+      <img alt="Blueprints" src="https://github.com/schoolboyqueue/home-assistant-blueprints/actions/workflows/validate-blueprints.yml/badge.svg">
+    </a>
     <a href="https://github.com/schoolboyqueue/home-assistant-blueprints/actions/workflows/ci-go-tools.yml">
       <img alt="CI" src="https://github.com/schoolboyqueue/home-assistant-blueprints/actions/workflows/ci-go-tools.yml/badge.svg">
     </a>
