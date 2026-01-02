@@ -29,6 +29,7 @@ jobs:
       build_client: ${{ steps.check.outputs.build_client }}
       build_validator: ${{ steps.check.outputs.build_validator }}
       release_version: ${{ steps.check.outputs.release_version }}
+      release_tag: ${{ steps.check.outputs.release_tag }}
       client_version: ${{ steps.check.outputs.client_version }}
       validator_version: ${{ steps.check.outputs.validator_version }}
     steps:
@@ -92,7 +93,24 @@ jobs:
             echo "release_version=$VALIDATE_VERSION" >> $GITHUB_OUTPUT
           fi
 
+          # Determine tag for release
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            # For manual dispatch, construct tag from version
+            if [ "$BUILD_CLIENT" == "true" ] && [ "$BUILD_VALIDATOR" == "true" ]; then
+              RELEASE_TAG="v$CLIENT_VERSION"
+            elif [ "$BUILD_CLIENT" == "true" ]; then
+              RELEASE_TAG="ha-ws-client-go/v$CLIENT_VERSION"
+            else
+              RELEASE_TAG="validate-blueprint-go/v$VALIDATE_VERSION"
+            fi
+          else
+            # For tag push, use the actual tag
+            RELEASE_TAG="$TAG_NAME"
+          fi
+          echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+
           echo "Tag: $TAG_NAME"
+          echo "Release tag: $RELEASE_TAG"
           echo "Build ha-ws-client-go: $BUILD_CLIENT (v$CLIENT_VERSION)"
           echo "Build validate-blueprint-go: $BUILD_VALIDATOR (v$VALIDATE_VERSION)"
 
@@ -256,6 +274,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.determine-builds.outputs.release_tag }}
           name: Go Tools v${{ needs.determine-builds.outputs.release_version }}
           body: ${{ steps.body.outputs.content }}
           files: |
