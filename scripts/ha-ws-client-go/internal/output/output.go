@@ -50,42 +50,21 @@ func SetConfig(cfg *Config) {
 	globalConfig = cfg
 }
 
-// ParseArgs parses output-related arguments and returns remaining args.
-func ParseArgs(args []string) []string {
-	var filtered []string
-
-	for _, arg := range args {
-		switch {
-		case strings.HasPrefix(arg, "--output=") || strings.HasPrefix(arg, "--format="):
-			format := strings.SplitN(arg, "=", 2)[1]
-			switch format {
-			case "json":
-				globalConfig.Format = FormatJSON
-			case "compact":
-				globalConfig.Format = FormatCompact
-			case "default":
-				globalConfig.Format = FormatDefault
-			}
-		case arg == "--compact":
-			globalConfig.Format = FormatCompact
-		case arg == "--json":
-			globalConfig.Format = FormatJSON
-		case arg == "--no-headers":
-			globalConfig.ShowHeaders = false
-		case arg == "--no-timestamps":
-			globalConfig.ShowTimestamps = false
-		case arg == "--show-age":
-			globalConfig.ShowAge = true
-		case strings.HasPrefix(arg, "--max-items="):
-			var n int
-			fmt.Sscanf(arg, "--max-items=%d", &n)
-			globalConfig.MaxItems = n
-		default:
-			filtered = append(filtered, arg)
-		}
+// ConfigureFromFlags sets the output configuration from parsed CLI flags.
+// This integrates with the cli package's flag parsing.
+func ConfigureFromFlags(format string, noHeaders, noTimestamps, showAge bool, maxItems int) {
+	switch format {
+	case "json":
+		globalConfig.Format = FormatJSON
+	case "compact":
+		globalConfig.Format = FormatCompact
+	default:
+		globalConfig.Format = FormatDefault
 	}
-
-	return filtered
+	globalConfig.ShowHeaders = !noHeaders
+	globalConfig.ShowTimestamps = !noTimestamps
+	globalConfig.ShowAge = showAge
+	globalConfig.MaxItems = maxItems
 }
 
 // Result represents a structured result for JSON output.

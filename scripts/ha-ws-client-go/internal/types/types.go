@@ -348,3 +348,50 @@ type TimeRange struct {
 	StartTime time.Time
 	EndTime   time.Time
 }
+
+// CLIFlags holds the parsed command-line flags for CLI tools.
+type CLIFlags struct {
+	// Standard flags
+	Help    bool
+	Version bool
+
+	// Time filtering flags
+	From     string
+	To       string
+	FromTime *time.Time
+	ToTime   *time.Time
+
+	// Output format flags
+	Output       string
+	Compact      bool
+	JSON         bool
+	NoHeaders    bool
+	NoTimestamps bool
+	ShowAge      bool
+	MaxItems     int
+
+	// Remaining positional arguments (command and its args)
+	Args []string
+}
+
+// GetOutputFormat returns the effective output format based on flag precedence.
+// --json and --compact flags take precedence over --output/--format.
+func (f *CLIFlags) GetOutputFormat() string {
+	if f.JSON {
+		return "json"
+	}
+	if f.Compact {
+		return "compact"
+	}
+	return f.Output
+}
+
+// ShowHelp returns true if help was requested via flag or bare command.
+func (f *CLIFlags) ShowHelp() bool {
+	return f.Help
+}
+
+// ShowVersion returns true if version was requested via flag or bare command.
+func (f *CLIFlags) ShowVersion() bool {
+	return f.Version
+}

@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
 
+	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/cli"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/client"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/handlers"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/output"
@@ -165,85 +165,6 @@ Examples:
 `)
 }
 
-func parseTimeArgs(args []string) (filtered []string, fromTime, toTime *time.Time) {
-	i := 0
-	for i < len(args) {
-		arg := args[i]
-		if arg == "--from" && i+1 < len(args) {
-			t, err := parseFlexibleDate(args[i+1])
-			if err == nil {
-				fromTime = &t
-			}
-			i += 2
-			continue
-		}
-		if arg == "--to" && i+1 < len(args) {
-			t, err := parseFlexibleDate(args[i+1])
-			if err == nil {
-				toTime = &t
-			}
-			i += 2
-			continue
-		}
-		if after, ok := strings.CutPrefix(arg, "--from="); ok {
-			t, err := parseFlexibleDate(after)
-			if err == nil {
-				fromTime = &t
-			}
-			i++
-			continue
-		}
-		if after, ok := strings.CutPrefix(arg, "--to="); ok {
-			t, err := parseFlexibleDate(after)
-			if err == nil {
-				toTime = &t
-			}
-			i++
-			continue
-		}
-		filtered = append(filtered, arg)
-		i++
-	}
-
-	return filtered, fromTime, toTime
-}
-
-func parseFlexibleDate(s string) (time.Time, error) {
-	formats := []string{
-		time.RFC3339,
-		"2006-01-02T15:04:05",
-		"2006-01-02 15:04:05",
-		"2006-01-02 15:04",
-		"2006-01-02",
-	}
-
-	for _, format := range formats {
-		if t, err := time.Parse(format, s); err == nil {
-			return t, nil
-		}
-	}
-
-	return time.Time{}, fmt.Errorf("unable to parse date: %s", s)
-}
-
-func isHelpRequested(args []string) bool {
-	for _, arg := range args {
-		if arg == "--help" || arg == "-h" || arg == "help" {
-			return true
-		}
-	}
-	return false
-}
-
-func isVersionRequested(args []string) bool {
-	for _, arg := range args {
-		if arg == "--version" || arg == "-v" || arg == "version" {
-			return true
-		}
-	}
-	return false
-}
-
 func showVersion() {
 	fmt.Printf("ha-ws-client %s\n", Version)
 	fmt.Printf("  Build time: %s\n", BuildTime)
@@ -257,30 +178,41 @@ func main() {
 func run() int {
 	rawArgs := os.Args[1:]
 
+	// Show help if no arguments
+	if len(rawArgs) == 0 {
+		showHelp()
+		return 0
+	}
+
+	// Parse all flags using the standard flag package
+	flags, err := cli.Parse(rawArgs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return 1
+	}
+
 	// Check for version first
-	if isVersionRequested(rawArgs) {
+	if flags.ShowVersion() {
 		showVersion()
 		return 0
 	}
 
 	// Check for help
-	if isHelpRequested(rawArgs) || len(rawArgs) == 0 {
+	if flags.ShowHelp() || len(flags.Args) == 0 {
 		showHelp()
 		return 0
 	}
 
-	// Parse output args first
-	argsAfterOutput := output.ParseArgs(rawArgs)
+	// Configure output settings from parsed flags
+	output.ConfigureFromFlags(
+		flags.GetOutputFormat(),
+		flags.NoHeaders,
+		flags.NoTimestamps,
+		flags.ShowAge,
+		flags.MaxItems,
+	)
 
-	// Parse time args
-	filteredArgs, fromTime, toTime := parseTimeArgs(argsAfterOutput)
-
-	if len(filteredArgs) == 0 {
-		showHelp()
-		return 0
-	}
-
-	command := filteredArgs[0]
+	command := flags.Args[0]
 
 	// Get supervisor token
 	token := os.Getenv("SUPERVISOR_TOKEN")
@@ -316,9 +248,9 @@ func run() int {
 	// Create handler context
 	ctx := &handlers.Context{
 		Client:   c,
-		Args:     filteredArgs,
-		FromTime: fromTime,
-		ToTime:   toTime,
+		Args:     flags.Args,
+		FromTime: flags.FromTime,
+		ToTime:   flags.ToTime,
 	}
 
 	// Look up and execute command
