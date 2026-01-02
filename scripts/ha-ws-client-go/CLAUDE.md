@@ -116,11 +116,14 @@ func HandleMyCommand(ctx *Context) error {
 
 ### Before Committing
 
-**1. Bump version (for code changes only, not documentation):**
+**1. Bump version (for functional code changes only):**
 - Update `VERSION` in `Makefile` (e.g., `1.0.4` → `1.0.5`)
 - Add entry to `CHANGELOG.md` with the new version and date
 - Use semantic versioning: patch for fixes, minor for features, major for breaking changes
-- Skip version bump for documentation-only changes (README.md, CLAUDE.md, comments)
+- **Skip version bump for:**
+  - Documentation-only changes (README.md, CLAUDE.md, comments)
+  - Test-only changes (*_test.go files, testdata/)
+  - CI/workflow changes (.github/)
 
 **2. Update documentation (for new features/commands):**
 - Update `README.md` command tables if adding new commands or flags
