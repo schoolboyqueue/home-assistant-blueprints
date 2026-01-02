@@ -11,17 +11,18 @@ import (
 )
 
 // HandleTraces lists automation traces.
-func HandleTraces(ctx *Context) error {
-	var automationID string
-	if len(ctx.Args) > 1 {
-		automationID = ctx.Args[1]
-	}
+// Wrapped with: WithOptionalAutomationID(1)
+var HandleTraces = Apply(
+	WithOptionalAutomationID(1),
+	handleTraces,
+)
+
+func handleTraces(ctx *Context) error {
+	automationID := ctx.Config.AutomationID
 
 	data := map[string]any{"domain": "automation"}
 	if automationID != "" {
-		// Extract the automation ID from entity_id format
-		id := strings.TrimPrefix(automationID, "automation.")
-		data["item_id"] = id
+		data["item_id"] = automationID
 	}
 
 	// HA returns traces as an array of TraceInfo, not a map
@@ -67,19 +68,18 @@ func HandleTraces(ctx *Context) error {
 }
 
 // HandleTrace gets detailed trace for a run.
-func HandleTrace(ctx *Context) error {
-	automationID, err := RequireArg(ctx, 1, "Usage: trace <automation_id> <run_id>")
-	if err != nil {
-		return err
-	}
+// Wrapped with: Chain(WithAutomationID(1, ...), RequireArg2(...))
+var HandleTrace = Apply(
+	Chain(
+		WithAutomationID(1, "Usage: trace <automation_id> <run_id>"),
+		RequireArg2("Usage: trace <automation_id> <run_id>"),
+	),
+	handleTrace,
+)
 
-	runID, err := RequireArg(ctx, 2, "Usage: trace <automation_id> <run_id>")
-	if err != nil {
-		return err
-	}
-
-	// Clean up automation ID
-	id := strings.TrimPrefix(automationID, "automation.")
+func handleTrace(ctx *Context) error {
+	id := ctx.Config.AutomationID
+	runID := ctx.Config.Args[1]
 
 	trace, err := client.SendMessageTyped[types.TraceDetail](ctx.Client, "trace/get", map[string]any{
 		"domain":  "automation",
@@ -95,14 +95,14 @@ func HandleTrace(ctx *Context) error {
 }
 
 // HandleTraceLatest gets the most recent trace for an automation.
-func HandleTraceLatest(ctx *Context) error {
-	automationID, err := RequireArg(ctx, 1, "Usage: trace-latest <automation_id>")
-	if err != nil {
-		return err
-	}
+// Wrapped with: WithAutomationID(1, "Usage: trace-latest <automation_id>")
+var HandleTraceLatest = Apply(
+	WithAutomationID(1, "Usage: trace-latest <automation_id>"),
+	handleTraceLatest,
+)
 
-	// Get traces for this automation
-	id := strings.TrimPrefix(automationID, "automation.")
+func handleTraceLatest(ctx *Context) error {
+	id := ctx.Config.AutomationID
 	traces, err := client.SendMessageTyped[[]types.TraceInfo](ctx.Client, "trace/list", map[string]any{
 		"domain":  "automation",
 		"item_id": id,
@@ -127,14 +127,14 @@ func HandleTraceLatest(ctx *Context) error {
 }
 
 // HandleTraceSummary shows a quick overview of recent automation runs.
-func HandleTraceSummary(ctx *Context) error {
-	automationID, err := RequireArg(ctx, 1, "Usage: trace-summary <automation_id>")
-	if err != nil {
-		return err
-	}
+// Wrapped with: WithAutomationID(1, "Usage: trace-summary <automation_id>")
+var HandleTraceSummary = Apply(
+	WithAutomationID(1, "Usage: trace-summary <automation_id>"),
+	handleTraceSummary,
+)
 
-	// Get traces for this automation
-	id := strings.TrimPrefix(automationID, "automation.")
+func handleTraceSummary(ctx *Context) error {
+	id := ctx.Config.AutomationID
 	traces, err := client.SendMessageTyped[[]types.TraceInfo](ctx.Client, "trace/list", map[string]any{
 		"domain":  "automation",
 		"item_id": id,
@@ -197,16 +197,18 @@ func HandleTraceSummary(ctx *Context) error {
 }
 
 // HandleTraceVars shows evaluated variables from a trace.
-func HandleTraceVars(ctx *Context) error {
-	automationID, err := RequireArg(ctx, 1, "Usage: trace-vars <automation_id> <run_id>")
-	if err != nil {
-		return err
-	}
+// Wrapped with: Chain(WithAutomationID(1, ...), RequireArg2(...))
+var HandleTraceVars = Apply(
+	Chain(
+		WithAutomationID(1, "Usage: trace-vars <automation_id> <run_id>"),
+		RequireArg2("Usage: trace-vars <automation_id> <run_id>"),
+	),
+	handleTraceVars,
+)
 
-	runID, err := RequireArg(ctx, 2, "Usage: trace-vars <automation_id> <run_id>")
-	if err != nil {
-		return err
-	}
+func handleTraceVars(ctx *Context) error {
+	automationID := ctx.Config.AutomationID
+	runID := ctx.Config.Args[1]
 
 	trace, err := getTraceDetail(ctx.Client, automationID, runID)
 	if err != nil {
@@ -242,16 +244,18 @@ func HandleTraceVars(ctx *Context) error {
 }
 
 // HandleTraceTimeline shows step-by-step execution timeline.
-func HandleTraceTimeline(ctx *Context) error {
-	automationID, err := RequireArg(ctx, 1, "Usage: trace-timeline <automation_id> <run_id>")
-	if err != nil {
-		return err
-	}
+// Wrapped with: Chain(WithAutomationID(1, ...), RequireArg2(...))
+var HandleTraceTimeline = Apply(
+	Chain(
+		WithAutomationID(1, "Usage: trace-timeline <automation_id> <run_id>"),
+		RequireArg2("Usage: trace-timeline <automation_id> <run_id>"),
+	),
+	handleTraceTimeline,
+)
 
-	runID, err := RequireArg(ctx, 2, "Usage: trace-timeline <automation_id> <run_id>")
-	if err != nil {
-		return err
-	}
+func handleTraceTimeline(ctx *Context) error {
+	automationID := ctx.Config.AutomationID
+	runID := ctx.Config.Args[1]
 
 	trace, err := getTraceDetail(ctx.Client, automationID, runID)
 	if err != nil {
@@ -292,16 +296,18 @@ func HandleTraceTimeline(ctx *Context) error {
 }
 
 // HandleTraceTrigger shows trigger context details.
-func HandleTraceTrigger(ctx *Context) error {
-	automationID, err := RequireArg(ctx, 1, "Usage: trace-trigger <automation_id> <run_id>")
-	if err != nil {
-		return err
-	}
+// Wrapped with: Chain(WithAutomationID(1, ...), RequireArg2(...))
+var HandleTraceTrigger = Apply(
+	Chain(
+		WithAutomationID(1, "Usage: trace-trigger <automation_id> <run_id>"),
+		RequireArg2("Usage: trace-trigger <automation_id> <run_id>"),
+	),
+	handleTraceTrigger,
+)
 
-	runID, err := RequireArg(ctx, 2, "Usage: trace-trigger <automation_id> <run_id>")
-	if err != nil {
-		return err
-	}
+func handleTraceTrigger(ctx *Context) error {
+	automationID := ctx.Config.AutomationID
+	runID := ctx.Config.Args[1]
 
 	trace, err := getTraceDetail(ctx.Client, automationID, runID)
 	if err != nil {
@@ -318,16 +324,18 @@ func HandleTraceTrigger(ctx *Context) error {
 }
 
 // HandleTraceActions shows action results.
-func HandleTraceActions(ctx *Context) error {
-	automationID, err := RequireArg(ctx, 1, "Usage: trace-actions <automation_id> <run_id>")
-	if err != nil {
-		return err
-	}
+// Wrapped with: Chain(WithAutomationID(1, ...), RequireArg2(...))
+var HandleTraceActions = Apply(
+	Chain(
+		WithAutomationID(1, "Usage: trace-actions <automation_id> <run_id>"),
+		RequireArg2("Usage: trace-actions <automation_id> <run_id>"),
+	),
+	handleTraceActions,
+)
 
-	runID, err := RequireArg(ctx, 2, "Usage: trace-actions <automation_id> <run_id>")
-	if err != nil {
-		return err
-	}
+func handleTraceActions(ctx *Context) error {
+	automationID := ctx.Config.AutomationID
+	runID := ctx.Config.Args[1]
 
 	trace, err := getTraceDetail(ctx.Client, automationID, runID)
 	if err != nil {
@@ -371,16 +379,18 @@ func HandleTraceActions(ctx *Context) error {
 }
 
 // HandleTraceDebug shows comprehensive debug view.
-func HandleTraceDebug(ctx *Context) error {
-	automationID, err := RequireArg(ctx, 1, "Usage: trace-debug <automation_id> <run_id>")
-	if err != nil {
-		return err
-	}
+// Wrapped with: Chain(WithAutomationID(1, ...), RequireArg2(...))
+var HandleTraceDebug = Apply(
+	Chain(
+		WithAutomationID(1, "Usage: trace-debug <automation_id> <run_id>"),
+		RequireArg2("Usage: trace-debug <automation_id> <run_id>"),
+	),
+	handleTraceDebug,
+)
 
-	runID, err := RequireArg(ctx, 2, "Usage: trace-debug <automation_id> <run_id>")
-	if err != nil {
-		return err
-	}
+func handleTraceDebug(ctx *Context) error {
+	automationID := ctx.Config.AutomationID
+	runID := ctx.Config.Args[1]
 
 	trace, err := getTraceDetail(ctx.Client, automationID, runID)
 	if err != nil {
@@ -393,16 +403,14 @@ func HandleTraceDebug(ctx *Context) error {
 }
 
 // HandleAutomationConfig gets automation configuration.
-func HandleAutomationConfig(ctx *Context) error {
-	entityID, err := RequireArg(ctx, 1, "Usage: automation-config <entity_id>")
-	if err != nil {
-		return err
-	}
+// Wrapped with: RequireArg1("Usage: automation-config <entity_id>")
+var HandleAutomationConfig = Apply(
+	RequireArg1("Usage: automation-config <entity_id>"),
+	handleAutomationConfig,
+)
 
-	// Ensure entity_id has automation. prefix
-	if !strings.HasPrefix(entityID, "automation.") {
-		entityID = "automation." + entityID
-	}
+func handleAutomationConfig(ctx *Context) error {
+	entityID := EnsureAutomationPrefix(ctx.Config.Args[0])
 
 	// Use automation/config WebSocket message type
 	type configResponse struct {
@@ -420,16 +428,14 @@ func HandleAutomationConfig(ctx *Context) error {
 }
 
 // HandleBlueprintInputs validates blueprint inputs.
-func HandleBlueprintInputs(ctx *Context) error {
-	entityID, err := RequireArg(ctx, 1, "Usage: blueprint-inputs <entity_id>")
-	if err != nil {
-		return err
-	}
+// Wrapped with: RequireArg1("Usage: blueprint-inputs <entity_id>")
+var HandleBlueprintInputs = Apply(
+	RequireArg1("Usage: blueprint-inputs <entity_id>"),
+	handleBlueprintInputs,
+)
 
-	// Ensure entity_id has automation. prefix
-	if !strings.HasPrefix(entityID, "automation.") {
-		entityID = "automation." + entityID
-	}
+func handleBlueprintInputs(ctx *Context) error {
+	entityID := EnsureAutomationPrefix(ctx.Config.Args[0])
 
 	// Use automation/config WebSocket message type
 	type configResponse struct {

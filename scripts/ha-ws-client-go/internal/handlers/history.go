@@ -14,37 +14,19 @@ import (
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
 
-// calculateTimeRange calculates the time range for history queries.
-func calculateTimeRange(ctx *Context, defaultHours int) types.TimeRange {
-	endTime := time.Now()
-	if ctx.ToTime != nil {
-		endTime = *ctx.ToTime
-	}
-
-	var startTime time.Time
-	if ctx.FromTime != nil {
-		startTime = *ctx.FromTime
-	} else {
-		hours := defaultHours
-		if len(ctx.Args) > 2 {
-			if h, err := strconv.Atoi(ctx.Args[2]); err == nil {
-				hours = h
-			}
-		}
-		startTime = endTime.Add(-time.Duration(hours) * time.Hour)
-	}
-
-	return types.TimeRange{StartTime: startTime, EndTime: endTime}
-}
-
 // HandleLogbook gets logbook entries for an entity.
-func HandleLogbook(ctx *Context) error {
-	entityID, err := RequireArg(ctx, 1, "Usage: logbook <entity_id> [hours]")
-	if err != nil {
-		return err
-	}
+// Wrapped with: Chain(RequireArg1(...), WithTimeRange(24, 2))
+var HandleLogbook = Apply(
+	Chain(
+		RequireArg1("Usage: logbook <entity_id> [hours]"),
+		WithTimeRange(24, 2),
+	),
+	handleLogbook,
+)
 
-	timeRange := calculateTimeRange(ctx, 24)
+func handleLogbook(ctx *Context) error {
+	entityID := ctx.Config.Args[0]
+	timeRange := *ctx.Config.TimeRange
 
 	// Use logbook/get_events WebSocket message type
 	entries, err := client.SendMessageTyped[[]types.LogbookEntry](ctx.Client, "logbook/get_events", map[string]any{
@@ -71,13 +53,18 @@ func HandleLogbook(ctx *Context) error {
 }
 
 // HandleHistory gets state history for an entity.
-func HandleHistory(ctx *Context) error {
-	entityID, err := RequireArg(ctx, 1, "Usage: history <entity_id> [hours]")
-	if err != nil {
-		return err
-	}
+// Wrapped with: Chain(RequireArg1(...), WithTimeRange(24, 2))
+var HandleHistory = Apply(
+	Chain(
+		RequireArg1("Usage: history <entity_id> [hours]"),
+		WithTimeRange(24, 2),
+	),
+	handleHistory,
+)
 
-	timeRange := calculateTimeRange(ctx, 24)
+func handleHistory(ctx *Context) error {
+	entityID := ctx.Config.Args[0]
+	timeRange := *ctx.Config.TimeRange
 
 	// Use history/history_during_period WebSocket message type
 	// Returns map[entity_id][]HistoryState
@@ -111,13 +98,18 @@ func HandleHistory(ctx *Context) error {
 }
 
 // HandleHistoryFull gets full history with attributes.
-func HandleHistoryFull(ctx *Context) error {
-	entityID, err := RequireArg(ctx, 1, "Usage: history-full <entity_id> [hours]")
-	if err != nil {
-		return err
-	}
+// Wrapped with: Chain(RequireArg1(...), WithTimeRange(24, 2))
+var HandleHistoryFull = Apply(
+	Chain(
+		RequireArg1("Usage: history-full <entity_id> [hours]"),
+		WithTimeRange(24, 2),
+	),
+	handleHistoryFull,
+)
 
-	timeRange := calculateTimeRange(ctx, 24)
+func handleHistoryFull(ctx *Context) error {
+	entityID := ctx.Config.Args[0]
+	timeRange := *ctx.Config.TimeRange
 
 	// Use history/history_during_period WebSocket message type
 	result, err := client.SendMessageTyped[map[string][]types.HistoryState](ctx.Client, "history/history_during_period", map[string]any{
@@ -174,13 +166,18 @@ func HandleHistoryFull(ctx *Context) error {
 }
 
 // HandleAttrs gets attribute change history.
-func HandleAttrs(ctx *Context) error {
-	entityID, err := RequireArg(ctx, 1, "Usage: attrs <entity_id> [hours]")
-	if err != nil {
-		return err
-	}
+// Wrapped with: Chain(RequireArg1(...), WithTimeRange(24, 2))
+var HandleAttrs = Apply(
+	Chain(
+		RequireArg1("Usage: attrs <entity_id> [hours]"),
+		WithTimeRange(24, 2),
+	),
+	handleAttrs,
+)
 
-	timeRange := calculateTimeRange(ctx, 24)
+func handleAttrs(ctx *Context) error {
+	entityID := ctx.Config.Args[0]
+	timeRange := *ctx.Config.TimeRange
 
 	// Use history/history_during_period WebSocket message type
 	result, err := client.SendMessageTyped[map[string][]types.HistoryState](ctx.Client, "history/history_during_period", map[string]any{
@@ -315,13 +312,18 @@ func HandleSyslog(ctx *Context) error {
 }
 
 // HandleStats gets sensor statistics.
-func HandleStats(ctx *Context) error {
-	entityID, err := RequireArg(ctx, 1, "Usage: stats <entity_id> [hours]")
-	if err != nil {
-		return err
-	}
+// Wrapped with: Chain(RequireArg1(...), WithTimeRange(24, 2))
+var HandleStats = Apply(
+	Chain(
+		RequireArg1("Usage: stats <entity_id> [hours]"),
+		WithTimeRange(24, 2),
+	),
+	handleStats,
+)
 
-	timeRange := calculateTimeRange(ctx, 24)
+func handleStats(ctx *Context) error {
+	entityID := ctx.Config.Args[0]
+	timeRange := *ctx.Config.TimeRange
 
 	result, err := client.SendMessageTyped[map[string][]types.StatEntry](ctx.Client, "recorder/statistics_during_period", map[string]any{
 		"start_time":    timeRange.StartTime.Format(time.RFC3339),
@@ -354,11 +356,14 @@ func HandleStats(ctx *Context) error {
 }
 
 // HandleContext looks up what triggered a state change.
-func HandleContext(ctx *Context) error {
-	contextID, err := RequireArg(ctx, 1, "Usage: context <context_id>")
-	if err != nil {
-		return err
-	}
+// Wrapped with: RequireArg1("Usage: context <context_id>")
+var HandleContext = Apply(
+	RequireArg1("Usage: context <context_id>"),
+	handleContext,
+)
+
+func handleContext(ctx *Context) error {
+	contextID := ctx.Config.Args[0]
 
 	// Search for states with this context
 	states, err := client.SendMessageTyped[[]types.HAState](ctx.Client, "get_states", nil)
@@ -389,18 +394,18 @@ func HandleContext(ctx *Context) error {
 }
 
 // HandleWatch subscribes to live state changes.
-func HandleWatch(ctx *Context) error {
-	entityID, err := RequireArg(ctx, 1, "Usage: watch <entity_id> [seconds]")
-	if err != nil {
-		return err
-	}
+// Wrapped with: Chain(RequireArg1(...), WithOptionalInt(60, 2))
+var HandleWatch = Apply(
+	Chain(
+		RequireArg1("Usage: watch <entity_id> [seconds]"),
+		WithOptionalInt(60, 2),
+	),
+	handleWatch,
+)
 
-	seconds := 60
-	if len(ctx.Args) > 2 {
-		if parsed, parseErr := strconv.Atoi(ctx.Args[2]); parseErr == nil {
-			seconds = parsed
-		}
-	}
+func handleWatch(ctx *Context) error {
+	entityID := ctx.Config.Args[0]
+	seconds := ctx.Config.OptionalInt
 
 	output.Message(fmt.Sprintf("Watching %s for %d seconds...", entityID, seconds))
 

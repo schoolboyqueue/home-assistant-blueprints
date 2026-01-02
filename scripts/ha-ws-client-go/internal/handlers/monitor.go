@@ -11,18 +11,18 @@ import (
 )
 
 // HandleMonitor monitors entity state changes.
-func HandleMonitor(ctx *Context) error {
-	entityID, err := RequireArg(ctx, 1, "Usage: monitor <entity_id>")
-	if err != nil {
-		return err
-	}
+// Wrapped with: Chain(RequireArg1(...), WithOptionalInt(60, 2))
+var HandleMonitor = Apply(
+	Chain(
+		RequireArg1("Usage: monitor <entity_id> [seconds]"),
+		WithOptionalInt(60, 2),
+	),
+	handleMonitor,
+)
 
-	seconds := 60
-	if len(ctx.Args) > 2 {
-		if parsed, parseErr := strconv.Atoi(ctx.Args[2]); parseErr == nil {
-			seconds = parsed
-		}
-	}
+func handleMonitor(ctx *Context) error {
+	entityID := ctx.Config.Args[0]
+	seconds := ctx.Config.OptionalInt
 
 	output.Message(fmt.Sprintf("Monitoring %s for %d seconds...", entityID, seconds))
 
@@ -154,11 +154,17 @@ func HandleMonitorMulti(ctx *Context) error {
 }
 
 // HandleAnalyze analyzes entity state patterns.
-func HandleAnalyze(ctx *Context) error {
-	entityID, err := RequireArg(ctx, 1, "Usage: analyze <entity_id>")
-	if err != nil {
-		return err
-	}
+// Wrapped with: Chain(RequireArg1(...), WithTimeRange(24, 0))
+var HandleAnalyze = Apply(
+	Chain(
+		RequireArg1("Usage: analyze <entity_id>"),
+		WithTimeRange(24, 0), // No hours arg for analyze
+	),
+	handleAnalyze,
+)
+
+func handleAnalyze(ctx *Context) error {
+	entityID := ctx.Config.Args[0]
 
 	// Get current state
 	states, err := getStates(ctx)
@@ -192,7 +198,7 @@ func HandleAnalyze(ctx *Context) error {
 	}
 
 	// Get recent history
-	timeRange := calculateTimeRange(ctx, 24)
+	timeRange := *ctx.Config.TimeRange
 
 	result, err := getHistory(ctx, entityID, timeRange)
 	if err != nil {

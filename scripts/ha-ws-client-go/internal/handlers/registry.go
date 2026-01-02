@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/client"
@@ -11,11 +10,14 @@ import (
 )
 
 // HandleEntities lists or searches the entity registry.
-func HandleEntities(ctx *Context) error {
-	var pattern string
-	if len(ctx.Args) > 1 {
-		pattern = ctx.Args[1]
-	}
+// Wrapped with: WithPattern(1)
+var HandleEntities = Apply(
+	WithPattern(1),
+	handleEntities,
+)
+
+func handleEntities(ctx *Context) error {
+	re := ctx.Config.Pattern
 
 	entries, err := client.SendMessageTyped[[]types.EntityEntry](ctx.Client, "config/entity_registry/list", nil)
 	if err != nil {
@@ -23,14 +25,7 @@ func HandleEntities(ctx *Context) error {
 	}
 
 	// Filter by pattern if provided
-	if pattern != "" {
-		regexPattern := regexp.QuoteMeta(pattern)
-		regexPattern = regexp.MustCompile(`\\\*`).ReplaceAllString(regexPattern, ".*")
-		re, err := regexp.Compile("(?i)" + regexPattern)
-		if err != nil {
-			return fmt.Errorf("invalid pattern: %w", err)
-		}
-
+	if re != nil {
 		var filtered []types.EntityEntry
 		for _, e := range entries {
 			if re.MatchString(e.EntityID) || re.MatchString(e.Name) || re.MatchString(e.OriginalName) {
@@ -62,11 +57,14 @@ func HandleEntities(ctx *Context) error {
 }
 
 // HandleDevices lists or searches the device registry.
-func HandleDevices(ctx *Context) error {
-	var pattern string
-	if len(ctx.Args) > 1 {
-		pattern = ctx.Args[1]
-	}
+// Wrapped with: WithPattern(1)
+var HandleDevices = Apply(
+	WithPattern(1),
+	handleDevices,
+)
+
+func handleDevices(ctx *Context) error {
+	re := ctx.Config.Pattern
 
 	devices, err := client.SendMessageTyped[[]types.DeviceEntry](ctx.Client, "config/device_registry/list", nil)
 	if err != nil {
@@ -74,14 +72,7 @@ func HandleDevices(ctx *Context) error {
 	}
 
 	// Filter by pattern if provided
-	if pattern != "" {
-		regexPattern := regexp.QuoteMeta(pattern)
-		regexPattern = regexp.MustCompile(`\\\*`).ReplaceAllString(regexPattern, ".*")
-		re, err := regexp.Compile("(?i)" + regexPattern)
-		if err != nil {
-			return fmt.Errorf("invalid pattern: %w", err)
-		}
-
+	if re != nil {
 		var filtered []types.DeviceEntry
 		for _, d := range devices {
 			name := d.Name

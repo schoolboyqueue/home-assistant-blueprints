@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 
@@ -22,6 +21,7 @@ type Context struct {
 	Args     []string
 	FromTime *time.Time
 	ToTime   *time.Time
+	Config   *HandlerConfig // Populated by middleware
 }
 
 // ErrEntityNotFound indicates an entity was not found.
@@ -33,14 +33,6 @@ const (
 	statusStale   = "stale"
 	statusUnknown = "unknown"
 )
-
-// RequireArg returns the argument at index or errors with usage.
-func RequireArg(ctx *Context, index int, usage string) (string, error) {
-	if index >= len(ctx.Args) {
-		return "", fmt.Errorf("missing argument: %s", usage)
-	}
-	return ctx.Args[index], nil
-}
 
 // HandlePing tests the WebSocket connection.
 func HandlePing(ctx *Context) error {
@@ -60,11 +52,14 @@ func HandlePing(ctx *Context) error {
 }
 
 // HandleState gets the state of a single entity.
-func HandleState(ctx *Context) error {
-	entityID, err := RequireArg(ctx, 1, "Usage: state <entity_id>")
-	if err != nil {
-		return err
-	}
+// Wrapped with: RequireArg1("Usage: state <entity_id>")
+var HandleState = Apply(
+	RequireArg1("Usage: state <entity_id>"),
+	handleState,
+)
+
+func handleState(ctx *Context) error {
+	entityID := ctx.Config.Args[0]
 
 	states, err := client.SendMessageTyped[[]types.HAState](ctx.Client, "get_states", nil)
 	if err != nil {
@@ -127,23 +122,18 @@ func HandleStatesJSON(ctx *Context) error {
 }
 
 // HandleStatesFilter filters states by entity_id pattern.
-func HandleStatesFilter(ctx *Context) error {
-	pattern, err := RequireArg(ctx, 1, "Usage: states-filter <pattern> [--show-age]")
-	if err != nil {
-		return err
-	}
+// Wrapped with: WithRequiredPattern(1, "Usage: states-filter <pattern> [--show-age]")
+var HandleStatesFilter = Apply(
+	WithRequiredPattern(1, "Usage: states-filter <pattern> [--show-age]"),
+	handleStatesFilter,
+)
+
+func handleStatesFilter(ctx *Context) error {
+	re := ctx.Config.Pattern
 
 	states, err := client.SendMessageTyped[[]types.HAState](ctx.Client, "get_states", nil)
 	if err != nil {
 		return err
-	}
-
-	// Convert glob pattern to regex
-	regexPattern := regexp.QuoteMeta(pattern)
-	regexPattern = regexp.MustCompile(`\\\*`).ReplaceAllString(regexPattern, ".*")
-	re, err := regexp.Compile(regexPattern)
-	if err != nil {
-		return fmt.Errorf("invalid pattern: %w", err)
 	}
 
 	var filtered []types.HAState
@@ -244,15 +234,15 @@ func HandleServices(ctx *Context) error {
 }
 
 // HandleCall calls a Home Assistant service.
-func HandleCall(ctx *Context) error {
-	domain, err := RequireArg(ctx, 1, "Usage: call <domain> <service> [data]")
-	if err != nil {
-		return err
-	}
-	service, err := RequireArg(ctx, 2, "Usage: call <domain> <service> [data]")
-	if err != nil {
-		return err
-	}
+// Wrapped with: RequireArg2("Usage: call <domain> <service> [data]")
+var HandleCall = Apply(
+	RequireArg2("Usage: call <domain> <service> [data]"),
+	handleCall,
+)
+
+func handleCall(ctx *Context) error {
+	domain := ctx.Config.Args[0]
+	service := ctx.Config.Args[1]
 
 	var serviceData map[string]any
 	if len(ctx.Args) > 3 {
@@ -346,11 +336,14 @@ func HandleTemplate(ctx *Context) error {
 }
 
 // HandleDeviceHealth checks if a device/entity is responsive by examining last_updated times.
-func HandleDeviceHealth(ctx *Context) error {
-	entityID, err := RequireArg(ctx, 1, "Usage: device-health <entity_id>")
-	if err != nil {
-		return err
-	}
+// Wrapped with: RequireArg1("Usage: device-health <entity_id>")
+var HandleDeviceHealth = Apply(
+	RequireArg1("Usage: device-health <entity_id>"),
+	handleDeviceHealth,
+)
+
+func handleDeviceHealth(ctx *Context) error {
+	entityID := ctx.Config.Args[0]
 
 	states, err := client.SendMessageTyped[[]types.HAState](ctx.Client, "get_states", nil)
 	if err != nil {
@@ -466,15 +459,15 @@ func HandleDeviceHealth(ctx *Context) error {
 }
 
 // HandleCompare compares two entities side-by-side.
-func HandleCompare(ctx *Context) error {
-	entity1, err := RequireArg(ctx, 1, "Usage: compare <entity_id1> <entity_id2>")
-	if err != nil {
-		return err
-	}
-	entity2, err := RequireArg(ctx, 2, "Usage: compare <entity_id1> <entity_id2>")
-	if err != nil {
-		return err
-	}
+// Wrapped with: RequireArg2("Usage: compare <entity_id1> <entity_id2>")
+var HandleCompare = Apply(
+	RequireArg2("Usage: compare <entity_id1> <entity_id2>"),
+	handleCompare,
+)
+
+func handleCompare(ctx *Context) error {
+	entity1 := ctx.Config.Args[0]
+	entity2 := ctx.Config.Args[1]
 
 	states, err := client.SendMessageTyped[[]types.HAState](ctx.Client, "get_states", nil)
 	if err != nil {
