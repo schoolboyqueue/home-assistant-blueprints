@@ -2,6 +2,12 @@
   <h1>Home Assistant Blueprints</h1>
   <p><em>Pro‑grade automation templates for real homes</em></p>
   <p>
+    <a href="https://github.com/schoolboyqueue/home-assistant-blueprints/actions/workflows/ci-go-tools.yml">
+      <img alt="CI" src="https://github.com/schoolboyqueue/home-assistant-blueprints/actions/workflows/ci-go-tools.yml/badge.svg">
+    </a>
+    <a href="https://codecov.io/gh/schoolboyqueue/home-assistant-blueprints">
+      <img alt="Coverage" src="https://codecov.io/gh/schoolboyqueue/home-assistant-blueprints/branch/main/graph/badge.svg">
+    </a>
     <a href="LICENSE">
       <img alt="MIT License" src="https://img.shields.io/badge/License-MIT-green.svg">
     </a>

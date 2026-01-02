@@ -41,9 +41,18 @@ jobs:
           working-directory: scripts/${{ matrix.tool }}
           args: --timeout=5m
 
-      - name: Run unit tests
+      - name: Run unit tests with coverage
         working-directory: scripts/${{ matrix.tool }}
-        run: go test -race -v ./...
+        run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: scripts/${{ matrix.tool }}/coverage.out
+          flags: ${{ matrix.tool }}
+          name: ${{ matrix.tool }}-coverage
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Check formatting
         working-directory: scripts/${{ matrix.tool }}
