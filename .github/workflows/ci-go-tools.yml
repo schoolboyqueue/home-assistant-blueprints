@@ -92,7 +92,10 @@ jobs:
         run: |
           echo "Waiting for Home Assistant to start..."
           for i in {1..90}; do
-            if curl -sf http://localhost:8123/api/ > /dev/null 2>&1; then
+            # Check onboarding endpoint (available without auth on fresh install)
+            if curl -sf http://localhost:8123/api/onboarding > /dev/null 2>&1; then
+              echo "Home Assistant responded, waiting for full initialization..."
+              sleep 10  # Give HA time to fully initialize
               echo "Home Assistant is ready!"
               exit 0
             fi
