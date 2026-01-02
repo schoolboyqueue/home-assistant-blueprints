@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/client"
@@ -134,6 +136,39 @@ func HandleHistoryFull(ctx *Context) error {
 	output.Timeline(states,
 		output.TimelineTitle[types.HistoryState](fmt.Sprintf("Full history for %s", entityID)),
 		output.TimelineCommand[types.HistoryState]("history-full"),
+		output.TimelineFormatter(func(s types.HistoryState) string {
+			t := s.GetLastUpdated()
+			state := s.GetState()
+
+			// Get attributes (handle both compact 'a' and full 'Attributes' formats)
+			attrs := s.A
+			if attrs == nil {
+				attrs = s.Attributes
+			}
+
+			if output.IsCompact() {
+				// Compact: timestamp state {key1:val1, key2:val2, ...}
+				if len(attrs) == 0 {
+					return fmt.Sprintf("%s %s", t.Format(time.RFC3339), state)
+				}
+				// Build abbreviated attrs string
+				attrParts := make([]string, 0, len(attrs))
+				for k, v := range attrs {
+					attrParts = append(attrParts, fmt.Sprintf("%s:%v", k, v))
+				}
+				return fmt.Sprintf("%s %s {%s}", t.Format(time.RFC3339), state, strings.Join(attrParts, ", "))
+			}
+
+			// Default format: formatted time, state, and attributes on separate lines
+			if len(attrs) == 0 {
+				return fmt.Sprintf("%s: %s", output.FormatTime(t), state)
+			}
+			attrJSON, err := json.MarshalIndent(attrs, "    ", "  ")
+			if err != nil {
+				return fmt.Sprintf("%s: %s (attrs: %v)", output.FormatTime(t), state, attrs)
+			}
+			return fmt.Sprintf("%s: %s\n    %s", output.FormatTime(t), state, string(attrJSON))
+		}),
 	)
 	return nil
 }
