@@ -18,6 +18,35 @@ import (
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
 
+// Test fixture entity IDs (from testdata/ha-config/configuration.yaml)
+// These are available when running in CI or with the test config mounted.
+const (
+	testInputBoolean   = "input_boolean.test_switch"
+	testInputNumber    = "input_number.test_temperature"
+	testInputText      = "input_text.test_message"
+	testInputSelect    = "input_select.test_mode"
+	testTemplateSensor = "sensor.test_calculated_value"
+	testAutomationID   = "test_automation_toggle"
+	testAutomationFull = "automation.test_automation_toggle"
+	testScript         = "script.test_script"
+)
+
+// hasTestFixtures checks if the test fixtures are available.
+// Returns true if running in CI or against an HA instance with test config.
+func hasTestFixtures(t *testing.T, c *client.Client) bool {
+	t.Helper()
+	states, err := client.SendMessageTyped[[]types.HAState](c, "get_states", nil)
+	if err != nil {
+		return false
+	}
+	for _, s := range states {
+		if s.EntityID == testInputBoolean {
+			return true
+		}
+	}
+	return false
+}
+
 // getTestConfig returns the WebSocket URL and token for integration tests.
 // It supports two modes:
 //  1. Local (add-on): Uses SUPERVISOR_TOKEN and ws://supervisor/core/api/websocket
@@ -584,4 +613,253 @@ func TestIntegration_EntityRegistryValidation(t *testing.T) {
 		parts := strings.Split(e.EntityID, ".")
 		assert.Equal(t, 2, len(parts), "entity_id should have domain.name format")
 	}
+}
+
+// =============================================================================
+// Test Fixture Tests (require testdata/ha-config to be mounted)
+// =============================================================================
+
+func TestIntegration_Fixtures_InputHelpers(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	states, err := client.SendMessageTyped[[]types.HAState](c, "get_states", nil)
+	require.NoError(t, err)
+
+	// Check that our test entities exist
+	foundEntities := make(map[string]bool)
+	testEntities := []string{testInputBoolean, testInputNumber, testInputText, testInputSelect}
+
+	for _, s := range states {
+		for _, te := range testEntities {
+			if s.EntityID == te {
+				foundEntities[te] = true
+			}
+		}
+	}
+
+	for _, te := range testEntities {
+		assert.True(t, foundEntities[te], "test entity %s should exist", te)
+	}
+}
+
+func TestIntegration_Fixtures_ServiceCall(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	// Get current state
+	states, err := client.SendMessageTyped[[]types.HAState](c, "get_states", nil)
+	require.NoError(t, err)
+
+	var initialState string
+	for _, s := range states {
+		if s.EntityID == testInputBoolean {
+			initialState = s.State
+			break
+		}
+	}
+
+	// Toggle the input boolean
+	_, err = c.SendMessage("call_service", map[string]any{
+		"domain":  "input_boolean",
+		"service": "toggle",
+		"target": map[string]any{
+			"entity_id": testInputBoolean,
+		},
+	})
+	require.NoError(t, err)
+
+	// Verify state changed
+	time.Sleep(500 * time.Millisecond)
+	states, err = client.SendMessageTyped[[]types.HAState](c, "get_states", nil)
+	require.NoError(t, err)
+
+	var newState string
+	for _, s := range states {
+		if s.EntityID == testInputBoolean {
+			newState = s.State
+			break
+		}
+	}
+
+	assert.NotEqual(t, initialState, newState, "state should have changed after toggle")
+
+	// Toggle back to restore original state
+	_, err = c.SendMessage("call_service", map[string]any{
+		"domain":  "input_boolean",
+		"service": "toggle",
+		"target": map[string]any{
+			"entity_id": testInputBoolean,
+		},
+	})
+	require.NoError(t, err)
+}
+
+func TestIntegration_Fixtures_InputNumberHistory(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	// Set a value to ensure history exists
+	_, err := c.SendMessage("call_service", map[string]any{
+		"domain":  "input_number",
+		"service": "set_value",
+		"target": map[string]any{
+			"entity_id": testInputNumber,
+		},
+		"service_data": map[string]any{
+			"value": 22.5,
+		},
+	})
+	require.NoError(t, err)
+
+	time.Sleep(500 * time.Millisecond)
+
+	// Query history
+	endTime := time.Now()
+	startTime := endTime.Add(-1 * time.Hour)
+
+	result, err := client.SendMessageTyped[map[string][]types.HistoryState](c,
+		"history/history_during_period",
+		map[string]any{
+			"start_time":               startTime.Format(time.RFC3339),
+			"end_time":                 endTime.Format(time.RFC3339),
+			"entity_ids":               []string{testInputNumber},
+			"minimal_response":         true,
+			"no_attributes":            true,
+			"significant_changes_only": false,
+		})
+	require.NoError(t, err)
+
+	history, ok := result[testInputNumber]
+	assert.True(t, ok, "should have history for %s", testInputNumber)
+	if ok {
+		assert.Greater(t, len(history), 0, "should have at least one history entry")
+	}
+}
+
+func TestIntegration_Fixtures_TemplateSensor(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	states, err := client.SendMessageTyped[[]types.HAState](c, "get_states", nil)
+	require.NoError(t, err)
+
+	var found bool
+	for _, s := range states {
+		if s.EntityID != testTemplateSensor {
+			continue
+		}
+
+		found = true
+		// Template sensor should have a numeric state (temperature in F)
+		assert.NotEmpty(t, s.State)
+		assert.NotEqual(t, "unavailable", s.State)
+		assert.NotEqual(t, "unknown", s.State)
+		t.Logf("Template sensor %s = %s", testTemplateSensor, s.State)
+		break
+	}
+	assert.True(t, found, "template sensor %s should exist", testTemplateSensor)
+}
+
+func TestIntegration_Fixtures_AutomationTraces(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	// Trigger the automation by changing the input number
+	_, err := c.SendMessage("call_service", map[string]any{
+		"domain":  "input_number",
+		"service": "set_value",
+		"target": map[string]any{
+			"entity_id": testInputNumber,
+		},
+		"service_data": map[string]any{
+			"value": 30.0,
+		},
+	})
+	require.NoError(t, err)
+
+	// Wait for automation to run
+	time.Sleep(1 * time.Second)
+
+	// Get traces
+	traces, err := client.SendMessageTyped[[]types.TraceInfo](c,
+		"trace/list",
+		map[string]any{"domain": "automation"})
+	require.NoError(t, err)
+
+	// Look for our test automation trace
+	var foundTrace bool
+	for _, trace := range traces {
+		if trace.ItemID == testAutomationFull {
+			foundTrace = true
+			t.Logf("Found trace for %s: run_id=%s, state=%s",
+				trace.ItemID, trace.RunID, trace.State)
+			break
+		}
+	}
+
+	assert.True(t, foundTrace, "should have trace for test automation %s", testAutomationFull)
+}
+
+func TestIntegration_Fixtures_StatesFilter(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	states, err := client.SendMessageTyped[[]types.HAState](c, "get_states", nil)
+	require.NoError(t, err)
+
+	// Filter for input_boolean entities
+	var inputBooleans []types.HAState
+	for _, s := range states {
+		if strings.HasPrefix(s.EntityID, "input_boolean.") {
+			inputBooleans = append(inputBooleans, s)
+		}
+	}
+
+	// Should have at least our test input booleans
+	assert.GreaterOrEqual(t, len(inputBooleans), 3,
+		"should have at least 3 input_boolean entities from fixtures")
+
+	// Verify our specific test entities are present
+	entityIDs := make([]string, len(inputBooleans))
+	for i, s := range inputBooleans {
+		entityIDs[i] = s.EntityID
+	}
+	assert.Contains(t, entityIDs, testInputBoolean)
+}
+
+func TestIntegration_Fixtures_Script(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	// Call our test script
+	_, err := c.SendMessage("call_service", map[string]any{
+		"domain":  "script",
+		"service": "test_script",
+	})
+	require.NoError(t, err)
+
+	// Script runs asynchronously, just verify it was called successfully
+	t.Log("Test script executed successfully")
 }

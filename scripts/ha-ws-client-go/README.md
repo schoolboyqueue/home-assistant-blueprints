@@ -366,11 +366,45 @@ HA_HOST=192.168.1.100:8124 HA_TOKEN=your_token go test -tags=integration -v ./in
 
 **Priority:** `HA_TOKEN` > `SUPERVISOR_TOKEN` for token, `HA_WS_URL` > `HA_HOST` > default for URL.
 
+#### Test Environments
+
+Integration tests are designed to run in three different environments:
+
+| Environment | Token | URL | Fixture Tests |
+|-------------|-------|-----|---------------|
+| **HA Add-on** | `SUPERVISOR_TOKEN` (auto) | `ws://supervisor/core/api/websocket` | Skipped |
+| **Remote** | `HA_TOKEN` | `ws://{HA_HOST}/api/websocket` | Skipped |
+| **CI (GitHub Actions)** | `HA_TOKEN` (from onboarding) | `ws://localhost:8123/api/websocket` | Run |
+
+**How it works:**
+
+1. **Base tests** use `sun.sun` and other entities that exist in any Home Assistant installation. These tests run in all environments.
+
+2. **Fixture tests** (`TestIntegration_Fixtures_*`) require specific test entities defined in `testdata/ha-config/configuration.yaml`. These tests:
+   - Automatically **skip** when test fixtures aren't detected
+   - Only **run** in CI where the test configuration is mounted
+   - Test service calls, state changes, history, automation traces, and scripts
+
+3. **Detection**: The `hasTestFixtures()` helper checks if `input_boolean.test_switch` exists. If not found, fixture tests are skipped gracefully.
+
+**What to expect:**
+
+```bash
+# Running locally or remotely - fixture tests skip
+=== RUN   TestIntegration_Fixtures_InputHelpers
+    handlers_integration_test.go:626: Test fixtures not available - skipping fixture tests
+--- SKIP: TestIntegration_Fixtures_InputHelpers (0.12s)
+
+# Running in CI with test config - fixture tests run
+=== RUN   TestIntegration_Fixtures_InputHelpers
+--- PASS: TestIntegration_Fixtures_InputHelpers (0.15s)
+```
+
 #### Test Coverage
 
-Integration tests cover:
+**Base tests** (run everywhere):
 - Basic commands (ping, states, config, services)
-- Entity state queries and filtering
+- Entity state queries and filtering (`sun.sun`)
 - Template rendering
 - Registry operations (entities, devices, areas)
 - History and logbook queries
@@ -378,6 +412,15 @@ Integration tests cover:
 - Real-time subscriptions (templates, triggers)
 - Error handling for invalid requests
 - Middleware behavior with live connections
+
+**Fixture tests** (CI only):
+- Input helper entity verification
+- Service calls with state change verification
+- Input number history queries
+- Template sensor calculations
+- Automation trace generation and retrieval
+- States filtering by pattern
+- Script execution
 
 ## Architecture
 

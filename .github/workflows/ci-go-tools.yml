@@ -41,7 +41,7 @@ jobs:
           working-directory: scripts/${{ matrix.tool }}
           args: --timeout=5m
 
-      - name: Run tests
+      - name: Run unit tests
         working-directory: scripts/${{ matrix.tool }}
         run: go test -race -v ./...
 
@@ -50,6 +50,199 @@ jobs:
         run: |
           go install mvdan.cc/gofumpt@v0.7.0
           test -z "$(gofumpt -l .)"
+
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: scripts/ha-ws-client-go/go.sum
+
+      - name: Prepare Home Assistant config
+        run: |
+          mkdir -p /tmp/ha-config
+          cp scripts/ha-ws-client-go/testdata/ha-config/configuration.yaml /tmp/ha-config/
+
+      - name: Start Home Assistant
+        run: |
+          docker run -d \
+            --name homeassistant \
+            -p 8123:8123 \
+            -v /tmp/ha-config:/config \
+            ghcr.io/home-assistant/home-assistant:stable
+
+      - name: Wait for Home Assistant to be ready
+        run: |
+          echo "Waiting for Home Assistant to start..."
+          for i in {1..90}; do
+            if curl -sf http://localhost:8123/api/ > /dev/null 2>&1; then
+              echo "Home Assistant is ready!"
+              exit 0
+            fi
+            echo "Attempt $i: Waiting..."
+            sleep 2
+          done
+          echo "Home Assistant failed to start"
+          docker logs homeassistant
+          exit 1
+
+      - name: Complete Home Assistant onboarding
+        id: onboarding
+        run: |
+          # Complete onboarding flow to create user
+          echo "Starting onboarding..."
+
+          # Step 1: Create user
+          curl -sf -X POST http://localhost:8123/api/onboarding/users \
+            -H "Content-Type: application/json" \
+            -d '{"client_id":"http://localhost:8123/","name":"Test User","username":"testuser","password":"testpassword123","language":"en"}' \
+            -o /tmp/user_response.json
+
+          AUTH_CODE=$(jq -r '.auth_code' /tmp/user_response.json)
+          echo "Got auth code"
+
+          # Step 2: Exchange auth code for tokens
+          curl -sf -X POST http://localhost:8123/auth/token \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "grant_type=authorization_code&code=${AUTH_CODE}&client_id=http://localhost:8123/" \
+            -o /tmp/token_response.json
+
+          ACCESS_TOKEN=$(jq -r '.access_token' /tmp/token_response.json)
+          export ACCESS_TOKEN
+          echo "Got access token"
+
+          # Step 3: Complete remaining onboarding steps
+          curl -sf -X POST http://localhost:8123/api/onboarding/core_config \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{}'
+
+          curl -sf -X POST http://localhost:8123/api/onboarding/analytics \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{}'
+
+          curl -sf -X POST http://localhost:8123/api/onboarding/integration \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{}' || true
+
+          # Step 4: Create long-lived access token
+          LLAT_RESPONSE=$(curl -sf -X POST http://localhost:8123/api/websocket \
+            --no-buffer \
+            -H "Upgrade: websocket" \
+            -H "Connection: Upgrade" 2>/dev/null || true)
+
+          # Use Python to create LLAT via WebSocket (more reliable)
+          pip install websockets > /dev/null 2>&1
+
+          LONG_LIVED_TOKEN=$(python3 << 'PYEOF'
+import asyncio
+import json
+import os
+import websockets
+
+async def get_llat():
+    token = os.environ.get("ACCESS_TOKEN")
+    uri = "ws://localhost:8123/api/websocket"
+    async with websockets.connect(uri) as ws:
+        # Wait for auth_required
+        msg = json.loads(await ws.recv())
+
+        # Send auth
+        await ws.send(json.dumps({
+            "type": "auth",
+            "access_token": token
+        }))
+
+        # Wait for auth_ok
+        msg = json.loads(await ws.recv())
+        if msg["type"] != "auth_ok":
+            raise Exception("Auth failed")
+
+        # Create long-lived token
+        await ws.send(json.dumps({
+            "id": 1,
+            "type": "auth/long_lived_access_token",
+            "client_name": "Integration Tests",
+            "lifespan": 365
+        }))
+
+        msg = json.loads(await ws.recv())
+        print(msg["result"])
+
+asyncio.run(get_llat())
+PYEOF
+          )
+
+          echo "HA_TOKEN=${LONG_LIVED_TOKEN}" >> $GITHUB_OUTPUT
+          echo "Successfully created long-lived access token"
+
+      - name: Generate test data
+        env:
+          HA_TOKEN: ${{ steps.onboarding.outputs.HA_TOKEN }}
+        run: |
+          echo "Triggering automations to generate trace data..."
+
+          # Trigger automations by changing entity states
+          curl -sf -X POST http://localhost:8123/api/services/input_number/set_value \
+            -H "Authorization: Bearer ${HA_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"entity_id": "input_number.test_temperature", "value": 25}'
+
+          sleep 2
+
+          curl -sf -X POST http://localhost:8123/api/services/input_boolean/turn_on \
+            -H "Authorization: Bearer ${HA_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"entity_id": "input_boolean.motion_detected"}'
+
+          sleep 2
+
+          curl -sf -X POST http://localhost:8123/api/services/input_select/select_option \
+            -H "Authorization: Bearer ${HA_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"entity_id": "input_select.test_mode", "option": "away"}'
+
+          sleep 2
+
+          # Run the test script
+          curl -sf -X POST http://localhost:8123/api/services/script/test_script \
+            -H "Authorization: Bearer ${HA_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{}'
+
+          sleep 2
+          echo "Test data generated successfully"
+
+      - name: Run integration tests
+        working-directory: scripts/ha-ws-client-go
+        env:
+          HA_HOST: localhost:8123
+          HA_TOKEN: ${{ steps.onboarding.outputs.HA_TOKEN }}
+        run: |
+          echo "Running integration tests against Home Assistant..."
+          go test -tags=integration -race -v ./internal/handlers/...
+
+      - name: Show Home Assistant logs on failure
+        if: failure()
+        run: |
+          echo "=== Home Assistant Logs ==="
+          docker logs homeassistant --tail 200
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop homeassistant || true
+          docker rm homeassistant || true
 
   build:
     name: Build Test

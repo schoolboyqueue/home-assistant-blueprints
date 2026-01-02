@@ -1,0 +1,189 @@
+# Home Assistant Test Configuration
+# Used for integration tests in CI
+
+homeassistant:
+  name: Test Home
+  unit_system: metric
+  time_zone: UTC
+  latitude: 40.7128
+  longitude: -74.0060
+
+# Enable default integrations
+default_config:
+
+# Logging
+logger:
+  default: warning
+  logs:
+    homeassistant.core: info
+
+# Input helpers for testing state changes and history
+input_boolean:
+  test_switch:
+    name: Test Switch
+    icon: mdi:toggle-switch
+  motion_detected:
+    name: Motion Detected
+    icon: mdi:motion-sensor
+  away_mode:
+    name: Away Mode
+    icon: mdi:home-export-outline
+
+input_number:
+  test_temperature:
+    name: Test Temperature
+    min: 0
+    max: 100
+    step: 0.5
+    unit_of_measurement: "°C"
+    icon: mdi:thermometer
+  test_brightness:
+    name: Test Brightness
+    min: 0
+    max: 255
+    step: 1
+    icon: mdi:brightness-6
+  target_humidity:
+    name: Target Humidity
+    min: 0
+    max: 100
+    step: 1
+    unit_of_measurement: "%"
+
+input_text:
+  test_message:
+    name: Test Message
+    max: 255
+    icon: mdi:message-text
+  last_event:
+    name: Last Event
+    max: 255
+
+input_select:
+  test_mode:
+    name: Test Mode
+    options:
+      - "home"
+      - "away"
+      - "night"
+      - "vacation"
+    icon: mdi:home-variant
+
+input_datetime:
+  test_time:
+    name: Test Time
+    has_date: true
+    has_time: true
+
+# Template sensors for testing template command
+template:
+  - sensor:
+      - name: "Test Calculated Value"
+        state: "{{ states('input_number.test_temperature') | float * 1.8 + 32 }}"
+        unit_of_measurement: "°F"
+
+      - name: "Test Status"
+        state: >
+          {% if is_state('input_boolean.test_switch', 'on') %}
+            Active
+          {% else %}
+            Inactive
+          {% endif %}
+
+      - name: "Current Hour"
+        state: "{{ now().hour }}"
+
+  - binary_sensor:
+      - name: "Test Condition"
+        state: "{{ states('input_number.test_temperature') | float > 25 }}"
+        device_class: heat
+
+# Automations for testing trace commands
+automation:
+  - id: test_automation_toggle
+    alias: "Test: Toggle on Temperature Change"
+    description: "Automation for testing trace functionality"
+    trigger:
+      - platform: state
+        entity_id: input_number.test_temperature
+    action:
+      - service: input_boolean.toggle
+        target:
+          entity_id: input_boolean.test_switch
+    mode: single
+
+  - id: test_automation_timed
+    alias: "Test: Timed Actions"
+    description: "Automation with multiple steps for trace testing"
+    trigger:
+      - platform: state
+        entity_id: input_boolean.motion_detected
+        to: "on"
+    condition:
+      - condition: state
+        entity_id: input_boolean.away_mode
+        state: "off"
+    action:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.last_event
+        data:
+          value: "Motion detected at {{ now().isoformat() }}"
+      - delay:
+          seconds: 1
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.motion_detected
+    mode: single
+
+  - id: test_automation_mode_change
+    alias: "Test: Mode Change Handler"
+    description: "Automation triggered by mode selection"
+    trigger:
+      - platform: state
+        entity_id: input_select.test_mode
+    action:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.last_event
+        data:
+          value: "Mode changed to {{ trigger.to_state.state }}"
+    mode: queued
+    max: 5
+
+# Scripts for testing call command
+script:
+  test_script:
+    alias: "Test Script"
+    description: "A simple test script"
+    sequence:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.test_switch
+      - delay:
+          milliseconds: 500
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.test_switch
+
+  set_test_values:
+    alias: "Set Test Values"
+    description: "Script to set multiple test values"
+    fields:
+      temperature:
+        description: "Temperature value to set"
+        example: 22.5
+      brightness:
+        description: "Brightness value to set"
+        example: 128
+    sequence:
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.test_temperature
+        data:
+          value: "{{ temperature | default(20) }}"
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.test_brightness
+        data:
+          value: "{{ brightness | default(100) }}"
