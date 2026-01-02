@@ -112,11 +112,27 @@ jobs:
           # Complete onboarding flow to create user
           echo "Starting onboarding..."
 
-          # Step 1: Create user
-          curl -sf -X POST http://localhost:8123/api/onboarding/users \
+          # Step 1: Create user (store JSON in file to avoid shell escaping issues)
+          cat > /tmp/onboarding_request.json << 'JSONEOF'
+          {"client_id":"http://localhost:8123/","name":"Test User","username":"testuser","password":"testpassword123","language":"en"}
+          JSONEOF
+
+          echo "Request payload:"
+          cat /tmp/onboarding_request.json
+
+          HTTP_CODE=$(curl -s -w "%{http_code}" -X POST http://localhost:8123/api/onboarding/users \
             -H "Content-Type: application/json" \
-            -d '{"client_id":"http://localhost:8123/","name":"Test User","username":"testuser","password":"testpassword123","language":"en"}' \
-            -o /tmp/user_response.json
+            -d @/tmp/onboarding_request.json \
+            -o /tmp/user_response.json)
+
+          echo "Response code: $HTTP_CODE"
+          echo "Response body:"
+          cat /tmp/user_response.json || true
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Onboarding failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
 
           AUTH_CODE=$(jq -r '.auth_code' /tmp/user_response.json)
           echo "Got auth code"
