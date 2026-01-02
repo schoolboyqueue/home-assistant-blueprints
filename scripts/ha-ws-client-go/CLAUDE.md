@@ -111,6 +111,33 @@ func HandleMyCommand(ctx *Context) error {
 }
 ```
 
+### Before Committing
+
+**Always run the formatter and linter before committing changes:**
+
+```bash
+# In the HA add-on environment (no make available):
+PATH=/config/.gopath/bin:$PATH gofumpt -l -w .
+PATH=/config/.gopath/bin:$PATH goimports -local github.com/home-assistant-blueprints/ha-ws-client-go -w .
+PATH=/config/.gopath/bin:$PATH GOPATH=/config/.gopath GOCACHE=/config/.gopath/cache golangci-lint run --fix
+
+# With make available:
+make pre-commit   # Runs format, lint-fix, and tests
+```
+
+**Common linter issues to watch for:**
+- Repeated string literals → extract to constants
+- Unchecked type assertions → use `val, ok := x.(Type)` pattern
+- Assignment operators → use `x /= 2` instead of `x = x / 2`
+- Error return values not checked → always check or explicitly ignore with `_ =`
+
+**Install dev tools if not present:**
+```bash
+GOPATH=/config/.gopath go install mvdan.cc/gofumpt@v0.7.0
+GOPATH=/config/.gopath go install golang.org/x/tools/cmd/goimports@latest
+GOPATH=/config/.gopath go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.2
+```
+
 ### WebSocket API Patterns
 
 ```go

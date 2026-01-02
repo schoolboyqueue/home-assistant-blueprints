@@ -333,7 +333,7 @@ func (s *StatEntry) GetStartTime() string {
 		ts := int64(v)
 		// HA returns milliseconds for statistics timestamps
 		if ts > 1e12 {
-			ts = ts / 1000
+			ts /= 1000
 		}
 		return time.Unix(ts, 0).Format(time.RFC3339)
 	case string:

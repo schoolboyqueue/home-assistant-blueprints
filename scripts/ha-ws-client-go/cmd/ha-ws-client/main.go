@@ -59,6 +59,8 @@ var commandRegistry = map[string]func(*handlers.Context) error{
 	// Automation commands
 	"traces":            handlers.HandleTraces,
 	"trace":             handlers.HandleTrace,
+	"trace-latest":      handlers.HandleTraceLatest,
+	"trace-summary":     handlers.HandleTraceSummary,
 	"trace-vars":        handlers.HandleTraceVars,
 	"trace-timeline":    handlers.HandleTraceTimeline,
 	"trace-trigger":     handlers.HandleTraceTrigger,
@@ -71,6 +73,10 @@ var commandRegistry = map[string]func(*handlers.Context) error{
 	"monitor":       handlers.HandleMonitor,
 	"monitor-multi": handlers.HandleMonitorMulti,
 	"analyze":       handlers.HandleAnalyze,
+
+	// Diagnostic commands
+	"device-health": handlers.HandleDeviceHealth,
+	"compare":       handlers.HandleCompare,
 }
 
 func showHelp() {
@@ -80,7 +86,7 @@ Commands:
   state <entity_id>              - Get single entity state
   states                         - Get all entity states (summary)
   states-json                    - Get all states as JSON array
-  states-filter <pattern>        - Filter states by entity_id pattern
+  states-filter <pattern>        - Filter states by entity_id pattern (--show-age)
   config                         - Get HA configuration
   services                       - List all services
   call <domain> <service> [data] - Call a service (data as JSON)
@@ -104,13 +110,15 @@ Registry Commands:
   areas                          - List all areas
 
 Automation Debugging:
-  traces [automation_id]         - List automation traces
-  trace <run_id> [automation_id] - Get detailed trace for a run
-  trace-vars <run_id> [auto_id]  - Show evaluated variables from trace
-  trace-timeline <run_id> [id]   - Step-by-step execution timeline
-  trace-trigger <run_id> [id]    - Show trigger context details
-  trace-actions <run_id> [id]    - Show action results
-  trace-debug <run_id> [id]      - Comprehensive debug view (all info)
+  traces [automation_id]         - List automation traces (supports --from)
+  trace <automation_id> <run_id> - Get detailed trace for a run
+  trace-latest <automation_id>   - Get the most recent trace
+  trace-summary <automation_id>  - Quick overview of recent runs
+  trace-vars <auto_id> <run_id>  - Show evaluated variables from trace
+  trace-timeline <id> <run_id>   - Step-by-step execution timeline
+  trace-trigger <id> <run_id>    - Show trigger context details
+  trace-actions <id> <run_id>    - Show action results
+  trace-debug <id> <run_id>      - Comprehensive debug view (all info)
   automation-config <entity_id>  - Get automation configuration
   blueprint-inputs <entity_id>   - Validate blueprint inputs vs expected
 
@@ -119,7 +127,11 @@ Monitoring Commands:
   monitor-multi <entity>...      - Monitor multiple entities
   analyze <entity_id>            - Analyze entity state patterns
 
-Time Filtering Options (for logbook, history, history-full, attrs, timeline):
+Diagnostic Commands:
+  device-health <entity_id>      - Check if device is responsive (stale detection)
+  compare <entity1> <entity2>    - Side-by-side entity comparison
+
+Time Filtering Options (for logbook, history, history-full, attrs, timeline, traces):
   --from "YYYY-MM-DD HH:MM"      - Start time (instead of hours ago)
   --to "YYYY-MM-DD HH:MM"        - End time (default: now)
 
@@ -132,6 +144,7 @@ Output Format Options (for AI agent context efficiency):
   --no-headers                   - Hide section headers/titles
   --no-timestamps                - Hide timestamps in output
   --max-items=N                  - Limit output to N items
+  --show-age                     - Show last_updated age (states-filter)
 
 Global Options:
   --help, -h, help               - Show this help message
@@ -142,9 +155,12 @@ Examples:
   ha-ws-client call light turn_on '{"entity_id":"light.kitchen"}'
   ha-ws-client attrs light.kitchen 4
   ha-ws-client watch binary_sensor.motion 30
-  ha-ws-client blueprint-inputs automation.bathroom_lights
-  ha-ws-client trace-vars 01KDQS4E2WHMYJYYXKC7K28XFG
-  ha-ws-client trace-debug 01KDQS4E2WHMYJYYXKC7K28XFG
+  ha-ws-client states-filter "cover.*" --show-age --compact
+  ha-ws-client trace-latest automation.bathroom_lights
+  ha-ws-client trace-summary automation.adaptive_shades
+  ha-ws-client traces automation.kitchen --from "2024-01-01"
+  ha-ws-client device-health cover.guest_bedroom_shade
+  ha-ws-client compare cover.living_room_shade cover.guest_bedroom_shade
   echo "{{ now() }}" | ha-ws-client template -
 `)
 }

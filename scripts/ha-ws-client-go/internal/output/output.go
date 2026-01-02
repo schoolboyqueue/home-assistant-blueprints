@@ -23,6 +23,7 @@ type Config struct {
 	Format         Format
 	ShowTimestamps bool
 	ShowHeaders    bool
+	ShowAge        bool
 	MaxItems       int
 }
 
@@ -32,6 +33,7 @@ func DefaultConfig() *Config {
 		Format:         FormatDefault,
 		ShowTimestamps: true,
 		ShowHeaders:    true,
+		ShowAge:        false,
 		MaxItems:       0,
 	}
 }
@@ -72,6 +74,8 @@ func ParseArgs(args []string) []string {
 			globalConfig.ShowHeaders = false
 		case arg == "--no-timestamps":
 			globalConfig.ShowTimestamps = false
+		case arg == "--show-age":
+			globalConfig.ShowAge = true
 		case strings.HasPrefix(arg, "--max-items="):
 			var n int
 			fmt.Sscanf(arg, "--max-items=%d", &n)
@@ -103,6 +107,11 @@ func IsJSON() bool {
 // IsCompact returns true if compact output mode is enabled.
 func IsCompact() bool {
 	return globalConfig.Format == FormatCompact
+}
+
+// ShowAge returns true if --show-age flag is set.
+func ShowAge() bool {
+	return globalConfig.ShowAge
 }
 
 // Data outputs data in the configured format.
