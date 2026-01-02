@@ -273,8 +273,9 @@ func (c *Client) SubscribeToTemplate(template string, callback func(string), tim
 	// Register event handler BEFORE sending to avoid race condition
 	c.subscriptionMu.Lock()
 	c.subscriptions[id] = func(vars map[string]any) {
-		if result, ok := vars["result"].(string); ok {
-			callback(result)
+		if result, ok := vars["result"]; ok {
+			// Convert result to string (could be string, int, float, etc.)
+			callback(fmt.Sprintf("%v", result))
 		}
 	}
 	c.subscriptionMu.Unlock()

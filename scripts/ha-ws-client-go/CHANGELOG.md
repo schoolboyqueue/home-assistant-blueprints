@@ -5,6 +5,15 @@ All notable changes to ha-ws-client-go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-01-02
+
+### Fixed
+
+- Fix `template` command timing out for non-string results (integers, floats)
+  - HA returns numeric template results (e.g., `{{ 1 + 1 }}` → `2`) as their native types
+  - The subscription callback was only accepting string types, causing silent failures
+  - Now properly converts any result type to string using `fmt.Sprintf("%v", result)`
+
 ## [1.1.0] - 2026-01-02
 
 ### Changed
