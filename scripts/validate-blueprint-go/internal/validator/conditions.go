@@ -1,0 +1,55 @@
+package validator
+
+import (
+	"fmt"
+	"slices"
+)
+
+// ValidateConditions validates condition definitions
+func (v *BlueprintValidator) ValidateConditions() {
+	conditions, ok := v.Data["condition"]
+	if !ok {
+		return // Conditions are optional
+	}
+
+	v.validateConditionList(conditions, "condition")
+}
+
+// validateConditionList validates a list of conditions
+func (v *BlueprintValidator) validateConditionList(conditions interface{}, path string) {
+	switch cond := conditions.(type) {
+	case []interface{}:
+		for i, c := range cond {
+			v.validateConditionList(c, fmt.Sprintf("%s[%d]", path, i))
+		}
+	case map[string]interface{}:
+		v.validateSingleCondition(cond, path)
+	}
+}
+
+// validateSingleCondition validates a single condition
+func (v *BlueprintValidator) validateSingleCondition(condition map[string]interface{}, path string) {
+	// Check for condition type
+	condType, hasCondition := condition["condition"].(string)
+	if !hasCondition {
+		// Shorthand condition (e.g., just entity_id without condition key)
+		if _, hasEntityID := condition["entity_id"]; hasEntityID {
+			return // Valid shorthand
+		}
+		v.AddWarningf("%s: Missing 'condition' key", path)
+		return
+	}
+
+	// Validate condition type
+	isValid := slices.Contains(ValidConditionTypes, condType)
+	if !isValid {
+		v.AddWarningf("%s: Unknown condition type '%s'", path, condType)
+	}
+
+	// Validate nested conditions for and/or/not
+	if condType == "and" || condType == "or" || condType == "not" {
+		if conditions, ok := condition["conditions"]; ok {
+			v.validateConditionList(conditions, fmt.Sprintf("%s.conditions", path))
+		}
+	}
+}

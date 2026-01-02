@@ -8,22 +8,51 @@ Go CLI for validating Home Assistant Blueprint YAML files. Checks YAML syntax, b
 
 ```
 validate-blueprint-go/
-├── main.go              # Main validator implementation
-│                        # - YAML parsing with !input tag support
-│                        # - Blueprint schema validation
-│                        # - Input/selector validation
-│                        # - Jinja2 template checking
-│                        # - Service call validation
-│                        # - Trigger/condition validation
-├── go.mod               # Go module definition
-├── go.sum               # Dependency checksums
-├── Makefile             # Build, format, lint, test targets
-├── .golangci.yml        # Linter configuration
-├── .editorconfig        # Editor settings
-├── README.md            # User documentation
-└── build/               # Build output directory (created by make build)
-    └── validate-blueprint  # Built binary
+├── main.go                      # CLI entry point and orchestration
+├── internal/
+│   └── validator/               # Core validation package
+│       ├── validator.go         # BlueprintValidator struct & Validate() orchestration
+│       ├── constants.go         # Configuration constants (ValidModes, ValidConditionTypes, etc.)
+│       ├── yaml.go              # YAML loading with !input tag support
+│       ├── schema.go            # Structure & blueprint section validation
+│       ├── inputs.go            # Input/selector validation
+│       ├── triggers.go          # Trigger validation
+│       ├── conditions.go        # Condition validation
+│       ├── actions.go           # Action/service validation
+│       ├── templates.go         # Jinja2 template validation
+│       ├── hysteresis.go        # Variable & hysteresis boundary validation
+│       ├── helpers.go           # Utility functions
+│       └── reporter.go          # Result formatting & display
+├── go.mod                       # Go module definition
+├── go.sum                       # Dependency checksums
+├── Makefile                     # Build, format, lint, test targets
+├── .golangci.yml                # Linter configuration
+├── .editorconfig                # Editor settings
+├── README.md                    # User documentation
+└── build/                       # Build output directory (created by make build)
+    └── validate-blueprint       # Built binary
 ```
+
+## Package Structure
+
+### `internal/validator`
+
+The core validation logic is organized into focused files:
+
+| File | Purpose |
+|------|---------|
+| `validator.go` | Main `BlueprintValidator` struct and `Validate()` orchestration |
+| `constants.go` | All configuration constants (ValidModes, ValidConditionTypes, ValidSelectorTypes, HysteresisPatterns, Jinja2Builtins) |
+| `yaml.go` | YAML parsing with custom `!input` tag handling |
+| `schema.go` | Root structure validation, blueprint section, mode, version sync |
+| `inputs.go` | Input definitions and selector validation |
+| `triggers.go` | Trigger validation and entity_id checks |
+| `conditions.go` | Condition validation including nested conditions |
+| `actions.go` | Action/service validation including choose/if/repeat blocks |
+| `templates.go` | Jinja2 template syntax validation |
+| `hysteresis.go` | Variable validation and hysteresis boundary detection |
+| `helpers.go` | Utility functions (ToFloat, Abs, ContainsVariableRef, etc.) |
+| `reporter.go` | Result formatting with colored output |
 
 ## Development
 
@@ -85,52 +114,54 @@ color.Yellow("⚠ Warning: %s", message)
 
 ### Validation Flow
 
-1. Parse YAML with custom `!input` tag handler
-2. Check required root-level keys (`blueprint`, `trigger`, `action`)
-3. Validate blueprint metadata (`name`, `description`, `domain`, `input`)
-4. Validate all input definitions and selector types
-5. Check trigger definitions and entity_id usage
-6. Validate service calls structure
-7. Check Jinja2 template syntax
-8. Validate hysteresis boundaries
-9. Check for documentation files
+1. Parse YAML with custom `!input` tag handler (`yaml.go`)
+2. Check required root-level keys (`schema.go`)
+3. Validate blueprint metadata (`schema.go`)
+4. Validate mode settings (`schema.go`)
+5. Validate all input definitions and selector types (`inputs.go`)
+6. Validate hysteresis boundaries (`hysteresis.go`)
+7. Validate variables section (`hysteresis.go`)
+8. Validate version sync (`schema.go`)
+9. Check trigger definitions and entity_id usage (`triggers.go`)
+10. Validate conditions (`conditions.go`)
+11. Validate service calls structure (`actions.go`)
+12. Check Jinja2 template syntax (`templates.go`)
+13. Validate input references (`inputs.go`)
+14. Check for documentation files (`reporter.go`)
 
 ### Adding New Validations
 
-1. Create validation function following existing patterns
-2. Add to appropriate validation section in `main.go`
-3. Update `README.md` with new check documentation
+1. Identify the appropriate file based on validation type
+2. Add validation method to `BlueprintValidator` receiver
+3. Call the new method from `Validate()` in `validator.go`
+4. Update `README.md` with new check documentation
 
-Validation function pattern:
+Validation method pattern:
 ```go
-func validateSomething(node *yaml.Node, path string, results *ValidationResults) {
+// In the appropriate file (e.g., schema.go, inputs.go, etc.)
+func (v *BlueprintValidator) ValidateSomething() {
     // Perform validation
     if invalid {
-        results.addError(path, "description of error")
+        v.AddErrorf("path: description of error")
     }
     if suspicious {
-        results.addWarning(path, "description of warning")
+        v.AddWarningf("path: description of warning")
     }
 }
 ```
 
 ### Error Handling
 
-Use the ValidationResults pattern:
+Use the `AddError`/`AddWarning` methods on `BlueprintValidator`:
 
 ```go
-type ValidationResults struct {
-    Errors   []ValidationIssue
-    Warnings []ValidationIssue
-}
+// Add error
+v.AddError("'variables' must be a dictionary")
+v.AddErrorf("Missing required key: '%s'", key)
 
-func (r *ValidationResults) addError(path, message string) {
-    r.Errors = append(r.Errors, ValidationIssue{Path: path, Message: message})
-}
-
-func (r *ValidationResults) addWarning(path, message string) {
-    r.Warnings = append(r.Warnings, ValidationIssue{Path: path, Message: message})
-}
+// Add warning
+v.AddWarning("No variables section defined")
+v.AddWarningf("Unknown selector type '%s'", selectorType)
 ```
 
 ## Usage

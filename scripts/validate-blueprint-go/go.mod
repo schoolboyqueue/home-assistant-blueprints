@@ -1,4 +1,4 @@
-module github.com/jeremiah-k/home-assistant-blueprints/scripts/validate-blueprint-go
+module github.com/home-assistant-blueprints/validate-blueprint-go
 
 go 1.22
 
