@@ -114,9 +114,40 @@ jobs:
           echo "Build ha-ws-client-go: $BUILD_CLIENT (v$CLIENT_VERSION)"
           echo "Build validate-blueprint-go: $BUILD_VALIDATOR (v$VALIDATE_VERSION)"
 
+  test:
+    name: Run Tests
+    needs: determine-builds
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        tool:
+          - validate-blueprint-go
+          - ha-ws-client-go
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: scripts/${{ matrix.tool }}/go.sum
+
+      - name: Run linter
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.62.2
+          working-directory: scripts/${{ matrix.tool }}
+          args: --timeout=5m
+
+      - name: Run tests
+        working-directory: scripts/${{ matrix.tool }}
+        run: go test -race -covermode=atomic ./...
+
   build:
     name: Build Go Binaries
-    needs: determine-builds
+    needs: [determine-builds, test]
     runs-on: ubuntu-latest
     strategy:
       matrix:

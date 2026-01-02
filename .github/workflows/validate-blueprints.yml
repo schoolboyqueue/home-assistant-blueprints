@@ -49,11 +49,11 @@ jobs:
               echo -n "  $blueprint ... "
               if ./scripts/validate-blueprint-go/validate-blueprint "$blueprint" > /tmp/output.txt 2>&1; then
                 echo "✓"
-                ((PASSED++))
+                PASSED=$((PASSED + 1))
               else
                 echo "✗"
                 cat /tmp/output.txt
-                ((FAILED++))
+                FAILED=$((FAILED + 1))
               fi
             fi
           done
