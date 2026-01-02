@@ -113,7 +113,12 @@ func HandleMyCommand(ctx *Context) error {
 
 ### Before Committing
 
-**Always run the formatter and linter before committing changes:**
+**1. Bump version (for any code changes):**
+- Update `VERSION` in `Makefile` (e.g., `1.0.4` → `1.0.5`)
+- Add entry to `CHANGELOG.md` with the new version and date
+- Use semantic versioning: patch for fixes, minor for features, major for breaking changes
+
+**2. Run formatter and linter:**
 
 ```bash
 # In the HA add-on environment (no make available):
@@ -124,6 +129,8 @@ PATH=/config/.gopath/bin:$PATH GOPATH=/config/.gopath GOCACHE=/config/.gopath/ca
 # With make available:
 make pre-commit   # Runs format, lint-fix, and tests
 ```
+
+**3. Build and test** before committing to verify changes work.
 
 **Common linter issues to watch for:**
 - Repeated string literals → extract to constants
