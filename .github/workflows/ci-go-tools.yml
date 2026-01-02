@@ -144,44 +144,22 @@ jobs:
           # Use Python to create LLAT via WebSocket (more reliable)
           pip install websockets > /dev/null 2>&1
 
-          LONG_LIVED_TOKEN=$(python3 << 'PYEOF'
-import asyncio
-import json
-import os
-import websockets
+          python3 - <<'PYEOF'
+          import asyncio, json, os, websockets
+          async def get_llat():
+              token = os.environ.get("ACCESS_TOKEN")
+              async with websockets.connect("ws://localhost:8123/api/websocket") as ws:
+                  await ws.recv()
+                  await ws.send(json.dumps({"type": "auth", "access_token": token}))
+                  msg = json.loads(await ws.recv())
+                  if msg["type"] != "auth_ok": raise Exception("Auth failed")
+                  await ws.send(json.dumps({"id": 1, "type": "auth/long_lived_access_token", "client_name": "Integration Tests", "lifespan": 365}))
+                  msg = json.loads(await ws.recv())
+                  with open("/tmp/ha_token.txt", "w") as f: f.write(msg["result"])
+          asyncio.run(get_llat())
+          PYEOF
 
-async def get_llat():
-    token = os.environ.get("ACCESS_TOKEN")
-    uri = "ws://localhost:8123/api/websocket"
-    async with websockets.connect(uri) as ws:
-        # Wait for auth_required
-        msg = json.loads(await ws.recv())
-
-        # Send auth
-        await ws.send(json.dumps({
-            "type": "auth",
-            "access_token": token
-        }))
-
-        # Wait for auth_ok
-        msg = json.loads(await ws.recv())
-        if msg["type"] != "auth_ok":
-            raise Exception("Auth failed")
-
-        # Create long-lived token
-        await ws.send(json.dumps({
-            "id": 1,
-            "type": "auth/long_lived_access_token",
-            "client_name": "Integration Tests",
-            "lifespan": 365
-        }))
-
-        msg = json.loads(await ws.recv())
-        print(msg["result"])
-
-asyncio.run(get_llat())
-PYEOF
-          )
+          LONG_LIVED_TOKEN=$(cat /tmp/ha_token.txt)
 
           echo "HA_TOKEN=${LONG_LIVED_TOKEN}" >> $GITHUB_OUTPUT
           echo "Successfully created long-lived access token"
