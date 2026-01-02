@@ -309,6 +309,76 @@ make ci
 
 Run `make help` to see all available targets organized by category.
 
+## Testing
+
+### Unit Tests
+
+Unit tests run without external dependencies:
+
+```bash
+make test
+# or
+go test ./...
+```
+
+### Integration Tests
+
+Integration tests connect to a real Home Assistant instance and verify the WebSocket API client works correctly. They are tagged with `//go:build integration` and skipped by default.
+
+#### Running from the HA Add-on
+
+When running inside the Home Assistant add-on environment, the `SUPERVISOR_TOKEN` is automatically available:
+
+```bash
+go test -tags=integration -v ./internal/handlers/...
+```
+
+#### Running from a Remote Machine
+
+To run integration tests from your development machine against a remote Home Assistant instance:
+
+1. **Create a Long-Lived Access Token** in Home Assistant:
+   - Go to your profile (click your name in the sidebar)
+   - Scroll to "Long-Lived Access Tokens"
+   - Click "Create Token" and copy it
+
+2. **Set environment variables** and run tests:
+
+```bash
+# Option 1: Using HA_HOST shorthand (recommended)
+HA_HOST=192.168.1.100 HA_TOKEN=your_token go test -tags=integration -v ./internal/handlers/...
+
+# Option 2: Using full WebSocket URL
+HA_WS_URL=ws://192.168.1.100:8123/api/websocket HA_TOKEN=your_token go test -tags=integration -v ./internal/handlers/...
+
+# Option 3: Non-standard port
+HA_HOST=192.168.1.100:8124 HA_TOKEN=your_token go test -tags=integration -v ./internal/handlers/...
+```
+
+#### Environment Variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `SUPERVISOR_TOKEN` | Add-on supervisor token (auto-set in add-on) | - |
+| `HA_TOKEN` | Long-lived access token for remote connections | `eyJ0eXAi...` |
+| `HA_HOST` | Home Assistant host (shorthand for HA_WS_URL) | `192.168.1.100` or `192.168.1.100:8124` |
+| `HA_WS_URL` | Full WebSocket URL (overrides HA_HOST) | `ws://192.168.1.100:8123/api/websocket` |
+
+**Priority:** `HA_TOKEN` > `SUPERVISOR_TOKEN` for token, `HA_WS_URL` > `HA_HOST` > default for URL.
+
+#### Test Coverage
+
+Integration tests cover:
+- Basic commands (ping, states, config, services)
+- Entity state queries and filtering
+- Template rendering
+- Registry operations (entities, devices, areas)
+- History and logbook queries
+- Automation trace retrieval
+- Real-time subscriptions (templates, triggers)
+- Error handling for invalid requests
+- Middleware behavior with live connections
+
 ## Architecture
 
 ```

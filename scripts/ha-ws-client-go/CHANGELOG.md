@@ -5,6 +5,18 @@ All notable changes to ha-ws-client-go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] - 2026-01-02
+
+### Added
+
+- Add integration tests for all handler commands with real Home Assistant connections
+- Add remote testing support via `HA_HOST`, `HA_WS_URL`, and `HA_TOKEN` environment variables
+- Add comprehensive Testing section to README with setup instructions
+
+### Changed
+
+- Refactor integration test client to support both local add-on and remote connections
+
 ## [1.1.1] - 2026-01-02
 
 ### Fixed
