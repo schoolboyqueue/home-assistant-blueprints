@@ -216,6 +216,8 @@ func TestClient_SendMessage_WithData(t *testing.T) {
 		}
 		err = conn.WriteJSON(resp)
 		require.NoError(t, err)
+		// Allow client time to read before handler returns and closes connection
+		time.Sleep(100 * time.Millisecond)
 	})
 	defer server.Close()
 
