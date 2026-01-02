@@ -181,6 +181,8 @@ func TestClient_SendMessage_Success(t *testing.T) {
 		}
 		err = conn.WriteJSON(resp)
 		require.NoError(t, err)
+		// Allow client time to read before handler returns and closes connection
+		time.Sleep(100 * time.Millisecond)
 	})
 	defer server.Close()
 
@@ -255,6 +257,8 @@ func TestClient_SendMessage_Error(t *testing.T) {
 		}
 		err = conn.WriteJSON(resp)
 		require.NoError(t, err)
+		// Allow client time to read before handler returns and closes connection
+		time.Sleep(100 * time.Millisecond)
 	})
 	defer server.Close()
 
@@ -290,6 +294,8 @@ func TestClient_SendMessage_ErrorWithoutDetails(t *testing.T) {
 		}
 		err = conn.WriteJSON(resp)
 		require.NoError(t, err)
+		// Allow client time to read before handler returns and closes connection
+		time.Sleep(100 * time.Millisecond)
 	})
 	defer server.Close()
 
@@ -348,6 +354,8 @@ func TestSendMessageTyped(t *testing.T) {
 		}
 		err = conn.WriteJSON(resp)
 		require.NoError(t, err)
+		// Allow client time to read before handler returns and closes connection
+		time.Sleep(100 * time.Millisecond)
 	})
 	defer server.Close()
 
@@ -380,6 +388,8 @@ func TestSendMessageTyped_Error(t *testing.T) {
 		}
 		err = conn.WriteJSON(resp)
 		require.NoError(t, err)
+		// Allow client time to read before handler returns and closes connection
+		time.Sleep(100 * time.Millisecond)
 	})
 	defer server.Close()
 
@@ -408,6 +418,8 @@ func TestClient_HandleMessage_Result(t *testing.T) {
 		}
 		err = conn.WriteJSON(resp)
 		require.NoError(t, err)
+		// Allow client time to read before handler returns and closes connection
+		time.Sleep(100 * time.Millisecond)
 	})
 	defer server.Close()
 
@@ -584,6 +596,8 @@ func TestClient_SubscribeToTrigger_Error(t *testing.T) {
 		}
 		err = conn.WriteJSON(resp)
 		require.NoError(t, err)
+		// Allow client time to read before handler returns and closes connection
+		time.Sleep(100 * time.Millisecond)
 	})
 	defer server.Close()
 
@@ -614,6 +628,8 @@ func TestClient_SubscribeToTemplate_Error(t *testing.T) {
 		}
 		err = conn.WriteJSON(resp)
 		require.NoError(t, err)
+		// Allow client time to read before handler returns and closes connection
+		time.Sleep(100 * time.Millisecond)
 	})
 	defer server.Close()
 
