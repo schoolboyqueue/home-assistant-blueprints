@@ -804,9 +804,12 @@ func TestIntegration_Fixtures_AutomationTraces(t *testing.T) {
 	require.NoError(t, err)
 
 	// Look for our test automation trace
+	// Note: trace/list returns item_id as the automation's id field, not entity_id
 	var foundTrace bool
+	var foundItemIDs []string
 	for _, trace := range traces {
-		if trace.ItemID == testAutomationFull {
+		foundItemIDs = append(foundItemIDs, trace.ItemID)
+		if trace.ItemID == testAutomationID {
 			foundTrace = true
 			t.Logf("Found trace for %s: run_id=%s, state=%s",
 				trace.ItemID, trace.RunID, trace.State)
@@ -814,7 +817,10 @@ func TestIntegration_Fixtures_AutomationTraces(t *testing.T) {
 		}
 	}
 
-	assert.True(t, foundTrace, "should have trace for test automation %s", testAutomationFull)
+	if !foundTrace {
+		t.Logf("Available trace item_ids: %v", foundItemIDs)
+	}
+	assert.True(t, foundTrace, "should have trace for test automation %s", testAutomationID)
 }
 
 func TestIntegration_Fixtures_StatesFilter(t *testing.T) {
