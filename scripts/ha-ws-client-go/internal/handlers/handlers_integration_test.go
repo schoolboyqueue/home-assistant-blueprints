@@ -27,7 +27,8 @@ const (
 	testInputSelect    = "input_select.test_mode"
 	testTemplateSensor = "sensor.test_calculated_value"
 	testAutomationID   = "test_automation_toggle"
-	testAutomationFull = "automation.test_automation_toggle"
+	// Entity ID is derived from alias, not the id field
+	testAutomationFull = "automation.test_toggle_on_temperature_change"
 	testScript         = "script.test_script"
 )
 
