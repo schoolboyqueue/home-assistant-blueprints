@@ -66,8 +66,8 @@ type LogbookEntry struct {
 // HistoryState represents a historical state entry.
 type HistoryState struct {
 	// Compact format fields
-	LU int64          `json:"lu,omitempty"` // Last updated (Unix timestamp)
-	LC int64          `json:"lc,omitempty"` // Last changed (Unix timestamp)
+	LU float64        `json:"lu,omitempty"` // Last updated (Unix timestamp with decimals)
+	LC float64        `json:"lc,omitempty"` // Last changed (Unix timestamp with decimals)
 	S  string         `json:"s,omitempty"`  // State
 	A  map[string]any `json:"a,omitempty"`  // Attributes
 
@@ -89,7 +89,9 @@ func (h *HistoryState) GetState() string {
 // GetLastUpdated returns the last updated time.
 func (h *HistoryState) GetLastUpdated() time.Time {
 	if h.LU > 0 {
-		return time.Unix(h.LU, 0)
+		sec := int64(h.LU)
+		nsec := int64((h.LU - float64(sec)) * 1e9)
+		return time.Unix(sec, nsec)
 	}
 	if h.LastUpdated != "" {
 		t, _ := time.Parse(time.RFC3339, h.LastUpdated)
@@ -214,13 +216,33 @@ type AreaEntry struct {
 
 // SysLogEntry represents a system log entry.
 type SysLogEntry struct {
-	Level         string   `json:"level,omitempty"`
-	Source        []string `json:"source,omitempty"`
-	Message       any      `json:"message,omitempty"` // Can be string or []string
-	Name          string   `json:"name,omitempty"`
-	Timestamp     float64  `json:"timestamp,omitempty"`
-	FirstOccurred float64  `json:"first_occurred,omitempty"`
-	Count         int      `json:"count,omitempty"`
+	Level         string  `json:"level,omitempty"`
+	Source        any     `json:"source,omitempty"` // Can be []string or []any (file, line)
+	Message       any     `json:"message,omitempty"` // Can be string or []string
+	Name          string  `json:"name,omitempty"`
+	Timestamp     float64 `json:"timestamp,omitempty"`
+	FirstOccurred float64 `json:"first_occurred,omitempty"`
+	Count         int     `json:"count,omitempty"`
+}
+
+// GetSource returns the source as a string.
+func (e *SysLogEntry) GetSource() string {
+	switch s := e.Source.(type) {
+	case []any:
+		if len(s) > 0 {
+			if str, ok := s[0].(string); ok {
+				return str
+			}
+		}
+		return ""
+	case []string:
+		if len(s) > 0 {
+			return s[0]
+		}
+		return ""
+	default:
+		return ""
+	}
 }
 
 // GetMessage returns the message as a string.

@@ -256,6 +256,22 @@ func (c *Client) SubscribeToTrigger(trigger map[string]any, callback func(map[st
 func (c *Client) SubscribeToTemplate(template string, callback func(string), timeout time.Duration) (subscriptionID int, cleanup func(), err error) {
 	id := c.NextID()
 
+	// Create cleanup function
+	cleanupFn := func() {
+		c.subscriptionMu.Lock()
+		delete(c.subscriptions, id)
+		c.subscriptionMu.Unlock()
+	}
+
+	// Register event handler BEFORE sending to avoid race condition
+	c.subscriptionMu.Lock()
+	c.subscriptions[id] = func(vars map[string]any) {
+		if result, ok := vars["result"].(string); ok {
+			callback(result)
+		}
+	}
+	c.subscriptionMu.Unlock()
+
 	msg := map[string]any{
 		"id":       id,
 		"type":     "render_template",
@@ -269,6 +285,7 @@ func (c *Client) SubscribeToTemplate(template string, callback func(string), tim
 
 	msgBytes, err := json.Marshal(msg)
 	if err != nil {
+		cleanupFn()
 		c.pendingMu.Lock()
 		delete(c.pending, id)
 		c.pendingMu.Unlock()
@@ -276,6 +293,7 @@ func (c *Client) SubscribeToTemplate(template string, callback func(string), tim
 	}
 
 	if err := c.conn.WriteMessage(websocket.TextMessage, msgBytes); err != nil {
+		cleanupFn()
 		c.pendingMu.Lock()
 		delete(c.pending, id)
 		c.pendingMu.Unlock()
@@ -286,24 +304,19 @@ func (c *Client) SubscribeToTemplate(template string, callback func(string), tim
 	select {
 	case resp, ok := <-respCh:
 		if !ok {
+			cleanupFn()
 			return 0, nil, errors.New("connection closed")
 		}
 		if resp.Success != nil && !*resp.Success {
+			cleanupFn()
 			errMsg := "subscription failed"
 			if resp.Error != nil {
 				errMsg = resp.Error.Message
 			}
 			return 0, nil, errors.New(errMsg)
 		}
-		// render_template returns the result immediately in the response
-		if resp.Result != nil {
-			if resultMap, ok := resp.Result.(map[string]any); ok {
-				if result, ok := resultMap["result"].(string); ok {
-					callback(result)
-				}
-			}
-		}
 	case <-time.After(5 * time.Second):
+		cleanupFn()
 		c.pendingMu.Lock()
 		delete(c.pending, id)
 		c.pendingMu.Unlock()
@@ -314,22 +327,6 @@ func (c *Client) SubscribeToTemplate(template string, callback func(string), tim
 	c.pendingMu.Lock()
 	delete(c.pending, id)
 	c.pendingMu.Unlock()
-
-	// Register handler for subsequent events (template may update on state changes)
-	c.subscriptionMu.Lock()
-	c.subscriptions[id] = func(vars map[string]any) {
-		if result, ok := vars["result"].(string); ok {
-			callback(result)
-		}
-	}
-	c.subscriptionMu.Unlock()
-
-	// Create cleanup function
-	cleanupFn := func() {
-		c.subscriptionMu.Lock()
-		delete(c.subscriptions, id)
-		c.subscriptionMu.Unlock()
-	}
 
 	// Auto-cleanup after timeout if specified
 	if timeout > 0 {

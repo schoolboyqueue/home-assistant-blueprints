@@ -268,10 +268,7 @@ func HandleSyslog(ctx *Context) error {
 		output.ListTitle[types.SysLogEntry]("System log entries"),
 		output.ListCommand[types.SysLogEntry]("syslog"),
 		output.ListFormatter(func(e types.SysLogEntry, _ int) string {
-			source := ""
-			if len(e.Source) > 0 {
-				source = e.Source[0]
-			}
+			source := e.GetSource()
 			msg := e.GetMessage()
 			if output.IsCompact() {
 				return fmt.Sprintf("[%s] %s: %s", e.Level, source, msg)

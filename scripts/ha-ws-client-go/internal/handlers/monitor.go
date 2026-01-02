@@ -302,7 +302,7 @@ func getHistory(ctx *Context, entityID string, timeRange types.TimeRange) ([]typ
 
 		hs := types.HistoryState{}
 		if lu, ok := stateMap["lu"].(float64); ok {
-			hs.LU = int64(lu)
+			hs.LU = lu
 		}
 		if s, ok := stateMap["s"].(string); ok {
 			hs.S = s
