@@ -8,10 +8,10 @@
 # Required variables for shared.mk
 BINARY_NAME := validate-blueprint
 PROJECT_NAME := validate-blueprint-go
-GO_LOCAL_PATH := github.com/jeremiah-k/home-assistant-blueprints
+GO_LOCAL_PATH := github.com/home-assistant-blueprints/validate-blueprint-go
 
 # Optional overrides
-VERSION ?= 1.6.0
+VERSION ?= 1.6.1
 BUILD_DIR := build
 BUILD_PATH := .
 

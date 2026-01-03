@@ -4,7 +4,6 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/client"
+	errs "github.com/home-assistant-blueprints/ha-ws-client-go/internal/errors"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/output"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
@@ -61,7 +61,8 @@ func (c *Context) Err() error {
 }
 
 // ErrEntityNotFound indicates an entity was not found.
-var ErrEntityNotFound = errors.New("entity not found")
+// This sentinel error is kept for backward compatibility with existing error checking.
+var ErrEntityNotFound = errs.New(errs.ErrorTypeNotFound, "entity not found")
 
 // Status constants for device health checks.
 const (
@@ -109,7 +110,7 @@ func handleState(ctx *Context) error {
 		}
 	}
 
-	return fmt.Errorf("%w: %s", ErrEntityNotFound, entityID)
+	return errs.ErrEntityNotFound(entityID)
 }
 
 // HandleStates gets a summary of all entity states.
@@ -285,7 +286,7 @@ func handleCall(ctx *Context) error {
 	var serviceData map[string]any
 	if len(ctx.Args) > 3 {
 		if unmarshalErr := json.Unmarshal([]byte(ctx.Args[3]), &serviceData); unmarshalErr != nil {
-			return fmt.Errorf("invalid JSON data: %w", unmarshalErr)
+			return errs.ErrInvalidJSON(unmarshalErr)
 		}
 	}
 
@@ -329,13 +330,13 @@ func HandleTemplate(ctx *Context) error {
 	if template == "" || template == "-" {
 		data, err := io.ReadAll(os.Stdin)
 		if err != nil {
-			return fmt.Errorf("failed to read from stdin: %w", err)
+			return errs.Wrap(errs.ErrorTypeInternal, err, "failed to read from stdin")
 		}
 		template = string(data)
 	}
 
 	if template == "" {
-		return errors.New("usage: template <template>\n  Or pipe template via stdin")
+		return errs.ErrMissingArgument("template <template>\n  Or pipe template via stdin")
 	}
 
 	// render_template is subscription-based - we subscribe and wait for the first result
@@ -369,7 +370,7 @@ func HandleTemplate(ctx *Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-time.After(5 * time.Second):
-		return errors.New("template render timeout")
+		return errs.ErrTemplateTimeout()
 	}
 
 	return nil
@@ -394,7 +395,7 @@ func handleDeviceHealth(ctx *Context) error {
 	// e.g., "cover.guest_bedroom_window_shade" -> "guest_bedroom_window_shade"
 	parts := strings.SplitN(entityID, ".", 2)
 	if len(parts) != 2 {
-		return fmt.Errorf("invalid entity_id format: %s", entityID)
+		return errs.ErrEntityInvalidID(entityID)
 	}
 	baseName := parts[1]
 
@@ -412,7 +413,7 @@ func handleDeviceHealth(ctx *Context) error {
 	}
 
 	if mainEntity == nil {
-		return fmt.Errorf("%w: %s", ErrEntityNotFound, entityID)
+		return errs.ErrEntityNotFound(entityID)
 	}
 
 	// Parse timestamps and calculate ages
@@ -525,10 +526,10 @@ func handleCompare(ctx *Context) error {
 	}
 
 	if state1 == nil {
-		return fmt.Errorf("%w: %s", ErrEntityNotFound, entity1)
+		return errs.ErrEntityNotFound(entity1)
 	}
 	if state2 == nil {
-		return fmt.Errorf("%w: %s", ErrEntityNotFound, entity2)
+		return errs.ErrEntityNotFound(entity2)
 	}
 
 	now := time.Now()

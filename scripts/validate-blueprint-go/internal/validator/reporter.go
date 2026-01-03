@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/fatih/color"
+
+	errs "github.com/home-assistant-blueprints/validate-blueprint-go/internal/errors"
 )
 
 // ReportResults prints validation results and returns success status
@@ -155,7 +157,7 @@ func (v *BlueprintValidator) CheckReadmeExists() {
 	dir := filepath.Dir(v.FilePath)
 	readmePath := filepath.Join(dir, "README.md")
 	if _, err := os.Stat(readmePath); os.IsNotExist(err) {
-		v.AddCategorizedWarningf(CategoryDocumentation, "", "No README.md found in %s/ directory", filepath.Base(dir))
+		v.AddTypedWarning(errs.ErrMissingReadme().WithMessagef("No README.md found in %s/ directory", filepath.Base(dir)))
 	}
 }
 
@@ -164,6 +166,6 @@ func (v *BlueprintValidator) CheckChangelogExists() {
 	dir := filepath.Dir(v.FilePath)
 	changelogPath := filepath.Join(dir, "CHANGELOG.md")
 	if _, err := os.Stat(changelogPath); os.IsNotExist(err) {
-		v.AddCategorizedWarningf(CategoryDocumentation, "", "No CHANGELOG.md found in %s/ directory", filepath.Base(dir))
+		v.AddTypedWarning(errs.ErrMissingChangelog().WithMessagef("No CHANGELOG.md found in %s/ directory", filepath.Base(dir)))
 	}
 }

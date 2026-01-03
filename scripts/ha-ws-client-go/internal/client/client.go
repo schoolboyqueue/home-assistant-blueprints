@@ -4,7 +4,6 @@ package client
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	errs "github.com/home-assistant-blueprints/ha-ws-client-go/internal/errors"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
 
@@ -30,17 +30,9 @@ type Client struct {
 }
 
 // HAClientError represents an error from the Home Assistant API.
-type HAClientError struct {
-	Message string
-	Code    string
-}
-
-func (e *HAClientError) Error() string {
-	if e.Code != "" {
-		return fmt.Sprintf("[%s] %s", e.Code, e.Message)
-	}
-	return e.Message
-}
+// Deprecated: Use errors.Error from the errors package instead.
+// This type is kept for backward compatibility.
+type HAClientError = errs.Error
 
 // New creates a new client connected to the given WebSocket connection.
 // Deprecated: Use NewWithContext instead for proper shutdown handling.
@@ -166,17 +158,17 @@ func (c *Client) SendMessageWithContext(ctx context.Context, msgType string, dat
 
 	msgBytes, err := json.Marshal(msg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal message: %w", err)
+		return nil, errs.ErrMessageMarshalFailed(err)
 	}
 
 	if err := c.conn.WriteMessage(websocket.TextMessage, msgBytes); err != nil {
-		return nil, fmt.Errorf("failed to send message: %w", err)
+		return nil, errs.ErrMessageSendFailed(err)
 	}
 
 	select {
 	case resp, ok := <-respCh:
 		if !ok {
-			return nil, errors.New("connection closed")
+			return nil, errs.ErrConnectionClosed()
 		}
 		if resp.Success != nil && !*resp.Success {
 			errMsg := "unknown error"
@@ -185,13 +177,13 @@ func (c *Client) SendMessageWithContext(ctx context.Context, msgType string, dat
 				errMsg = resp.Error.Message
 				code = resp.Error.Code
 			}
-			return nil, &HAClientError{Message: errMsg, Code: code}
+			return nil, errs.ErrAPIError(code, errMsg)
 		}
 		return resp, nil
 	case <-ctx.Done():
-		return nil, fmt.Errorf("request canceled: %w", ctx.Err())
+		return nil, errs.ErrRequestCanceled(ctx.Err())
 	case <-c.done:
-		return nil, fmt.Errorf("connection closed: %w", c.readErr)
+		return nil, errs.ErrConnectionClosed().WithCause(c.readErr)
 	}
 }
 
@@ -205,11 +197,11 @@ func SendMessageTyped[T any](c *Client, msgType string, data map[string]any) (T,
 
 	resultBytes, err := json.Marshal(resp.Result)
 	if err != nil {
-		return result, fmt.Errorf("failed to marshal result: %w", err)
+		return result, errs.Wrapf(errs.ErrorTypeParsing, err, "failed to marshal result")
 	}
 
 	if err := json.Unmarshal(resultBytes, &result); err != nil {
-		return result, fmt.Errorf("failed to unmarshal result: %w", err)
+		return result, errs.Wrapf(errs.ErrorTypeParsing, err, "failed to unmarshal result")
 	}
 
 	return result, nil
@@ -245,39 +237,39 @@ func (c *Client) SubscribeToTriggerWithContext(ctx context.Context, trigger map[
 		c.pendingMu.Lock()
 		delete(c.pending, id)
 		c.pendingMu.Unlock()
-		return 0, nil, fmt.Errorf("failed to marshal message: %w", err)
+		return 0, nil, errs.ErrMessageMarshalFailed(err)
 	}
 
 	if err := c.conn.WriteMessage(websocket.TextMessage, msgBytes); err != nil {
 		c.pendingMu.Lock()
 		delete(c.pending, id)
 		c.pendingMu.Unlock()
-		return 0, nil, fmt.Errorf("failed to send message: %w", err)
+		return 0, nil, errs.ErrMessageSendFailed(err)
 	}
 
 	// Wait for subscription confirmation with context support
 	select {
 	case resp, ok := <-respCh:
 		if !ok {
-			return 0, nil, errors.New("connection closed")
+			return 0, nil, errs.ErrConnectionClosed()
 		}
 		if resp.Success != nil && !*resp.Success {
 			errMsg := "subscription failed"
 			if resp.Error != nil {
 				errMsg = resp.Error.Message
 			}
-			return 0, nil, errors.New(errMsg)
+			return 0, nil, errs.ErrSubscriptionFailed(nil).WithMessage(errMsg)
 		}
 	case <-ctx.Done():
 		c.pendingMu.Lock()
 		delete(c.pending, id)
 		c.pendingMu.Unlock()
-		return 0, nil, fmt.Errorf("subscription canceled: %w", ctx.Err())
+		return 0, nil, errs.ErrRequestCanceled(ctx.Err())
 	case <-time.After(5 * time.Second):
 		c.pendingMu.Lock()
 		delete(c.pending, id)
 		c.pendingMu.Unlock()
-		return 0, nil, errors.New("subscription timeout")
+		return 0, nil, errs.ErrSubscriptionTimeout()
 	}
 
 	// Clean up pending request channel
@@ -363,7 +355,7 @@ func (c *Client) SubscribeToTemplateWithContext(ctx context.Context, template st
 		c.pendingMu.Lock()
 		delete(c.pending, id)
 		c.pendingMu.Unlock()
-		return 0, nil, fmt.Errorf("failed to marshal message: %w", err)
+		return 0, nil, errs.ErrMessageMarshalFailed(err)
 	}
 
 	if err := c.conn.WriteMessage(websocket.TextMessage, msgBytes); err != nil {
@@ -371,7 +363,7 @@ func (c *Client) SubscribeToTemplateWithContext(ctx context.Context, template st
 		c.pendingMu.Lock()
 		delete(c.pending, id)
 		c.pendingMu.Unlock()
-		return 0, nil, fmt.Errorf("failed to send message: %w", err)
+		return 0, nil, errs.ErrMessageSendFailed(err)
 	}
 
 	// Wait for subscription confirmation with context support
@@ -379,7 +371,7 @@ func (c *Client) SubscribeToTemplateWithContext(ctx context.Context, template st
 	case resp, ok := <-respCh:
 		if !ok {
 			cleanupFn()
-			return 0, nil, errors.New("connection closed")
+			return 0, nil, errs.ErrConnectionClosed()
 		}
 		if resp.Success != nil && !*resp.Success {
 			cleanupFn()
@@ -387,20 +379,20 @@ func (c *Client) SubscribeToTemplateWithContext(ctx context.Context, template st
 			if resp.Error != nil {
 				errMsg = resp.Error.Message
 			}
-			return 0, nil, errors.New(errMsg)
+			return 0, nil, errs.ErrSubscriptionFailed(nil).WithMessage(errMsg)
 		}
 	case <-ctx.Done():
 		cleanupFn()
 		c.pendingMu.Lock()
 		delete(c.pending, id)
 		c.pendingMu.Unlock()
-		return 0, nil, fmt.Errorf("subscription canceled: %w", ctx.Err())
+		return 0, nil, errs.ErrRequestCanceled(ctx.Err())
 	case <-time.After(5 * time.Second):
 		cleanupFn()
 		c.pendingMu.Lock()
 		delete(c.pending, id)
 		c.pendingMu.Unlock()
-		return 0, nil, errors.New("subscription timeout")
+		return 0, nil, errs.ErrSubscriptionTimeout()
 	}
 
 	// Clean up pending request channel

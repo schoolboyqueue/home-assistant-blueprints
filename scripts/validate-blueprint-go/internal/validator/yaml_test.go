@@ -84,7 +84,7 @@ action:
 
 		assert.False(t, result)
 		require.Len(t, v.Errors, 1)
-		assert.Contains(t, v.Errors[0], "Failed to load file")
+		assert.Contains(t, v.Errors[0], "failed to read file")
 	})
 
 	t.Run("invalid YAML syntax", func(t *testing.T) {

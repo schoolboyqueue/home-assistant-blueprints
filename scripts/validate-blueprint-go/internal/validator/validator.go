@@ -1,6 +1,10 @@
 package validator
 
-import "fmt"
+import (
+	"fmt"
+
+	errs "github.com/home-assistant-blueprints/validate-blueprint-go/internal/errors"
+)
 
 // BlueprintValidator validates Home Assistant Blueprint YAML files.
 // It embeds ValidationContext to encapsulate all validation state including
@@ -157,4 +161,28 @@ func (v *BlueprintValidator) HasCategoryErrors(categories ...ErrorCategory) bool
 // HasCategoryWarnings returns true if there are any warnings in the specified categories
 func (v *BlueprintValidator) HasCategoryWarnings(categories ...ErrorCategory) bool {
 	return len(v.GetWarningsByCategory(categories...)) > 0
+}
+
+// AddTypedError adds an error from the errors package to the validator.
+// This automatically converts the errs.Error to a CategorizedError.
+func (v *BlueprintValidator) AddTypedError(e *errs.Error) {
+	if e == nil {
+		return
+	}
+	catErr := CategorizedErrorFromError(e)
+	v.CategorizedErrors = append(v.CategorizedErrors, catErr)
+	// Also add to legacy Errors slice for backward compatibility
+	v.Errors = append(v.Errors, catErr.String())
+}
+
+// AddTypedWarning adds a warning from the errors package to the validator.
+// This automatically converts the errs.Error to a CategorizedWarning.
+func (v *BlueprintValidator) AddTypedWarning(e *errs.Error) {
+	if e == nil {
+		return
+	}
+	catWarn := CategorizedWarningFromError(e)
+	v.CategorizedWarnings = append(v.CategorizedWarnings, catWarn)
+	// Also add to legacy Warnings slice for backward compatibility
+	v.Warnings = append(v.Warnings, catWarn.String())
 }

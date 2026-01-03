@@ -5,6 +5,21 @@ All notable changes to ha-ws-client-go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-01-03
+
+### Added
+
+- Centralized error handling system with new `internal/errors` package
+  - `Error` type with typed error categories (Network, Validation, Parsing, Timeout, NotFound, Auth, API, Internal, Canceled, Subscription)
+  - Error registry pattern with predefined error codes and factory functions
+  - Helper functions for error type checking (`IsNotFound`, `IsValidation`, etc.)
+  - Common error factories (`ErrEntityNotFound`, `ErrMissingArgument`, `ErrInvalidJSON`, etc.)
+
+### Changed
+
+- Refactor all handlers to use centralized error types instead of ad-hoc error creation
+- Update error handling in client, middleware, and message dispatcher to use typed errors
+
 ## [1.5.0] - 2026-01-03
 
 ### Added

@@ -236,6 +236,9 @@ validate-blueprint-go/
 ├── internal/
 │   ├── common/              # Shared utilities
 │   │   └── validators.go    # Common validation helpers
+│   ├── errors/              # Centralized error handling
+│   │   ├── errors.go        # Typed errors with ErrorType enum
+│   │   └── registry.go      # Error registry and factories
 │   ├── shutdown/            # Graceful shutdown coordination
 │   │   └── shutdown.go
 │   ├── testfixtures/        # Test fixture utilities

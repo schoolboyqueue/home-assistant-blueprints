@@ -2,12 +2,12 @@
 package handlers
 
 import (
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	errs "github.com/home-assistant-blueprints/ha-ws-client-go/internal/errors"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
 
@@ -61,7 +61,7 @@ func RequireArgs(usage string, indices ...int) Middleware {
 
 			for i, idx := range indices {
 				if idx >= len(ctx.Args) {
-					return fmt.Errorf("missing argument: %s", usage)
+					return errs.ErrMissingArgument(usage)
 				}
 				config.Args[i] = ctx.Args[idx]
 			}
@@ -169,7 +169,7 @@ func WithPattern(argIndex int) Middleware {
 				regexPattern = regexp.MustCompile(`\\\*`).ReplaceAllString(regexPattern, ".*")
 				re, err := regexp.Compile("(?i)" + regexPattern)
 				if err != nil {
-					return fmt.Errorf("invalid pattern: %w", err)
+					return errs.ErrInvalidPattern(err)
 				}
 				config.Pattern = re
 			}
@@ -192,7 +192,7 @@ func WithRequiredPattern(argIndex int, usage string) Middleware {
 	return func(next Handler) Handler {
 		return func(ctx *Context) error {
 			if argIndex >= len(ctx.Args) {
-				return fmt.Errorf("missing argument: %s", usage)
+				return errs.ErrMissingArgument(usage)
 			}
 
 			config := WithConfig(ctx)
@@ -201,7 +201,7 @@ func WithRequiredPattern(argIndex int, usage string) Middleware {
 			regexPattern = regexp.MustCompile(`\\\*`).ReplaceAllString(regexPattern, ".*")
 			re, err := regexp.Compile("(?i)" + regexPattern)
 			if err != nil {
-				return fmt.Errorf("invalid pattern: %w", err)
+				return errs.ErrInvalidPattern(err)
 			}
 			config.Pattern = re
 
@@ -224,7 +224,7 @@ func WithAutomationID(argIndex int, usage string) Middleware {
 	return func(next Handler) Handler {
 		return func(ctx *Context) error {
 			if argIndex >= len(ctx.Args) {
-				return fmt.Errorf("missing argument: %s", usage)
+				return errs.ErrMissingArgument(usage)
 			}
 
 			config := WithConfig(ctx)

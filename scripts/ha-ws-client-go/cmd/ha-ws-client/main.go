@@ -14,6 +14,7 @@ import (
 
 	hacli "github.com/home-assistant-blueprints/ha-ws-client-go/internal/cli"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/client"
+	errs "github.com/home-assistant-blueprints/ha-ws-client-go/internal/errors"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/handlers"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/output"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/shutdown"
@@ -130,14 +131,14 @@ func wrapHandler(handler func(*handlers.Context) error) cli.ActionFunc {
 		if fromStr := cmd.String("from"); fromStr != "" {
 			t, err := hacli.ParseFlexibleDate(fromStr)
 			if err != nil {
-				return fmt.Errorf("invalid --from value: %w", err)
+				return errs.Wrap(errs.ErrorTypeValidation, err, "invalid --from value")
 			}
 			fromTime = &t
 		}
 		if toStr := cmd.String("to"); toStr != "" {
 			t, err := hacli.ParseFlexibleDate(toStr)
 			if err != nil {
-				return fmt.Errorf("invalid --to value: %w", err)
+				return errs.Wrap(errs.ErrorTypeValidation, err, "invalid --to value")
 			}
 			toTime = &t
 		}
@@ -225,11 +226,11 @@ func authenticate(conn *websocket.Conn, token string) error {
 	}
 
 	if err := conn.ReadJSON(&msg); err != nil {
-		return fmt.Errorf("failed to read auth_required: %w", err)
+		return errs.Wrap(errs.ErrorTypeNetwork, err, "failed to read auth_required")
 	}
 
 	if msg.Type != "auth_required" {
-		return fmt.Errorf("unexpected message type: %s", msg.Type)
+		return errs.Newf(errs.ErrorTypeAuth, "unexpected message type: %s", msg.Type)
 	}
 
 	// Send auth message
@@ -239,7 +240,7 @@ func authenticate(conn *websocket.Conn, token string) error {
 	}
 
 	if err := conn.WriteJSON(authMsg); err != nil {
-		return fmt.Errorf("failed to send auth: %w", err)
+		return errs.Wrap(errs.ErrorTypeNetwork, err, "failed to send auth")
 	}
 
 	// Read auth result
@@ -249,11 +250,11 @@ func authenticate(conn *websocket.Conn, token string) error {
 	}
 
 	if err := conn.ReadJSON(&authResult); err != nil {
-		return fmt.Errorf("failed to read auth result: %w", err)
+		return errs.Wrap(errs.ErrorTypeNetwork, err, "failed to read auth result")
 	}
 
 	if authResult.Type != "auth_ok" {
-		return fmt.Errorf("authentication failed: %s", authResult.Message)
+		return errs.ErrAuthFailed(authResult.Message)
 	}
 
 	return nil

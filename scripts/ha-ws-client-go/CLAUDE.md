@@ -15,6 +15,9 @@ ha-ws-client-go/
 │   │   └── client.go         # WebSocket request/response, message IDs
 │   ├── cli/
 │   │   └── time.go           # Time parsing utilities
+│   ├── errors/
+│   │   ├── errors.go         # Typed errors with ErrorType enum
+│   │   └── registry.go       # Error registry and factory functions
 │   ├── handlers/
 │   │   ├── automation.go     # traces, trace, trace-vars, trace-timeline, trace-debug
 │   │   ├── basic.go          # ping, state, states, config, services, call, template
@@ -187,20 +190,33 @@ defer cleanup()
 
 ### Error Handling
 
-Use the custom error type from `internal/client/`:
+Use the centralized error system from `internal/errors/`:
 
 ```go
-import "github.com/home-assistant-blueprints/ha-ws-client-go/internal/client"
+import apperrors "github.com/home-assistant-blueprints/ha-ws-client-go/internal/errors"
 
-// HAClientError is returned for API errors
-var clientErr *client.HAClientError
-if errors.As(err, &clientErr) {
-    output.Error(err, clientErr.Code)
+// Create typed errors with factory functions
+return apperrors.ErrEntityNotFound(entityID)
+return apperrors.ErrMissingArgument("usage: command <entity_id>")
+return apperrors.ErrInvalidJSON(err)
+
+// Check error types
+if apperrors.IsNotFound(err) {
+    // Handle not found
+}
+if apperrors.IsValidation(err) {
+    // Handle validation error
 }
 
-// For missing entities
-return fmt.Errorf("%w: %s", handlers.ErrEntityNotFound, entityID)
+// Get error details
+if code := apperrors.GetCode(err); code != "" {
+    output.Error(err, code)
+}
 ```
+
+**Error Types:** Network, Validation, Parsing, Timeout, NotFound, Auth, API, Internal, Canceled, Subscription
+
+**Common Error Codes:** `entity_not_found`, `missing_argument`, `invalid_argument`, `connection_failed`, `auth_failed`, `api_error`
 
 ## Environment
 

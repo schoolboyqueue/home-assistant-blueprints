@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/client"
+	errs "github.com/home-assistant-blueprints/ha-ws-client-go/internal/errors"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/output"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
@@ -156,7 +157,7 @@ func handleTraceLatest(ctx *Context) error {
 	}
 
 	if len(traces) == 0 {
-		return fmt.Errorf("no traces found for automation.%s", id)
+		return errs.ErrNoTracesFound(id)
 	}
 
 	// Get the most recent trace (first in list)

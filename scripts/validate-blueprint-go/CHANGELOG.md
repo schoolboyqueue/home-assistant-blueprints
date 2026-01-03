@@ -5,6 +5,22 @@ All notable changes to validate-blueprint-go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-01-03
+
+### Added
+
+- Centralized error handling system with new `internal/errors` package
+  - `Error` type with typed error categories (Syntax, Schema, Validation, Parsing, Reference, Template, Input, Trigger, Condition, Action, Documentation, Internal)
+  - Error registry pattern for consistent error creation
+  - Path-aware errors with `WithPath()` for precise error location
+  - Warning support via `AsWarning()` for non-blocking issues
+  - Helper functions for error type checking (`IsSyntax`, `IsSchema`, `IsTemplate`, etc.)
+
+### Changed
+
+- Refactor all validator modules to use centralized error types
+- Update reporter to leverage typed error information for categorization
+
 ## [1.6.0] - 2026-01-03
 
 ### Added

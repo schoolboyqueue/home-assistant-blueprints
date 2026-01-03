@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	"github.com/home-assistant-blueprints/validate-blueprint-go/internal/common"
+	errs "github.com/home-assistant-blueprints/validate-blueprint-go/internal/errors"
 )
 
 // ValidateConditions validates condition definitions
@@ -39,14 +40,14 @@ func (v *BlueprintValidator) validateSingleCondition(condition RawData, path str
 		if _, hasEntityID := condition["entity_id"]; hasEntityID {
 			return // Valid shorthand
 		}
-		v.AddCategorizedWarning(CategoryConditions, path, "Missing 'condition' key")
+		v.AddTypedWarning(errs.ErrMissingConditionType(path))
 		return
 	}
 
 	// Validate condition type using common enum validation pattern
 	isValid := slices.Contains(ValidConditionTypes, condType)
 	if !isValid {
-		v.AddCategorizedWarningf(CategoryConditions, path, "Unknown condition type '%s'", condType)
+		v.AddTypedWarning(errs.Create(errs.CodeUnknownConditionType).WithPath(path).WithMessagef("Unknown condition type '%s'", condType))
 	}
 
 	// Validate nested conditions for and/or/not

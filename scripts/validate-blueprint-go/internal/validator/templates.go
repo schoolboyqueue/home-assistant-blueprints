@@ -2,6 +2,7 @@ package validator
 
 import (
 	"github.com/home-assistant-blueprints/validate-blueprint-go/internal/common"
+	errs "github.com/home-assistant-blueprints/validate-blueprint-go/internal/errors"
 )
 
 // ValidateTemplates validates Jinja2 templates throughout the blueprint
@@ -25,11 +26,11 @@ func (v *BlueprintValidator) validateTemplatesInValue(value interface{}, path st
 func (v *BlueprintValidator) validateTemplateString(template, path string) {
 	// Check for !input inside {{ }} blocks
 	if err := common.ValidateNoInputInTemplate(template, path); err != "" {
-		v.AddCategorizedError(CategoryTemplates, path, err)
+		v.AddTypedError(errs.ErrInvalidTemplate(path, err))
 	}
 
 	// Check for balanced Jinja2 delimiters
 	for _, err := range common.ValidateBalancedDelimiters(template, path) {
-		v.AddCategorizedError(CategoryTemplates, path, err)
+		v.AddTypedError(errs.Create(errs.CodeUnclosedTemplateTag).WithPath(path).WithMessage(err))
 	}
 }

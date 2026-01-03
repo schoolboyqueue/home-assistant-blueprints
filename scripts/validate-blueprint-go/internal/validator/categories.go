@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
+
+	errs "github.com/home-assistant-blueprints/validate-blueprint-go/internal/errors"
 )
 
 // ErrorCategory represents the type/category of a validation error
@@ -258,15 +260,15 @@ func FormatCategorySummary(errors []CategorizedError, warnings []CategorizedWarn
 		// Get categories in display order
 		var presentCategories []ErrorCategory
 		for _, cat := range AllCategories() {
-			if errs, ok := grouped[cat]; ok && len(errs) > 0 {
+			if catErrs, ok := grouped[cat]; ok && len(catErrs) > 0 {
 				presentCategories = append(presentCategories, cat)
 			}
 		}
 
 		for _, cat := range presentCategories {
-			errs := grouped[cat]
-			fmt.Fprintf(&sb, "%s %s ERRORS (%d):\n", red("X"), cyan(cat.String()), len(errs))
-			for _, err := range errs {
+			catErrs := grouped[cat]
+			fmt.Fprintf(&sb, "%s %s ERRORS (%d):\n", red("X"), cyan(cat.String()), len(catErrs))
+			for _, err := range catErrs {
 				fmt.Fprintf(&sb, "  %s %s\n", red("*"), err.String())
 			}
 			sb.WriteString("\n")
@@ -320,4 +322,47 @@ func SortedCategoryKeys(m map[ErrorCategory][]CategorizedError) []ErrorCategory 
 	}
 	slices.Sort(keys)
 	return keys
+}
+
+// errorTypeToCategoryMap maps errs.ErrorType to ErrorCategory
+var errorTypeToCategoryMap = map[errs.ErrorType]ErrorCategory{
+	errs.ErrorTypeSyntax:        CategorySyntax,
+	errs.ErrorTypeSchema:        CategorySchema,
+	errs.ErrorTypeReference:     CategoryReferences,
+	errs.ErrorTypeTemplate:      CategoryTemplates,
+	errs.ErrorTypeInput:         CategoryInputs,
+	errs.ErrorTypeTrigger:       CategoryTriggers,
+	errs.ErrorTypeCondition:     CategoryConditions,
+	errs.ErrorTypeAction:        CategoryActions,
+	errs.ErrorTypeDocumentation: CategoryDocumentation,
+	// Parsing and Validation errors map to Syntax
+	errs.ErrorTypeParsing:    CategorySyntax,
+	errs.ErrorTypeValidation: CategorySchema,
+}
+
+// CategoryFromErrorType converts an errs.ErrorType to an ErrorCategory.
+// Returns CategorySchema for unknown error types as a sensible default.
+func CategoryFromErrorType(t errs.ErrorType) ErrorCategory {
+	if cat, ok := errorTypeToCategoryMap[t]; ok {
+		return cat
+	}
+	return CategorySchema
+}
+
+// CategorizedErrorFromError creates a CategorizedError from an errs.Error.
+func CategorizedErrorFromError(e *errs.Error) CategorizedError {
+	return CategorizedError{
+		Category: CategoryFromErrorType(e.Type),
+		Path:     e.Path,
+		Message:  e.Message,
+	}
+}
+
+// CategorizedWarningFromError creates a CategorizedWarning from an errs.Error.
+func CategorizedWarningFromError(e *errs.Error) CategorizedWarning {
+	return CategorizedWarning{
+		Category: CategoryFromErrorType(e.Type),
+		Path:     e.Path,
+		Message:  e.Message,
+	}
 }

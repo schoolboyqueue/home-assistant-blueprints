@@ -2,6 +2,7 @@ package validator
 
 import (
 	"github.com/home-assistant-blueprints/validate-blueprint-go/internal/common"
+	errs "github.com/home-assistant-blueprints/validate-blueprint-go/internal/errors"
 )
 
 // ValidateTriggers validates trigger definitions
@@ -35,7 +36,7 @@ func (v *BlueprintValidator) validateSingleTrigger(trigger RawData, path string)
 	triggerType, hasTrigger := trigger["trigger"]
 
 	if !hasPlatform && !hasTrigger {
-		v.AddCategorizedError(CategoryTriggers, path, "Missing 'platform' or 'trigger' key")
+		v.AddTypedError(errs.ErrMissingTriggerType(path))
 		return
 	}
 
@@ -55,8 +56,7 @@ func (v *BlueprintValidator) validateSingleTrigger(trigger RawData, path string)
 		if valueTemplate, ok := common.TryGetString(trigger, "value_template"); ok {
 			// Template triggers cannot reference automation variables directly
 			if common.ContainsVariableRef(valueTemplate) && !common.ContainsInputRef(valueTemplate) {
-				v.AddCategorizedWarning(CategoryTriggers, path,
-					"Template trigger references variables. Trigger templates are evaluated separately and may not have access to blueprint variables.")
+				v.AddTypedWarning(errs.ErrInvalidTrigger(path, "Template trigger references variables. Trigger templates are evaluated separately and may not have access to blueprint variables."))
 			}
 		}
 	}
@@ -64,7 +64,7 @@ func (v *BlueprintValidator) validateSingleTrigger(trigger RawData, path string)
 	// Check entity_id is static (no templates in trigger entity_id)
 	if entityID, ok := common.TryGetString(trigger, "entity_id"); ok {
 		if err := common.ValidateNoTemplateInField(entityID, path, "entity_id"); err != "" {
-			v.AddCategorizedError(CategoryTriggers, path, err)
+			v.AddTypedError(errs.ErrInvalidTrigger(path, err))
 		}
 	}
 
@@ -74,8 +74,7 @@ func (v *BlueprintValidator) validateSingleTrigger(trigger RawData, path string)
 			if common.ContainsTemplate(forStr) {
 				// Template in 'for' is valid but may reference unavailable variables
 				if common.ContainsVariableRef(forStr) && !common.ContainsInputRef(forStr) {
-					v.AddCategorizedWarning(CategoryTriggers, path,
-						"'for' template references variables. Variables may not be available in trigger context.")
+					v.AddTypedWarning(errs.ErrInvalidTrigger(path, "'for' template references variables. Variables may not be available in trigger context."))
 				}
 			}
 		}

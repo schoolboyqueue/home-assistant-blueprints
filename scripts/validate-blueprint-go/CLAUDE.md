@@ -12,6 +12,9 @@ validate-blueprint-go/
 ├── internal/
 │   ├── common/                  # Shared utilities
 │   │   └── validators.go        # Common validation helpers
+│   ├── errors/                  # Centralized error handling
+│   │   ├── errors.go            # Typed errors with ErrorType enum
+│   │   └── registry.go          # Error registry and factories
 │   ├── shutdown/                # Graceful shutdown coordination
 │   │   └── shutdown.go          # Context-based shutdown handling
 │   ├── testfixtures/            # Test fixture utilities
@@ -71,6 +74,13 @@ The core validation logic is organized into focused files:
 | File | Purpose |
 |------|---------|
 | `validators.go` | Shared validation helpers used across packages |
+
+### `internal/errors`
+
+| File | Purpose |
+|------|---------|
+| `errors.go` | Typed errors with ErrorType enum (Syntax, Schema, Template, etc.) |
+| `registry.go` | Error registry pattern for consistent error creation |
 
 ### `internal/shutdown`
 

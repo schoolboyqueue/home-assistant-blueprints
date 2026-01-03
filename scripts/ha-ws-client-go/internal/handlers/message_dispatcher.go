@@ -2,9 +2,8 @@
 package handlers
 
 import (
-	"fmt"
-
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/client"
+	errs "github.com/home-assistant-blueprints/ha-ws-client-go/internal/errors"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/output"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
@@ -189,7 +188,7 @@ func FetchAndFindEntity[T interface{ GetEntityID() string }](ctx *Context, entit
 		}
 	}
 
-	return nil, fmt.Errorf("%w: %s", ErrEntityNotFound, entityID)
+	return nil, errs.ErrEntityNotFound(entityID)
 }
 
 // ListRequest provides a simplified interface for commands that fetch and list data.

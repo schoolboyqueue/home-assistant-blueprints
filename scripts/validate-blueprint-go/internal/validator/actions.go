@@ -2,6 +2,7 @@ package validator
 
 import (
 	"github.com/home-assistant-blueprints/validate-blueprint-go/internal/common"
+	errs "github.com/home-assistant-blueprints/validate-blueprint-go/internal/errors"
 )
 
 // ValidateActions validates action definitions
@@ -34,13 +35,13 @@ func (v *BlueprintValidator) validateSingleAction(action RawData, path string) {
 	if service, ok := common.TryGetString(action, "service"); ok {
 		// Validate service format using common validator
 		if warnMsg := common.ValidateServiceFormat(service, path); warnMsg != "" {
-			v.AddCategorizedWarning(CategoryActions, path, warnMsg)
+			v.AddTypedWarning(errs.Create(errs.CodeInvalidServiceFormat).WithPath(path).WithMessage(warnMsg))
 		}
 
 		// Check data is not nil when present using common nil validation
 		if data, hasData := action["data"]; hasData {
 			if errMsg := common.ValidateNotNil(data, path, "'data' block"); errMsg != "" {
-				v.AddCategorizedError(CategoryActions, path, errMsg)
+				v.AddTypedError(errs.ErrInvalidAction(path, errMsg))
 			}
 		}
 	}
@@ -66,7 +67,7 @@ func (v *BlueprintValidator) validateSingleAction(action RawData, path string) {
 		if thenAction, ok := action["then"]; ok {
 			v.validateActionList(thenAction, common.JoinPath(path, "then"))
 		} else {
-			v.AddCategorizedError(CategoryActions, path, "'if' requires 'then'")
+			v.AddTypedError(errs.ErrInvalidAction(path, "'if' requires 'then'"))
 		}
 		if elseAction, ok := action["else"]; ok {
 			v.validateActionList(elseAction, common.JoinPath(path, "else"))
@@ -79,7 +80,7 @@ func (v *BlueprintValidator) validateSingleAction(action RawData, path string) {
 		if sequence, ok := repeat["sequence"]; ok {
 			v.validateActionList(sequence, common.JoinPath(repeatPath, "sequence"))
 		} else {
-			v.AddCategorizedError(CategoryActions, repeatPath, "Missing 'sequence'")
+			v.AddTypedError(errs.ErrMissingField(repeatPath, "sequence"))
 		}
 	}
 

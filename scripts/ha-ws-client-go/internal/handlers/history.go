@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/client"
+	errs "github.com/home-assistant-blueprints/ha-ws-client-go/internal/errors"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/output"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
@@ -246,12 +246,12 @@ func handleAttrs(ctx *Context) error {
 // HandleTimeline shows multi-entity chronological timeline.
 func HandleTimeline(ctx *Context) error {
 	if len(ctx.Args) < 3 {
-		return errors.New("missing arguments: timeline <hours> <entity>")
+		return errs.ErrMissingArgument("timeline <hours> <entity>")
 	}
 
 	hours, err := strconv.Atoi(ctx.Args[1])
 	if err != nil {
-		return fmt.Errorf("invalid hours: %w", err)
+		return errs.ErrInvalidArgument(fmt.Sprintf("invalid hours: %v", err))
 	}
 
 	entities := ctx.Args[2:]
@@ -383,7 +383,7 @@ type EntityStatsSummary struct {
 // Uses batch execution to fan-out statistics requests with error collection.
 func HandleStatsMulti(ctx *Context) error {
 	if len(ctx.Args) < 2 {
-		return errors.New("usage: stats-multi <entity>... [hours]")
+		return errs.ErrMissingArgument("stats-multi <entity>... [hours]")
 	}
 
 	// Check if the last argument is a number (hours)
@@ -403,7 +403,7 @@ func HandleStatsMulti(ctx *Context) error {
 	}
 
 	if len(entities) == 0 {
-		return errors.New("usage: stats-multi <entity>... [hours]")
+		return errs.ErrMissingArgument("stats-multi <entity>... [hours]")
 	}
 
 	endTime := time.Now()
@@ -429,7 +429,7 @@ func HandleStatsMulti(ctx *Context) error {
 
 			stats, ok := result[entityID]
 			if !ok || len(stats) == 0 {
-				return EntityStatsSummary{EntityID: entityID}, fmt.Errorf("no statistics found")
+				return EntityStatsSummary{EntityID: entityID}, errs.ErrNoDataFound("no statistics found")
 			}
 
 			// Calculate aggregated statistics

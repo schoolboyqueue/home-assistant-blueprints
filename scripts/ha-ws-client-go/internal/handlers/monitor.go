@@ -2,13 +2,13 @@ package handlers
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	errs "github.com/home-assistant-blueprints/ha-ws-client-go/internal/errors"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/output"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
@@ -96,7 +96,7 @@ type subscriptionResult struct {
 // Uses batch execution to fan-out subscription requests with error collection.
 func HandleMonitorMulti(ctx *Context) error {
 	if len(ctx.Args) < 2 {
-		return errors.New("usage: monitor-multi <entity>... [seconds]")
+		return errs.ErrMissingArgument("monitor-multi <entity>... [seconds]")
 	}
 
 	// Check if the last argument is a number (duration)
@@ -116,7 +116,7 @@ func HandleMonitorMulti(ctx *Context) error {
 	}
 
 	if len(entities) == 0 {
-		return errors.New("usage: monitor-multi <entity>... [seconds]")
+		return errs.ErrMissingArgument("monitor-multi <entity>... [seconds]")
 	}
 
 	output.Message(fmt.Sprintf("Monitoring %d entities for %d seconds... (Ctrl+C to stop)", len(entities), seconds))
@@ -205,7 +205,7 @@ func HandleMonitorMulti(ctx *Context) error {
 
 	successful := results.Successful()
 	if len(successful) == 0 {
-		return errors.New("failed to subscribe to any entities")
+		return errs.ErrSubscriptionFailed(nil).WithMessage("failed to subscribe to any entities")
 	}
 
 	output.Message(fmt.Sprintf("Successfully subscribed to %d/%d entities", len(successful), len(entities)))
@@ -263,7 +263,7 @@ func handleAnalyze(ctx *Context) error {
 	}
 
 	if currentState == nil {
-		return fmt.Errorf("entity not found: %s", entityID)
+		return errs.ErrEntityNotFound(entityID)
 	}
 
 	// Get recent history
@@ -311,7 +311,7 @@ func getStates(ctx *Context) ([]struct {
 	// Convert result to states
 	statesData, ok := resp.Result.([]any)
 	if !ok {
-		return nil, errors.New("unexpected response type")
+		return nil, errs.New(errs.ErrorTypeParsing, "unexpected response type")
 	}
 
 	states := make([]struct {

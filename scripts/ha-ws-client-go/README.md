@@ -450,6 +450,9 @@ ha-ws-client-go/
 │   │   └── client.go
 │   ├── cli/                 # CLI utilities
 │   │   └── time.go          # Time parsing helpers
+│   ├── errors/              # Centralized error handling
+│   │   ├── errors.go        # Typed errors and helpers
+│   │   └── registry.go      # Error registry and factories
 │   ├── handlers/            # Command handlers
 │   │   ├── automation.go    # Automation/trace commands
 │   │   ├── basic.go         # Basic commands (state, call, etc.)
