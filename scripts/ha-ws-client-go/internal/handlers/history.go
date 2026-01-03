@@ -15,6 +15,22 @@ import (
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
 
+func init() {
+	// Register history commands
+	RegisterAll(
+		Cmd("logbook", "Get logbook entries (default 24h)", "<entity_id> [hours]", "history", HandleLogbook),
+		Cmd("history", "Get state history (default 24h)", "<entity_id> [hours]", "history", HandleHistory),
+		Cmd("history-full", "Get history with full attributes", "<entity_id> [hours]", "history", HandleHistoryFull),
+		Cmd("attrs", "Attribute change history (compact)", "<entity_id> [hours]", "history", HandleAttrs),
+		Cmd("timeline", "Multi-entity chronological timeline", "<hours> <entity>...", "history", HandleTimeline),
+		Cmd("syslog", "Get system log errors/warnings", "", "history", HandleSyslog),
+		Cmd("stats", "Get sensor statistics (default 24h)", "<entity_id> [hours]", "history", HandleStats),
+		Cmd("stats-multi", "Get statistics for multiple entities", "<entity>... [hours]", "history", HandleStatsMulti),
+		Cmd("context", "Look up what triggered a state change", "<entity_id|context_id>", "history", HandleContext),
+		Cmd("watch", "Live subscribe to state changes (default 60s)", "<entity_id> [seconds]", "history", HandleWatch),
+	)
+}
+
 // HandleLogbook gets logbook entries for an entity.
 // Wrapped with: Chain(RequireArg1(...), WithTimeRange(24, 2))
 var HandleLogbook = Apply(

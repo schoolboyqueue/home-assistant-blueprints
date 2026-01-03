@@ -10,6 +10,23 @@ import (
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
 
+func init() {
+	// Register automation debugging commands
+	RegisterAll(
+		Cmd("traces", "List automation traces", "[automation_id]", "automation", HandleTraces),
+		Cmd("trace", "Get detailed trace for a run", "<automation_id> <run_id>", "automation", HandleTrace),
+		Cmd("trace-latest", "Get the most recent trace", "<automation_id>", "automation", HandleTraceLatest),
+		Cmd("trace-summary", "Quick overview of recent runs", "<automation_id>", "automation", HandleTraceSummary),
+		Cmd("trace-vars", "Show evaluated variables from trace", "<automation_id> <run_id>", "automation", HandleTraceVars),
+		Cmd("trace-timeline", "Step-by-step execution timeline", "<automation_id> <run_id>", "automation", HandleTraceTimeline),
+		Cmd("trace-trigger", "Show trigger context details", "<automation_id> <run_id>", "automation", HandleTraceTrigger),
+		Cmd("trace-actions", "Show action results", "<automation_id> <run_id>", "automation", HandleTraceActions),
+		Cmd("trace-debug", "Comprehensive debug view (all info)", "<automation_id> <run_id>", "automation", HandleTraceDebug),
+		Cmd("automation-config", "Get automation configuration", "<entity_id>", "automation", HandleAutomationConfig),
+		Cmd("blueprint-inputs", "Validate blueprint inputs vs expected", "<entity_id>", "automation", HandleBlueprintInputs),
+	)
+}
+
 // HandleTraces lists automation traces.
 // Wrapped with: WithOptionalAutomationID(1)
 var HandleTraces = Apply(

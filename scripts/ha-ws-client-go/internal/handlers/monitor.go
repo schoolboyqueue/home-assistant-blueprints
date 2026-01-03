@@ -13,6 +13,15 @@ import (
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
 
+func init() {
+	// Register monitoring commands
+	RegisterAll(
+		Cmd("monitor", "Monitor entity state changes", "<entity_id> [seconds]", "monitoring", HandleMonitor),
+		Cmd("monitor-multi", "Monitor multiple entities", "<entity>...", "monitoring", HandleMonitorMulti),
+		Cmd("analyze", "Analyze entity state patterns", "<entity_id>", "monitoring", HandleAnalyze),
+	)
+}
+
 // HandleMonitor monitors entity state changes.
 // Wrapped with: Chain(RequireArg1(...), WithOptionalInt(60, 2))
 var HandleMonitor = Apply(

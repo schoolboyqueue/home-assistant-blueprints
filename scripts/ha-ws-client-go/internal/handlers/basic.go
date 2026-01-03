@@ -15,6 +15,23 @@ import (
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
 
+func init() {
+	// Register basic commands
+	RegisterAll(
+		Cmd("ping", "Test connection", "", "basic", HandlePing),
+		Cmd("state", "Get single entity state", "<entity_id>", "basic", HandleState),
+		Cmd("states", "Get all entity states (summary)", "", "basic", HandleStates),
+		Cmd("states-json", "Get all states as JSON array", "", "basic", HandleStatesJSON),
+		Cmd("states-filter", "Filter states by entity_id pattern", "<pattern>", "basic", HandleStatesFilter),
+		Cmd("config", "Get HA configuration", "", "basic", HandleConfig),
+		Cmd("services", "List all services", "", "basic", HandleServices),
+		Cmd("call", "Call a service (data as JSON)", "<domain> <service> [data]", "basic", HandleCall),
+		Cmd("template", "Render a Jinja template (use - for stdin)", "<template>", "basic", HandleTemplate),
+		Cmd("device-health", "Check if device is responsive", "<entity_id>", "diagnostic", HandleDeviceHealth),
+		Cmd("compare", "Side-by-side entity comparison", "<entity1> <entity2>", "diagnostic", HandleCompare),
+	)
+}
+
 // Context holds the execution context for handlers.
 type Context struct {
 	Client   *client.Client

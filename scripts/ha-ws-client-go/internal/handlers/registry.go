@@ -11,6 +11,15 @@ import (
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
 
+func init() {
+	// Register entity/device/area registry commands
+	RegisterAll(
+		Cmd("entities", "List/search entity registry", "[pattern]", "registry", HandleEntities),
+		Cmd("devices", "List/search device registry", "[pattern]", "registry", HandleDevices),
+		Cmd("areas", "List all areas", "", "registry", HandleAreas),
+	)
+}
+
 // RegistryConfig holds the configuration for a filtered registry handler.
 type RegistryConfig[T any] struct {
 	// MessageType is the WebSocket message type to fetch data (e.g., "config/entity_registry/list").
