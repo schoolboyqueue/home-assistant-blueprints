@@ -162,8 +162,11 @@ HVAC-aware ceiling fan automation with EN 16798 adaptive comfort model, heat ind
 │       └── README.md
 ├── .github/
 │   └── workflows/
-│       ├── ci-go-tools.yml
-│       └── release-go-tools.yml
+│       ├── auto-tag-go-tools.yml  # Auto-tag on Go tool version changes
+│       ├── ci-go-tools.yml        # CI for Go tools (lint, test, build)
+│       ├── pages.yml              # GitHub Pages deployment
+│       ├── release-go-tools.yml   # Release binaries on version tags
+│       └── validate-blueprints.yml # Blueprint validation CI
 ├── scripts/
 │   ├── ha-ws-client-go/          # Home Assistant WebSocket CLI client
 │   │   ├── cmd/ha-ws-client/     # CLI entry point
