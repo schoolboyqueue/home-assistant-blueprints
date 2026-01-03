@@ -443,27 +443,34 @@ Integration tests are designed to run in three different environments:
 
 ```
 ha-ws-client-go/
-├── cmd/ha-ws-client/    # Main entry point
+├── cmd/ha-ws-client/        # Main entry point
 │   └── main.go
 ├── internal/
-│   ├── client/          # WebSocket client
+│   ├── client/              # WebSocket client
 │   │   └── client.go
-│   ├── handlers/        # Command handlers
-│   │   ├── basic.go
-│   │   ├── batch.go      # Concurrent batch executor
-│   │   ├── history.go
-│   │   ├── automation.go
-│   │   ├── registry.go
-│   │   └── monitor.go
-│   ├── output/          # Output formatting
+│   ├── cli/                 # CLI utilities
+│   │   └── time.go          # Time parsing helpers
+│   ├── handlers/            # Command handlers
+│   │   ├── automation.go    # Automation/trace commands
+│   │   ├── basic.go         # Basic commands (state, call, etc.)
+│   │   ├── batch.go         # Concurrent batch executor
+│   │   ├── command_registry.go  # Command registration
+│   │   ├── history.go       # History/logbook commands
+│   │   ├── message_dispatcher.go  # WebSocket message routing
+│   │   ├── middleware.go    # Request/response middleware
+│   │   ├── monitor.go       # Real-time monitoring commands
+│   │   └── registry.go      # Entity/device registry commands
+│   ├── output/              # Output formatting
 │   │   └── output.go
-│   └── types/           # Type definitions
+│   ├── shutdown/            # Graceful shutdown coordination
+│   │   └── shutdown.go
+│   └── types/               # Type definitions
 │       └── types.go
 ├── go.mod
 ├── go.sum
 ├── Makefile
-├── .golangci.yml        # Linter configuration
-├── .editorconfig        # Editor settings
+├── .golangci.yml            # Linter configuration
+├── .editorconfig            # Editor settings
 ├── .gitignore
 └── README.md
 ```

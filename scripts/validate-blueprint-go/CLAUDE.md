@@ -10,19 +10,28 @@ Go CLI for validating Home Assistant Blueprint YAML files. Checks YAML syntax, b
 validate-blueprint-go/
 ├── main.go                      # CLI entry point and orchestration
 ├── internal/
+│   ├── common/                  # Shared utilities
+│   │   └── validators.go        # Common validation helpers
+│   ├── shutdown/                # Graceful shutdown coordination
+│   │   └── shutdown.go          # Context-based shutdown handling
+│   ├── testfixtures/            # Test fixture utilities
+│   │   └── fixtures.go          # Test data helpers
 │   └── validator/               # Core validation package
-│       ├── validator.go         # BlueprintValidator struct & Validate() orchestration
-│       ├── constants.go         # Configuration constants (ValidModes, ValidConditionTypes, etc.)
-│       ├── yaml.go              # YAML loading with !input tag support
-│       ├── schema.go            # Structure & blueprint section validation
-│       ├── inputs.go            # Input/selector validation
-│       ├── triggers.go          # Trigger validation
-│       ├── conditions.go        # Condition validation
 │       ├── actions.go           # Action/service validation
-│       ├── templates.go         # Jinja2 template validation
-│       ├── hysteresis.go        # Variable & hysteresis boundary validation
+│       ├── categories.go        # Category classification
+│       ├── conditions.go        # Condition validation
+│       ├── constants.go         # Configuration constants
+│       ├── context.go           # Validation context
 │       ├── helpers.go           # Utility functions
-│       └── reporter.go          # Result formatting & display
+│       ├── hysteresis.go        # Variable & hysteresis boundary validation
+│       ├── inputs.go            # Input/selector validation
+│       ├── reporter.go          # Result formatting & display
+│       ├── schema.go            # Structure & blueprint section validation
+│       ├── templates.go         # Jinja2 template validation
+│       ├── triggers.go          # Trigger validation
+│       ├── types.go             # Type definitions
+│       ├── validator.go         # BlueprintValidator struct & orchestration
+│       └── yaml.go              # YAML loading with !input tag support
 ├── go.mod                       # Go module definition
 ├── go.sum                       # Dependency checksums
 ├── Makefile                     # Build, format, lint, test targets
@@ -53,6 +62,27 @@ The core validation logic is organized into focused files:
 | `hysteresis.go` | Variable validation and hysteresis boundary detection |
 | `helpers.go` | Utility functions (ToFloat, Abs, ContainsVariableRef, etc.) |
 | `reporter.go` | Result formatting with colored output |
+| `categories.go` | Category classification for validation messages |
+| `context.go` | Validation context management |
+| `types.go` | Type definitions for validation |
+
+### `internal/common`
+
+| File | Purpose |
+|------|---------|
+| `validators.go` | Shared validation helpers used across packages |
+
+### `internal/shutdown`
+
+| File | Purpose |
+|------|---------|
+| `shutdown.go` | Graceful shutdown coordination with context cancellation |
+
+### `internal/testfixtures`
+
+| File | Purpose |
+|------|---------|
+| `fixtures.go` | Test fixture utilities for unit tests |
 
 ## Development
 

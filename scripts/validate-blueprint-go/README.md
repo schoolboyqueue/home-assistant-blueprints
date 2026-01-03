@@ -232,16 +232,39 @@ Run `make help` to see all available targets organized by category.
 
 ```
 validate-blueprint-go/
-├── main.go              # Main validator implementation
-├── go.mod               # Go module definition
-├── go.sum               # Dependency checksums
-├── Makefile             # Development task automation
-├── .golangci.yml        # Linter configuration
-├── .editorconfig        # Editor settings
-├── .gitignore           # Git ignore rules
-├── README.md            # This file
-└── build/               # Build output directory (created by make build)
-    └── validate-blueprint  # Built binary
+├── main.go                  # CLI entry point and orchestration
+├── internal/
+│   ├── common/              # Shared utilities
+│   │   └── validators.go    # Common validation helpers
+│   ├── shutdown/            # Graceful shutdown coordination
+│   │   └── shutdown.go
+│   ├── testfixtures/        # Test fixture utilities
+│   │   └── fixtures.go
+│   └── validator/           # Core validation package
+│       ├── actions.go       # Action/service validation
+│       ├── categories.go    # Category classification
+│       ├── conditions.go    # Condition validation
+│       ├── constants.go     # Configuration constants
+│       ├── context.go       # Validation context
+│       ├── helpers.go       # Utility functions
+│       ├── hysteresis.go    # Hysteresis boundary validation
+│       ├── inputs.go        # Input/selector validation
+│       ├── reporter.go      # Result formatting & display
+│       ├── schema.go        # Structure & blueprint validation
+│       ├── templates.go     # Jinja2 template validation
+│       ├── triggers.go      # Trigger validation
+│       ├── types.go         # Type definitions
+│       ├── validator.go     # Main validator orchestration
+│       └── yaml.go          # YAML loading with !input support
+├── go.mod                   # Go module definition
+├── go.sum                   # Dependency checksums
+├── Makefile                 # Development task automation
+├── .golangci.yml            # Linter configuration
+├── .editorconfig            # Editor settings
+├── .gitignore               # Git ignore rules
+├── README.md                # This file
+└── build/                   # Build output directory (created by make build)
+    └── validate-blueprint   # Built binary
 ```
 
 ## Integration

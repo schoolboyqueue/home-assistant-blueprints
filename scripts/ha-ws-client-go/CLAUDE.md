@@ -9,25 +9,33 @@ Go CLI for Home Assistant WebSocket API. Runs in HA add-on environment or on Ras
 ```
 ha-ws-client-go/
 ├── cmd/ha-ws-client/
-│   └── main.go           # Entry point - CLI parsing, WebSocket, routing
+│   └── main.go               # Entry point - CLI parsing, WebSocket, routing
 ├── internal/
 │   ├── client/
-│   │   └── client.go     # WebSocket request/response, message IDs
+│   │   └── client.go         # WebSocket request/response, message IDs
+│   ├── cli/
+│   │   └── time.go           # Time parsing utilities
 │   ├── handlers/
-│   │   ├── basic.go      # ping, state, states, config, services, call, template
-│   │   ├── history.go    # logbook, history, attrs, timeline, stats, syslog
-│   │   ├── registry.go   # entities, devices, areas
-│   │   ├── automation.go # traces, trace, trace-vars, trace-timeline, trace-debug, etc.
-│   │   └── monitor.go    # watch, monitor, monitor-multi, analyze
+│   │   ├── automation.go     # traces, trace, trace-vars, trace-timeline, trace-debug
+│   │   ├── basic.go          # ping, state, states, config, services, call, template
+│   │   ├── batch.go          # Concurrent batch executor
+│   │   ├── command_registry.go  # Command registration and lookup
+│   │   ├── history.go        # logbook, history, attrs, timeline, stats, syslog
+│   │   ├── message_dispatcher.go  # WebSocket message routing
+│   │   ├── middleware.go     # Request/response middleware
+│   │   ├── monitor.go        # watch, monitor, monitor-multi, analyze
+│   │   └── registry.go       # entities, devices, areas
 │   ├── output/
-│   │   └── output.go     # Output formatting (json/compact/default)
+│   │   └── output.go         # Output formatting (json/compact/default)
+│   ├── shutdown/
+│   │   └── shutdown.go       # Graceful shutdown coordination
 │   └── types/
-│       └── types.go      # All Go type definitions
+│       └── types.go          # All Go type definitions
 ├── go.mod
 ├── go.sum
-├── Makefile              # Build, format, lint, test targets
-├── .golangci.yml         # Linter configuration
-└── .editorconfig         # Editor settings
+├── Makefile                  # Build, format, lint, test targets
+├── .golangci.yml             # Linter configuration
+└── .editorconfig             # Editor settings
 ```
 
 ## Development
