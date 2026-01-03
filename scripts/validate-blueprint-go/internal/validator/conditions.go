@@ -24,14 +24,14 @@ func (v *BlueprintValidator) validateConditionList(conditions interface{}, path 
 		for i, c := range cond {
 			v.validateConditionList(c, common.IndexPath(path, i))
 		}
-	case map[string]interface{}:
+	case RawData:
 		v.validateSingleCondition(cond, path)
 	}
 }
 
 // validateSingleCondition validates a single condition
 // Uses common enum validation for condition types.
-func (v *BlueprintValidator) validateSingleCondition(condition map[string]interface{}, path string) {
+func (v *BlueprintValidator) validateSingleCondition(condition RawData, path string) {
 	// Check for condition type
 	condType, hasCondition := condition["condition"].(string)
 	if !hasCondition {

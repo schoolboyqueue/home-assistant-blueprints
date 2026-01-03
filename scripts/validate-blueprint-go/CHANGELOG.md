@@ -5,6 +5,22 @@ All notable changes to validate-blueprint-go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-01-03
+
+### Added
+
+- Strongly-typed struct definitions for blueprint data structures (`types.go`)
+- `BlueprintData` struct as root type with typed fields for triggers, conditions, actions
+- Comprehensive `Selector` type with all Home Assistant selector variants
+- `RawData` and `AnyList` type aliases for improved code documentation
+- Typed selector support in ValidationContext (`TypedInputSelectors`)
+
+### Changed
+
+- Replace `map[string]interface{}` with `RawData` type alias throughout codebase
+- Update test fixtures to use common type aliases
+- Add `TypedData` field to ValidationContext for gradual migration to type-safe code
+
 ## [1.4.0] - 2026-01-03
 
 ### Added

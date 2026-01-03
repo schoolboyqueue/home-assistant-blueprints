@@ -14,8 +14,13 @@ type ValidationContext struct {
 	// CategorizedWarnings contains warnings with category and path information
 	CategorizedWarnings []CategorizedWarning
 
-	// Data contains the parsed YAML blueprint data
-	Data map[string]interface{}
+	// Data contains the parsed YAML blueprint data as a raw map for backward compatibility.
+	// Use TypedData for type-safe access to blueprint fields.
+	Data RawData
+
+	// TypedData provides strongly-typed access to blueprint fields.
+	// This is populated alongside Data for gradual migration to type-safe code.
+	TypedData *BlueprintData
 
 	// Input tracking
 	// DefinedInputs tracks input names that are defined in the blueprint
@@ -24,8 +29,10 @@ type ValidationContext struct {
 	UsedInputs map[string]bool
 	// InputDefaults stores default values for inputs
 	InputDefaults map[string]interface{}
-	// InputSelectors stores selector configuration for each input
-	InputSelectors map[string]map[string]interface{}
+	// InputSelectors stores selector configuration for each input (raw map for backward compatibility)
+	InputSelectors map[string]RawData
+	// TypedInputSelectors stores typed selector configuration for each input
+	TypedInputSelectors map[string]*Selector
 	// EntityInputs tracks inputs with entity selectors
 	EntityInputs map[string]bool
 	// InputDatetimeInputs tracks inputs with input_datetime entity domain
@@ -47,11 +54,13 @@ func NewValidationContext() *ValidationContext {
 		Warnings:            []string{},
 		CategorizedErrors:   []CategorizedError{},
 		CategorizedWarnings: []CategorizedWarning{},
-		Data:                make(map[string]interface{}),
+		Data:                make(RawData),
+		TypedData:           nil,
 		DefinedInputs:       make(map[string]bool),
 		UsedInputs:          make(map[string]bool),
 		InputDefaults:       make(map[string]interface{}),
-		InputSelectors:      make(map[string]map[string]interface{}),
+		InputSelectors:      make(map[string]RawData),
+		TypedInputSelectors: make(map[string]*Selector),
 		EntityInputs:        make(map[string]bool),
 		InputDatetimeInputs: make(map[string]bool),
 		DefinedVariables:    make(map[string]bool),
@@ -61,9 +70,11 @@ func NewValidationContext() *ValidationContext {
 }
 
 // NewValidationContextWithData creates a new ValidationContext initialized with the provided data.
-func NewValidationContextWithData(data map[string]interface{}) *ValidationContext {
+func NewValidationContextWithData(data RawData) *ValidationContext {
 	ctx := NewValidationContext()
 	ctx.Data = data
+	// Also initialize TypedData with a reference to the raw data
+	ctx.TypedData = &BlueprintData{Raw: data}
 	return ctx
 }
 
@@ -77,7 +88,8 @@ func (ctx *ValidationContext) Reset() {
 	ctx.DefinedInputs = make(map[string]bool)
 	ctx.UsedInputs = make(map[string]bool)
 	ctx.InputDefaults = make(map[string]interface{})
-	ctx.InputSelectors = make(map[string]map[string]interface{})
+	ctx.InputSelectors = make(map[string]RawData)
+	ctx.TypedInputSelectors = make(map[string]*Selector)
 	ctx.EntityInputs = make(map[string]bool)
 	ctx.InputDatetimeInputs = make(map[string]bool)
 	ctx.DefinedVariables = make(map[string]bool)
@@ -147,13 +159,24 @@ func (ctx *ValidationContext) GetInputDefault(name string) (interface{}, bool) {
 }
 
 // SetInputSelector sets the selector configuration for an input.
-func (ctx *ValidationContext) SetInputSelector(name string, selector map[string]interface{}) {
+func (ctx *ValidationContext) SetInputSelector(name string, selector RawData) {
 	ctx.InputSelectors[name] = selector
 }
 
+// SetTypedInputSelector sets the typed selector configuration for an input.
+func (ctx *ValidationContext) SetTypedInputSelector(name string, selector *Selector) {
+	ctx.TypedInputSelectors[name] = selector
+}
+
 // GetInputSelector returns the selector configuration for an input and whether it exists.
-func (ctx *ValidationContext) GetInputSelector(name string) (map[string]interface{}, bool) {
+func (ctx *ValidationContext) GetInputSelector(name string) (RawData, bool) {
 	sel, ok := ctx.InputSelectors[name]
+	return sel, ok
+}
+
+// GetTypedInputSelector returns the typed selector configuration for an input and whether it exists.
+func (ctx *ValidationContext) GetTypedInputSelector(name string) (*Selector, bool) {
+	sel, ok := ctx.TypedInputSelectors[name]
 	return sel, ok
 }
 
@@ -237,11 +260,13 @@ func (ctx *ValidationContext) Clone() *ValidationContext {
 		Warnings:            make([]string, len(ctx.Warnings)),
 		CategorizedErrors:   make([]CategorizedError, len(ctx.CategorizedErrors)),
 		CategorizedWarnings: make([]CategorizedWarning, len(ctx.CategorizedWarnings)),
-		Data:                ctx.Data, // Shared reference
+		Data:                ctx.Data,      // Shared reference
+		TypedData:           ctx.TypedData, // Shared reference
 		DefinedInputs:       make(map[string]bool),
 		UsedInputs:          make(map[string]bool),
 		InputDefaults:       make(map[string]interface{}),
-		InputSelectors:      make(map[string]map[string]interface{}),
+		InputSelectors:      make(map[string]RawData),
+		TypedInputSelectors: make(map[string]*Selector),
 		EntityInputs:        make(map[string]bool),
 		InputDatetimeInputs: make(map[string]bool),
 		DefinedVariables:    make(map[string]bool),
@@ -265,6 +290,9 @@ func (ctx *ValidationContext) Clone() *ValidationContext {
 	}
 	for k, v := range ctx.InputSelectors {
 		clone.InputSelectors[k] = v
+	}
+	for k, v := range ctx.TypedInputSelectors {
+		clone.TypedInputSelectors[k] = v
 	}
 	for k, v := range ctx.EntityInputs {
 		clone.EntityInputs[k] = v

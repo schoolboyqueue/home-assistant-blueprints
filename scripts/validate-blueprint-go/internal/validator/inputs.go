@@ -27,7 +27,7 @@ func (v *BlueprintValidator) ValidateInputs() {
 
 // validateInputDict recursively validates input definitions
 // Uses common path building utilities for consistency.
-func (v *BlueprintValidator) validateInputDict(inputs map[string]interface{}, path string) {
+func (v *BlueprintValidator) validateInputDict(inputs RawData, path string) {
 	for key, value := range inputs {
 		currentPath := common.KeyPath(path, key)
 
@@ -56,7 +56,7 @@ func (v *BlueprintValidator) validateInputDict(inputs map[string]interface{}, pa
 
 // validateSingleInput validates a single input definition
 // Uses common type extraction and validation patterns.
-func (v *BlueprintValidator) validateSingleInput(inputDef map[string]interface{}, path, inputName string) {
+func (v *BlueprintValidator) validateSingleInput(inputDef RawData, path, inputName string) {
 	// Track default value
 	if defaultVal, ok := inputDef["default"]; ok {
 		v.InputDefaults[inputName] = defaultVal
@@ -107,7 +107,7 @@ func (v *BlueprintValidator) validateSingleInput(inputDef map[string]interface{}
 
 // validateSelectOptions validates select selector options
 // Uses common path building and type checking utilities.
-func (v *BlueprintValidator) validateSelectOptions(selectConfig map[string]interface{}, path string) {
+func (v *BlueprintValidator) validateSelectOptions(selectConfig RawData, path string) {
 	options, ok := selectConfig["options"]
 	if !ok {
 		return
@@ -126,7 +126,7 @@ func (v *BlueprintValidator) validateSelectOptions(selectConfig map[string]inter
 		switch opt := option.(type) {
 		case nil:
 			v.AddCategorizedError(CategoryInputs, optionPath, "Option cannot be None. Select options must be strings or label/value dicts with non-empty values.")
-		case map[string]interface{}:
+		case RawData:
 			value := opt["value"]
 			label := opt["label"]
 

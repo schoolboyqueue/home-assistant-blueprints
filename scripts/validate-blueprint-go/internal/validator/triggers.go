@@ -14,14 +14,14 @@ func (v *BlueprintValidator) ValidateTriggers() {
 	triggerList, ok := triggers.([]interface{})
 	if !ok {
 		// Single trigger (not a list)
-		if triggerMap, ok := triggers.(map[string]interface{}); ok {
+		if triggerMap, ok := triggers.(RawData); ok {
 			v.validateSingleTrigger(triggerMap, "trigger")
 		}
 		return
 	}
 
 	for i, trigger := range triggerList {
-		if triggerMap, ok := trigger.(map[string]interface{}); ok {
+		if triggerMap, ok := trigger.(RawData); ok {
 			v.validateSingleTrigger(triggerMap, common.IndexPath("trigger", i))
 		}
 	}
@@ -29,7 +29,7 @@ func (v *BlueprintValidator) ValidateTriggers() {
 
 // validateSingleTrigger validates a single trigger
 // Uses common template and field validation utilities.
-func (v *BlueprintValidator) validateSingleTrigger(trigger map[string]interface{}, path string) {
+func (v *BlueprintValidator) validateSingleTrigger(trigger RawData, path string) {
 	// Check for platform or trigger type
 	platform, hasPlatform := trigger["platform"]
 	triggerType, hasTrigger := trigger["trigger"]

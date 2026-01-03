@@ -27,7 +27,7 @@ func (v *BlueprintValidator) ValidateStructure() {
 
 	// Check for variables at root
 	if variables, ok := v.Data["variables"]; ok && variables != nil {
-		if _, isMap := variables.(map[string]interface{}); !isMap {
+		if _, isMap := variables.(RawData); !isMap {
 			v.AddCategorizedError(CategorySchema, "variables", "'variables' must be a dictionary")
 		}
 	}

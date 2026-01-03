@@ -3,11 +3,15 @@
 // This reduces repetitive test code and ensures consistency across tests.
 package testfixtures
 
-// Map is a shorthand for the common map type used in YAML structures
-type Map = map[string]interface{}
+import "github.com/home-assistant-blueprints/validate-blueprint-go/internal/common"
 
-// List is a shorthand for the common list type used in YAML structures
-type List = []interface{}
+// Map is a shorthand for the common map type used in YAML structures.
+// This is an alias for common.RawData for backward compatibility.
+type Map = common.RawData
+
+// List is a shorthand for the common list type used in YAML structures.
+// This is an alias for common.AnyList for backward compatibility.
+type List = common.AnyList
 
 // =====================================
 // Blueprint Section Fixtures

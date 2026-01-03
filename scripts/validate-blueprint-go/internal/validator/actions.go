@@ -22,14 +22,14 @@ func (v *BlueprintValidator) validateActionList(actions interface{}, path string
 		for i, action := range a {
 			v.validateActionList(action, common.IndexPath(path, i))
 		}
-	case map[string]interface{}:
+	case RawData:
 		v.validateSingleAction(a, path)
 	}
 }
 
 // validateSingleAction validates a single action
 // Uses common service format validation and nil checking.
-func (v *BlueprintValidator) validateSingleAction(action map[string]interface{}, path string) {
+func (v *BlueprintValidator) validateSingleAction(action RawData, path string) {
 	// Check for service call
 	if service, ok := common.TryGetString(action, "service"); ok {
 		// Validate service format using common validator
@@ -50,7 +50,7 @@ func (v *BlueprintValidator) validateSingleAction(action map[string]interface{},
 		choosePath := common.JoinPath(path, "choose")
 		for i, choice := range choose {
 			choicePath := common.IndexPath(choosePath, i)
-			if choiceMap, ok := choice.(map[string]interface{}); ok {
+			if choiceMap, ok := choice.(RawData); ok {
 				if conditions, ok := choiceMap["conditions"]; ok {
 					v.validateConditionList(conditions, common.JoinPath(choicePath, "conditions"))
 				}

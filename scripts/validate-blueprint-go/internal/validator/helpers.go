@@ -54,7 +54,7 @@ func (v *BlueprintValidator) CollectInputRefs(value string) {
 
 // CollectInputRefsFromMap recursively collects !input references from a map
 // Uses common.TraverseValue for consistent traversal.
-func (v *BlueprintValidator) CollectInputRefsFromMap(m map[string]interface{}) {
+func (v *BlueprintValidator) CollectInputRefsFromMap(m RawData) {
 	common.TraverseValue(m, "", func(value interface{}, _ string) bool {
 		if s, ok := value.(string); ok {
 			if inputName := common.ExtractInputRef(s); inputName != "" {

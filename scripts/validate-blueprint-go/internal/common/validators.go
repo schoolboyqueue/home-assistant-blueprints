@@ -10,6 +10,18 @@ import (
 	"strings"
 )
 
+// --- Type Aliases ---
+// These type aliases improve code readability and provide a migration path toward
+// stronger typing without breaking existing code.
+
+// RawData represents an untyped map structure from YAML parsing.
+// This replaces map[string]interface{} throughout the codebase for better documentation.
+type RawData = map[string]interface{}
+
+// AnyList represents an untyped list from YAML parsing.
+// This replaces []interface{} throughout the codebase for better documentation.
+type AnyList = []interface{}
+
 // --- Type Extraction Utilities ---
 // These functions safely extract typed values from interface{} with descriptive error messages.
 
