@@ -151,6 +151,22 @@ automation:
     mode: queued
     max: 5
 
+  - id: test_automation_no_traces
+    alias: "Test: No Traces Stored"
+    description: "Automation with trace storage disabled for testing"
+    trace:
+      stored_traces: 0
+    trigger:
+      - platform: state
+        entity_id: input_number.target_humidity
+    action:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.last_event
+        data:
+          value: "Humidity changed"
+    mode: single
+
 # Scripts for testing call command
 script:
   test_script:

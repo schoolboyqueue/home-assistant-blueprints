@@ -220,6 +220,14 @@ jobs:
 
           sleep 2
 
+          # Trigger automation with stored_traces: 0 (for testing traces discrepancy)
+          curl -sf -X POST http://localhost:8123/api/services/input_number/set_value \
+            -H "Authorization: Bearer ${HA_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{"entity_id": "input_number.target_humidity", "value": 50}'
+
+          sleep 2
+
           # Run the test script
           curl -sf -X POST http://localhost:8123/api/services/script/test_script \
             -H "Authorization: Bearer ${HA_TOKEN}" \

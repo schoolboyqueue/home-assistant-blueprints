@@ -5,6 +5,27 @@ All notable changes to ha-ws-client-go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-01-02
+
+### Added
+
+- Add `context` command support for entity_id input (previously only accepted context_id)
+  - Now accepts either `context <entity_id>` or `context <context_id>`
+  - Shows related state changes that share the same context chain
+  - Displays helpful message when no matches found with suggestions
+- Add `traces` command discrepancy detection when automation has `last_triggered` but no stored traces
+  - Shows the last_triggered timestamp and suggests checking trace storage settings
+- Add unit tests for context helper functions (`findEntityByID`, `findStatesByContext`, `addParentContextMatches`, `formatContextInfo`)
+- Add integration tests for `context`, `traces`, and `automation-config` handlers
+- Add test automation with `stored_traces: 0` for testing traces discrepancy feature
+
+### Changed
+
+- Improve `automation-config` command to retrieve full config from traces when available
+  - For blueprint automations, tries to get resolved config from most recent trace
+  - Falls back to API when no traces available with helpful message
+- Refactor `handleContext` to reduce cyclomatic complexity using helper functions
+
 ## [1.2.0] - 2026-01-03
 
 ### Added

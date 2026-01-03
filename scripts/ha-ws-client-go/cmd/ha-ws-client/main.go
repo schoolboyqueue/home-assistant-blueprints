@@ -197,7 +197,7 @@ func buildCommands() []*cli.Command {
 			Name:      "context",
 			Usage:     "Look up what triggered a state change",
 			Action:    wrapHandler(handlers.HandleContext),
-			ArgsUsage: "<context_id>",
+			ArgsUsage: "<entity_id|context_id>",
 		},
 		{
 			Name:      "watch",

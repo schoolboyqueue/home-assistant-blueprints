@@ -498,40 +498,125 @@ func HandleStatsMulti(ctx *Context) error {
 }
 
 // HandleContext looks up what triggered a state change.
-// Wrapped with: RequireArg1("Usage: context <context_id>")
+// Accepts either an entity_id or a context_id.
+// Wrapped with: RequireArg1("Usage: context <entity_id|context_id>")
 var HandleContext = Apply(
-	RequireArg1("Usage: context <context_id>"),
+	RequireArg1("Usage: context <entity_id|context_id>"),
 	handleContext,
 )
 
-func handleContext(ctx *Context) error {
-	contextID := ctx.Config.Args[0]
-
-	// Search for states with this context
-	states, err := client.SendMessageTyped[[]types.HAState](ctx.Client, "get_states", nil)
-	if err != nil {
-		return err
+// findEntityByID finds an entity in states by entity_id.
+func findEntityByID(states []types.HAState, entityID string) *types.HAState {
+	for i := range states {
+		if states[i].EntityID == entityID {
+			return &states[i]
+		}
 	}
+	return nil
+}
 
+// findStatesByContext finds all states matching a context ID or having it as parent.
+func findStatesByContext(states []types.HAState, contextID string) []types.HAState {
 	var matches []types.HAState
 	for _, s := range states {
 		if s.Context != nil && (s.Context.ID == contextID || s.Context.ParentID == contextID) {
 			matches = append(matches, s)
 		}
 	}
+	return matches
+}
+
+// addParentContextMatches adds states matching the parent context if not already present.
+func addParentContextMatches(matches, states []types.HAState, parentID string) []types.HAState {
+	for _, s := range states {
+		if s.Context == nil || s.Context.ID != parentID {
+			continue
+		}
+		found := false
+		for _, m := range matches {
+			if m.EntityID == s.EntityID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			matches = append(matches, s)
+		}
+	}
+	return matches
+}
+
+// formatContextInfo formats context information for display.
+func formatContextInfo(ctx *types.HAContext) string {
+	if ctx == nil {
+		return ""
+	}
+	if ctx.ParentID != "" {
+		return fmt.Sprintf(" (context: %s, parent: %s)", ctx.ID, ctx.ParentID)
+	}
+	return fmt.Sprintf(" (context: %s)", ctx.ID)
+}
+
+func handleContext(ctx *Context) error {
+	arg := ctx.Config.Args[0]
+
+	states, err := client.SendMessageTyped[[]types.HAState](ctx.Client, "get_states", nil)
+	if err != nil {
+		return err
+	}
+
+	// Check if arg is an entity_id
+	targetEntity := findEntityByID(states, arg)
+	contextID := arg
+	if targetEntity != nil && targetEntity.Context != nil {
+		contextID = targetEntity.Context.ID
+	}
+
+	// Find matching states
+	matches := findStatesByContext(states, contextID)
+
+	// Add parent context matches if applicable
+	if targetEntity != nil && targetEntity.Context != nil && targetEntity.Context.ParentID != "" {
+		matches = addParentContextMatches(matches, states, targetEntity.Context.ParentID)
+	}
 
 	if len(matches) == 0 {
-		output.Message(fmt.Sprintf("No states found with context ID: %s", contextID))
-		return nil
+		return outputNoContextMatches(arg, contextID, targetEntity)
+	}
+
+	title := fmt.Sprintf("States with context %s", contextID)
+	if targetEntity != nil {
+		title = fmt.Sprintf("Related state changes for %s", arg)
 	}
 
 	output.List(matches,
-		output.ListTitle[types.HAState](fmt.Sprintf("States with context %s", contextID)),
+		output.ListTitle[types.HAState](title),
 		output.ListCommand[types.HAState]("context"),
 		output.ListFormatter(func(s types.HAState, _ int) string {
-			return fmt.Sprintf("%s: %s (context: %s)", s.EntityID, s.State, s.Context.ID)
+			contextInfo := formatContextInfo(s.Context)
+			if output.IsCompact() {
+				return fmt.Sprintf("%s %s%s", s.EntityID, s.State, contextInfo)
+			}
+			return fmt.Sprintf("%s: %s%s", s.EntityID, s.State, contextInfo)
 		}),
 	)
+	return nil
+}
+
+// outputNoContextMatches outputs appropriate message when no matches found.
+func outputNoContextMatches(arg, contextID string, targetEntity *types.HAState) error {
+	if targetEntity != nil {
+		output.Message(fmt.Sprintf("No related state changes found for %s", arg))
+		output.Message(fmt.Sprintf("Context ID: %s", contextID))
+		if targetEntity.Context != nil && targetEntity.Context.ParentID != "" {
+			output.Message(fmt.Sprintf("Parent context: %s", targetEntity.Context.ParentID))
+		}
+		output.Message("")
+		output.Message("The triggering event may have occurred before the current state snapshot.")
+		output.Message("Try 'logbook <entity_id>' to see recent history with context.")
+	} else {
+		output.Message(fmt.Sprintf("No states found with context ID: %s", contextID))
+	}
 	return nil
 }
 

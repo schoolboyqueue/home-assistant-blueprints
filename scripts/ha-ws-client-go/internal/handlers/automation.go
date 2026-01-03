@@ -45,6 +45,28 @@ func handleTraces(ctx *Context) error {
 		allTraces = filteredTraces
 	}
 
+	// If filtering by specific automation and no traces found, check if it has last_triggered
+	if len(allTraces) == 0 && automationID != "" {
+		entityID := EnsureAutomationPrefix(automationID)
+		states, statesErr := client.SendMessageTyped[[]types.HAState](ctx.Client, "get_states", nil)
+		if statesErr == nil {
+			for _, s := range states {
+				if s.EntityID == entityID {
+					if lastTriggered, ok := s.Attributes["last_triggered"].(string); ok && lastTriggered != "" {
+						output.Message(fmt.Sprintf("No stored traces for %s", entityID))
+						output.Message(fmt.Sprintf("However, last_triggered: %s", lastTriggered))
+						output.Message("")
+						output.Message("Traces may be disabled or cleared. Check:")
+						output.Message("  - Settings > Automations > (automation) > Stored Traces")
+						output.Message("  - Trace storage limit (default: 5)")
+						return nil
+					}
+					break
+				}
+			}
+		}
+	}
+
 	output.List(allTraces,
 		output.ListTitle[types.TraceInfo]("Automation traces"),
 		output.ListCommand[types.TraceInfo]("traces"),
@@ -411,16 +433,42 @@ var HandleAutomationConfig = Apply(
 
 func handleAutomationConfig(ctx *Context) error {
 	entityID := EnsureAutomationPrefix(ctx.Config.Args[0])
+	automationID := strings.TrimPrefix(entityID, "automation.")
 
-	// Use automation/config WebSocket message type
+	// First try to get config from a trace (more complete for blueprint automations)
+	traces, err := client.SendMessageTyped[[]types.TraceInfo](ctx.Client, "trace/list", map[string]any{
+		"domain":  "automation",
+		"item_id": automationID,
+	})
+	if err == nil && len(traces) > 0 {
+		// Get the most recent trace which contains the resolved config
+		trace, traceErr := getTraceDetail(ctx.Client, automationID, traces[0].RunID)
+		if traceErr == nil && trace.Config != nil {
+			// Check if trace config has actual content (trigger/action)
+			if len(trace.Config.Trigger) > 0 || len(trace.Config.Action) > 0 {
+				output.Data(trace.Config, output.WithCommand("automation-config"))
+				return nil
+			}
+		}
+	}
+
+	// Fall back to automation/config API
 	type configResponse struct {
 		Config types.AutomationConfig `json:"config"`
 	}
-	result, err := client.SendMessageTyped[configResponse](ctx.Client, "automation/config", map[string]any{
+	result, apiErr := client.SendMessageTyped[configResponse](ctx.Client, "automation/config", map[string]any{
 		"entity_id": entityID,
 	})
-	if err != nil {
-		return err
+	if apiErr != nil {
+		return apiErr
+	}
+
+	// Check if we got a meaningful config
+	if len(result.Config.Trigger) == 0 && len(result.Config.Action) == 0 && result.Config.UseBlueprint == nil {
+		// Minimal config returned - likely a blueprint automation with no traces
+		output.Message(fmt.Sprintf("Limited config available for %s (blueprint automation with no stored traces).", entityID))
+		output.Message("Run the automation once to generate a trace, then use 'trace-latest' or 'trace-debug' to see the resolved config.")
+		output.Message("")
 	}
 
 	output.Data(result.Config, output.WithCommand("automation-config"))

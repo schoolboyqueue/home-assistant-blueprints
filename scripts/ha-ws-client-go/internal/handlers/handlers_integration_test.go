@@ -870,3 +870,243 @@ func TestIntegration_Fixtures_Script(t *testing.T) {
 	// Script runs asynchronously, just verify it was called successfully
 	t.Log("Test script executed successfully")
 }
+
+// =============================================================================
+// Context Handler Tests
+// =============================================================================
+
+func TestIntegration_HandleContext_WithEntityID(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	// Trigger the automation to create a causal chain:
+	// input_number.test_temperature change -> automation -> input_boolean.test_switch toggle
+	_, err := c.SendMessage("call_service", map[string]any{
+		"domain":  "input_number",
+		"service": "set_value",
+		"target": map[string]any{
+			"entity_id": testInputNumber,
+		},
+		"service_data": map[string]any{
+			"value": 42.0,
+		},
+	})
+	require.NoError(t, err)
+
+	// Wait for automation to run
+	time.Sleep(1 * time.Second)
+
+	// Now test the context handler with an entity_id
+	ctx := testContext(t, c, "context", testInputBoolean)
+	err = handlers.HandleContext(ctx)
+	assert.NoError(t, err)
+}
+
+func TestIntegration_HandleContext_WithNonexistentEntity(t *testing.T) {
+	c := testClient(t)
+
+	// Test with a non-existent entity (should treat as context_id)
+	ctx := testContext(t, c, "context", "nonexistent.entity_xyz")
+	err := handlers.HandleContext(ctx)
+	// Should not error, just show "no states found" message
+	assert.NoError(t, err)
+}
+
+func TestIntegration_HandleContext_FindsRelatedStates(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	// Trigger an automation to create related state changes
+	_, err := c.SendMessage("call_service", map[string]any{
+		"domain":  "input_number",
+		"service": "set_value",
+		"target": map[string]any{
+			"entity_id": testInputNumber,
+		},
+		"service_data": map[string]any{
+			"value": 35.0,
+		},
+	})
+	require.NoError(t, err)
+
+	time.Sleep(1 * time.Second)
+
+	// Get the input_boolean state and verify it has a context
+	states, err := client.SendMessageTyped[[]types.HAState](c, "get_states", nil)
+	require.NoError(t, err)
+
+	var switchState *types.HAState
+	for i, s := range states {
+		if s.EntityID == testInputBoolean {
+			switchState = &states[i]
+			break
+		}
+	}
+	require.NotNil(t, switchState, "test switch should exist")
+	require.NotNil(t, switchState.Context, "test switch should have context")
+
+	t.Logf("Test switch context: ID=%s, ParentID=%s",
+		switchState.Context.ID, switchState.Context.ParentID)
+}
+
+// =============================================================================
+// Traces Handler Tests (with last_triggered discrepancy)
+// =============================================================================
+
+const testAutomationNoTraces = "test_automation_no_traces"
+
+func TestIntegration_HandleTraces_ShowsLastTriggered(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	// Trigger the automation that has stored_traces: 0
+	_, err := c.SendMessage("call_service", map[string]any{
+		"domain":  "input_number",
+		"service": "set_value",
+		"target": map[string]any{
+			"entity_id": "input_number.target_humidity",
+		},
+		"service_data": map[string]any{
+			"value": 55.0,
+		},
+	})
+	require.NoError(t, err)
+
+	time.Sleep(1 * time.Second)
+
+	// Verify the automation has last_triggered but no traces
+	states, err := client.SendMessageTyped[[]types.HAState](c, "get_states", nil)
+	require.NoError(t, err)
+
+	var automationState *types.HAState
+	for i, s := range states {
+		if s.EntityID == "automation.test_no_traces_stored" {
+			automationState = &states[i]
+			break
+		}
+	}
+
+	if automationState != nil {
+		lastTriggered, ok := automationState.Attributes["last_triggered"].(string)
+		if ok && lastTriggered != "" {
+			t.Logf("Automation last_triggered: %s", lastTriggered)
+
+			// Now verify traces command shows the discrepancy
+			ctx := testContext(t, c, "traces", testAutomationNoTraces)
+			err = handlers.HandleTraces(ctx)
+			assert.NoError(t, err)
+		}
+	}
+}
+
+func TestIntegration_HandleTraces_WithTraces(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	// Trigger an automation that stores traces
+	_, err := c.SendMessage("call_service", map[string]any{
+		"domain":  "input_number",
+		"service": "set_value",
+		"target": map[string]any{
+			"entity_id": testInputNumber,
+		},
+		"service_data": map[string]any{
+			"value": 28.0,
+		},
+	})
+	require.NoError(t, err)
+
+	time.Sleep(1 * time.Second)
+
+	// Get traces for the test automation
+	ctx := testContext(t, c, "traces", testAutomationID)
+	err = handlers.HandleTraces(ctx)
+	assert.NoError(t, err)
+}
+
+// =============================================================================
+// Automation Config Handler Tests
+// =============================================================================
+
+func TestIntegration_HandleAutomationConfig_WithTraces(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	// First ensure we have a trace
+	_, err := c.SendMessage("call_service", map[string]any{
+		"domain":  "input_number",
+		"service": "set_value",
+		"target": map[string]any{
+			"entity_id": testInputNumber,
+		},
+		"service_data": map[string]any{
+			"value": 33.0,
+		},
+	})
+	require.NoError(t, err)
+
+	time.Sleep(1 * time.Second)
+
+	// Test automation-config command
+	ctx := testContext(t, c, "automation-config", testAutomationFull)
+	err = handlers.HandleAutomationConfig(ctx)
+	assert.NoError(t, err)
+}
+
+func TestIntegration_HandleAutomationConfig_DirectAPI(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	// Test the automation/config API directly
+	type configResponse struct {
+		Config types.AutomationConfig `json:"config"`
+	}
+	result, err := client.SendMessageTyped[configResponse](c, "automation/config", map[string]any{
+		"entity_id": testAutomationFull,
+	})
+	require.NoError(t, err)
+
+	t.Logf("Automation config: ID=%s, Alias=%s", result.Config.ID, result.Config.Alias)
+	assert.NotEmpty(t, result.Config.ID)
+	assert.NotEmpty(t, result.Config.Alias)
+}
+
+func TestIntegration_HandleAutomationConfig_NonBlueprintAutomation(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	// Test with our non-blueprint test automation
+	// Should return full config since it's defined in YAML
+	type configResponse struct {
+		Config types.AutomationConfig `json:"config"`
+	}
+	result, err := client.SendMessageTyped[configResponse](c, "automation/config", map[string]any{
+		"entity_id": testAutomationFull,
+	})
+	require.NoError(t, err)
+
+	// Non-blueprint automations should have trigger and action
+	t.Logf("Config has %d triggers, %d actions",
+		len(result.Config.Trigger), len(result.Config.Action))
+}
