@@ -360,6 +360,120 @@ func TestTraceResultStructure(t *testing.T) {
 	}
 }
 
+func TestIsNumericID(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{
+			name:     "numeric ID",
+			input:    "1764091895602",
+			expected: true,
+		},
+		{
+			name:     "single digit",
+			input:    "5",
+			expected: true,
+		},
+		{
+			name:     "entity name",
+			input:    "guest_bedroom_adaptive_shade",
+			expected: false,
+		},
+		{
+			name:     "mixed alphanumeric",
+			input:    "abc123",
+			expected: false,
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: false,
+		},
+		{
+			name:     "starts with number but has letters",
+			input:    "123abc",
+			expected: false,
+		},
+		{
+			name:     "has dash",
+			input:    "123-456",
+			expected: false,
+		},
+		{
+			name:     "has underscore",
+			input:    "123_456",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := isNumericID(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// isNumericID checks if a string contains only digits.
+// This is the logic used by resolveAutomationInternalID to determine
+// if an ID is already a numeric internal ID or needs resolution.
+func isNumericID(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, ch := range s {
+		if ch < '0' || ch > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func TestResolveAutomationInternalID_NumericPassthrough(t *testing.T) {
+	t.Parallel()
+
+	// When given a numeric ID, resolveAutomationInternalID should return it unchanged
+	// without making any API calls. We test this indirectly by checking the logic.
+	tests := []struct {
+		name      string
+		input     string
+		isNumeric bool
+	}{
+		{
+			name:      "numeric ID passes through",
+			input:     "1764091895602",
+			isNumeric: true,
+		},
+		{
+			name:      "entity name needs resolution",
+			input:     "guest_bedroom_adaptive_shade",
+			isNumeric: false,
+		},
+		{
+			name:      "empty returns empty",
+			input:     "",
+			isNumeric: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			// Verify the numeric detection logic matches expectations
+			assert.Equal(t, tt.isNumeric, isNumericID(tt.input))
+		})
+	}
+}
+
+// Note: Full integration testing of resolveAutomationInternalID requires a real
+// WebSocket connection to Home Assistant. The handlers_integration_test.go file
+// contains integration tests that verify the complete flow including API calls.
+
 // Benchmark for EnsureAutomationPrefix which is used throughout automation handlers
 func BenchmarkEnsureAutomationPrefix(b *testing.B) {
 	inputs := []string{

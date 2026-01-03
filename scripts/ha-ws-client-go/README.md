@@ -84,7 +84,7 @@ ha-ws-client logbook light.kitchen --from "2024-01-15 10:00"
 
 # Automation debugging
 ha-ws-client traces automation.morning_routine
-ha-ws-client trace-debug 01KDQS4E2WHMYJYYXKC7K28XFG
+ha-ws-client trace-debug automation.morning_routine abc123def456
 
 # Real-time monitoring
 ha-ws-client watch binary_sensor.motion 60
@@ -137,17 +137,20 @@ ha-ws-client stats-multi sensor.temp_kitchen sensor.temp_bedroom sensor.temp_liv
 | `areas` | List all areas |
 
 ### Automation Debugging
+
+> **Note:** All trace commands accept `automation_id` in either entity_id format (e.g., `automation.morning_routine`) or internal numeric ID format (e.g., `1764091895602`). The entity_id format is automatically resolved to the internal ID.
+
 | Command | Description |
 |---------|-------------|
 | `traces [automation_id] [--from]` | List automation traces (supports time filtering) |
 | `trace <automation_id> <run_id>` | Get detailed trace |
 | `trace-latest <automation_id>` | Get most recent trace without listing first |
 | `trace-summary <automation_id>` | Quick overview of recent automation runs |
-| `trace-vars <run_id>` | Show evaluated variables |
-| `trace-timeline <run_id>` | Step-by-step execution timeline |
-| `trace-trigger <run_id>` | Show trigger context details |
-| `trace-actions <run_id>` | Show action results |
-| `trace-debug <run_id>` | Comprehensive debug view |
+| `trace-vars <automation_id> <run_id>` | Show evaluated variables |
+| `trace-timeline <automation_id> <run_id>` | Step-by-step execution timeline |
+| `trace-trigger <automation_id> <run_id>` | Show trigger context details |
+| `trace-actions <automation_id> <run_id>` | Show action results |
+| `trace-debug <automation_id> <run_id>` | Comprehensive debug view |
 | `automation-config <entity_id>` | Get automation configuration |
 | `blueprint-inputs <entity_id>` | Validate blueprint inputs |
 

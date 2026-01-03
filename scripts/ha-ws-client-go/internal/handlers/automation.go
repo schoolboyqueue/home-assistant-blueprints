@@ -35,12 +35,53 @@ var HandleTraces = Apply(
 	handleTraces,
 )
 
+// resolveAutomationInternalID converts an automation entity name to its internal numeric ID.
+// The trace API requires the internal ID (e.g., "1764091895602"), not the entity name
+// (e.g., "guest_bedroom_adaptive_shade"). This function looks up the automation state
+// and extracts the "id" attribute.
+// Returns the original automationID if it already looks numeric or if lookup fails.
+func resolveAutomationInternalID(c *client.Client, automationID string) string {
+	// If it already looks like a numeric ID, return as-is
+	if automationID == "" {
+		return automationID
+	}
+	isNumeric := true
+	for _, ch := range automationID {
+		if ch < '0' || ch > '9' {
+			isNumeric = false
+			break
+		}
+	}
+	if isNumeric {
+		return automationID
+	}
+
+	// Look up the automation state to get its internal ID
+	entityID := EnsureAutomationPrefix(automationID)
+	states, err := client.SendMessageTyped[[]types.HAState](c, "get_states", nil)
+	if err != nil {
+		return automationID // Fall back to original
+	}
+
+	for _, s := range states {
+		if s.EntityID == entityID {
+			if id, ok := s.Attributes["id"].(string); ok && id != "" {
+				return id
+			}
+			break
+		}
+	}
+
+	return automationID // Fall back to original if not found
+}
+
 func handleTraces(ctx *Context) error {
 	automationID := ctx.Config.AutomationID
 
 	data := map[string]any{"domain": "automation"}
 	if automationID != "" {
-		data["item_id"] = automationID
+		// Resolve entity name to internal ID for the trace API
+		data["item_id"] = resolveAutomationInternalID(ctx.Client, automationID)
 	}
 
 	// HA returns traces as an array of TraceInfo, not a map
@@ -131,10 +172,13 @@ func handleTrace(ctx *Context) error {
 	id := ctx.Config.AutomationID
 	runID := ctx.Config.Args[1]
 
+	// Resolve entity name to internal ID for the trace API
+	internalID := resolveAutomationInternalID(ctx.Client, id)
+
 	// Use unified MessageRequest pattern for simplified request/response handling
 	return NewRequest[types.TraceDetail]("trace/get", map[string]any{
 		"domain":  "automation",
-		"item_id": id,
+		"item_id": internalID,
 		"run_id":  runID,
 	}).ExecuteAndOutput(ctx, WithOutputCommand("trace"))
 }
@@ -148,9 +192,13 @@ var HandleTraceLatest = Apply(
 
 func handleTraceLatest(ctx *Context) error {
 	id := ctx.Config.AutomationID
+
+	// Resolve entity name to internal ID for the trace API
+	internalID := resolveAutomationInternalID(ctx.Client, id)
+
 	traces, err := client.SendMessageTyped[[]types.TraceInfo](ctx.Client, "trace/list", map[string]any{
 		"domain":  "automation",
-		"item_id": id,
+		"item_id": internalID,
 	})
 	if err != nil {
 		return err
@@ -180,9 +228,13 @@ var HandleTraceSummary = Apply(
 
 func handleTraceSummary(ctx *Context) error {
 	id := ctx.Config.AutomationID
+
+	// Resolve entity name to internal ID for the trace API
+	internalID := resolveAutomationInternalID(ctx.Client, id)
+
 	traces, err := client.SendMessageTyped[[]types.TraceInfo](ctx.Client, "trace/list", map[string]any{
 		"domain":  "automation",
-		"item_id": id,
+		"item_id": internalID,
 	})
 	if err != nil {
 		return err
@@ -438,9 +490,11 @@ func handleTraceDebug(ctx *Context) error {
 	runID := ctx.Config.Args[1]
 
 	// Use unified MessageRequest pattern for simplified request/response handling
+	// Resolve entity name to internal ID for the trace API
+	internalID := resolveAutomationInternalID(ctx.Client, strings.TrimPrefix(automationID, "automation."))
 	return NewRequest[types.TraceDetail]("trace/get", map[string]any{
 		"domain":  "automation",
-		"item_id": strings.TrimPrefix(automationID, "automation."),
+		"item_id": internalID,
 		"run_id":  runID,
 	}).ExecuteAndOutput(ctx, WithOutputCommand("trace-debug"))
 }
@@ -456,10 +510,13 @@ func handleAutomationConfig(ctx *Context) error {
 	entityID := EnsureAutomationPrefix(ctx.Config.Args[0])
 	automationID := strings.TrimPrefix(entityID, "automation.")
 
+	// Resolve entity name to internal ID for the trace API
+	internalID := resolveAutomationInternalID(ctx.Client, automationID)
+
 	// First try to get config from a trace (more complete for blueprint automations)
 	traces, err := client.SendMessageTyped[[]types.TraceInfo](ctx.Client, "trace/list", map[string]any{
 		"domain":  "automation",
-		"item_id": automationID,
+		"item_id": internalID,
 	})
 	if err == nil && len(traces) > 0 {
 		// Get the most recent trace which contains the resolved config
@@ -531,12 +588,13 @@ func handleBlueprintInputs(ctx *Context) error {
 
 // getTraceDetail retrieves trace detail for a run.
 func getTraceDetail(c *client.Client, automationID, runID string) (*types.TraceDetail, error) {
-	// Clean up automation ID
+	// Clean up automation ID and resolve to internal ID
 	id := strings.TrimPrefix(automationID, "automation.")
+	internalID := resolveAutomationInternalID(c, id)
 
 	trace, err := client.SendMessageTyped[types.TraceDetail](c, "trace/get", map[string]any{
 		"domain":  "automation",
-		"item_id": id,
+		"item_id": internalID,
 		"run_id":  runID,
 	})
 	if err != nil {

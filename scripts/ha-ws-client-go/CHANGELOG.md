@@ -5,6 +5,14 @@ All notable changes to ha-ws-client-go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2] - 2026-01-03
+
+### Fixed
+
+- Trace commands now accept entity_id format (e.g., `automation.guest_bedroom_adaptive_shade`) in addition to internal numeric IDs
+  - Added `resolveAutomationInternalID` helper to automatically look up the automation's internal ID from its state attributes
+  - Fixed `traces`, `trace`, `trace-latest`, `trace-summary`, `trace-debug`, `automation-config`, and `getTraceDetail` to resolve entity names
+
 ## [1.5.1] - 2026-01-03
 
 ### Added
