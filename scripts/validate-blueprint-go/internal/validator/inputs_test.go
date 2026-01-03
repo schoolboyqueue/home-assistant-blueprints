@@ -3,6 +3,7 @@ package validator
 import (
 	"testing"
 
+	"github.com/home-assistant-blueprints/validate-blueprint-go/internal/testfixtures"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,22 +19,20 @@ func TestValidateInputs(t *testing.T) {
 	}{
 		{
 			name:           "no blueprint section",
-			data:           map[string]interface{}{},
+			data:           testfixtures.Map{},
 			expectedErrors: 0,
 		},
 		{
 			name: "no input section",
-			data: map[string]interface{}{
-				"blueprint": map[string]interface{}{
-					"name": "Test",
-				},
+			data: testfixtures.Map{
+				"blueprint": testfixtures.BlueprintWithName("Test"),
 			},
 			expectedErrors: 0,
 		},
 		{
 			name: "input is not a map",
-			data: map[string]interface{}{
-				"blueprint": map[string]interface{}{
+			data: testfixtures.Map{
+				"blueprint": testfixtures.Map{
 					"name":  "Test",
 					"input": "not a map",
 				},
@@ -42,16 +41,11 @@ func TestValidateInputs(t *testing.T) {
 		},
 		{
 			name: "valid simple input",
-			data: map[string]interface{}{
-				"blueprint": map[string]interface{}{
+			data: testfixtures.Map{
+				"blueprint": testfixtures.Map{
 					"name": "Test",
-					"input": map[string]interface{}{
-						"my_input": map[string]interface{}{
-							"name": "My Input",
-							"selector": map[string]interface{}{
-								"entity": map[string]interface{}{},
-							},
-						},
+					"input": testfixtures.Map{
+						"my_input": testfixtures.EntityInput("My Input"),
 					},
 				},
 			},
@@ -60,13 +54,11 @@ func TestValidateInputs(t *testing.T) {
 		},
 		{
 			name: "input without selector (warning)",
-			data: map[string]interface{}{
-				"blueprint": map[string]interface{}{
+			data: testfixtures.Map{
+				"blueprint": testfixtures.Map{
 					"name": "Test",
-					"input": map[string]interface{}{
-						"my_input": map[string]interface{}{
-							"name": "My Input",
-						},
+					"input": testfixtures.Map{
+						"my_input": testfixtures.InputWithoutSelector("My Input"),
 					},
 				},
 			},
@@ -75,21 +67,13 @@ func TestValidateInputs(t *testing.T) {
 		},
 		{
 			name: "nested input group",
-			data: map[string]interface{}{
-				"blueprint": map[string]interface{}{
+			data: testfixtures.Map{
+				"blueprint": testfixtures.Map{
 					"name": "Test",
-					"input": map[string]interface{}{
-						"group": map[string]interface{}{
-							"name": "Group",
-							"input": map[string]interface{}{
-								"nested_input": map[string]interface{}{
-									"name": "Nested",
-									"selector": map[string]interface{}{
-										"text": map[string]interface{}{},
-									},
-								},
-							},
-						},
+					"input": testfixtures.Map{
+						"group": testfixtures.InputGroup("Group", testfixtures.Map{
+							"nested_input": testfixtures.TextInput("Nested"),
+						}),
 					},
 				},
 			},
@@ -98,10 +82,10 @@ func TestValidateInputs(t *testing.T) {
 		},
 		{
 			name: "input definition is not a map",
-			data: map[string]interface{}{
-				"blueprint": map[string]interface{}{
+			data: testfixtures.Map{
+				"blueprint": testfixtures.Map{
 					"name": "Test",
-					"input": map[string]interface{}{
+					"input": testfixtures.Map{
 						"my_input": "not a map",
 					},
 				},
@@ -140,13 +124,8 @@ func TestValidateSingleInput(t *testing.T) {
 		trackSelector    bool
 	}{
 		{
-			name: "valid entity selector",
-			inputDef: map[string]interface{}{
-				"name": "Entity",
-				"selector": map[string]interface{}{
-					"entity": map[string]interface{}{},
-				},
-			},
+			name:             "valid entity selector",
+			inputDef:         testfixtures.EntityInput("Entity"),
 			inputName:        "my_entity",
 			expectedErrors:   0,
 			expectedWarnings: 0,
@@ -154,15 +133,8 @@ func TestValidateSingleInput(t *testing.T) {
 			trackSelector:    true,
 		},
 		{
-			name: "input_datetime entity",
-			inputDef: map[string]interface{}{
-				"name": "Datetime Entity",
-				"selector": map[string]interface{}{
-					"entity": map[string]interface{}{
-						"domain": "input_datetime",
-					},
-				},
-			},
+			name:             "input_datetime entity",
+			inputDef:         testfixtures.EntityInputWithDomain("Datetime Entity", "input_datetime"),
 			inputName:        "datetime_entity",
 			expectedErrors:   0,
 			expectedWarnings: 0,
@@ -171,17 +143,15 @@ func TestValidateSingleInput(t *testing.T) {
 			trackSelector:    true,
 		},
 		{
-			name: "no selector (warning)",
-			inputDef: map[string]interface{}{
-				"name": "No Selector",
-			},
+			name:             "no selector (warning)",
+			inputDef:         testfixtures.InputWithoutSelector("No Selector"),
 			inputName:        "no_selector",
 			expectedErrors:   0,
 			expectedWarnings: 1,
 		},
 		{
 			name: "selector is not a map",
-			inputDef: map[string]interface{}{
+			inputDef: testfixtures.Map{
 				"name":     "Invalid Selector",
 				"selector": "not a map",
 			},
@@ -191,10 +161,10 @@ func TestValidateSingleInput(t *testing.T) {
 		},
 		{
 			name: "unknown selector type (warning)",
-			inputDef: map[string]interface{}{
+			inputDef: testfixtures.Map{
 				"name": "Unknown Selector",
-				"selector": map[string]interface{}{
-					"unknown_type": map[string]interface{}{},
+				"selector": testfixtures.Map{
+					"unknown_type": testfixtures.Map{},
 				},
 			},
 			inputName:        "unknown",
@@ -203,14 +173,8 @@ func TestValidateSingleInput(t *testing.T) {
 			trackSelector:    true,
 		},
 		{
-			name: "with default value",
-			inputDef: map[string]interface{}{
-				"name":    "With Default",
-				"default": "default_value",
-				"selector": map[string]interface{}{
-					"text": map[string]interface{}{},
-				},
-			},
+			name:           "with default value",
+			inputDef:       testfixtures.TextInputWithDefault("With Default", "default_value"),
 			inputName:      "with_default",
 			expectedErrors: 0,
 			trackDefault:   true,
@@ -218,20 +182,10 @@ func TestValidateSingleInput(t *testing.T) {
 		},
 		{
 			name: "valid select selector",
-			inputDef: map[string]interface{}{
-				"name": "Select Input",
-				"selector": map[string]interface{}{
-					"select": map[string]interface{}{
-						"options": []interface{}{
-							"option1",
-							map[string]interface{}{
-								"label": "Option 2",
-								"value": "option2",
-							},
-						},
-					},
-				},
-			},
+			inputDef: testfixtures.SelectInputWithLabelValue("Select Input", []testfixtures.Map{
+				testfixtures.SelectOption("Option 1", "option1"),
+				testfixtures.SelectOption("Option 2", "option2"),
+			}),
 			inputName:      "select_input",
 			expectedErrors: 0,
 			trackSelector:  true,
@@ -273,51 +227,45 @@ func TestValidateSelectOptions(t *testing.T) {
 	}{
 		{
 			name:           "no options",
-			selectConfig:   map[string]interface{}{},
+			selectConfig:   testfixtures.Map{},
 			expectedErrors: 0,
 		},
 		{
 			name: "options not a list",
-			selectConfig: map[string]interface{}{
+			selectConfig: testfixtures.Map{
 				"options": "not a list",
 			},
 			expectedErrors: 1,
 		},
 		{
 			name: "valid string options",
-			selectConfig: map[string]interface{}{
-				"options": []interface{}{"option1", "option2", "option3"},
+			selectConfig: testfixtures.Map{
+				"options": testfixtures.List{"option1", "option2", "option3"},
 			},
 			expectedErrors: 0,
 		},
 		{
 			name: "valid label/value options",
-			selectConfig: map[string]interface{}{
-				"options": []interface{}{
-					map[string]interface{}{
-						"label": "Label 1",
-						"value": "value1",
-					},
-					map[string]interface{}{
-						"label": "Label 2",
-						"value": "value2",
-					},
+			selectConfig: testfixtures.Map{
+				"options": testfixtures.List{
+					testfixtures.SelectOption("Label 1", "value1"),
+					testfixtures.SelectOption("Label 2", "value2"),
 				},
 			},
 			expectedErrors: 0,
 		},
 		{
 			name: "nil option (error)",
-			selectConfig: map[string]interface{}{
-				"options": []interface{}{nil},
+			selectConfig: testfixtures.Map{
+				"options": testfixtures.List{nil},
 			},
 			expectedErrors: 1,
 		},
 		{
 			name: "option value is nil",
-			selectConfig: map[string]interface{}{
-				"options": []interface{}{
-					map[string]interface{}{
+			selectConfig: testfixtures.Map{
+				"options": testfixtures.List{
+					testfixtures.Map{
 						"label": "Label",
 						"value": nil,
 					},
@@ -327,9 +275,9 @@ func TestValidateSelectOptions(t *testing.T) {
 		},
 		{
 			name: "option value is empty string",
-			selectConfig: map[string]interface{}{
-				"options": []interface{}{
-					map[string]interface{}{
+			selectConfig: testfixtures.Map{
+				"options": testfixtures.List{
+					testfixtures.Map{
 						"label": "Label",
 						"value": "",
 					},
@@ -339,9 +287,9 @@ func TestValidateSelectOptions(t *testing.T) {
 		},
 		{
 			name: "option value is not a string",
-			selectConfig: map[string]interface{}{
-				"options": []interface{}{
-					map[string]interface{}{
+			selectConfig: testfixtures.Map{
+				"options": testfixtures.List{
+					testfixtures.Map{
 						"label": "Label",
 						"value": 123,
 					},
@@ -351,8 +299,8 @@ func TestValidateSelectOptions(t *testing.T) {
 		},
 		{
 			name: "invalid option type",
-			selectConfig: map[string]interface{}{
-				"options": []interface{}{
+			selectConfig: testfixtures.Map{
+				"options": testfixtures.List{
 					123, // Not string or map
 				},
 			},
@@ -360,15 +308,12 @@ func TestValidateSelectOptions(t *testing.T) {
 		},
 		{
 			name: "mixed valid and invalid options",
-			selectConfig: map[string]interface{}{
-				"options": []interface{}{
+			selectConfig: testfixtures.Map{
+				"options": testfixtures.List{
 					"valid_option",
 					nil,
-					map[string]interface{}{
-						"label": "Valid",
-						"value": "valid",
-					},
-					map[string]interface{}{
+					testfixtures.SelectOption("Valid", "valid"),
+					testfixtures.Map{
 						"label": "Invalid",
 						"value": nil,
 					},
@@ -393,8 +338,8 @@ func TestValidateSelectOptionsWarnings(t *testing.T) {
 	t.Parallel()
 
 	v := New("test.yaml")
-	v.validateSelectOptions(map[string]interface{}{
-		"options": []interface{}{""},
+	v.validateSelectOptions(testfixtures.Map{
+		"options": testfixtures.List{""},
 	}, "test.path")
 
 	// Empty string option should produce a warning, not an error
@@ -473,24 +418,11 @@ func TestValidateInputDict(t *testing.T) {
 	t.Run("nested input groups", func(t *testing.T) {
 		t.Parallel()
 		v := New("test.yaml")
-		inputs := map[string]interface{}{
-			"group1": map[string]interface{}{
-				"name": "Group 1",
-				"input": map[string]interface{}{
-					"inner1": map[string]interface{}{
-						"name": "Inner 1",
-						"selector": map[string]interface{}{
-							"text": map[string]interface{}{},
-						},
-					},
-				},
-			},
-			"standalone": map[string]interface{}{
-				"name": "Standalone",
-				"selector": map[string]interface{}{
-					"number": map[string]interface{}{},
-				},
-			},
+		inputs := testfixtures.Map{
+			"group1": testfixtures.InputGroup("Group 1", testfixtures.Map{
+				"inner1": testfixtures.TextInput("Inner 1"),
+			}),
+			"standalone": testfixtures.NumberInput("Standalone", 0, 100),
 		}
 
 		v.validateInputDict(inputs, "blueprint.input")
@@ -502,8 +434,8 @@ func TestValidateInputDict(t *testing.T) {
 	t.Run("invalid nested input type", func(t *testing.T) {
 		t.Parallel()
 		v := New("test.yaml")
-		inputs := map[string]interface{}{
-			"group": map[string]interface{}{
+		inputs := testfixtures.Map{
+			"group": testfixtures.Map{
 				"name":  "Group",
 				"input": "not a map",
 			},
@@ -520,29 +452,12 @@ func TestInputTrackingDuringValidation(t *testing.T) {
 	t.Parallel()
 
 	v := New("test.yaml")
-	v.Data = map[string]interface{}{
-		"blueprint": map[string]interface{}{
+	v.Data = testfixtures.Map{
+		"blueprint": testfixtures.Map{
 			"name": "Test",
-			"input": map[string]interface{}{
-				"entity_input": map[string]interface{}{
-					"name":    "Entity",
-					"default": "light.default",
-					"selector": map[string]interface{}{
-						"entity": map[string]interface{}{
-							"domain": "light",
-						},
-					},
-				},
-				"number_input": map[string]interface{}{
-					"name":    "Number",
-					"default": 50,
-					"selector": map[string]interface{}{
-						"number": map[string]interface{}{
-							"min": 0,
-							"max": 100,
-						},
-					},
-				},
+			"input": testfixtures.Map{
+				"entity_input": testfixtures.EntityInputWithDefault("Entity", "light.default"),
+				"number_input": testfixtures.NumberInputWithDefault("Number", 0, 100, 50),
 			},
 		},
 	}
@@ -557,7 +472,7 @@ func TestInputTrackingDuringValidation(t *testing.T) {
 
 	// Check defaults are tracked
 	assert.Equal(t, "light.default", v.InputDefaults["entity_input"])
-	assert.Equal(t, 50, v.InputDefaults["number_input"])
+	assert.Equal(t, float64(50), v.InputDefaults["number_input"])
 
 	// Check selectors are tracked
 	assert.NotNil(t, v.InputSelectors["entity_input"])

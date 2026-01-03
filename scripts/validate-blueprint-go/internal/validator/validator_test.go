@@ -3,6 +3,7 @@ package validator
 import (
 	"testing"
 
+	"github.com/home-assistant-blueprints/validate-blueprint-go/internal/testfixtures"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -80,54 +81,54 @@ func TestValidateStructure(t *testing.T) {
 	}{
 		{
 			name: "valid structure",
-			data: map[string]interface{}{
-				"blueprint": map[string]interface{}{"name": "test"},
-				"trigger":   []interface{}{},
-				"action":    []interface{}{},
+			data: testfixtures.Map{
+				"blueprint": testfixtures.BlueprintWithName("test"),
+				"trigger":   testfixtures.List{},
+				"action":    testfixtures.List{},
 			},
 			expectedErrors: 0,
 		},
 		{
 			name:           "missing all required keys",
-			data:           map[string]interface{}{},
+			data:           testfixtures.Map{},
 			expectedErrors: 3, // blueprint, trigger, action
 		},
 		{
 			name: "missing trigger",
-			data: map[string]interface{}{
-				"blueprint": map[string]interface{}{"name": "test"},
-				"action":    []interface{}{},
+			data: testfixtures.Map{
+				"blueprint": testfixtures.BlueprintWithName("test"),
+				"action":    testfixtures.List{},
 			},
 			expectedErrors: 1,
 		},
 		{
 			name: "variables nested under blueprint (error)",
-			data: map[string]interface{}{
-				"blueprint": map[string]interface{}{
+			data: testfixtures.Map{
+				"blueprint": testfixtures.Map{
 					"name":      "test",
-					"variables": map[string]interface{}{},
+					"variables": testfixtures.Map{},
 				},
-				"trigger": []interface{}{},
-				"action":  []interface{}{},
+				"trigger": testfixtures.List{},
+				"action":  testfixtures.List{},
 			},
 			expectedErrors: 1,
 		},
 		{
 			name: "variables at root (valid)",
-			data: map[string]interface{}{
-				"blueprint": map[string]interface{}{"name": "test"},
-				"trigger":   []interface{}{},
-				"action":    []interface{}{},
-				"variables": map[string]interface{}{"test": "value"},
+			data: testfixtures.Map{
+				"blueprint": testfixtures.BlueprintWithName("test"),
+				"trigger":   testfixtures.List{},
+				"action":    testfixtures.List{},
+				"variables": testfixtures.Map{"test": "value"},
 			},
 			expectedErrors: 0,
 		},
 		{
 			name: "variables not a dictionary",
-			data: map[string]interface{}{
-				"blueprint": map[string]interface{}{"name": "test"},
-				"trigger":   []interface{}{},
-				"action":    []interface{}{},
+			data: testfixtures.Map{
+				"blueprint": testfixtures.BlueprintWithName("test"),
+				"trigger":   testfixtures.List{},
+				"action":    testfixtures.List{},
 				"variables": "not a map",
 			},
 			expectedErrors: 1,
@@ -156,32 +157,27 @@ func TestValidateBlueprintSection(t *testing.T) {
 	}{
 		{
 			name: "valid blueprint section",
-			data: map[string]interface{}{
-				"blueprint": map[string]interface{}{
-					"name":        "Test Blueprint",
-					"description": "A test blueprint",
-					"domain":      "automation",
-					"input":       map[string]interface{}{},
-				},
+			data: testfixtures.Map{
+				"blueprint": testfixtures.BlueprintSection("Test Blueprint", "A test blueprint", "automation"),
 			},
 			expectedErrors: 0,
 		},
 		{
 			name:           "no blueprint section",
-			data:           map[string]interface{}{},
+			data:           testfixtures.Map{},
 			expectedErrors: 0, // No errors, just returns
 		},
 		{
 			name: "blueprint is not a map",
-			data: map[string]interface{}{
+			data: testfixtures.Map{
 				"blueprint": "not a map",
 			},
 			expectedErrors: 1,
 		},
 		{
 			name: "missing required blueprint keys",
-			data: map[string]interface{}{
-				"blueprint": map[string]interface{}{
+			data: testfixtures.Map{
+				"blueprint": testfixtures.Map{
 					"name": "Only name",
 				},
 			},
@@ -189,25 +185,20 @@ func TestValidateBlueprintSection(t *testing.T) {
 		},
 		{
 			name: "invalid domain",
-			data: map[string]interface{}{
-				"blueprint": map[string]interface{}{
+			data: testfixtures.Map{
+				"blueprint": testfixtures.Map{
 					"name":        "Test",
 					"description": "Test",
 					"domain":      "invalid_domain",
-					"input":       map[string]interface{}{},
+					"input":       testfixtures.Map{},
 				},
 			},
 			expectedErrors: 1,
 		},
 		{
 			name: "valid script domain",
-			data: map[string]interface{}{
-				"blueprint": map[string]interface{}{
-					"name":        "Test",
-					"description": "Test",
-					"domain":      "script",
-					"input":       map[string]interface{}{},
-				},
+			data: testfixtures.Map{
+				"blueprint": testfixtures.BlueprintSection("Test", "Test", "script"),
 			},
 			expectedErrors: 0,
 		},
@@ -235,64 +226,52 @@ func TestValidateMode(t *testing.T) {
 	}{
 		{
 			name:           "no mode (default single)",
-			data:           map[string]interface{}{},
+			data:           testfixtures.Map{},
 			expectedErrors: 0,
 		},
 		{
 			name:           "valid single mode",
-			data:           map[string]interface{}{"mode": "single"},
+			data:           testfixtures.ModeSection("single"),
 			expectedErrors: 0,
 		},
 		{
 			name:           "valid restart mode",
-			data:           map[string]interface{}{"mode": "restart"},
+			data:           testfixtures.ModeSection("restart"),
 			expectedErrors: 0,
 		},
 		{
-			name: "valid queued mode with max",
-			data: map[string]interface{}{
-				"mode": "queued",
-				"max":  10,
-			},
+			name:           "valid queued mode with max",
+			data:           testfixtures.ModeSectionWithMax("queued", 10),
 			expectedErrors: 0,
 		},
 		{
-			name: "valid parallel mode with max",
-			data: map[string]interface{}{
-				"mode": "parallel",
-				"max":  5,
-			},
+			name:           "valid parallel mode with max",
+			data:           testfixtures.ModeSectionWithMax("parallel", 5),
 			expectedErrors: 0,
 		},
 		{
 			name:           "invalid mode",
-			data:           map[string]interface{}{"mode": "invalid"},
+			data:           testfixtures.ModeSection("invalid"),
 			expectedErrors: 1,
 		},
 		{
 			name:           "mode not a string",
-			data:           map[string]interface{}{"mode": 123},
+			data:           testfixtures.Map{"mode": 123},
 			expectedErrors: 1,
 		},
 		{
-			name: "queued mode with invalid max",
-			data: map[string]interface{}{
-				"mode": "queued",
-				"max":  0,
-			},
+			name:           "queued mode with invalid max",
+			data:           testfixtures.ModeSectionWithMax("queued", 0),
 			expectedErrors: 1,
 		},
 		{
-			name: "parallel mode with negative max",
-			data: map[string]interface{}{
-				"mode": "parallel",
-				"max":  -1,
-			},
+			name:           "parallel mode with negative max",
+			data:           testfixtures.ModeSectionWithMax("parallel", -1),
 			expectedErrors: 1,
 		},
 		{
 			name: "queued mode with non-integer max",
-			data: map[string]interface{}{
+			data: testfixtures.Map{
 				"mode": "queued",
 				"max":  "ten",
 			},
@@ -322,45 +301,45 @@ func TestValidateVersionSync(t *testing.T) {
 	}{
 		{
 			name:             "no blueprint section",
-			data:             map[string]interface{}{},
+			data:             testfixtures.Map{},
 			expectedWarnings: 0,
 		},
 		{
 			name: "no variables section",
-			data: map[string]interface{}{
-				"blueprint": map[string]interface{}{"name": "Test v1.0"},
+			data: testfixtures.Map{
+				"blueprint": testfixtures.BlueprintWithName("Test v1.0"),
 			},
 			expectedWarnings: 0,
 		},
 		{
 			name: "no blueprint_version variable",
-			data: map[string]interface{}{
-				"blueprint": map[string]interface{}{"name": "Test v1.0"},
-				"variables": map[string]interface{}{"other": "value"},
+			data: testfixtures.Map{
+				"blueprint": testfixtures.BlueprintWithName("Test v1.0"),
+				"variables": testfixtures.Map{"other": "value"},
 			},
 			expectedWarnings: 0,
 		},
 		{
 			name: "versions match",
-			data: map[string]interface{}{
-				"blueprint": map[string]interface{}{"name": "Test v1.0"},
-				"variables": map[string]interface{}{"blueprint_version": "1.0"},
+			data: testfixtures.Map{
+				"blueprint": testfixtures.BlueprintWithName("Test v1.0"),
+				"variables": testfixtures.VariablesWithVersion("1.0", testfixtures.Map{}),
 			},
 			expectedWarnings: 0,
 		},
 		{
 			name: "versions mismatch",
-			data: map[string]interface{}{
-				"blueprint": map[string]interface{}{"name": "Test v1.0"},
-				"variables": map[string]interface{}{"blueprint_version": "2.0"},
+			data: testfixtures.Map{
+				"blueprint": testfixtures.BlueprintWithName("Test v1.0"),
+				"variables": testfixtures.VariablesWithVersion("2.0", testfixtures.Map{}),
 			},
 			expectedWarnings: 1,
 		},
 		{
 			name: "no version in name",
-			data: map[string]interface{}{
-				"blueprint": map[string]interface{}{"name": "Test Blueprint"},
-				"variables": map[string]interface{}{"blueprint_version": "1.0"},
+			data: testfixtures.Map{
+				"blueprint": testfixtures.BlueprintWithName("Test Blueprint"),
+				"variables": testfixtures.VariablesWithVersion("1.0", testfixtures.Map{}),
 			},
 			expectedWarnings: 0,
 		},

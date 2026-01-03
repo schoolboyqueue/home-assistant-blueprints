@@ -18,7 +18,7 @@ func (v *BlueprintValidator) ValidateInputs() {
 
 	inputsMap, ok, errMsg := common.GetMap(inputs, "blueprint.input")
 	if !ok {
-		v.AddError(errMsg)
+		v.AddCategorizedError(CategoryInputs, "blueprint.input", errMsg)
 		return
 	}
 
@@ -33,7 +33,7 @@ func (v *BlueprintValidator) validateInputDict(inputs map[string]interface{}, pa
 
 		valueMap, ok, errMsg := common.GetMap(value, currentPath)
 		if !ok {
-			v.AddError(errMsg)
+			v.AddCategorizedError(CategoryInputs, currentPath, errMsg)
 			continue
 		}
 
@@ -42,7 +42,7 @@ func (v *BlueprintValidator) validateInputDict(inputs map[string]interface{}, pa
 			// This is a group
 			nestedMap, ok, errMsg := common.GetMap(nestedInput, common.JoinPath(currentPath, "input"))
 			if !ok {
-				v.AddError(errMsg)
+				v.AddCategorizedError(CategoryInputs, common.JoinPath(currentPath, "input"), errMsg)
 			} else {
 				v.validateInputDict(nestedMap, currentPath)
 			}
@@ -65,14 +65,14 @@ func (v *BlueprintValidator) validateSingleInput(inputDef map[string]interface{}
 	// Check for selector
 	selector, ok := inputDef["selector"]
 	if !ok {
-		v.AddWarningf("%s: No selector defined (inputs should have selectors)", path)
+		v.AddCategorizedWarningf(CategoryInputs, path, "No selector defined (inputs should have selectors)")
 		return
 	}
 
 	selectorPath := common.JoinPath(path, "selector")
 	selectorMap, ok, errMsg := common.GetMap(selector, selectorPath)
 	if !ok {
-		v.AddError(errMsg)
+		v.AddCategorizedError(CategoryInputs, selectorPath, errMsg)
 		return
 	}
 
@@ -83,7 +83,7 @@ func (v *BlueprintValidator) validateSingleInput(inputDef map[string]interface{}
 	for selectorType := range selectorMap {
 		// Use common selector validation
 		if warnMsg := common.ValidateSelector(selectorType, ValidSelectorTypes, selectorPath); warnMsg != "" {
-			v.AddWarning(warnMsg)
+			v.AddCategorizedWarning(CategoryInputs, selectorPath, warnMsg)
 		}
 
 		// Track entity selector inputs
@@ -116,7 +116,7 @@ func (v *BlueprintValidator) validateSelectOptions(selectConfig map[string]inter
 	optionsPath := common.JoinPath(path, "selector.select.options")
 	optionsList, ok, errMsg := common.GetList(options, optionsPath)
 	if !ok {
-		v.AddError(errMsg)
+		v.AddCategorizedError(CategoryInputs, optionsPath, errMsg)
 		return
 	}
 
@@ -125,24 +125,24 @@ func (v *BlueprintValidator) validateSelectOptions(selectConfig map[string]inter
 
 		switch opt := option.(type) {
 		case nil:
-			v.AddErrorf("%s: Option cannot be None. Select options must be strings or label/value dicts with non-empty values.", optionPath)
+			v.AddCategorizedError(CategoryInputs, optionPath, "Option cannot be None. Select options must be strings or label/value dicts with non-empty values.")
 		case map[string]interface{}:
 			value := opt["value"]
 			label := opt["label"]
 
 			if value == nil {
-				v.AddErrorf("%s: Option value is None. Label/value options must have a non-empty 'value' field. Label: '%v'", optionPath, label)
+				v.AddCategorizedErrorf(CategoryInputs, optionPath, "Option value is None. Label/value options must have a non-empty 'value' field. Label: '%v'", label)
 			} else if valueStr, ok := value.(string); !ok {
-				v.AddErrorf("%s: Option value must be a string. Label: '%v'", optionPath, label)
+				v.AddCategorizedErrorf(CategoryInputs, optionPath, "Option value must be a string. Label: '%v'", label)
 			} else if valueStr == "" {
-				v.AddErrorf("%s: Option value cannot be empty string. Home Assistant treats empty values as None during import. Label: '%v'", optionPath, label)
+				v.AddCategorizedErrorf(CategoryInputs, optionPath, "Option value cannot be empty string. Home Assistant treats empty values as None during import. Label: '%v'", label)
 			}
 		case string:
 			if opt == "" {
-				v.AddWarningf("%s: Empty string option. Consider using a meaningful value.", optionPath)
+				v.AddCategorizedWarning(CategoryInputs, optionPath, "Empty string option. Consider using a meaningful value.")
 			}
 		default:
-			v.AddErrorf("%s: Option must be a string or label/value dict", optionPath)
+			v.AddCategorizedError(CategoryInputs, optionPath, "Option must be a string or label/value dict")
 		}
 	}
 }
@@ -152,7 +152,7 @@ func (v *BlueprintValidator) ValidateInputReferences() {
 	// Find undefined inputs
 	for inputName := range v.UsedInputs {
 		if !v.DefinedInputs[inputName] {
-			v.AddErrorf(
+			v.AddCategorizedErrorf(CategoryReferences, "",
 				"Undefined input reference: '!input %s' - no matching input defined in blueprint.input",
 				inputName)
 		}

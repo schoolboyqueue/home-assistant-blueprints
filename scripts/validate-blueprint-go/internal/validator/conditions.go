@@ -39,14 +39,14 @@ func (v *BlueprintValidator) validateSingleCondition(condition map[string]interf
 		if _, hasEntityID := condition["entity_id"]; hasEntityID {
 			return // Valid shorthand
 		}
-		v.AddWarningf("%s: Missing 'condition' key", path)
+		v.AddCategorizedWarning(CategoryConditions, path, "Missing 'condition' key")
 		return
 	}
 
 	// Validate condition type using common enum validation pattern
 	isValid := slices.Contains(ValidConditionTypes, condType)
 	if !isValid {
-		v.AddWarningf("%s: Unknown condition type '%s'", path, condType)
+		v.AddCategorizedWarningf(CategoryConditions, path, "Unknown condition type '%s'", condType)
 	}
 
 	// Validate nested conditions for and/or/not

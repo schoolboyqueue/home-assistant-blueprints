@@ -3,6 +3,7 @@ package validator
 import (
 	"testing"
 
+	"github.com/home-assistant-blueprints/validate-blueprint-go/internal/testfixtures"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,31 +17,25 @@ func TestValidateActions(t *testing.T) {
 	}{
 		{
 			name:           "no actions",
-			data:           map[string]interface{}{},
+			data:           testfixtures.Map{},
 			expectedErrors: 0,
 		},
 		{
 			name: "single action as map",
-			data: map[string]interface{}{
-				"action": map[string]interface{}{
-					"service": "light.turn_on",
-					"target": map[string]interface{}{
-						"entity_id": "light.test",
-					},
-				},
+			data: testfixtures.Map{
+				"action": testfixtures.ServiceCallWithTarget(
+					testfixtures.CommonServices.LightTurnOn,
+					"light.test",
+				),
 			},
 			expectedErrors: 0,
 		},
 		{
 			name: "action list",
-			data: map[string]interface{}{
-				"action": []interface{}{
-					map[string]interface{}{
-						"service": "light.turn_on",
-					},
-					map[string]interface{}{
-						"service": "light.turn_off",
-					},
+			data: testfixtures.Map{
+				"action": testfixtures.List{
+					testfixtures.ServiceCall(testfixtures.CommonServices.LightTurnOn),
+					testfixtures.ServiceCall(testfixtures.CommonServices.LightTurnOff),
 				},
 			},
 			expectedErrors: 0,
@@ -70,30 +65,26 @@ func TestValidateSingleAction(t *testing.T) {
 	}{
 		{
 			name: "valid service call",
-			action: map[string]interface{}{
-				"service": "light.turn_on",
-				"target": map[string]interface{}{
-					"entity_id": "light.test",
-				},
-			},
+			action: testfixtures.ServiceCallWithTarget(
+				testfixtures.CommonServices.LightTurnOn,
+				"light.test",
+			),
 			expectedErrors:   0,
 			expectedWarnings: 0,
 		},
 		{
 			name: "service with data",
-			action: map[string]interface{}{
-				"service": "light.turn_on",
-				"data": map[string]interface{}{
-					"brightness": 255,
-				},
-			},
+			action: testfixtures.ServiceCallWithData(
+				testfixtures.CommonServices.LightTurnOn,
+				testfixtures.Map{"brightness": 255},
+			),
 			expectedErrors:   0,
 			expectedWarnings: 0,
 		},
 		{
 			name: "service with nil data (error)",
-			action: map[string]interface{}{
-				"service": "light.turn_on",
+			action: testfixtures.Map{
+				"service": testfixtures.CommonServices.LightTurnOn,
 				"data":    nil,
 			},
 			expectedErrors:   1,
@@ -101,7 +92,7 @@ func TestValidateSingleAction(t *testing.T) {
 		},
 		{
 			name: "invalid service format (warning)",
-			action: map[string]interface{}{
+			action: testfixtures.Map{
 				"service": "turn_on", // Missing domain
 			},
 			expectedErrors:   0,
@@ -109,33 +100,29 @@ func TestValidateSingleAction(t *testing.T) {
 		},
 		{
 			name: "service with input reference (valid)",
-			action: map[string]interface{}{
-				"service": "!input my_service",
+			action: testfixtures.Map{
+				"service": testfixtures.InputRef("my_service"),
 			},
 			expectedErrors:   0,
 			expectedWarnings: 0,
 		},
 		{
 			name: "service with template (valid)",
-			action: map[string]interface{}{
+			action: testfixtures.Map{
 				"service": "{{ my_service }}",
 			},
 			expectedErrors:   0,
 			expectedWarnings: 0,
 		},
 		{
-			name: "delay action",
-			action: map[string]interface{}{
-				"delay": "00:00:05",
-			},
+			name:             "delay action",
+			action:           testfixtures.DelayAction("00:00:05"),
 			expectedErrors:   0,
 			expectedWarnings: 0,
 		},
 		{
-			name: "wait_template action",
-			action: map[string]interface{}{
-				"wait_template": "{{ is_state('light.test', 'on') }}",
-			},
+			name:             "wait_template action",
+			action:           testfixtures.WaitTemplateAction(testfixtures.ValidTemplates.IsState),
 			expectedErrors:   0,
 			expectedWarnings: 0,
 		},
@@ -163,67 +150,39 @@ func TestValidateChooseAction(t *testing.T) {
 	}{
 		{
 			name: "valid choose block",
-			action: map[string]interface{}{
-				"choose": []interface{}{
-					map[string]interface{}{
-						"conditions": []interface{}{
-							map[string]interface{}{
-								"condition": "state",
-								"entity_id": "light.test",
-								"state":     "on",
-							},
-						},
-						"sequence": []interface{}{
-							map[string]interface{}{
-								"service": "light.turn_off",
-							},
-						},
-					},
-				},
-			},
+			action: testfixtures.ChooseAction(
+				testfixtures.ChooseOption(
+					[]testfixtures.Map{testfixtures.StateCondition("light.test", "on")},
+					[]testfixtures.Map{testfixtures.ServiceCall(testfixtures.CommonServices.LightTurnOff)},
+				),
+			),
 			expectedErrors: 0,
 		},
 		{
 			name: "choose with multiple options",
-			action: map[string]interface{}{
-				"choose": []interface{}{
-					map[string]interface{}{
-						"conditions": []interface{}{
-							map[string]interface{}{"condition": "state", "entity_id": "a", "state": "on"},
-						},
-						"sequence": []interface{}{
-							map[string]interface{}{"service": "light.turn_on"},
-						},
-					},
-					map[string]interface{}{
-						"conditions": []interface{}{
-							map[string]interface{}{"condition": "state", "entity_id": "b", "state": "off"},
-						},
-						"sequence": []interface{}{
-							map[string]interface{}{"service": "light.turn_off"},
-						},
-					},
-				},
-			},
+			action: testfixtures.ChooseAction(
+				testfixtures.ChooseOption(
+					[]testfixtures.Map{testfixtures.StateCondition("a", "on")},
+					[]testfixtures.Map{testfixtures.ServiceCall(testfixtures.CommonServices.LightTurnOn)},
+				),
+				testfixtures.ChooseOption(
+					[]testfixtures.Map{testfixtures.StateCondition("b", "off")},
+					[]testfixtures.Map{testfixtures.ServiceCall(testfixtures.CommonServices.LightTurnOff)},
+				),
+			),
 			expectedErrors: 0,
 		},
 		{
 			name: "choose with default",
-			action: map[string]interface{}{
-				"choose": []interface{}{
-					map[string]interface{}{
-						"conditions": []interface{}{
-							map[string]interface{}{"condition": "state", "entity_id": "a", "state": "on"},
-						},
-						"sequence": []interface{}{
-							map[string]interface{}{"service": "light.turn_on"},
-						},
-					},
+			action: testfixtures.ChooseActionWithDefault(
+				[]testfixtures.Map{
+					testfixtures.ChooseOption(
+						[]testfixtures.Map{testfixtures.StateCondition("a", "on")},
+						[]testfixtures.Map{testfixtures.ServiceCall(testfixtures.CommonServices.LightTurnOn)},
+					),
 				},
-				"default": []interface{}{
-					map[string]interface{}{"service": "light.turn_off"},
-				},
-			},
+				[]testfixtures.Map{testfixtures.ServiceCall(testfixtures.CommonServices.LightTurnOff)},
+			),
 			expectedErrors: 0,
 		},
 	}
@@ -249,54 +208,26 @@ func TestValidateIfThenElseAction(t *testing.T) {
 	}{
 		{
 			name: "valid if/then",
-			action: map[string]interface{}{
-				"if": []interface{}{
-					map[string]interface{}{
-						"condition": "state",
-						"entity_id": "light.test",
-						"state":     "on",
-					},
-				},
-				"then": []interface{}{
-					map[string]interface{}{
-						"service": "light.turn_off",
-					},
-				},
-			},
+			action: testfixtures.IfThenAction(
+				[]testfixtures.Map{testfixtures.StateCondition("light.test", "on")},
+				[]testfixtures.Map{testfixtures.ServiceCall(testfixtures.CommonServices.LightTurnOff)},
+			),
 			expectedErrors: 0,
 		},
 		{
 			name: "valid if/then/else",
-			action: map[string]interface{}{
-				"if": []interface{}{
-					map[string]interface{}{
-						"condition": "state",
-						"entity_id": "light.test",
-						"state":     "on",
-					},
-				},
-				"then": []interface{}{
-					map[string]interface{}{
-						"service": "light.turn_off",
-					},
-				},
-				"else": []interface{}{
-					map[string]interface{}{
-						"service": "light.turn_on",
-					},
-				},
-			},
+			action: testfixtures.IfThenElseAction(
+				[]testfixtures.Map{testfixtures.StateCondition("light.test", "on")},
+				[]testfixtures.Map{testfixtures.ServiceCall(testfixtures.CommonServices.LightTurnOff)},
+				[]testfixtures.Map{testfixtures.ServiceCall(testfixtures.CommonServices.LightTurnOn)},
+			),
 			expectedErrors: 0,
 		},
 		{
 			name: "if without then (error)",
-			action: map[string]interface{}{
-				"if": []interface{}{
-					map[string]interface{}{
-						"condition": "state",
-						"entity_id": "light.test",
-						"state":     "on",
-					},
+			action: testfixtures.Map{
+				"if": testfixtures.List{
+					testfixtures.StateCondition("light.test", "on"),
 				},
 			},
 			expectedErrors: 1,
@@ -324,62 +255,32 @@ func TestValidateRepeatAction(t *testing.T) {
 	}{
 		{
 			name: "valid repeat with sequence",
-			action: map[string]interface{}{
-				"repeat": map[string]interface{}{
-					"count": 5,
-					"sequence": []interface{}{
-						map[string]interface{}{
-							"service": "light.toggle",
-						},
-					},
-				},
-			},
+			action: testfixtures.RepeatCountAction(
+				5,
+				[]testfixtures.Map{testfixtures.ServiceCall(testfixtures.CommonServices.LightToggle)},
+			),
 			expectedErrors: 0,
 		},
 		{
 			name: "valid repeat while",
-			action: map[string]interface{}{
-				"repeat": map[string]interface{}{
-					"while": []interface{}{
-						map[string]interface{}{
-							"condition": "state",
-							"entity_id": "light.test",
-							"state":     "on",
-						},
-					},
-					"sequence": []interface{}{
-						map[string]interface{}{
-							"delay": "00:00:01",
-						},
-					},
-				},
-			},
+			action: testfixtures.RepeatWhileAction(
+				[]testfixtures.Map{testfixtures.StateCondition("light.test", "on")},
+				[]testfixtures.Map{testfixtures.DelayAction("00:00:01")},
+			),
 			expectedErrors: 0,
 		},
 		{
 			name: "valid repeat until",
-			action: map[string]interface{}{
-				"repeat": map[string]interface{}{
-					"until": []interface{}{
-						map[string]interface{}{
-							"condition": "state",
-							"entity_id": "light.test",
-							"state":     "off",
-						},
-					},
-					"sequence": []interface{}{
-						map[string]interface{}{
-							"service": "light.turn_off",
-						},
-					},
-				},
-			},
+			action: testfixtures.RepeatUntilAction(
+				[]testfixtures.Map{testfixtures.StateCondition("light.test", "off")},
+				[]testfixtures.Map{testfixtures.ServiceCall(testfixtures.CommonServices.LightTurnOff)},
+			),
 			expectedErrors: 0,
 		},
 		{
 			name: "repeat without sequence (error)",
-			action: map[string]interface{}{
-				"repeat": map[string]interface{}{
+			action: testfixtures.Map{
+				"repeat": testfixtures.Map{
 					"count": 5,
 				},
 			},
@@ -402,13 +303,13 @@ func TestActionInputRefCollection(t *testing.T) {
 	t.Parallel()
 
 	v := New("test.yaml")
-	action := map[string]interface{}{
-		"service": "!input my_service",
-		"target": map[string]interface{}{
-			"entity_id": "!input target_entity",
+	action := testfixtures.Map{
+		"service": testfixtures.InputRef("my_service"),
+		"target": testfixtures.Map{
+			"entity_id": testfixtures.InputRef("target_entity"),
 		},
-		"data": map[string]interface{}{
-			"brightness": "!input brightness_value",
+		"data": testfixtures.Map{
+			"brightness": testfixtures.InputRef("brightness_value"),
 		},
 	}
 
@@ -424,48 +325,25 @@ func TestNestedActionValidation(t *testing.T) {
 	t.Parallel()
 
 	v := New("test.yaml")
-	v.Data = map[string]interface{}{
-		"action": []interface{}{
-			map[string]interface{}{
-				"choose": []interface{}{
-					map[string]interface{}{
-						"conditions": []interface{}{
-							map[string]interface{}{
-								"condition": "state",
-								"entity_id": "light.test",
-								"state":     "on",
+	v.Data = testfixtures.Map{
+		"action": testfixtures.List{
+			testfixtures.ChooseAction(
+				testfixtures.ChooseOption(
+					[]testfixtures.Map{testfixtures.StateCondition("light.test", "on")},
+					[]testfixtures.Map{
+						testfixtures.IfThenElseAction(
+							[]testfixtures.Map{testfixtures.TimeCondition("22:00:00", "")},
+							[]testfixtures.Map{testfixtures.ServiceCall(testfixtures.CommonServices.LightTurnOff)},
+							[]testfixtures.Map{
+								testfixtures.RepeatCountAction(
+									3,
+									[]testfixtures.Map{testfixtures.ServiceCall(testfixtures.CommonServices.LightToggle)},
+								),
 							},
-						},
-						"sequence": []interface{}{
-							map[string]interface{}{
-								"if": []interface{}{
-									map[string]interface{}{
-										"condition": "time",
-										"after":     "22:00:00",
-									},
-								},
-								"then": []interface{}{
-									map[string]interface{}{
-										"service": "light.turn_off",
-									},
-								},
-								"else": []interface{}{
-									map[string]interface{}{
-										"repeat": map[string]interface{}{
-											"count": 3,
-											"sequence": []interface{}{
-												map[string]interface{}{
-													"service": "light.toggle",
-												},
-											},
-										},
-									},
-								},
-							},
-						},
+						),
 					},
-				},
-			},
+				),
+			),
 		},
 	}
 

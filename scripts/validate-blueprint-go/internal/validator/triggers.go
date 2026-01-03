@@ -35,7 +35,7 @@ func (v *BlueprintValidator) validateSingleTrigger(trigger map[string]interface{
 	triggerType, hasTrigger := trigger["trigger"]
 
 	if !hasPlatform && !hasTrigger {
-		v.AddErrorf("%s: Missing 'platform' or 'trigger' key", path)
+		v.AddCategorizedError(CategoryTriggers, path, "Missing 'platform' or 'trigger' key")
 		return
 	}
 
@@ -55,9 +55,8 @@ func (v *BlueprintValidator) validateSingleTrigger(trigger map[string]interface{
 		if valueTemplate, ok := common.TryGetString(trigger, "value_template"); ok {
 			// Template triggers cannot reference automation variables directly
 			if common.ContainsVariableRef(valueTemplate) && !common.ContainsInputRef(valueTemplate) {
-				v.AddWarningf(
-					"%s: Template trigger references variables. Trigger templates are evaluated separately and may not have access to blueprint variables.",
-					path)
+				v.AddCategorizedWarning(CategoryTriggers, path,
+					"Template trigger references variables. Trigger templates are evaluated separately and may not have access to blueprint variables.")
 			}
 		}
 	}
@@ -65,7 +64,7 @@ func (v *BlueprintValidator) validateSingleTrigger(trigger map[string]interface{
 	// Check entity_id is static (no templates in trigger entity_id)
 	if entityID, ok := common.TryGetString(trigger, "entity_id"); ok {
 		if err := common.ValidateNoTemplateInField(entityID, path, "entity_id"); err != "" {
-			v.AddError(err)
+			v.AddCategorizedError(CategoryTriggers, path, err)
 		}
 	}
 
@@ -75,9 +74,8 @@ func (v *BlueprintValidator) validateSingleTrigger(trigger map[string]interface{
 			if common.ContainsTemplate(forStr) {
 				// Template in 'for' is valid but may reference unavailable variables
 				if common.ContainsVariableRef(forStr) && !common.ContainsInputRef(forStr) {
-					v.AddWarningf(
-						"%s: 'for' template references variables. Variables may not be available in trigger context.",
-						path)
+					v.AddCategorizedWarning(CategoryTriggers, path,
+						"'for' template references variables. Variables may not be available in trigger context.")
 				}
 			}
 		}

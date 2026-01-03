@@ -3,6 +3,7 @@ package validator
 import (
 	"testing"
 
+	"github.com/home-assistant-blueprints/validate-blueprint-go/internal/testfixtures"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,33 +18,31 @@ func TestValidateTriggers(t *testing.T) {
 	}{
 		{
 			name:           "no triggers",
-			data:           map[string]interface{}{},
+			data:           testfixtures.Map{},
 			expectedErrors: 0,
 		},
 		{
 			name: "single trigger as map",
-			data: map[string]interface{}{
-				"trigger": map[string]interface{}{
-					"platform": "state",
-				},
+			data: testfixtures.Map{
+				"trigger": testfixtures.TriggerWithPlatform("state"),
 			},
 			expectedErrors: 0,
 		},
 		{
 			name: "trigger list with valid triggers",
-			data: map[string]interface{}{
-				"trigger": []interface{}{
-					map[string]interface{}{"platform": "state"},
-					map[string]interface{}{"trigger": "time"},
+			data: testfixtures.Map{
+				"trigger": testfixtures.List{
+					testfixtures.TriggerWithPlatform("state"),
+					testfixtures.TimeTrigger("07:00:00"),
 				},
 			},
 			expectedErrors: 0,
 		},
 		{
 			name: "trigger missing platform or trigger key",
-			data: map[string]interface{}{
-				"trigger": []interface{}{
-					map[string]interface{}{"entity_id": "light.test"},
+			data: testfixtures.Map{
+				"trigger": testfixtures.List{
+					testfixtures.InvalidTrigger(),
 				},
 			},
 			expectedErrors: 1,
@@ -73,50 +72,38 @@ func TestValidateSingleTrigger(t *testing.T) {
 		expectedWarnings int
 	}{
 		{
-			name: "valid state trigger",
-			trigger: map[string]interface{}{
-				"platform":  "state",
-				"entity_id": "light.living_room",
-			},
+			name:             "valid state trigger",
+			trigger:          testfixtures.StateTrigger(testfixtures.CommonEntityIDs.Light),
 			expectedErrors:   0,
 			expectedWarnings: 0,
 		},
 		{
-			name: "valid trigger using 'trigger' key",
-			trigger: map[string]interface{}{
-				"trigger": "time",
-				"at":      "07:00:00",
-			},
+			name:             "valid trigger using 'trigger' key",
+			trigger:          testfixtures.TimeTrigger("07:00:00"),
 			expectedErrors:   0,
 			expectedWarnings: 0,
 		},
 		{
 			name:             "missing platform and trigger key",
-			trigger:          map[string]interface{}{"entity_id": "light.test"},
+			trigger:          testfixtures.InvalidTrigger(),
 			expectedErrors:   1,
 			expectedWarnings: 0,
 		},
 		{
-			name: "template trigger with variable reference (warning)",
-			trigger: map[string]interface{}{
-				"platform":       "template",
-				"value_template": "{{ my_variable > 10 }}",
-			},
+			name:             "template trigger with variable reference (warning)",
+			trigger:          testfixtures.TemplateTrigger("{{ my_variable > 10 }}"),
 			expectedErrors:   0,
 			expectedWarnings: 1,
 		},
 		{
-			name: "template trigger with input reference (no warning)",
-			trigger: map[string]interface{}{
-				"platform":       "template",
-				"value_template": "{{ states(!input my_entity) }}",
-			},
+			name:             "template trigger with input reference (no warning)",
+			trigger:          testfixtures.TemplateTrigger("{{ states(!input my_entity) }}"),
 			expectedErrors:   0,
 			expectedWarnings: 0,
 		},
 		{
 			name: "entity_id with template (error)",
-			trigger: map[string]interface{}{
+			trigger: testfixtures.Map{
 				"platform":  "state",
 				"entity_id": "{{ entity }}",
 			},
@@ -125,52 +112,36 @@ func TestValidateSingleTrigger(t *testing.T) {
 		},
 		{
 			name: "entity_id with input reference (valid)",
-			trigger: map[string]interface{}{
+			trigger: testfixtures.Map{
 				"platform":  "state",
-				"entity_id": "!input target_entity",
+				"entity_id": testfixtures.InputRef("target_entity"),
 			},
 			expectedErrors:   0,
 			expectedWarnings: 0,
 		},
 		{
-			name: "for with template containing variable (warning)",
-			trigger: map[string]interface{}{
-				"platform":  "state",
-				"entity_id": "light.test",
-				"for":       "{{ my_duration }}",
-			},
+			name:             "for with template containing variable (warning)",
+			trigger:          testfixtures.StateTriggerWithFor("light.test", "{{ my_duration }}"),
 			expectedErrors:   0,
 			expectedWarnings: 1,
 		},
 		{
-			name: "for with input reference (no warning)",
-			trigger: map[string]interface{}{
-				"platform":  "state",
-				"entity_id": "light.test",
-				"for":       "!input duration",
-			},
+			name:             "for with input reference (no warning)",
+			trigger:          testfixtures.StateTriggerWithFor("light.test", testfixtures.InputRef("duration")),
 			expectedErrors:   0,
 			expectedWarnings: 0,
 		},
 		{
 			name: "for with dict value (no warning)",
-			trigger: map[string]interface{}{
-				"platform":  "state",
-				"entity_id": "light.test",
-				"for": map[string]interface{}{
-					"minutes": 5,
-				},
-			},
+			trigger: testfixtures.StateTriggerWithFor("light.test", testfixtures.Map{
+				"minutes": 5,
+			}),
 			expectedErrors:   0,
 			expectedWarnings: 0,
 		},
 		{
-			name: "for with static string",
-			trigger: map[string]interface{}{
-				"platform":  "state",
-				"entity_id": "light.test",
-				"for":       "00:05:00",
-			},
+			name:             "for with static string",
+			trigger:          testfixtures.StateTriggerWithFor("light.test", "00:05:00"),
 			expectedErrors:   0,
 			expectedWarnings: 0,
 		},
@@ -194,10 +165,7 @@ func TestTriggerVariableWarnings(t *testing.T) {
 	t.Run("template trigger references variable but not input", func(t *testing.T) {
 		t.Parallel()
 		v := New("test.yaml")
-		trigger := map[string]interface{}{
-			"platform":       "template",
-			"value_template": "{{ threshold_value > 100 }}",
-		}
+		trigger := testfixtures.TemplateTrigger("{{ threshold_value > 100 }}")
 
 		v.validateSingleTrigger(trigger, "trigger")
 
@@ -208,11 +176,7 @@ func TestTriggerVariableWarnings(t *testing.T) {
 	t.Run("for clause references variable but not input", func(t *testing.T) {
 		t.Parallel()
 		v := New("test.yaml")
-		trigger := map[string]interface{}{
-			"platform":  "state",
-			"entity_id": "light.test",
-			"for":       "{{ delay_time }}",
-		}
+		trigger := testfixtures.StateTriggerWithFor("light.test", "{{ delay_time }}")
 
 		v.validateSingleTrigger(trigger, "trigger")
 
@@ -225,20 +189,11 @@ func TestMultipleTriggers(t *testing.T) {
 	t.Parallel()
 
 	v := New("test.yaml")
-	v.Data = map[string]interface{}{
-		"trigger": []interface{}{
-			map[string]interface{}{
-				"platform":  "state",
-				"entity_id": "light.one",
-			},
-			map[string]interface{}{
-				"trigger": "time",
-				"at":      "sunset",
-			},
-			map[string]interface{}{
-				// Missing platform/trigger - error
-				"entity_id": "light.error",
-			},
+	v.Data = testfixtures.Map{
+		"trigger": testfixtures.List{
+			testfixtures.StateTrigger("light.one"),
+			testfixtures.TimeTrigger("sunset"),
+			testfixtures.InvalidTrigger(), // Missing platform/trigger - error
 		},
 	}
 

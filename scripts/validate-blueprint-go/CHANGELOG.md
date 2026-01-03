@@ -5,6 +5,20 @@ All notable changes to validate-blueprint-go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-01-03
+
+### Added
+
+- Error categorization system with category types (Syntax, Schema, References, Templates, Inputs, Triggers, Conditions, Actions, Documentation)
+- CategorizedError and CategorizedWarning types for enhanced error reporting
+- Category-based error grouping and filtering functions
+- Enhanced reporter with category summary output
+
+### Changed
+
+- Refactored test files to use shared test fixtures and reduce duplication
+- Enhanced reporter to support both flat and categorized error display
+
 ## [1.2.0] - 2026-01-02
 
 ### Changed

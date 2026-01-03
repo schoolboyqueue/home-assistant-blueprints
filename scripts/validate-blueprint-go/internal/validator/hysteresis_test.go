@@ -3,6 +3,7 @@ package validator
 import (
 	"testing"
 
+	"github.com/home-assistant-blueprints/validate-blueprint-go/internal/testfixtures"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -194,30 +195,29 @@ func TestValidateVariables(t *testing.T) {
 	}{
 		{
 			name:             "no variables section",
-			data:             map[string]interface{}{},
+			data:             testfixtures.Map{},
 			expectedWarnings: 1, // Warning about missing variables section
 		},
 		{
 			name: "variables is not a map",
-			data: map[string]interface{}{
+			data: testfixtures.Map{
 				"variables": "not a map",
 			},
 			expectedErrors: 1,
 		},
 		{
 			name: "valid variables section",
-			data: map[string]interface{}{
-				"variables": map[string]interface{}{
-					"my_var":            "{{ states('sensor.temp') }}",
-					"blueprint_version": "1.0",
-				},
+			data: testfixtures.Map{
+				"variables": testfixtures.VariablesWithVersion("1.0", testfixtures.Map{
+					"my_var": testfixtures.ValidTemplates.States,
+				}),
 			},
 			expectedVars: []string{"my_var", "blueprint_version"},
 		},
 		{
 			name: "missing blueprint_version",
-			data: map[string]interface{}{
-				"variables": map[string]interface{}{
+			data: testfixtures.Map{
+				"variables": testfixtures.Map{
 					"my_var": "value",
 				},
 			},
@@ -225,11 +225,10 @@ func TestValidateVariables(t *testing.T) {
 		},
 		{
 			name: "variable with join filter",
-			data: map[string]interface{}{
-				"variables": map[string]interface{}{
-					"list_var":          "{{ items | join(', ') }}",
-					"blueprint_version": "1.0",
-				},
+			data: testfixtures.Map{
+				"variables": testfixtures.VariablesWithVersion("1.0", testfixtures.Map{
+					"list_var": testfixtures.ValidTemplates.WithFilter,
+				}),
 			},
 			expectedVars: []string{"list_var"},
 		},
@@ -343,7 +342,7 @@ func TestCheckUnsafeMathOperations(t *testing.T) {
 		{
 			name:             "no math operations",
 			varName:          "test",
-			value:            "{{ states('sensor.temp') }}",
+			value:            testfixtures.ValidTemplates.States,
 			expectedWarnings: 0,
 		},
 		{
@@ -457,13 +456,12 @@ func TestVariableTracking(t *testing.T) {
 	t.Parallel()
 
 	v := New("test.yaml")
-	v.Data = map[string]interface{}{
-		"variables": map[string]interface{}{
-			"var1":              "{{ states('sensor.temp') | float(0) }}",
-			"var2":              "{{ [a, b] | join(', ') }}",
-			"var3":              "{{ value | float(10) }}",
-			"blueprint_version": "1.0",
-		},
+	v.Data = testfixtures.Map{
+		"variables": testfixtures.VariablesWithVersion("1.0", testfixtures.Map{
+			"var1": testfixtures.ValidTemplates.Float,
+			"var2": testfixtures.ValidTemplates.WithFilter,
+			"var3": "{{ value | float(10) }}",
+		}),
 	}
 
 	v.ValidateVariables()
@@ -487,12 +485,11 @@ func TestInputRefCollectionInVariables(t *testing.T) {
 	t.Parallel()
 
 	v := New("test.yaml")
-	v.Data = map[string]interface{}{
-		"variables": map[string]interface{}{
-			"entity":            "!input target_entity",
-			"brightness":        "!input brightness_level",
-			"blueprint_version": "1.0",
-		},
+	v.Data = testfixtures.Map{
+		"variables": testfixtures.VariablesWithVersion("1.0", testfixtures.Map{
+			"entity":     testfixtures.InputRef("target_entity"),
+			"brightness": testfixtures.InputRef("brightness_level"),
+		}),
 	}
 
 	v.ValidateVariables()

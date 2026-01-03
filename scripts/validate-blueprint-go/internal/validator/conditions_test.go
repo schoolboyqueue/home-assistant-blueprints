@@ -3,6 +3,7 @@ package validator
 import (
 	"testing"
 
+	"github.com/home-assistant-blueprints/validate-blueprint-go/internal/testfixtures"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,33 +18,22 @@ func TestValidateConditions(t *testing.T) {
 	}{
 		{
 			name:           "no conditions",
-			data:           map[string]interface{}{},
+			data:           testfixtures.Map{},
 			expectedErrors: 0,
 		},
 		{
 			name: "single condition as map",
-			data: map[string]interface{}{
-				"condition": map[string]interface{}{
-					"condition": "state",
-					"entity_id": "light.test",
-					"state":     "on",
-				},
+			data: testfixtures.Map{
+				"condition": testfixtures.StateCondition("light.test", "on"),
 			},
 			expectedErrors: 0,
 		},
 		{
 			name: "condition list",
-			data: map[string]interface{}{
-				"condition": []interface{}{
-					map[string]interface{}{
-						"condition": "state",
-						"entity_id": "light.test",
-						"state":     "on",
-					},
-					map[string]interface{}{
-						"condition": "time",
-						"after":     "07:00:00",
-					},
+			data: testfixtures.Map{
+				"condition": testfixtures.List{
+					testfixtures.StateCondition("light.test", "on"),
+					testfixtures.TimeCondition("07:00:00", ""),
 				},
 			},
 			expectedErrors: 0,
@@ -73,56 +63,38 @@ func TestValidateSingleCondition(t *testing.T) {
 		expectedWarnings int
 	}{
 		{
-			name: "valid state condition",
-			condition: map[string]interface{}{
-				"condition": "state",
-				"entity_id": "light.test",
-				"state":     "on",
-			},
+			name:             "valid state condition",
+			condition:        testfixtures.StateCondition("light.test", "on"),
 			expectedErrors:   0,
 			expectedWarnings: 0,
 		},
 		{
-			name: "valid numeric_state condition",
-			condition: map[string]interface{}{
-				"condition": "numeric_state",
-				"entity_id": "sensor.temperature",
-				"above":     20,
-			},
+			name:             "valid numeric_state condition",
+			condition:        testfixtures.NumericStateCondition(testfixtures.CommonEntityIDs.Sensor, 20, nil),
 			expectedErrors:   0,
 			expectedWarnings: 0,
 		},
 		{
-			name: "valid template condition",
-			condition: map[string]interface{}{
-				"condition":      "template",
-				"value_template": "{{ is_state('light.test', 'on') }}",
-			},
+			name:             "valid template condition",
+			condition:        testfixtures.TemplateCondition(testfixtures.ValidTemplates.IsState),
 			expectedErrors:   0,
 			expectedWarnings: 0,
 		},
 		{
-			name: "valid time condition",
-			condition: map[string]interface{}{
-				"condition": "time",
-				"after":     "07:00:00",
-				"before":    "23:00:00",
-			},
+			name:             "valid time condition",
+			condition:        testfixtures.TimeCondition("07:00:00", "23:00:00"),
 			expectedErrors:   0,
 			expectedWarnings: 0,
 		},
 		{
-			name: "shorthand condition (entity_id only)",
-			condition: map[string]interface{}{
-				"entity_id": "light.test",
-				"state":     "on",
-			},
+			name:             "shorthand condition (entity_id only)",
+			condition:        testfixtures.ShorthandCondition("light.test", "on"),
 			expectedErrors:   0,
 			expectedWarnings: 0,
 		},
 		{
 			name: "missing condition key (warning)",
-			condition: map[string]interface{}{
+			condition: testfixtures.Map{
 				"value_template": "{{ true }}",
 			},
 			expectedErrors:   0,
@@ -130,7 +102,7 @@ func TestValidateSingleCondition(t *testing.T) {
 		},
 		{
 			name: "unknown condition type (warning)",
-			condition: map[string]interface{}{
+			condition: testfixtures.Map{
 				"condition": "unknown_type",
 			},
 			expectedErrors:   0,
@@ -138,90 +110,50 @@ func TestValidateSingleCondition(t *testing.T) {
 		},
 		{
 			name: "valid and condition",
-			condition: map[string]interface{}{
-				"condition": "and",
-				"conditions": []interface{}{
-					map[string]interface{}{
-						"condition": "state",
-						"entity_id": "light.one",
-						"state":     "on",
-					},
-					map[string]interface{}{
-						"condition": "state",
-						"entity_id": "light.two",
-						"state":     "on",
-					},
-				},
-			},
+			condition: testfixtures.AndCondition(
+				testfixtures.StateCondition("light.one", "on"),
+				testfixtures.StateCondition("light.two", "on"),
+			),
 			expectedErrors:   0,
 			expectedWarnings: 0,
 		},
 		{
 			name: "valid or condition",
-			condition: map[string]interface{}{
-				"condition": "or",
-				"conditions": []interface{}{
-					map[string]interface{}{
-						"condition": "state",
-						"entity_id": "light.one",
-						"state":     "on",
-					},
-				},
-			},
+			condition: testfixtures.OrCondition(
+				testfixtures.StateCondition("light.one", "on"),
+			),
 			expectedErrors:   0,
 			expectedWarnings: 0,
 		},
 		{
 			name: "valid not condition",
-			condition: map[string]interface{}{
-				"condition": "not",
-				"conditions": []interface{}{
-					map[string]interface{}{
-						"condition": "state",
-						"entity_id": "light.test",
-						"state":     "on",
-					},
-				},
-			},
+			condition: testfixtures.NotCondition(
+				testfixtures.StateCondition("light.test", "on"),
+			),
 			expectedErrors:   0,
 			expectedWarnings: 0,
 		},
 		{
-			name: "zone condition",
-			condition: map[string]interface{}{
-				"condition": "zone",
-				"entity_id": "person.me",
-				"zone":      "zone.home",
-			},
+			name:             "zone condition",
+			condition:        testfixtures.ZoneCondition(testfixtures.CommonEntityIDs.Person, testfixtures.CommonEntityIDs.Zone),
 			expectedErrors:   0,
 			expectedWarnings: 0,
 		},
 		{
-			name: "trigger condition",
-			condition: map[string]interface{}{
-				"condition": "trigger",
-				"id":        "motion_detected",
-			},
+			name:             "trigger condition",
+			condition:        testfixtures.TriggerCondition("motion_detected"),
 			expectedErrors:   0,
 			expectedWarnings: 0,
 		},
 		{
-			name: "sun condition",
-			condition: map[string]interface{}{
-				"condition": "sun",
-				"after":     "sunset",
-			},
+			name:             "sun condition",
+			condition:        testfixtures.SunCondition("sunset"),
 			expectedErrors:   0,
 			expectedWarnings: 0,
 		},
 		{
-			name: "device condition",
-			condition: map[string]interface{}{
-				"condition": "device",
-				"device_id": "abc123",
-				"domain":    "light",
-				"type":      "is_on",
-			},
+			name:             "device condition",
+			condition:        testfixtures.DeviceCondition("abc123", "light", "is_on"),
 			expectedErrors:   0,
 			expectedWarnings: 0,
 		},
@@ -243,29 +175,19 @@ func TestNestedConditions(t *testing.T) {
 	t.Parallel()
 
 	v := New("test.yaml")
-	v.Data = map[string]interface{}{
-		"condition": map[string]interface{}{
-			"condition": "and",
-			"conditions": []interface{}{
-				map[string]interface{}{
-					"condition": "or",
-					"conditions": []interface{}{
-						map[string]interface{}{
-							"condition": "state",
-							"entity_id": "light.one",
-							"state":     "on",
-						},
-						map[string]interface{}{
-							// Missing condition key - warning
-							"value_template": "{{ true }}",
-						},
-					},
+	v.Data = testfixtures.Map{
+		"condition": testfixtures.AndCondition(
+			testfixtures.OrCondition(
+				testfixtures.StateCondition("light.one", "on"),
+				testfixtures.Map{
+					// Missing condition key - warning
+					"value_template": "{{ true }}",
 				},
-				map[string]interface{}{
-					"condition": "unknown_type", // warning
-				},
+			),
+			testfixtures.Map{
+				"condition": "unknown_type", // warning
 			},
-		},
+		),
 	}
 
 	v.ValidateConditions()
@@ -279,17 +201,9 @@ func TestConditionListProcessing(t *testing.T) {
 	t.Parallel()
 
 	v := New("test.yaml")
-	conditions := []interface{}{
-		map[string]interface{}{
-			"condition": "state",
-			"entity_id": "light.one",
-			"state":     "on",
-		},
-		map[string]interface{}{
-			"condition": "state",
-			"entity_id": "light.two",
-			"state":     "off",
-		},
+	conditions := testfixtures.List{
+		testfixtures.StateCondition("light.one", "on"),
+		testfixtures.StateCondition("light.two", "off"),
 	}
 
 	v.validateConditionList(conditions, "condition")
@@ -302,14 +216,11 @@ func TestConditionWithInvalidNestedConditions(t *testing.T) {
 	t.Parallel()
 
 	v := New("test.yaml")
-	condition := map[string]interface{}{
-		"condition": "and",
-		"conditions": []interface{}{
-			map[string]interface{}{
-				"condition": "invalid_type",
-			},
+	condition := testfixtures.AndCondition(
+		testfixtures.Map{
+			"condition": "invalid_type",
 		},
-	}
+	)
 
 	v.validateSingleCondition(condition, "condition")
 

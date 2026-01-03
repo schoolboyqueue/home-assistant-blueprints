@@ -25,11 +25,11 @@ func (v *BlueprintValidator) validateTemplatesInValue(value interface{}, path st
 func (v *BlueprintValidator) validateTemplateString(template, path string) {
 	// Check for !input inside {{ }} blocks
 	if err := common.ValidateNoInputInTemplate(template, path); err != "" {
-		v.AddError(err)
+		v.AddCategorizedError(CategoryTemplates, path, err)
 	}
 
 	// Check for balanced Jinja2 delimiters
 	for _, err := range common.ValidateBalancedDelimiters(template, path) {
-		v.AddError(err)
+		v.AddCategorizedError(CategoryTemplates, path, err)
 	}
 }

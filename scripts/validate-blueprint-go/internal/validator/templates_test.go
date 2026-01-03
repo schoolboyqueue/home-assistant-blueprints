@@ -3,6 +3,7 @@ package validator
 import (
 	"testing"
 
+	"github.com/home-assistant-blueprints/validate-blueprint-go/internal/testfixtures"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,51 +17,51 @@ func TestValidateTemplates(t *testing.T) {
 	}{
 		{
 			name:           "empty data",
-			data:           map[string]interface{}{},
+			data:           testfixtures.Map{},
 			expectedErrors: 0,
 		},
 		{
 			name: "valid templates",
-			data: map[string]interface{}{
-				"template1": "{{ states('light.test') }}",
-				"template2": "{% if is_state('light.test', 'on') %}on{% endif %}",
+			data: testfixtures.Map{
+				"template1": testfixtures.ValidTemplates.States,
+				"template2": testfixtures.ValidTemplates.MultiLine,
 			},
 			expectedErrors: 0,
 		},
 		{
 			name: "unbalanced double braces",
-			data: map[string]interface{}{
-				"template": "{{ states('light.test')",
+			data: testfixtures.Map{
+				"template": testfixtures.InvalidTemplates.UnbalancedOpen,
 			},
 			expectedErrors: 1,
 		},
 		{
 			name: "unbalanced block braces",
-			data: map[string]interface{}{
-				"template": "{% if true",
+			data: testfixtures.Map{
+				"template": testfixtures.InvalidTemplates.UnbalancedBlock,
 			},
 			expectedErrors: 1,
 		},
 		{
 			name: "input inside template block",
-			data: map[string]interface{}{
-				"template": "{{ !input my_input }}",
+			data: testfixtures.Map{
+				"template": testfixtures.InvalidTemplates.InputInTemplate,
 			},
 			expectedErrors: 1,
 		},
 		{
 			name: "input outside template block (valid)",
-			data: map[string]interface{}{
-				"value": "!input my_input",
+			data: testfixtures.Map{
+				"value": testfixtures.ValidTemplates.InputRef,
 			},
 			expectedErrors: 0,
 		},
 		{
 			name: "nested templates all valid",
-			data: map[string]interface{}{
-				"outer": map[string]interface{}{
+			data: testfixtures.Map{
+				"outer": testfixtures.Map{
 					"inner": "{{ value }}",
-					"list": []interface{}{
+					"list": testfixtures.List{
 						"{{ item1 }}",
 						"{{ item2 }}",
 					},
@@ -70,9 +71,9 @@ func TestValidateTemplates(t *testing.T) {
 		},
 		{
 			name: "nested template with error",
-			data: map[string]interface{}{
-				"outer": map[string]interface{}{
-					"inner": "{{ unbalanced",
+			data: testfixtures.Map{
+				"outer": testfixtures.Map{
+					"inner": testfixtures.InvalidTemplates.UnbalancedOpen,
 				},
 			},
 			expectedErrors: 1,
@@ -106,12 +107,12 @@ func TestValidateTemplateString(t *testing.T) {
 		},
 		{
 			name:           "valid double brace template",
-			template:       "{{ states('sensor.temp') }}",
+			template:       testfixtures.ValidTemplates.States,
 			expectedErrors: 0,
 		},
 		{
 			name:           "valid block template",
-			template:       "{% if x > 5 %}big{% else %}small{% endif %}",
+			template:       testfixtures.ValidTemplates.MultiLine,
 			expectedErrors: 0,
 		},
 		{
@@ -121,17 +122,17 @@ func TestValidateTemplateString(t *testing.T) {
 		},
 		{
 			name:           "unbalanced opening double brace",
-			template:       "{{ value",
+			template:       testfixtures.InvalidTemplates.UnbalancedOpen,
 			expectedErrors: 1,
 		},
 		{
 			name:           "unbalanced closing double brace",
-			template:       "value }}",
+			template:       testfixtures.InvalidTemplates.UnbalancedClose,
 			expectedErrors: 1,
 		},
 		{
 			name:           "unbalanced opening block",
-			template:       "{% if true",
+			template:       testfixtures.InvalidTemplates.UnbalancedBlock,
 			expectedErrors: 1,
 		},
 		{
@@ -141,17 +142,17 @@ func TestValidateTemplateString(t *testing.T) {
 		},
 		{
 			name:           "input inside double braces",
-			template:       "{{ !input sensor }}",
+			template:       testfixtures.InvalidTemplates.InputInTemplate,
 			expectedErrors: 1,
 		},
 		{
 			name:           "input reference outside template (valid)",
-			template:       "!input sensor_entity",
+			template:       testfixtures.ValidTemplates.InputRef,
 			expectedErrors: 0,
 		},
 		{
 			name:           "multiple errors",
-			template:       "{{ !input x }} {% incomplete",
+			template:       testfixtures.InvalidTemplates.MultipleErrors,
 			expectedErrors: 2, // input in template + unbalanced block
 		},
 	}
@@ -173,9 +174,9 @@ func TestValidateTemplatesInValue(t *testing.T) {
 	t.Run("validates strings in map", func(t *testing.T) {
 		t.Parallel()
 		v := New("test.yaml")
-		value := map[string]interface{}{
-			"valid":   "{{ states('light.test') }}",
-			"invalid": "{{ unclosed",
+		value := testfixtures.Map{
+			"valid":   testfixtures.ValidTemplates.States,
+			"invalid": testfixtures.InvalidTemplates.UnbalancedOpen,
 		}
 
 		v.validateTemplatesInValue(value, "root")
@@ -187,10 +188,10 @@ func TestValidateTemplatesInValue(t *testing.T) {
 	t.Run("validates strings in list", func(t *testing.T) {
 		t.Parallel()
 		v := New("test.yaml")
-		value := []interface{}{
+		value := testfixtures.List{
 			"{{ valid }}",
-			"{% if true %}{% endif %}",
-			"{{ unclosed",
+			testfixtures.ValidTemplates.MultiLine,
+			testfixtures.InvalidTemplates.UnbalancedOpen,
 		}
 
 		v.validateTemplatesInValue(value, "items")
@@ -201,11 +202,11 @@ func TestValidateTemplatesInValue(t *testing.T) {
 	t.Run("validates deeply nested structures", func(t *testing.T) {
 		t.Parallel()
 		v := New("test.yaml")
-		value := map[string]interface{}{
-			"level1": map[string]interface{}{
-				"level2": []interface{}{
-					map[string]interface{}{
-						"template": "{{ !input bad }}",
+		value := testfixtures.Map{
+			"level1": testfixtures.Map{
+				"level2": testfixtures.List{
+					testfixtures.Map{
+						"template": testfixtures.InvalidTemplates.InputInTemplate,
 					},
 				},
 			},
@@ -220,7 +221,7 @@ func TestValidateTemplatesInValue(t *testing.T) {
 	t.Run("skips non-string values", func(t *testing.T) {
 		t.Parallel()
 		v := New("test.yaml")
-		value := map[string]interface{}{
+		value := testfixtures.Map{
 			"number": 42,
 			"bool":   true,
 			"nil":    nil,
@@ -235,32 +236,27 @@ func TestValidateTemplatesInValue(t *testing.T) {
 func TestComplexTemplateValidation(t *testing.T) {
 	t.Parallel()
 
-	// Test a realistic blueprint structure
+	// Test a realistic blueprint structure using fixtures
 	v := New("test.yaml")
-	v.Data = map[string]interface{}{
-		"blueprint": map[string]interface{}{
-			"name":        "Test Blueprint",
-			"description": "A test blueprint",
-		},
-		"variables": map[string]interface{}{
-			"temp": "{{ states('sensor.temperature') | float(0) }}",
+	v.Data = testfixtures.AutomationBlueprintWithVariables(
+		"Test Blueprint",
+		testfixtures.Map{},
+		testfixtures.Map{
+			"temp": testfixtures.ValidTemplates.Float,
 			"on":   "{{ true if temp > 20 else false }}",
 		},
-		"trigger": []interface{}{
-			map[string]interface{}{
-				"platform":       "template",
-				"value_template": "{{ is_state('light.test', 'on') }}",
-			},
+		[]testfixtures.Map{
+			testfixtures.TemplateTrigger(testfixtures.ValidTemplates.IsState),
 		},
-		"action": []interface{}{
-			map[string]interface{}{
-				"service": "notify.mobile",
-				"data": map[string]interface{}{
+		[]testfixtures.Map{
+			testfixtures.ServiceCallWithData(
+				testfixtures.CommonServices.NotifyMobile,
+				testfixtures.Map{
 					"message": "Temperature is {{ states('sensor.temp') }}",
 				},
-			},
+			),
 		},
-	}
+	)
 
 	v.ValidateTemplates()
 

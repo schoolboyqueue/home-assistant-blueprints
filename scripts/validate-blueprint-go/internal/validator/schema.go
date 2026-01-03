@@ -14,21 +14,21 @@ func (v *BlueprintValidator) ValidateStructure() {
 	// Check required root keys
 	for _, key := range RequiredRootKeys {
 		if _, ok := v.Data[key]; !ok {
-			v.AddErrorf("Missing required root key: '%s'", key)
+			v.AddCategorizedErrorf(CategorySchema, "", "Missing required root key: '%s'", key)
 		}
 	}
 
 	// Warn about variables not at root level
 	if blueprint, ok := common.TryGetMap(v.Data, "blueprint"); ok {
 		if _, hasVars := blueprint["variables"]; hasVars {
-			v.AddError("'variables' must be at root level, not nested under 'blueprint'")
+			v.AddCategorizedError(CategorySchema, "blueprint.variables", "'variables' must be at root level, not nested under 'blueprint'")
 		}
 	}
 
 	// Check for variables at root
 	if variables, ok := v.Data["variables"]; ok && variables != nil {
 		if _, isMap := variables.(map[string]interface{}); !isMap {
-			v.AddError("'variables' must be a dictionary")
+			v.AddCategorizedError(CategorySchema, "variables", "'variables' must be a dictionary")
 		}
 	}
 }
@@ -43,14 +43,14 @@ func (v *BlueprintValidator) ValidateBlueprintSection() {
 
 	blueprintMap, ok, errMsg := common.GetMap(blueprint, "blueprint")
 	if !ok {
-		v.AddError(errMsg)
+		v.AddCategorizedError(CategorySchema, "blueprint", errMsg)
 		return
 	}
 
 	// Check required blueprint keys
 	for _, key := range RequiredBlueprintKeys {
 		if _, ok := blueprintMap[key]; !ok {
-			v.AddErrorf("Missing required blueprint key: '%s'", key)
+			v.AddCategorizedErrorf(CategorySchema, "blueprint", "Missing required blueprint key: '%s'", key)
 		}
 	}
 
@@ -58,7 +58,7 @@ func (v *BlueprintValidator) ValidateBlueprintSection() {
 	if domain, ok := common.TryGetString(blueprintMap, "domain"); ok {
 		validDomains := []string{"automation", "script"}
 		if errMsg := common.ValidateEnumValue(domain, validDomains, "blueprint", "domain"); errMsg != "" {
-			v.AddError(errMsg)
+			v.AddCategorizedError(CategorySchema, "blueprint.domain", errMsg)
 		}
 	}
 }
@@ -73,20 +73,20 @@ func (v *BlueprintValidator) ValidateMode() {
 
 	modeStr, ok, errMsg := common.GetString(mode, "mode")
 	if !ok {
-		v.AddError(errMsg)
+		v.AddCategorizedError(CategorySchema, "mode", errMsg)
 		return
 	}
 
 	// Validate mode using common enum validation
 	if errMsg := common.ValidateEnumValue(modeStr, ValidModes, "", "mode"); errMsg != "" {
-		v.AddError(errMsg)
+		v.AddCategorizedError(CategorySchema, "mode", errMsg)
 	}
 
 	// Check for max when using queued/parallel
 	if modeStr == "queued" || modeStr == "parallel" {
 		if maxVal, ok := v.Data["max"]; ok {
 			if maxInt, ok := maxVal.(int); !ok || maxInt < 1 {
-				v.AddErrorf("'max' must be a positive integer when mode is '%s'", modeStr)
+				v.AddCategorizedErrorf(CategorySchema, "max", "'max' must be a positive integer when mode is '%s'", modeStr)
 			}
 		}
 	}
@@ -119,7 +119,7 @@ func (v *BlueprintValidator) ValidateVersionSync() {
 	nameVersionMatch := versionPattern.FindString(name)
 
 	if nameVersionMatch != "" && !strings.Contains(name, versionStr) {
-		v.AddWarningf(
+		v.AddCategorizedWarningf(CategorySchema, "blueprint.name",
 			"Version mismatch: blueprint name contains '%s' but blueprint_version is '%s'",
 			nameVersionMatch, versionStr)
 	}

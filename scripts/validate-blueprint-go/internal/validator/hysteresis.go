@@ -47,17 +47,17 @@ func (v *BlueprintValidator) ValidateHysteresisBoundaries() {
 
 			switch {
 			case onValue < offValue:
-				v.AddErrorf(
+				v.AddCategorizedErrorf(CategoryInputs, "",
 					"Hysteresis %s inversion: '%s' (default=%v) should be greater than '%s' (default=%v). With ON < OFF, the system will chatter rapidly.",
 					pattern.Description, inputName, onValue, offName, offValue)
 			case onValue == offValue:
-				v.AddWarningf(
+				v.AddCategorizedWarningf(CategoryInputs, "",
 					"Hysteresis %s has no gap: '%s' and '%s' both default to %v. Without a gap between ON and OFF thresholds, there's no hysteresis protection against oscillation.",
 					pattern.Description, inputName, offName, onValue)
 			default:
 				gap := onValue - offValue
 				if onValue != 0 && gap/Abs(onValue) < 0.1 {
-					v.AddWarningf(
+					v.AddCategorizedWarningf(CategoryInputs, "",
 						"Hysteresis %s gap may be too small: '%s' (default=%v) minus '%s' (default=%v) = %v. A larger gap provides better oscillation protection.",
 						pattern.Description, inputName, onValue, offName, offValue, gap)
 				}
@@ -71,13 +71,13 @@ func (v *BlueprintValidator) ValidateHysteresisBoundaries() {
 func (v *BlueprintValidator) ValidateVariables() {
 	variables, ok := v.Data["variables"]
 	if !ok {
-		v.AddWarning("No variables section defined")
+		v.AddCategorizedWarning(CategorySchema, "variables", "No variables section defined")
 		return
 	}
 
 	variablesMap, ok, errMsg := common.GetMap(variables, "variables")
 	if !ok {
-		v.AddError(errMsg)
+		v.AddCategorizedError(CategorySchema, "variables", errMsg)
 		return
 	}
 
@@ -125,7 +125,7 @@ func (v *BlueprintValidator) ValidateVariables() {
 
 	// Check for blueprint_version
 	if _, ok := variablesMap["blueprint_version"]; !ok {
-		v.AddWarning("No 'blueprint_version' variable defined")
+		v.AddCategorizedWarning(CategorySchema, "variables", "No 'blueprint_version' variable defined")
 	}
 }
 
@@ -151,31 +151,32 @@ func (v *BlueprintValidator) CheckBareBooleanLiterals(varName, value string) {
 			continue
 		}
 
+		varPath := common.JoinPath("variables", varName)
 		if stripped == "true" && !foundBareTrue {
 			foundBareTrue = true
-			v.AddWarningf(
-				"Variable '%s': Bare 'true' outputs STRING \"true\", not boolean. Use '{{ true }}' to output actual boolean.",
-				varName)
+			v.AddCategorizedWarningf(CategoryTemplates, varPath,
+				"Bare 'true' outputs STRING \"true\", not boolean. Use '{{ true }}' to output actual boolean.")
 		} else if stripped == "false" && !foundBareFalse {
 			foundBareFalse = true
-			v.AddWarningf(
-				"Variable '%s': Bare 'false' outputs STRING \"false\", not boolean. The string \"false\" is TRUTHY (non-empty). Use '{{ false }}' instead.",
-				varName)
+			v.AddCategorizedWarningf(CategoryTemplates, varPath,
+				"Bare 'false' outputs STRING \"false\", not boolean. The string \"false\" is TRUTHY (non-empty). Use '{{ false }}' instead.")
 		}
 	}
 }
 
 // CheckUnsafeMathOperations checks for potentially unsafe math operations
 func (v *BlueprintValidator) CheckUnsafeMathOperations(varName, value string) {
+	varPath := common.JoinPath("variables", varName)
+
 	// Check for log() with potentially non-positive arguments
 	logPattern := regexp.MustCompile(`log\s*\(\s*(\w+)\s*\)`)
 	for _, match := range logPattern.FindAllStringSubmatch(value, -1) {
 		varRef := match[1]
 		guardPattern := regexp.MustCompile(fmt.Sprintf(`%s\s*>\s*0|%s\s+is\s+number`, regexp.QuoteMeta(varRef), regexp.QuoteMeta(varRef)))
 		if !guardPattern.MatchString(value) {
-			v.AddWarningf(
-				"Variable '%s': log(%s) may fail if %s <= 0. Consider adding a guard like 'if %s > 0'.",
-				varName, varRef, varRef, varRef)
+			v.AddCategorizedWarningf(CategoryTemplates, varPath,
+				"log(%s) may fail if %s <= 0. Consider adding a guard like 'if %s > 0'.",
+				varRef, varRef, varRef)
 		}
 	}
 
@@ -192,9 +193,8 @@ func (v *BlueprintValidator) CheckUnsafeMathOperations(varName, value string) {
 		if !strings.Contains(value, "max(0,") && !strings.Contains(value, "abs(") {
 			varMatch := regexp.MustCompile(`([a-zA-Z_]\w*)`).FindStringSubmatch(arg)
 			if varMatch != nil {
-				v.AddWarningf(
-					"Variable '%s': sqrt() with potentially negative argument. Consider using sqrt(max(0, value)).",
-					varName)
+				v.AddCategorizedWarning(CategoryTemplates, varPath,
+					"sqrt() with potentially negative argument. Consider using sqrt(max(0, value)).")
 				break
 			}
 		}
@@ -203,11 +203,12 @@ func (v *BlueprintValidator) CheckUnsafeMathOperations(varName, value string) {
 
 // CheckPythonStyleMethods checks for Python-style list methods
 func (v *BlueprintValidator) CheckPythonStyleMethods(varName, value string) {
+	varPath := common.JoinPath("variables", varName)
+
 	// Check for patterns like [a,b].min() which should be [a,b] | min
 	pythonMethodPattern := regexp.MustCompile(`\[[^\]]+\]\.(min|max|sum|sort|reverse)\(\)`)
 	if pythonMethodPattern.MatchString(value) {
-		v.AddErrorf(
-			"Variable '%s': Python-style list method detected. Use Jinja2 filter syntax instead (e.g., '[a,b] | min' not '[a,b].min()').",
-			varName)
+		v.AddCategorizedError(CategoryTemplates, varPath,
+			"Python-style list method detected. Use Jinja2 filter syntax instead (e.g., '[a,b] | min' not '[a,b].min()').")
 	}
 }

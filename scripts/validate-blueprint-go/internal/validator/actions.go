@@ -34,13 +34,13 @@ func (v *BlueprintValidator) validateSingleAction(action map[string]interface{},
 	if service, ok := common.TryGetString(action, "service"); ok {
 		// Validate service format using common validator
 		if warnMsg := common.ValidateServiceFormat(service, path); warnMsg != "" {
-			v.AddWarning(warnMsg)
+			v.AddCategorizedWarning(CategoryActions, path, warnMsg)
 		}
 
 		// Check data is not nil when present using common nil validation
 		if data, hasData := action["data"]; hasData {
 			if errMsg := common.ValidateNotNil(data, path, "'data' block"); errMsg != "" {
-				v.AddError(errMsg)
+				v.AddCategorizedError(CategoryActions, path, errMsg)
 			}
 		}
 	}
@@ -66,7 +66,7 @@ func (v *BlueprintValidator) validateSingleAction(action map[string]interface{},
 		if thenAction, ok := action["then"]; ok {
 			v.validateActionList(thenAction, common.JoinPath(path, "then"))
 		} else {
-			v.AddErrorf("%s: 'if' requires 'then'", path)
+			v.AddCategorizedError(CategoryActions, path, "'if' requires 'then'")
 		}
 		if elseAction, ok := action["else"]; ok {
 			v.validateActionList(elseAction, common.JoinPath(path, "else"))
@@ -79,7 +79,7 @@ func (v *BlueprintValidator) validateSingleAction(action map[string]interface{},
 		if sequence, ok := repeat["sequence"]; ok {
 			v.validateActionList(sequence, common.JoinPath(repeatPath, "sequence"))
 		} else {
-			v.AddErrorf("%s: Missing 'sequence'", repeatPath)
+			v.AddCategorizedError(CategoryActions, repeatPath, "Missing 'sequence'")
 		}
 	}
 
