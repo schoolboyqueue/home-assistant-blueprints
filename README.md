@@ -165,16 +165,26 @@ HVAC-aware ceiling fan automation with EN 16798 adaptive comfort model, heat ind
 │       ├── ci-go-tools.yml
 │       └── release-go-tools.yml
 ├── scripts/
-│   ├── ha-ws-client-go/
-│   │   ├── cmd/ha-ws-client/main.go
+│   ├── ha-ws-client-go/          # Home Assistant WebSocket CLI client
+│   │   ├── cmd/ha-ws-client/     # CLI entry point
 │   │   ├── internal/
+│   │   │   ├── client/           # WebSocket client
+│   │   │   ├── handlers/         # Command handlers
+│   │   │   ├── shutdown/         # Graceful shutdown coordination
+│   │   │   ├── output/           # Output formatting
+│   │   │   ├── cli/              # CLI utilities
+│   │   │   └── types/            # Type definitions
 │   │   ├── Makefile
 │   │   └── README.md
-│   ├── validate-blueprint-go/
+│   ├── validate-blueprint-go/    # Blueprint validator CLI
 │   │   ├── main.go
+│   │   ├── internal/
+│   │   │   ├── validator/        # Core validation logic
+│   │   │   ├── shutdown/         # Graceful shutdown coordination
+│   │   │   └── common/           # Shared utilities
 │   │   ├── Makefile
 │   │   └── README.md
-│   └── README.md
+│   └── shared.mk                 # Shared Makefile definitions
 └── README.md (this file)
 ```
 
