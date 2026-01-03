@@ -5,6 +5,27 @@ All notable changes to ha-ws-client-go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-01-03
+
+### Added
+
+- Message dispatcher abstractions for unified WebSocket request/response handling
+  - `MessageRequest[T]` generic type for type-safe message requests with `Execute()` and `ExecuteAndOutput()` methods
+  - `MessageDispatcher[T]` fluent API with `Transform()` and `Output()` pipeline stages
+  - `ListRequest[T]` for simplified list-based command handlers
+  - `TimelineRequest[T]` for timeline display handlers
+  - `MapRequest[T]` for map-based response extraction
+  - `SimpleHandler` and `TransformHandler` factory functions for common patterns
+- Unit tests for all new dispatcher abstractions
+
+### Changed
+
+- Refactor `handleTrace` and `handleTraceDebug` to use `MessageRequest` pattern
+- Refactor `HandleStatesJSON` and `HandleConfig` to use `MessageRequest` pattern
+- Refactor `HandleSyslog` to use `ListRequest` pattern
+- Refactor `HandleAreas` to use `ListRequest` pattern
+- Rename `errors` variable to `errs` in shutdown tests (lint fix)
+
 ## [1.4.0] - 2026-01-03
 
 ### Added

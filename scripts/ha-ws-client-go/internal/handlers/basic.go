@@ -147,8 +147,9 @@ func HandleStates(ctx *Context) error {
 }
 
 // HandleStatesJSON gets all entity states as JSON.
+// Uses the unified MessageRequest pattern for simplified request/response handling.
 func HandleStatesJSON(ctx *Context) error {
-	states, err := client.SendMessageTyped[[]types.HAState](ctx.Client, "get_states", nil)
+	states, err := NewRequest[[]types.HAState]("get_states", nil).Execute(ctx)
 	if err != nil {
 		return err
 	}
@@ -209,8 +210,9 @@ func handleStatesFilter(ctx *Context) error {
 }
 
 // HandleConfig gets Home Assistant configuration.
+// Uses the unified MessageRequest pattern with transform for response processing.
 func HandleConfig(ctx *Context) error {
-	config, err := client.SendMessageTyped[types.HAConfig](ctx.Client, "get_config", nil)
+	config, err := NewRequest[types.HAConfig]("get_config", nil).Execute(ctx)
 	if err != nil {
 		return err
 	}

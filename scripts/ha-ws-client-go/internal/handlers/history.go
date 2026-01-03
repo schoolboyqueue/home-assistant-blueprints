@@ -307,25 +307,21 @@ func HandleTimeline(ctx *Context) error {
 }
 
 // HandleSyslog gets system log errors/warnings.
+// Uses the unified ListRequest pattern for simplified list display.
 func HandleSyslog(ctx *Context) error {
-	entries, err := client.SendMessageTyped[[]types.SysLogEntry](ctx.Client, "system_log/list", nil)
-	if err != nil {
-		return err
-	}
-
-	output.List(entries,
-		output.ListTitle[types.SysLogEntry]("System log entries"),
-		output.ListCommand[types.SysLogEntry]("syslog"),
-		output.ListFormatter(func(e types.SysLogEntry, _ int) string {
+	return (&ListRequest[types.SysLogEntry]{
+		MessageType: "system_log/list",
+		Title:       "System log entries",
+		Command:     "syslog",
+		Formatter: func(e types.SysLogEntry, _ int) string {
 			source := e.GetSource()
 			msg := e.GetMessage()
 			if output.IsCompact() {
 				return fmt.Sprintf("[%s] %s: %s", e.Level, source, msg)
 			}
 			return fmt.Sprintf("[%s] %s\n  %s", e.Level, source, msg)
-		}),
-	)
-	return nil
+		},
+	}).Execute(ctx)
 }
 
 // HandleStats gets sensor statistics.

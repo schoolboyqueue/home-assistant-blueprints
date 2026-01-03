@@ -130,17 +130,12 @@ func handleTrace(ctx *Context) error {
 	id := ctx.Config.AutomationID
 	runID := ctx.Config.Args[1]
 
-	trace, err := client.SendMessageTyped[types.TraceDetail](ctx.Client, "trace/get", map[string]any{
+	// Use unified MessageRequest pattern for simplified request/response handling
+	return NewRequest[types.TraceDetail]("trace/get", map[string]any{
 		"domain":  "automation",
 		"item_id": id,
 		"run_id":  runID,
-	})
-	if err != nil {
-		return err
-	}
-
-	output.Data(trace, output.WithCommand("trace"))
-	return nil
+	}).ExecuteAndOutput(ctx, WithOutputCommand("trace"))
 }
 
 // HandleTraceLatest gets the most recent trace for an automation.
@@ -441,14 +436,12 @@ func handleTraceDebug(ctx *Context) error {
 	automationID := ctx.Config.AutomationID
 	runID := ctx.Config.Args[1]
 
-	trace, err := getTraceDetail(ctx.Client, automationID, runID)
-	if err != nil {
-		return err
-	}
-
-	// Output the complete trace data
-	output.Data(trace, output.WithCommand("trace-debug"))
-	return nil
+	// Use unified MessageRequest pattern for simplified request/response handling
+	return NewRequest[types.TraceDetail]("trace/get", map[string]any{
+		"domain":  "automation",
+		"item_id": strings.TrimPrefix(automationID, "automation."),
+		"run_id":  runID,
+	}).ExecuteAndOutput(ctx, WithOutputCommand("trace-debug"))
 }
 
 // HandleAutomationConfig gets automation configuration.

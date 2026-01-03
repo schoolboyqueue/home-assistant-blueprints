@@ -177,7 +177,7 @@ func TestPartialResult(t *testing.T) {
 	pr.RecordSuccess("item2")
 	pr.RecordError(context.DeadlineExceeded)
 
-	completed, total, errors := pr.Summary()
+	completed, total, errs := pr.Summary()
 
 	if completed != 3 {
 		t.Errorf("expected 3 completed, got %d", completed)
@@ -185,8 +185,8 @@ func TestPartialResult(t *testing.T) {
 	if total != 10 {
 		t.Errorf("expected 10 total, got %d", total)
 	}
-	if len(errors) != 1 {
-		t.Errorf("expected 1 error, got %d", len(errors))
+	if len(errs) != 1 {
+		t.Errorf("expected 1 error, got %d", len(errs))
 	}
 
 	if pr.IsComplete() {

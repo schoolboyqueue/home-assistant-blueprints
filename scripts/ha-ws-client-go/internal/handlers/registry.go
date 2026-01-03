@@ -11,6 +11,9 @@ import (
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
 
+// Note: client import is still needed for FilteredRegistryHandler which uses
+// client.SendMessageTyped for its generic implementation.
+
 func init() {
 	// Register entity/device/area registry commands
 	RegisterAll(
@@ -131,16 +134,13 @@ var HandleDevices = Apply(
 )
 
 // HandleAreas lists all areas.
+// Uses the unified ListRequest pattern for simplified list display.
 func HandleAreas(ctx *Context) error {
-	areas, err := client.SendMessageTyped[[]types.AreaEntry](ctx.Client, "config/area_registry/list", nil)
-	if err != nil {
-		return err
-	}
-
-	output.List(areas,
-		output.ListTitle[types.AreaEntry]("Areas"),
-		output.ListCommand[types.AreaEntry]("areas"),
-		output.ListFormatter(func(a types.AreaEntry, _ int) string {
+	return (&ListRequest[types.AreaEntry]{
+		MessageType: "config/area_registry/list",
+		Title:       "Areas",
+		Command:     "areas",
+		Formatter: func(a types.AreaEntry, _ int) string {
 			aliases := ""
 			if len(a.Aliases) > 0 {
 				aliases = fmt.Sprintf(" (aliases: %s)", strings.Join(a.Aliases, ", "))
@@ -149,7 +149,6 @@ func HandleAreas(ctx *Context) error {
 				return fmt.Sprintf("%s: %s%s", a.AreaID, a.Name, aliases)
 			}
 			return fmt.Sprintf("%s: %s%s", a.AreaID, a.Name, aliases)
-		}),
-	)
-	return nil
+		},
+	}).Execute(ctx)
 }
