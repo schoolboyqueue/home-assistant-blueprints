@@ -1,3 +1,9 @@
+## [4.23.3] — 2026-01-03
+
+### Fixed
+
+- **Door/window pause not working during manual override**: The `pause_any` trigger (from door/window sensors) was being blocked by the manual override check, so open doors wouldn't pause the HVAC when a manual override was active. Now `pause_any` triggers bypass the override check, allowing doors to pause HVAC even during overrides. When doors close during an override, the HVAC is restored to its previous mode without changing setpoints (preserving the manual adjustments).
+
 ## [4.23.2] — 2026-01-01
 
 ### Fixed
