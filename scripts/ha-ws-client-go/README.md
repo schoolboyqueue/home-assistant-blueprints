@@ -36,6 +36,19 @@ Download the appropriate binary for your platform from the releases page:
 - `ha-ws-client-darwin-arm64` - macOS Apple Silicon
 - `ha-ws-client-darwin-amd64` - macOS Intel
 
+### One Shot Installation on Home Assistant OS
+
+The following one shot command will download the appropriate binary for your architecture, place it at `/config/.claude/ha-ws-client` and make it executable. This command is reusable and will update your binary to the latest version released on GitHub.
+
+```bash
+mkdir -p /config/.claude && \
+curl -s https://api.github.com/repos/schoolboyqueue/home-assistant-blueprints/releases | \
+grep -om1 "https://[^\"]*ha-ws-client-linux-$(uname -m | \
+sed 's/x86_64/amd64/;s/aarch64/arm64/;s/armv7l/armv7/;s/armv6l/armv6/')" | \
+xargs -r curl -sL -o /config/.claude/ha-ws-client && \
+chmod +x /config/.claude/ha-ws-client
+```
+
 ### Build from Source
 
 Requires Go 1.22 or later:
