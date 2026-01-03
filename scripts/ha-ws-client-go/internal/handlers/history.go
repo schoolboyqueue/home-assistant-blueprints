@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -352,6 +353,147 @@ func handleStats(ctx *Context) error {
 			return fmt.Sprintf("%s: min=%.2f, max=%.2f, mean=%.2f", startTime, s.Min, s.Max, s.Mean)
 		}),
 	)
+	return nil
+}
+
+// EntityStatsSummary holds aggregated statistics for a single entity.
+type EntityStatsSummary struct {
+	EntityID   string  `json:"entity_id"`
+	Min        float64 `json:"min"`
+	Max        float64 `json:"max"`
+	Mean       float64 `json:"mean"`
+	Sum        float64 `json:"sum"`
+	DataPoints int     `json:"data_points"`
+	Error      string  `json:"error,omitempty"`
+}
+
+// HandleStatsMulti gets sensor statistics for multiple entities concurrently.
+// Uses batch execution to fan-out statistics requests with error collection.
+func HandleStatsMulti(ctx *Context) error {
+	if len(ctx.Args) < 2 {
+		return errors.New("usage: stats-multi <entity>... [hours]")
+	}
+
+	// Check if the last argument is a number (hours)
+	args := ctx.Args[1:]
+	hours := 24
+	var entities []string
+
+	if len(args) > 1 {
+		if parsed, parseErr := strconv.Atoi(args[len(args)-1]); parseErr == nil {
+			hours = parsed
+			entities = args[:len(args)-1]
+		} else {
+			entities = args
+		}
+	} else {
+		entities = args
+	}
+
+	if len(entities) == 0 {
+		return errors.New("usage: stats-multi <entity>... [hours]")
+	}
+
+	endTime := time.Now()
+	startTime := endTime.Add(-time.Duration(hours) * time.Hour)
+
+	output.Message(fmt.Sprintf("Fetching statistics for %d entities (last %d hours, concurrent requests)...", len(entities), hours))
+
+	// Use batch executor to fetch stats concurrently
+	results := BatchExecutor(
+		context.Background(),
+		entities,
+		func(e string) string { return e },
+		func(_ context.Context, _ int, entityID string) (EntityStatsSummary, error) {
+			result, err := client.SendMessageTyped[map[string][]types.StatEntry](ctx.Client, "recorder/statistics_during_period", map[string]any{
+				"start_time":    startTime.Format(time.RFC3339),
+				"end_time":      endTime.Format(time.RFC3339),
+				"statistic_ids": []string{entityID},
+				"period":        "hour",
+			})
+			if err != nil {
+				return EntityStatsSummary{EntityID: entityID}, err
+			}
+
+			stats, ok := result[entityID]
+			if !ok || len(stats) == 0 {
+				return EntityStatsSummary{EntityID: entityID}, fmt.Errorf("no statistics found")
+			}
+
+			// Calculate aggregated statistics
+			summary := EntityStatsSummary{
+				EntityID:   entityID,
+				Min:        stats[0].Min,
+				Max:        stats[0].Max,
+				DataPoints: len(stats),
+			}
+
+			var sum float64
+			for _, s := range stats {
+				if s.Min < summary.Min {
+					summary.Min = s.Min
+				}
+				if s.Max > summary.Max {
+					summary.Max = s.Max
+				}
+				sum += s.Mean
+				summary.Sum += s.Sum
+			}
+			summary.Mean = sum / float64(len(stats))
+
+			return summary, nil
+		},
+		BatchConfig{
+			MaxConcurrency:  10, // Limit concurrent requests to avoid overwhelming the server
+			ContinueOnError: true,
+		},
+	)
+
+	// Collect successful results
+	successful := results.Successful()
+	failed := results.Failed()
+
+	// Build output data
+	var summaries []EntityStatsSummary
+	for _, r := range successful {
+		summaries = append(summaries, r.Result)
+	}
+
+	// Add failed entities with error messages
+	for _, f := range failed {
+		summaries = append(summaries, EntityStatsSummary{
+			EntityID: f.Item,
+			Error:    f.Err.Error(),
+		})
+	}
+
+	// Sort by entity ID for consistent output
+	sort.Slice(summaries, func(i, j int) bool {
+		return summaries[i].EntityID < summaries[j].EntityID
+	})
+
+	if output.IsJSON() {
+		output.Data(map[string]any{
+			"entities":   summaries,
+			"hours":      hours,
+			"successful": len(successful),
+			"failed":     len(failed),
+		}, output.WithCommand("stats-multi"), output.WithCount(len(entities)))
+	} else {
+		fmt.Printf("\nStatistics Summary (%d hours):\n", hours)
+		fmt.Printf("Successfully fetched: %d/%d entities\n\n", len(successful), len(entities))
+
+		for _, s := range summaries {
+			if s.Error != "" {
+				fmt.Printf("  %s: ERROR - %s\n", s.EntityID, s.Error)
+			} else {
+				fmt.Printf("  %s:\n", s.EntityID)
+				fmt.Printf("    min=%.2f, max=%.2f, mean=%.2f, sum=%.2f (%d data points)\n",
+					s.Min, s.Max, s.Mean, s.Sum, s.DataPoints)
+			}
+		}
+	}
+
 	return nil
 }
 

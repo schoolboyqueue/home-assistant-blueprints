@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -9,8 +10,9 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/urfave/cli/v3"
 
-	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/cli"
+	hacli "github.com/home-assistant-blueprints/ha-ws-client-go/internal/cli"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/client"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/handlers"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/output"
@@ -28,249 +30,395 @@ const (
 	defaultTimeout = 30 * time.Second
 )
 
-var commandRegistry = map[string]func(*handlers.Context) error{
-	// Basic commands
-	"ping":          handlers.HandlePing,
-	"state":         handlers.HandleState,
-	"states":        handlers.HandleStates,
-	"states-json":   handlers.HandleStatesJSON,
-	"states-filter": handlers.HandleStatesFilter,
-	"config":        handlers.HandleConfig,
-	"services":      handlers.HandleServices,
-	"call":          handlers.HandleCall,
-	"template":      handlers.HandleTemplate,
-
-	// History commands
-	"logbook":      handlers.HandleLogbook,
-	"history":      handlers.HandleHistory,
-	"history-full": handlers.HandleHistoryFull,
-	"attrs":        handlers.HandleAttrs,
-	"timeline":     handlers.HandleTimeline,
-	"syslog":       handlers.HandleSyslog,
-	"stats":        handlers.HandleStats,
-	"context":      handlers.HandleContext,
-	"watch":        handlers.HandleWatch,
-
-	// Registry commands
-	"entities": handlers.HandleEntities,
-	"devices":  handlers.HandleDevices,
-	"areas":    handlers.HandleAreas,
-
-	// Automation commands
-	"traces":            handlers.HandleTraces,
-	"trace":             handlers.HandleTrace,
-	"trace-latest":      handlers.HandleTraceLatest,
-	"trace-summary":     handlers.HandleTraceSummary,
-	"trace-vars":        handlers.HandleTraceVars,
-	"trace-timeline":    handlers.HandleTraceTimeline,
-	"trace-trigger":     handlers.HandleTraceTrigger,
-	"trace-actions":     handlers.HandleTraceActions,
-	"trace-debug":       handlers.HandleTraceDebug,
-	"automation-config": handlers.HandleAutomationConfig,
-	"blueprint-inputs":  handlers.HandleBlueprintInputs,
-
-	// Monitor commands
-	"monitor":       handlers.HandleMonitor,
-	"monitor-multi": handlers.HandleMonitorMulti,
-	"analyze":       handlers.HandleAnalyze,
-
-	// Diagnostic commands
-	"device-health": handlers.HandleDeviceHealth,
-	"compare":       handlers.HandleCompare,
-}
-
-func showHelp() {
-	fmt.Print(`Usage: ha-ws-client <command> [args...] [--from "TIME"] [--to "TIME"]
-
-Commands:
-  state <entity_id>              - Get single entity state
-  states                         - Get all entity states (summary)
-  states-json                    - Get all states as JSON array
-  states-filter <pattern>        - Filter states by entity_id pattern (--show-age)
-  config                         - Get HA configuration
-  services                       - List all services
-  call <domain> <service> [data] - Call a service (data as JSON)
-  template <template>            - Render a Jinja template (use - for stdin)
-  ping                           - Test connection
-
-Log Commands:
-  logbook <entity_id> [hours]    - Get logbook entries (default 24h)
-  history <entity_id> [hours]    - Get state history (default 24h)
-  history-full <entity_id> [hours] - Get history with full attributes
-  attrs <entity_id> [hours]      - Attribute change history (compact)
-  timeline <hours> <entity>...   - Multi-entity chronological timeline
-  syslog                         - Get system log errors/warnings
-  stats <entity_id> [hours]      - Get sensor statistics (default 24h)
-  context <context_id>           - Look up what triggered a state change
-  watch <entity_id> [seconds]    - Live subscribe to state changes (default 60s)
-
-Registry Commands:
-  entities [pattern]             - List/search entity registry
-  devices [pattern]              - List/search device registry
-  areas                          - List all areas
-
-Automation Debugging:
-  traces [automation_id]         - List automation traces (supports --from)
-  trace <automation_id> <run_id> - Get detailed trace for a run
-  trace-latest <automation_id>   - Get the most recent trace
-  trace-summary <automation_id>  - Quick overview of recent runs
-  trace-vars <auto_id> <run_id>  - Show evaluated variables from trace
-  trace-timeline <id> <run_id>   - Step-by-step execution timeline
-  trace-trigger <id> <run_id>    - Show trigger context details
-  trace-actions <id> <run_id>    - Show action results
-  trace-debug <id> <run_id>      - Comprehensive debug view (all info)
-  automation-config <entity_id>  - Get automation configuration
-  blueprint-inputs <entity_id>   - Validate blueprint inputs vs expected
-
-Monitoring Commands:
-  monitor <entity_id> [seconds]  - Monitor entity state changes
-  monitor-multi <entity>...      - Monitor multiple entities
-  analyze <entity_id>            - Analyze entity state patterns
-
-Diagnostic Commands:
-  device-health <entity_id>      - Check if device is responsive (stale detection)
-  compare <entity1> <entity2>    - Side-by-side entity comparison
-
-Time Filtering Options (for logbook, history, history-full, attrs, timeline, traces):
-  --from "YYYY-MM-DD HH:MM"      - Start time (instead of hours ago)
-  --to "YYYY-MM-DD HH:MM"        - End time (default: now)
-
-Output Format Options (for AI agent context efficiency):
-  --output=json                  - Machine-readable JSON (most context-efficient)
-  --output=compact               - Reduced verbosity, single-line entries
-  --output=default               - Human-readable formatted output
-  --json                         - Shorthand for --output=json
-  --compact                      - Shorthand for --output=compact
-  --no-headers                   - Hide section headers/titles
-  --no-timestamps                - Hide timestamps in output
-  --max-items=N                  - Limit output to N items
-  --show-age                     - Show last_updated age (states-filter)
-
-Global Options:
-  --help, -h, help               - Show this help message
-  --version, -v, version         - Show version information
-
-Examples:
-  ha-ws-client state sun.sun
-  ha-ws-client call light turn_on '{"entity_id":"light.kitchen"}'
-  ha-ws-client attrs light.kitchen 4
-  ha-ws-client watch binary_sensor.motion 30
-  ha-ws-client states-filter "cover.*" --show-age --compact
-  ha-ws-client trace-latest automation.bathroom_lights
-  ha-ws-client trace-summary automation.adaptive_shades
-  ha-ws-client traces automation.kitchen --from "2024-01-01"
-  ha-ws-client device-health cover.guest_bedroom_shade
-  ha-ws-client compare cover.living_room_shade cover.guest_bedroom_shade
-  echo "{{ now() }}" | ha-ws-client template -
-`)
-}
-
-func showVersion() {
-	fmt.Printf("ha-ws-client %s\n", Version)
-	fmt.Printf("  Build time: %s\n", BuildTime)
-	fmt.Printf("  Git commit: %s\n", GitCommit)
-}
-
 func main() {
-	os.Exit(run())
+	cmd := &cli.Command{
+		Name:    "ha-ws-client",
+		Usage:   "Home Assistant WebSocket API client",
+		Version: Version,
+		Flags: []cli.Flag{
+			// Time filtering flags
+			&cli.StringFlag{
+				Name:  "from",
+				Usage: "Start time for filtering (YYYY-MM-DD or YYYY-MM-DD HH:MM)",
+			},
+			&cli.StringFlag{
+				Name:  "to",
+				Usage: "End time for filtering (YYYY-MM-DD or YYYY-MM-DD HH:MM)",
+			},
+			// Output format flags
+			&cli.StringFlag{
+				Name:    "output",
+				Aliases: []string{"format"},
+				Value:   "default",
+				Usage:   "Output format: json, compact, or default",
+			},
+			&cli.BoolFlag{
+				Name:  "compact",
+				Usage: "Use compact output format (single-line entries)",
+			},
+			&cli.BoolFlag{
+				Name:  "json",
+				Usage: "Use JSON output format (machine-readable)",
+			},
+			&cli.BoolFlag{
+				Name:  "no-headers",
+				Usage: "Hide section headers and titles",
+			},
+			&cli.BoolFlag{
+				Name:  "no-timestamps",
+				Usage: "Hide timestamps in output",
+			},
+			&cli.BoolFlag{
+				Name:  "show-age",
+				Usage: "Show last_updated age for states-filter command",
+			},
+			&cli.IntFlag{
+				Name:  "max-items",
+				Usage: "Limit output to N items (0 = unlimited)",
+			},
+		},
+		Commands: buildCommands(),
+	}
+
+	if err := cmd.Run(context.Background(), os.Args); err != nil {
+		os.Exit(1)
+	}
 }
 
-func run() int {
-	rawArgs := os.Args[1:]
+// buildCommands creates all CLI commands
+func buildCommands() []*cli.Command {
+	return []*cli.Command{
+		// Basic commands
+		{
+			Name:      "ping",
+			Usage:     "Test connection",
+			Action:    wrapHandler(handlers.HandlePing),
+			ArgsUsage: "",
+		},
+		{
+			Name:      "state",
+			Usage:     "Get single entity state",
+			Action:    wrapHandler(handlers.HandleState),
+			ArgsUsage: "<entity_id>",
+		},
+		{
+			Name:      "states",
+			Usage:     "Get all entity states (summary)",
+			Action:    wrapHandler(handlers.HandleStates),
+			ArgsUsage: "",
+		},
+		{
+			Name:      "states-json",
+			Usage:     "Get all states as JSON array",
+			Action:    wrapHandler(handlers.HandleStatesJSON),
+			ArgsUsage: "",
+		},
+		{
+			Name:      "states-filter",
+			Usage:     "Filter states by entity_id pattern",
+			Action:    wrapHandler(handlers.HandleStatesFilter),
+			ArgsUsage: "<pattern>",
+		},
+		{
+			Name:      "config",
+			Usage:     "Get HA configuration",
+			Action:    wrapHandler(handlers.HandleConfig),
+			ArgsUsage: "",
+		},
+		{
+			Name:      "services",
+			Usage:     "List all services",
+			Action:    wrapHandler(handlers.HandleServices),
+			ArgsUsage: "",
+		},
+		{
+			Name:      "call",
+			Usage:     "Call a service (data as JSON)",
+			Action:    wrapHandler(handlers.HandleCall),
+			ArgsUsage: "<domain> <service> [data]",
+		},
+		{
+			Name:      "template",
+			Usage:     "Render a Jinja template (use - for stdin)",
+			Action:    wrapHandler(handlers.HandleTemplate),
+			ArgsUsage: "<template>",
+		},
 
-	// Show help if no arguments
-	if len(rawArgs) == 0 {
-		showHelp()
-		return 0
+		// History commands
+		{
+			Name:      "logbook",
+			Usage:     "Get logbook entries (default 24h)",
+			Action:    wrapHandler(handlers.HandleLogbook),
+			ArgsUsage: "<entity_id> [hours]",
+		},
+		{
+			Name:      "history",
+			Usage:     "Get state history (default 24h)",
+			Action:    wrapHandler(handlers.HandleHistory),
+			ArgsUsage: "<entity_id> [hours]",
+		},
+		{
+			Name:      "history-full",
+			Usage:     "Get history with full attributes",
+			Action:    wrapHandler(handlers.HandleHistoryFull),
+			ArgsUsage: "<entity_id> [hours]",
+		},
+		{
+			Name:      "attrs",
+			Usage:     "Attribute change history (compact)",
+			Action:    wrapHandler(handlers.HandleAttrs),
+			ArgsUsage: "<entity_id> [hours]",
+		},
+		{
+			Name:      "timeline",
+			Usage:     "Multi-entity chronological timeline",
+			Action:    wrapHandler(handlers.HandleTimeline),
+			ArgsUsage: "<hours> <entity>...",
+		},
+		{
+			Name:      "syslog",
+			Usage:     "Get system log errors/warnings",
+			Action:    wrapHandler(handlers.HandleSyslog),
+			ArgsUsage: "",
+		},
+		{
+			Name:      "stats",
+			Usage:     "Get sensor statistics (default 24h)",
+			Action:    wrapHandler(handlers.HandleStats),
+			ArgsUsage: "<entity_id> [hours]",
+		},
+		{
+			Name:      "stats-multi",
+			Usage:     "Get statistics for multiple entities",
+			Action:    wrapHandler(handlers.HandleStatsMulti),
+			ArgsUsage: "<entity>... [hours]",
+		},
+		{
+			Name:      "context",
+			Usage:     "Look up what triggered a state change",
+			Action:    wrapHandler(handlers.HandleContext),
+			ArgsUsage: "<context_id>",
+		},
+		{
+			Name:      "watch",
+			Usage:     "Live subscribe to state changes (default 60s)",
+			Action:    wrapHandler(handlers.HandleWatch),
+			ArgsUsage: "<entity_id> [seconds]",
+		},
+
+		// Registry commands
+		{
+			Name:      "entities",
+			Usage:     "List/search entity registry",
+			Action:    wrapHandler(handlers.HandleEntities),
+			ArgsUsage: "[pattern]",
+		},
+		{
+			Name:      "devices",
+			Usage:     "List/search device registry",
+			Action:    wrapHandler(handlers.HandleDevices),
+			ArgsUsage: "[pattern]",
+		},
+		{
+			Name:      "areas",
+			Usage:     "List all areas",
+			Action:    wrapHandler(handlers.HandleAreas),
+			ArgsUsage: "",
+		},
+
+		// Automation debugging commands
+		{
+			Name:      "traces",
+			Usage:     "List automation traces",
+			Action:    wrapHandler(handlers.HandleTraces),
+			ArgsUsage: "[automation_id]",
+		},
+		{
+			Name:      "trace",
+			Usage:     "Get detailed trace for a run",
+			Action:    wrapHandler(handlers.HandleTrace),
+			ArgsUsage: "<automation_id> <run_id>",
+		},
+		{
+			Name:      "trace-latest",
+			Usage:     "Get the most recent trace",
+			Action:    wrapHandler(handlers.HandleTraceLatest),
+			ArgsUsage: "<automation_id>",
+		},
+		{
+			Name:      "trace-summary",
+			Usage:     "Quick overview of recent runs",
+			Action:    wrapHandler(handlers.HandleTraceSummary),
+			ArgsUsage: "<automation_id>",
+		},
+		{
+			Name:      "trace-vars",
+			Usage:     "Show evaluated variables from trace",
+			Action:    wrapHandler(handlers.HandleTraceVars),
+			ArgsUsage: "<automation_id> <run_id>",
+		},
+		{
+			Name:      "trace-timeline",
+			Usage:     "Step-by-step execution timeline",
+			Action:    wrapHandler(handlers.HandleTraceTimeline),
+			ArgsUsage: "<automation_id> <run_id>",
+		},
+		{
+			Name:      "trace-trigger",
+			Usage:     "Show trigger context details",
+			Action:    wrapHandler(handlers.HandleTraceTrigger),
+			ArgsUsage: "<automation_id> <run_id>",
+		},
+		{
+			Name:      "trace-actions",
+			Usage:     "Show action results",
+			Action:    wrapHandler(handlers.HandleTraceActions),
+			ArgsUsage: "<automation_id> <run_id>",
+		},
+		{
+			Name:      "trace-debug",
+			Usage:     "Comprehensive debug view (all info)",
+			Action:    wrapHandler(handlers.HandleTraceDebug),
+			ArgsUsage: "<automation_id> <run_id>",
+		},
+		{
+			Name:      "automation-config",
+			Usage:     "Get automation configuration",
+			Action:    wrapHandler(handlers.HandleAutomationConfig),
+			ArgsUsage: "<entity_id>",
+		},
+		{
+			Name:      "blueprint-inputs",
+			Usage:     "Validate blueprint inputs vs expected",
+			Action:    wrapHandler(handlers.HandleBlueprintInputs),
+			ArgsUsage: "<entity_id>",
+		},
+
+		// Monitoring commands
+		{
+			Name:      "monitor",
+			Usage:     "Monitor entity state changes",
+			Action:    wrapHandler(handlers.HandleMonitor),
+			ArgsUsage: "<entity_id> [seconds]",
+		},
+		{
+			Name:      "monitor-multi",
+			Usage:     "Monitor multiple entities",
+			Action:    wrapHandler(handlers.HandleMonitorMulti),
+			ArgsUsage: "<entity>...",
+		},
+		{
+			Name:      "analyze",
+			Usage:     "Analyze entity state patterns",
+			Action:    wrapHandler(handlers.HandleAnalyze),
+			ArgsUsage: "<entity_id>",
+		},
+
+		// Diagnostic commands
+		{
+			Name:      "device-health",
+			Usage:     "Check if device is responsive",
+			Action:    wrapHandler(handlers.HandleDeviceHealth),
+			ArgsUsage: "<entity_id>",
+		},
+		{
+			Name:      "compare",
+			Usage:     "Side-by-side entity comparison",
+			Action:    wrapHandler(handlers.HandleCompare),
+			ArgsUsage: "<entity1> <entity2>",
+		},
 	}
+}
 
-	// Parse all flags using the standard flag package
-	flags, err := cli.Parse(rawArgs)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return 1
-	}
-
-	// Check for version first
-	if flags.ShowVersion() {
-		showVersion()
-		return 0
-	}
-
-	// Check for help
-	if flags.ShowHelp() || len(flags.Args) == 0 {
-		showHelp()
-		return 0
-	}
-
-	// Configure output settings from parsed flags
-	output.ConfigureFromFlags(
-		flags.GetOutputFormat(),
-		flags.NoHeaders,
-		flags.NoTimestamps,
-		flags.ShowAge,
-		flags.MaxItems,
-	)
-
-	command := flags.Args[0]
-
-	// Get supervisor token
-	token := os.Getenv("SUPERVISOR_TOKEN")
-	if token == "" {
-		fmt.Fprintln(os.Stderr, "Error: SUPERVISOR_TOKEN environment variable not set")
-		return 1
-	}
-
-	// Connect to WebSocket
-	header := http.Header{}
-	header.Set("Authorization", "Bearer "+token)
-
-	dialer := websocket.Dialer{
-		HandshakeTimeout: defaultTimeout,
-	}
-
-	conn, _, err := dialer.Dial(wsURL, header)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to connect to Home Assistant: %v\n", err)
-		return 1
-	}
-	defer conn.Close()
-
-	// Authenticate
-	if err := authenticate(conn, token); err != nil {
-		fmt.Fprintf(os.Stderr, "Authentication failed: %v\n", err)
-		return 1
-	}
-
-	// Create client
-	c := client.New(conn)
-
-	// Create handler context
-	ctx := &handlers.Context{
-		Client:   c,
-		Args:     flags.Args,
-		FromTime: flags.FromTime,
-		ToTime:   flags.ToTime,
-	}
-
-	// Look up and execute command
-	handler, ok := commandRegistry[command]
-	if !ok {
-		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", command)
-		return 1
-	}
-
-	if err := handler(ctx); err != nil {
-		var clientErr *client.HAClientError
-		if errors.As(err, &clientErr) {
-			output.Error(err, clientErr.Code)
-		} else {
-			output.Error(err, "")
+// wrapHandler wraps a handlers.Context function into a cli.ActionFunc
+func wrapHandler(handler func(*handlers.Context) error) cli.ActionFunc {
+	return func(_ context.Context, cmd *cli.Command) error {
+		// Parse time flags from root command
+		var fromTime, toTime *time.Time
+		if fromStr := cmd.String("from"); fromStr != "" {
+			t, err := hacli.ParseFlexibleDate(fromStr)
+			if err != nil {
+				return fmt.Errorf("invalid --from value: %w", err)
+			}
+			fromTime = &t
 		}
-		return 1
-	}
+		if toStr := cmd.String("to"); toStr != "" {
+			t, err := hacli.ParseFlexibleDate(toStr)
+			if err != nil {
+				return fmt.Errorf("invalid --to value: %w", err)
+			}
+			toTime = &t
+		}
 
-	return 0
+		// Determine output format
+		outputFormat := cmd.String("output")
+		if cmd.Bool("json") {
+			outputFormat = "json"
+		} else if cmd.Bool("compact") {
+			outputFormat = "compact"
+		}
+
+		// Configure output settings
+		output.ConfigureFromFlags(
+			outputFormat,
+			cmd.Bool("no-headers"),
+			cmd.Bool("no-timestamps"),
+			cmd.Bool("show-age"),
+			cmd.Int("max-items"),
+		)
+
+		// Get supervisor token
+		token := os.Getenv("SUPERVISOR_TOKEN")
+		if token == "" {
+			return cli.Exit("Error: SUPERVISOR_TOKEN environment variable not set", 1)
+		}
+
+		// Connect to WebSocket
+		header := http.Header{}
+		header.Set("Authorization", "Bearer "+token)
+
+		dialer := websocket.Dialer{
+			HandshakeTimeout: defaultTimeout,
+		}
+
+		conn, _, err := dialer.Dial(wsURL, header)
+		if err != nil {
+			return cli.Exit(fmt.Sprintf("Failed to connect to Home Assistant: %v", err), 1)
+		}
+		defer conn.Close()
+
+		// Authenticate
+		if err := authenticate(conn, token); err != nil {
+			return cli.Exit(fmt.Sprintf("Authentication failed: %v", err), 1)
+		}
+
+		// Create client
+		haClient := client.New(conn)
+
+		// Build args array with command name first (for backward compatibility with handlers)
+		args := append([]string{cmd.Name}, cmd.Args().Slice()...)
+
+		// Create handler context
+		handlerCtx := &handlers.Context{
+			Client:   haClient,
+			Args:     args,
+			FromTime: fromTime,
+			ToTime:   toTime,
+		}
+
+		// Execute handler
+		if err := handler(handlerCtx); err != nil {
+			var clientErr *client.HAClientError
+			if errors.As(err, &clientErr) {
+				output.Error(err, clientErr.Code)
+			} else {
+				output.Error(err, "")
+			}
+			return cli.Exit("", 1)
+		}
+
+		return nil
+	}
 }
 
 func authenticate(conn *websocket.Conn, token string) error {

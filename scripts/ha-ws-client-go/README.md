@@ -75,7 +75,10 @@ ha-ws-client trace-debug 01KDQS4E2WHMYJYYXKC7K28XFG
 
 # Real-time monitoring
 ha-ws-client watch binary_sensor.motion 60
-ha-ws-client monitor-multi light.kitchen light.living_room
+ha-ws-client monitor-multi light.kitchen light.living_room 120
+
+# Batch statistics (concurrent requests)
+ha-ws-client stats-multi sensor.temp_kitchen sensor.temp_bedroom sensor.temp_living 48
 ```
 
 ## Commands
@@ -109,6 +112,7 @@ ha-ws-client monitor-multi light.kitchen light.living_room
 | `timeline <hours> <entity>...` | Multi-entity chronological timeline |
 | `syslog` | Get system log errors/warnings |
 | `stats <entity_id> [hours]` | Get sensor statistics |
+| `stats-multi <entity>... [hours]` | Get statistics for multiple entities concurrently |
 | `context <context_id>` | Look up what triggered a state change |
 | `watch <entity_id> [seconds]` | Live subscribe to state changes |
 
@@ -138,7 +142,7 @@ ha-ws-client monitor-multi light.kitchen light.living_room
 | Command | Description |
 |---------|-------------|
 | `monitor <entity_id>` | Monitor entity state changes |
-| `monitor-multi <entity>...` | Monitor multiple entities |
+| `monitor-multi <entity>... [seconds]` | Monitor multiple entities concurrently (default 60s) |
 | `analyze <entity_id>` | Analyze entity state patterns |
 
 ## Output Formats
@@ -433,6 +437,7 @@ ha-ws-client-go/
 │   │   └── client.go
 │   ├── handlers/        # Command handlers
 │   │   ├── basic.go
+│   │   ├── batch.go      # Concurrent batch executor
 │   │   ├── history.go
 │   │   ├── automation.go
 │   │   ├── registry.go

@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"fmt"
+	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/client"
@@ -9,36 +11,71 @@ import (
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
 
+// RegistryConfig holds the configuration for a filtered registry handler.
+type RegistryConfig[T any] struct {
+	// MessageType is the WebSocket message type to fetch data (e.g., "config/entity_registry/list").
+	MessageType string
+	// Title is the list title shown in output.
+	Title string
+	// Command is the command name for JSON output.
+	Command string
+	// MatchFields returns the string fields to match against the pattern for a given item.
+	MatchFields func(item T) []string
+	// Formatter formats an item for display output.
+	Formatter func(item T, index int) string
+}
+
+// FilteredRegistryHandler creates a handler that fetches registry data,
+// optionally filters by pattern, and outputs the results.
+// This is a generic helper that unifies the pattern-filtering logic used by
+// entities, devices, and similar registry commands.
+func FilteredRegistryHandler[T any](cfg RegistryConfig[T]) Handler {
+	return func(ctx *Context) error {
+		re := ctx.Config.Pattern
+
+		items, err := client.SendMessageTyped[[]T](ctx.Client, cfg.MessageType, nil)
+		if err != nil {
+			return err
+		}
+
+		// Filter by pattern if provided
+		if re != nil {
+			items = filterByPattern(items, re, cfg.MatchFields)
+		}
+
+		output.List(items,
+			output.ListTitle[T](cfg.Title),
+			output.ListCommand[T](cfg.Command),
+			output.ListFormatter(cfg.Formatter),
+		)
+		return nil
+	}
+}
+
+// filterByPattern filters a slice of items, keeping only those where at least
+// one of the match fields matches the given pattern.
+func filterByPattern[T any](items []T, re *regexp.Regexp, matchFields func(T) []string) []T {
+	var filtered []T
+	for _, item := range items {
+		if slices.ContainsFunc(matchFields(item), re.MatchString) {
+			filtered = append(filtered, item)
+		}
+	}
+	return filtered
+}
+
 // HandleEntities lists or searches the entity registry.
 // Wrapped with: WithPattern(1)
 var HandleEntities = Apply(
 	WithPattern(1),
-	handleEntities,
-)
-
-func handleEntities(ctx *Context) error {
-	re := ctx.Config.Pattern
-
-	entries, err := client.SendMessageTyped[[]types.EntityEntry](ctx.Client, "config/entity_registry/list", nil)
-	if err != nil {
-		return err
-	}
-
-	// Filter by pattern if provided
-	if re != nil {
-		var filtered []types.EntityEntry
-		for _, e := range entries {
-			if re.MatchString(e.EntityID) || re.MatchString(e.Name) || re.MatchString(e.OriginalName) {
-				filtered = append(filtered, e)
-			}
-		}
-		entries = filtered
-	}
-
-	output.List(entries,
-		output.ListTitle[types.EntityEntry]("Entity registry"),
-		output.ListCommand[types.EntityEntry]("entities"),
-		output.ListFormatter(func(e types.EntityEntry, _ int) string {
+	FilteredRegistryHandler(RegistryConfig[types.EntityEntry]{
+		MessageType: "config/entity_registry/list",
+		Title:       "Entity registry",
+		Command:     "entities",
+		MatchFields: func(e types.EntityEntry) []string {
+			return []string{e.EntityID, e.Name, e.OriginalName}
+		},
+		Formatter: func(e types.EntityEntry, _ int) string {
 			name := e.Name
 			if name == "" {
 				name = e.OriginalName
@@ -51,45 +88,26 @@ func handleEntities(ctx *Context) error {
 				return fmt.Sprintf("%s (%s)%s", e.EntityID, name, disabled)
 			}
 			return fmt.Sprintf("%s\n  Name: %s\n  Platform: %s%s", e.EntityID, name, e.Platform, disabled)
-		}),
-	)
-	return nil
-}
+		},
+	}),
+)
 
 // HandleDevices lists or searches the device registry.
 // Wrapped with: WithPattern(1)
 var HandleDevices = Apply(
 	WithPattern(1),
-	handleDevices,
-)
-
-func handleDevices(ctx *Context) error {
-	re := ctx.Config.Pattern
-
-	devices, err := client.SendMessageTyped[[]types.DeviceEntry](ctx.Client, "config/device_registry/list", nil)
-	if err != nil {
-		return err
-	}
-
-	// Filter by pattern if provided
-	if re != nil {
-		var filtered []types.DeviceEntry
-		for _, d := range devices {
+	FilteredRegistryHandler(RegistryConfig[types.DeviceEntry]{
+		MessageType: "config/device_registry/list",
+		Title:       "Device registry",
+		Command:     "devices",
+		MatchFields: func(d types.DeviceEntry) []string {
 			name := d.Name
 			if d.NameByUser != "" {
 				name = d.NameByUser
 			}
-			if re.MatchString(d.ID) || re.MatchString(name) || re.MatchString(d.Manufacturer) || re.MatchString(d.Model) {
-				filtered = append(filtered, d)
-			}
-		}
-		devices = filtered
-	}
-
-	output.List(devices,
-		output.ListTitle[types.DeviceEntry]("Device registry"),
-		output.ListCommand[types.DeviceEntry]("devices"),
-		output.ListFormatter(func(d types.DeviceEntry, _ int) string {
+			return []string{d.ID, name, d.Manufacturer, d.Model}
+		},
+		Formatter: func(d types.DeviceEntry, _ int) string {
 			name := d.Name
 			if d.NameByUser != "" {
 				name = d.NameByUser
@@ -99,10 +117,9 @@ func handleDevices(ctx *Context) error {
 			}
 			return fmt.Sprintf("%s\n  Name: %s\n  Manufacturer: %s\n  Model: %s\n  Area: %s",
 				d.ID, name, d.Manufacturer, d.Model, d.AreaID)
-		}),
-	)
-	return nil
-}
+		},
+	}),
+)
 
 // HandleAreas lists all areas.
 func HandleAreas(ctx *Context) error {

@@ -1,9 +1,12 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/output"
@@ -68,7 +71,14 @@ func handleMonitor(ctx *Context) error {
 	return nil
 }
 
-// HandleMonitorMulti monitors multiple entities.
+// subscriptionResult holds the result of a subscription attempt.
+type subscriptionResult struct {
+	EntityID string
+	Cleanup  func()
+}
+
+// HandleMonitorMulti monitors multiple entities concurrently.
+// Uses batch execution to fan-out subscription requests with error collection.
 func HandleMonitorMulti(ctx *Context) error {
 	if len(ctx.Args) < 2 {
 		return errors.New("usage: monitor-multi <entity>... [seconds]")
@@ -94,62 +104,95 @@ func HandleMonitorMulti(ctx *Context) error {
 		return errors.New("usage: monitor-multi <entity>... [seconds]")
 	}
 
-	output.Message(fmt.Sprintf("Monitoring %d entities for %d seconds...", len(entities), seconds))
+	output.Message(fmt.Sprintf("Monitoring %d entities for %d seconds (concurrent subscriptions)...", len(entities), seconds))
 
-	changeCount := 0
+	// Thread-safe counter for state changes
+	var changeCount atomic.Int64
+
+	// Mutex for cleanups slice
+	var cleanupsMu sync.Mutex
 	cleanups := make([]func(), 0, len(entities))
 
-	for _, entityID := range entities {
-		trigger := map[string]any{
-			"platform":  "state",
-			"entity_id": entityID,
-		}
+	// Use batch executor to subscribe concurrently
+	results := BatchExecutor(
+		context.Background(),
+		entities,
+		func(e string) string { return e },
+		func(_ context.Context, _ int, entityID string) (subscriptionResult, error) {
+			trigger := map[string]any{
+				"platform":  "state",
+				"entity_id": entityID,
+			}
 
-		currentEntity := entityID // Capture for closure
-		_, cleanup, err := ctx.Client.SubscribeToTrigger(trigger, func(vars map[string]any) {
-			changeCount++
-			if triggerData, ok := vars["trigger"].(map[string]any); ok {
-				if toState, ok := triggerData["to_state"].(map[string]any); ok {
-					state := toState["state"]
-					fromState := ""
-					if fs, ok := triggerData["from_state"].(map[string]any); ok {
-						fromState = fmt.Sprintf("%v", fs["state"])
-					}
+			_, cleanup, err := ctx.Client.SubscribeToTrigger(trigger, func(vars map[string]any) {
+				count := changeCount.Add(1)
+				if triggerData, ok := vars["trigger"].(map[string]any); ok {
+					if toState, ok := triggerData["to_state"].(map[string]any); ok {
+						state := toState["state"]
+						fromState := ""
+						if fs, ok := triggerData["from_state"].(map[string]any); ok {
+							fromState = fmt.Sprintf("%v", fs["state"])
+						}
 
-					if output.IsJSON() {
-						output.Data(map[string]any{
-							"timestamp":  time.Now().Format(time.RFC3339),
-							"entity_id":  currentEntity,
-							"from_state": fromState,
-							"to_state":   state,
-							"change_num": changeCount,
-						})
-					} else {
-						fmt.Printf("[%d] %s %s: %s -> %v\n", changeCount, output.FormatTime(time.Now()), currentEntity, fromState, state)
+						if output.IsJSON() {
+							output.Data(map[string]any{
+								"timestamp":  time.Now().Format(time.RFC3339),
+								"entity_id":  entityID,
+								"from_state": fromState,
+								"to_state":   state,
+								"change_num": count,
+							})
+						} else {
+							fmt.Printf("[%d] %s %s: %s -> %v\n", count, output.FormatTime(time.Now()), entityID, fromState, state)
+						}
 					}
 				}
+			}, time.Duration(seconds)*time.Second)
+			if err != nil {
+				return subscriptionResult{}, err
 			}
-		}, time.Duration(seconds)*time.Second)
-		if err != nil {
-			// Clean up any subscriptions we've already made
-			for _, c := range cleanups {
-				c()
-			}
-			return fmt.Errorf("failed to subscribe to %s: %w", entityID, err)
-		}
 
-		cleanups = append(cleanups, cleanup)
-	}
+			// Store cleanup function safely
+			cleanupsMu.Lock()
+			cleanups = append(cleanups, cleanup)
+			cleanupsMu.Unlock()
 
+			return subscriptionResult{EntityID: entityID, Cleanup: cleanup}, nil
+		},
+		BatchConfig{
+			MaxConcurrency:  0, // No limit - subscribe to all concurrently
+			ContinueOnError: true,
+		},
+	)
+
+	// Defer cleanup of all successful subscriptions
 	defer func() {
+		cleanupsMu.Lock()
+		defer cleanupsMu.Unlock()
 		for _, cleanup := range cleanups {
 			cleanup()
 		}
 	}()
 
+	// Report any subscription failures
+	failed := results.Failed()
+	if len(failed) > 0 {
+		for _, f := range failed {
+			output.Message(fmt.Sprintf("Warning: failed to subscribe to %s: %v", f.Item, f.Err))
+		}
+	}
+
+	successful := results.Successful()
+	if len(successful) == 0 {
+		return errors.New("failed to subscribe to any entities")
+	}
+
+	output.Message(fmt.Sprintf("Successfully subscribed to %d/%d entities", len(successful), len(entities)))
+
+	// Wait for monitoring duration
 	<-time.After(time.Duration(seconds) * time.Second)
 
-	output.Message(fmt.Sprintf("Monitoring complete. %d state changes observed.", changeCount))
+	output.Message(fmt.Sprintf("Monitoring complete. %d state changes observed.", changeCount.Load()))
 	return nil
 }
 
