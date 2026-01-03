@@ -1,23 +1,10 @@
-// Package testfixtures provides shared test fixtures and factory functions
-// for creating common Home Assistant blueprint YAML structures.
-// This reduces repetitive test code and ensures consistency across tests.
 package testfixtures
-
-import "github.com/home-assistant-blueprints/validate-blueprint-go/internal/common"
-
-// Map is a shorthand for the common map type used in YAML structures.
-// This is an alias for common.RawData for backward compatibility.
-type Map = common.RawData
-
-// List is a shorthand for the common list type used in YAML structures.
-// This is an alias for common.AnyList for backward compatibility.
-type List = common.AnyList
 
 // =====================================
 // Blueprint Section Fixtures
 // =====================================
 
-// MinimalBlueprint returns a minimal valid blueprint structure
+// MinimalBlueprint returns a minimal valid blueprint structure.
 func MinimalBlueprint() Map {
 	return Map{
 		"blueprint": Map{
@@ -31,7 +18,7 @@ func MinimalBlueprint() Map {
 	}
 }
 
-// BlueprintWithName returns a blueprint section with a custom name
+// BlueprintWithName returns a blueprint section with a custom name.
 func BlueprintWithName(name string) Map {
 	return Map{
 		"name":        name,
@@ -41,7 +28,7 @@ func BlueprintWithName(name string) Map {
 	}
 }
 
-// BlueprintSection returns a complete blueprint section
+// BlueprintSection returns a complete blueprint section.
 func BlueprintSection(name, description, domain string) Map {
 	return Map{
 		"name":        name,
@@ -55,7 +42,7 @@ func BlueprintSection(name, description, domain string) Map {
 // Trigger Fixtures
 // =====================================
 
-// StateTrigger creates a state trigger with the given entity_id
+// StateTrigger creates a state trigger with the given entity_id.
 func StateTrigger(entityID string) Map {
 	return Map{
 		"platform":  "state",
@@ -63,7 +50,7 @@ func StateTrigger(entityID string) Map {
 	}
 }
 
-// StateTriggerWithFor creates a state trigger with a for clause
+// StateTriggerWithFor creates a state trigger with a for clause.
 func StateTriggerWithFor(entityID string, forDuration interface{}) Map {
 	return Map{
 		"platform":  "state",
@@ -72,7 +59,7 @@ func StateTriggerWithFor(entityID string, forDuration interface{}) Map {
 	}
 }
 
-// StateTriggerWithToFrom creates a state trigger with to/from states
+// StateTriggerWithToFrom creates a state trigger with to/from states.
 func StateTriggerWithToFrom(entityID, to, from string) Map {
 	return Map{
 		"platform":  "state",
@@ -82,7 +69,7 @@ func StateTriggerWithToFrom(entityID, to, from string) Map {
 	}
 }
 
-// TimeTrigger creates a time trigger
+// TimeTrigger creates a time trigger.
 func TimeTrigger(at string) Map {
 	return Map{
 		"trigger": "time",
@@ -90,7 +77,7 @@ func TimeTrigger(at string) Map {
 	}
 }
 
-// TemplateTrigger creates a template trigger
+// TemplateTrigger creates a template trigger.
 func TemplateTrigger(valueTemplate string) Map {
 	return Map{
 		"platform":       "template",
@@ -98,7 +85,7 @@ func TemplateTrigger(valueTemplate string) Map {
 	}
 }
 
-// DeviceTrigger creates a device trigger
+// DeviceTrigger creates a device trigger.
 func DeviceTrigger(deviceID, domain, triggerType string) Map {
 	return Map{
 		"platform":  "device",
@@ -108,7 +95,7 @@ func DeviceTrigger(deviceID, domain, triggerType string) Map {
 	}
 }
 
-// NumericStateTrigger creates a numeric_state trigger
+// NumericStateTrigger creates a numeric_state trigger.
 func NumericStateTrigger(entityID string, above, below interface{}) Map {
 	t := Map{
 		"platform":  "numeric_state",
@@ -123,14 +110,14 @@ func NumericStateTrigger(entityID string, above, below interface{}) Map {
 	return t
 }
 
-// TriggerWithPlatform creates a trigger with only the platform specified
+// TriggerWithPlatform creates a trigger with only the platform specified.
 func TriggerWithPlatform(platform string) Map {
 	return Map{
 		"platform": platform,
 	}
 }
 
-// InvalidTrigger creates a trigger missing both platform and trigger key
+// InvalidTrigger creates a trigger missing both platform and trigger key.
 func InvalidTrigger() Map {
 	return Map{
 		"entity_id": "light.test",
@@ -141,7 +128,7 @@ func InvalidTrigger() Map {
 // Condition Fixtures
 // =====================================
 
-// StateCondition creates a state condition
+// StateCondition creates a state condition.
 func StateCondition(entityID, state string) Map {
 	return Map{
 		"condition": "state",
@@ -150,7 +137,7 @@ func StateCondition(entityID, state string) Map {
 	}
 }
 
-// NumericStateCondition creates a numeric_state condition
+// NumericStateCondition creates a numeric_state condition.
 func NumericStateCondition(entityID string, above, below interface{}) Map {
 	c := Map{
 		"condition": "numeric_state",
@@ -165,7 +152,7 @@ func NumericStateCondition(entityID string, above, below interface{}) Map {
 	return c
 }
 
-// TemplateCondition creates a template condition
+// TemplateCondition creates a template condition.
 func TemplateCondition(valueTemplate string) Map {
 	return Map{
 		"condition":      "template",
@@ -173,7 +160,7 @@ func TemplateCondition(valueTemplate string) Map {
 	}
 }
 
-// TimeCondition creates a time condition
+// TimeCondition creates a time condition.
 func TimeCondition(after, before string) Map {
 	c := Map{
 		"condition": "time",
@@ -187,7 +174,7 @@ func TimeCondition(after, before string) Map {
 	return c
 }
 
-// AndCondition creates an AND condition with nested conditions
+// AndCondition creates an AND condition with nested conditions.
 func AndCondition(conditions ...Map) Map {
 	condList := make(List, len(conditions))
 	for i, c := range conditions {
@@ -199,7 +186,7 @@ func AndCondition(conditions ...Map) Map {
 	}
 }
 
-// OrCondition creates an OR condition with nested conditions
+// OrCondition creates an OR condition with nested conditions.
 func OrCondition(conditions ...Map) Map {
 	condList := make(List, len(conditions))
 	for i, c := range conditions {
@@ -211,7 +198,7 @@ func OrCondition(conditions ...Map) Map {
 	}
 }
 
-// NotCondition creates a NOT condition with nested conditions
+// NotCondition creates a NOT condition with nested conditions.
 func NotCondition(conditions ...Map) Map {
 	condList := make(List, len(conditions))
 	for i, c := range conditions {
@@ -223,7 +210,7 @@ func NotCondition(conditions ...Map) Map {
 	}
 }
 
-// ZoneCondition creates a zone condition
+// ZoneCondition creates a zone condition.
 func ZoneCondition(entityID, zone string) Map {
 	return Map{
 		"condition": "zone",
@@ -232,7 +219,7 @@ func ZoneCondition(entityID, zone string) Map {
 	}
 }
 
-// TriggerCondition creates a trigger condition
+// TriggerCondition creates a trigger condition.
 func TriggerCondition(id string) Map {
 	return Map{
 		"condition": "trigger",
@@ -240,7 +227,7 @@ func TriggerCondition(id string) Map {
 	}
 }
 
-// SunCondition creates a sun condition
+// SunCondition creates a sun condition.
 func SunCondition(afterEvent string) Map {
 	return Map{
 		"condition": "sun",
@@ -248,7 +235,7 @@ func SunCondition(afterEvent string) Map {
 	}
 }
 
-// DeviceCondition creates a device condition
+// DeviceCondition creates a device condition.
 func DeviceCondition(deviceID, domain, condType string) Map {
 	return Map{
 		"condition": "device",
@@ -258,7 +245,7 @@ func DeviceCondition(deviceID, domain, condType string) Map {
 	}
 }
 
-// ShorthandCondition creates a shorthand condition (entity_id + state without condition key)
+// ShorthandCondition creates a shorthand condition (entity_id + state without condition key).
 func ShorthandCondition(entityID, state string) Map {
 	return Map{
 		"entity_id": entityID,
@@ -270,14 +257,14 @@ func ShorthandCondition(entityID, state string) Map {
 // Action Fixtures
 // =====================================
 
-// ServiceCall creates a service call action
+// ServiceCall creates a service call action.
 func ServiceCall(service string) Map {
 	return Map{
 		"service": service,
 	}
 }
 
-// ServiceCallWithTarget creates a service call with target
+// ServiceCallWithTarget creates a service call with target.
 func ServiceCallWithTarget(service, entityID string) Map {
 	return Map{
 		"service": service,
@@ -287,7 +274,7 @@ func ServiceCallWithTarget(service, entityID string) Map {
 	}
 }
 
-// ServiceCallWithData creates a service call with data
+// ServiceCallWithData creates a service call with data.
 func ServiceCallWithData(service string, data Map) Map {
 	return Map{
 		"service": service,
@@ -295,7 +282,7 @@ func ServiceCallWithData(service string, data Map) Map {
 	}
 }
 
-// ServiceCallFull creates a service call with target and data
+// ServiceCallFull creates a service call with target and data.
 func ServiceCallFull(service, entityID string, data Map) Map {
 	return Map{
 		"service": service,
@@ -306,14 +293,14 @@ func ServiceCallFull(service, entityID string, data Map) Map {
 	}
 }
 
-// DelayAction creates a delay action
+// DelayAction creates a delay action.
 func DelayAction(duration string) Map {
 	return Map{
 		"delay": duration,
 	}
 }
 
-// DelayActionDict creates a delay action with a dictionary duration
+// DelayActionDict creates a delay action with a dictionary duration.
 func DelayActionDict(hours, minutes, seconds int) Map {
 	return Map{
 		"delay": Map{
@@ -324,14 +311,14 @@ func DelayActionDict(hours, minutes, seconds int) Map {
 	}
 }
 
-// WaitTemplateAction creates a wait_template action
+// WaitTemplateAction creates a wait_template action.
 func WaitTemplateAction(template string) Map {
 	return Map{
 		"wait_template": template,
 	}
 }
 
-// ChooseAction creates a choose action
+// ChooseAction creates a choose action.
 func ChooseAction(options ...Map) Map {
 	optList := make(List, len(options))
 	for i, o := range options {
@@ -342,7 +329,7 @@ func ChooseAction(options ...Map) Map {
 	}
 }
 
-// ChooseActionWithDefault creates a choose action with a default sequence
+// ChooseActionWithDefault creates a choose action with a default sequence.
 func ChooseActionWithDefault(options, defaultSequence []Map) Map {
 	optList := make(List, len(options))
 	for i, o := range options {
@@ -358,7 +345,7 @@ func ChooseActionWithDefault(options, defaultSequence []Map) Map {
 	}
 }
 
-// ChooseOption creates a choose option with conditions and sequence
+// ChooseOption creates a choose option with conditions and sequence.
 func ChooseOption(conditions, sequence []Map) Map {
 	condList := make(List, len(conditions))
 	for i, c := range conditions {
@@ -374,7 +361,7 @@ func ChooseOption(conditions, sequence []Map) Map {
 	}
 }
 
-// IfThenAction creates an if/then action
+// IfThenAction creates an if/then action.
 func IfThenAction(conditions, then []Map) Map {
 	condList := make(List, len(conditions))
 	for i, c := range conditions {
@@ -390,7 +377,7 @@ func IfThenAction(conditions, then []Map) Map {
 	}
 }
 
-// IfThenElseAction creates an if/then/else action
+// IfThenElseAction creates an if/then/else action.
 func IfThenElseAction(conditions, then, elseActions []Map) Map {
 	condList := make(List, len(conditions))
 	for i, c := range conditions {
@@ -411,7 +398,7 @@ func IfThenElseAction(conditions, then, elseActions []Map) Map {
 	}
 }
 
-// RepeatCountAction creates a repeat action with count
+// RepeatCountAction creates a repeat action with count.
 func RepeatCountAction(count int, sequence []Map) Map {
 	seqList := make(List, len(sequence))
 	for i, s := range sequence {
@@ -425,7 +412,7 @@ func RepeatCountAction(count int, sequence []Map) Map {
 	}
 }
 
-// RepeatWhileAction creates a repeat while action
+// RepeatWhileAction creates a repeat while action.
 func RepeatWhileAction(conditions, sequence []Map) Map {
 	condList := make(List, len(conditions))
 	for i, c := range conditions {
@@ -443,7 +430,7 @@ func RepeatWhileAction(conditions, sequence []Map) Map {
 	}
 }
 
-// RepeatUntilAction creates a repeat until action
+// RepeatUntilAction creates a repeat until action.
 func RepeatUntilAction(conditions, sequence []Map) Map {
 	condList := make(List, len(conditions))
 	for i, c := range conditions {
@@ -465,7 +452,7 @@ func RepeatUntilAction(conditions, sequence []Map) Map {
 // Input Fixtures
 // =====================================
 
-// EntityInput creates an entity input definition
+// EntityInput creates an entity input definition.
 func EntityInput(name string) Map {
 	return Map{
 		"name": name,
@@ -475,7 +462,7 @@ func EntityInput(name string) Map {
 	}
 }
 
-// EntityInputWithDomain creates an entity input with domain filter
+// EntityInputWithDomain creates an entity input with domain filter.
 func EntityInputWithDomain(name, domain string) Map {
 	return Map{
 		"name": name,
@@ -487,7 +474,7 @@ func EntityInputWithDomain(name, domain string) Map {
 	}
 }
 
-// EntityInputWithDefault creates an entity input with a default value
+// EntityInputWithDefault creates an entity input with a default value.
 func EntityInputWithDefault(name, defaultEntity string) Map {
 	return Map{
 		"name":    name,
@@ -498,7 +485,7 @@ func EntityInputWithDefault(name, defaultEntity string) Map {
 	}
 }
 
-// TextInput creates a text input definition
+// TextInput creates a text input definition.
 func TextInput(name string) Map {
 	return Map{
 		"name": name,
@@ -508,7 +495,7 @@ func TextInput(name string) Map {
 	}
 }
 
-// TextInputWithDefault creates a text input with a default value
+// TextInputWithDefault creates a text input with a default value.
 func TextInputWithDefault(name, defaultValue string) Map {
 	return Map{
 		"name":    name,
@@ -519,7 +506,7 @@ func TextInputWithDefault(name, defaultValue string) Map {
 	}
 }
 
-// NumberInput creates a number input definition
+// NumberInput creates a number input definition.
 func NumberInput(name string, minVal, maxVal float64) Map {
 	return Map{
 		"name": name,
@@ -532,7 +519,7 @@ func NumberInput(name string, minVal, maxVal float64) Map {
 	}
 }
 
-// NumberInputWithDefault creates a number input with a default value
+// NumberInputWithDefault creates a number input with a default value.
 func NumberInputWithDefault(name string, minVal, maxVal, defaultVal float64) Map {
 	return Map{
 		"name":    name,
@@ -546,7 +533,7 @@ func NumberInputWithDefault(name string, minVal, maxVal, defaultVal float64) Map
 	}
 }
 
-// BooleanInput creates a boolean input definition
+// BooleanInput creates a boolean input definition.
 func BooleanInput(name string) Map {
 	return Map{
 		"name": name,
@@ -556,7 +543,7 @@ func BooleanInput(name string) Map {
 	}
 }
 
-// BooleanInputWithDefault creates a boolean input with a default value
+// BooleanInputWithDefault creates a boolean input with a default value.
 func BooleanInputWithDefault(name string, defaultVal bool) Map {
 	return Map{
 		"name":    name,
@@ -567,7 +554,7 @@ func BooleanInputWithDefault(name string, defaultVal bool) Map {
 	}
 }
 
-// SelectInput creates a select input with options
+// SelectInput creates a select input with options.
 func SelectInput(name string, options []string) Map {
 	optList := make(List, len(options))
 	for i, o := range options {
@@ -583,7 +570,7 @@ func SelectInput(name string, options []string) Map {
 	}
 }
 
-// SelectInputWithLabelValue creates a select input with label/value options
+// SelectInputWithLabelValue creates a select input with label/value options.
 func SelectInputWithLabelValue(name string, options []Map) Map {
 	optList := make(List, len(options))
 	for i, o := range options {
@@ -599,7 +586,7 @@ func SelectInputWithLabelValue(name string, options []Map) Map {
 	}
 }
 
-// SelectOption creates a select option with label and value
+// SelectOption creates a select option with label and value.
 func SelectOption(label, value string) Map {
 	return Map{
 		"label": label,
@@ -607,7 +594,7 @@ func SelectOption(label, value string) Map {
 	}
 }
 
-// TimeInput creates a time input definition
+// TimeInput creates a time input definition.
 func TimeInput(name string) Map {
 	return Map{
 		"name": name,
@@ -617,7 +604,7 @@ func TimeInput(name string) Map {
 	}
 }
 
-// DateTimeInput creates a datetime input definition
+// DateTimeInput creates a datetime input definition.
 func DateTimeInput(name string) Map {
 	return Map{
 		"name": name,
@@ -627,7 +614,7 @@ func DateTimeInput(name string) Map {
 	}
 }
 
-// InputGroup creates an input group containing other inputs
+// InputGroup creates an input group containing other inputs.
 func InputGroup(name string, inputs Map) Map {
 	return Map{
 		"name":  name,
@@ -635,7 +622,7 @@ func InputGroup(name string, inputs Map) Map {
 	}
 }
 
-// InputWithoutSelector creates an input without a selector (triggers warning)
+// InputWithoutSelector creates an input without a selector (triggers warning).
 func InputWithoutSelector(name string) Map {
 	return Map{
 		"name": name,
@@ -646,7 +633,7 @@ func InputWithoutSelector(name string) Map {
 // Template String Fixtures
 // =====================================
 
-// ValidTemplates provides commonly used valid templates
+// ValidTemplates provides commonly used valid templates.
 var ValidTemplates = struct {
 	States        string
 	IsState       string
@@ -673,7 +660,7 @@ var ValidTemplates = struct {
 	NestedBraces:  "{{ {'key': value} | to_json }}",
 }
 
-// InvalidTemplates provides commonly used invalid templates
+// InvalidTemplates provides commonly used invalid templates.
 var InvalidTemplates = struct {
 	UnbalancedOpen  string
 	UnbalancedClose string
@@ -692,12 +679,12 @@ var InvalidTemplates = struct {
 // Variables Section Fixtures
 // =====================================
 
-// VariablesSection creates a variables section
+// VariablesSection creates a variables section.
 func VariablesSection(vars Map) Map {
 	return vars
 }
 
-// VariablesWithVersion creates a variables section with blueprint_version
+// VariablesWithVersion creates a variables section with blueprint_version.
 func VariablesWithVersion(version string, otherVars Map) Map {
 	vars := Map{
 		"blueprint_version": version,
@@ -712,7 +699,7 @@ func VariablesWithVersion(version string, otherVars Map) Map {
 // Complete Blueprint Fixtures
 // =====================================
 
-// AutomationBlueprint creates a complete automation blueprint
+// AutomationBlueprint creates a complete automation blueprint.
 func AutomationBlueprint(name string, inputs Map, triggers, actions []Map) Map {
 	trigList := make(List, len(triggers))
 	for i, t := range triggers {
@@ -734,7 +721,7 @@ func AutomationBlueprint(name string, inputs Map, triggers, actions []Map) Map {
 	}
 }
 
-// AutomationBlueprintWithConditions creates a complete automation with conditions
+// AutomationBlueprintWithConditions creates a complete automation with conditions.
 func AutomationBlueprintWithConditions(name string, inputs Map, triggers, conditions, actions []Map) Map {
 	bp := AutomationBlueprint(name, inputs, triggers, actions)
 	condList := make(List, len(conditions))
@@ -745,14 +732,14 @@ func AutomationBlueprintWithConditions(name string, inputs Map, triggers, condit
 	return bp
 }
 
-// AutomationBlueprintWithVariables creates a complete automation with variables
+// AutomationBlueprintWithVariables creates a complete automation with variables.
 func AutomationBlueprintWithVariables(name string, inputs, variables Map, triggers, actions []Map) Map {
 	bp := AutomationBlueprint(name, inputs, triggers, actions)
 	bp["variables"] = variables
 	return bp
 }
 
-// ScriptBlueprint creates a complete script blueprint
+// ScriptBlueprint creates a complete script blueprint.
 func ScriptBlueprint(name string, inputs Map, sequence []Map) Map {
 	seqList := make(List, len(sequence))
 	for i, s := range sequence {
@@ -773,74 +760,28 @@ func ScriptBlueprint(name string, inputs Map, sequence []Map) Map {
 // Input Reference Fixtures
 // =====================================
 
-// InputRef creates an input reference string
+// InputRef creates an input reference string.
 func InputRef(inputName string) string {
 	return "!input " + inputName
 }
 
-// InputRefInTemplate creates an input reference inside a template
+// InputRefInTemplate creates an input reference inside a template.
 func InputRefInTemplate(inputName string) string {
 	return "{{ states(!input " + inputName + ") }}"
-}
-
-// =====================================
-// Common Test Data
-// =====================================
-
-// CommonEntityIDs provides common test entity IDs
-var CommonEntityIDs = struct {
-	Light         string
-	Switch        string
-	Sensor        string
-	BinarySensor  string
-	Person        string
-	Zone          string
-	InputBoolean  string
-	InputNumber   string
-	InputDateTime string
-}{
-	Light:         "light.living_room",
-	Switch:        "switch.bedroom",
-	Sensor:        "sensor.temperature",
-	BinarySensor:  "binary_sensor.motion",
-	Person:        "person.me",
-	Zone:          "zone.home",
-	InputBoolean:  "input_boolean.test",
-	InputNumber:   "input_number.threshold",
-	InputDateTime: "input_datetime.alarm",
-}
-
-// CommonServices provides common test service names
-var CommonServices = struct {
-	LightTurnOn   string
-	LightTurnOff  string
-	LightToggle   string
-	SwitchTurnOn  string
-	SwitchTurnOff string
-	NotifyMobile  string
-	ScriptTurnOn  string
-}{
-	LightTurnOn:   "light.turn_on",
-	LightTurnOff:  "light.turn_off",
-	LightToggle:   "light.toggle",
-	SwitchTurnOn:  "switch.turn_on",
-	SwitchTurnOff: "switch.turn_off",
-	NotifyMobile:  "notify.mobile",
-	ScriptTurnOn:  "script.turn_on",
 }
 
 // =====================================
 // Mode Fixtures
 // =====================================
 
-// ModeSection creates a mode section
+// ModeSection creates a mode section.
 func ModeSection(mode string) Map {
 	return Map{
 		"mode": mode,
 	}
 }
 
-// ModeSectionWithMax creates a mode section with max setting
+// ModeSectionWithMax creates a mode section with max setting.
 func ModeSectionWithMax(mode string, maxConcurrent int) Map {
 	return Map{
 		"mode": mode,

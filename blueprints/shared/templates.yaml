@@ -1,0 +1,559 @@
+# Shared Jinja2 Template Macros v1.0.0
+# ============================================================================
+# Reusable template patterns for Home Assistant blueprints
+#
+# IMPORTANT: Home Assistant blueprints do NOT support external imports.
+# This file serves as:
+#   1. Single source of truth for common calculation patterns
+#   2. Copy-paste reference for blueprint developers
+#   3. Documentation of the mathematical formulas used
+#
+# Usage: Copy the relevant variables/macros into your blueprint's
+#        `variables:` section. Keep this file updated as the canonical
+#        reference.
+# ============================================================================
+
+# =============================================================================
+# MATHEMATICAL CONSTANTS
+# =============================================================================
+# Copy these to your blueprint's variables section
+
+_math_constants: |
+  pi: 3.141592653589793
+  e_const: 2.718281828459045
+  deg_to_rad: 0.017453292519943295
+  rad_to_deg: 57.29577951308232
+
+# =============================================================================
+# UNIT CONVERSION MACROS
+# =============================================================================
+# Temperature conversion between Celsius and Fahrenheit
+#
+# Usage:
+#   {% set temp_f = (temp_c * 9/5) + 32 %}
+#   {% set temp_c = (temp_f - 32) * 5/9 %}
+#   {% set delta_f = delta_c * 9/5 %}  # For temperature differences
+#   {% set delta_c = delta_f * 5/9 %}
+
+_unit_conversion_examples: |
+  # Celsius to Fahrenheit (absolute temperature)
+  temp_f_from_c: "{{ (temp_c | float * 9/5) + 32 }}"
+
+  # Fahrenheit to Celsius (absolute temperature)
+  temp_c_from_f: "{{ (temp_f | float - 32) * 5/9 }}"
+
+  # Temperature difference conversion (no offset needed)
+  delta_f_from_c: "{{ delta_c | float * 9/5 }}"
+  delta_c_from_f: "{{ delta_f | float * 5/9 }}"
+
+  # Generic bi-directional conversion based on is_imperial flag
+  # Use when you need to convert TO system units
+  to_system_units: >
+    {% if is_imperial %}
+      {{ (value_c | float * 9/5) + 32 }}
+    {% else %}
+      {{ value_c | float }}
+    {% endif %}
+
+  # Convert FROM system units to Celsius (for internal calculations)
+  to_celsius: >
+    {% if is_imperial %}
+      {{ (value_sys | float - 32) * 5/9 }}
+    {% else %}
+      {{ value_sys | float }}
+    {% endif %}
+
+# =============================================================================
+# HEAT INDEX CALCULATION (Rothfusz Regression)
+# =============================================================================
+# Calculates "feels like" temperature based on temperature and humidity.
+# Used by: adaptive-fan-control
+#
+# Inputs:
+#   T = Temperature in Celsius
+#   R = Relative Humidity in %
+#
+# Returns: Heat index in Celsius
+#
+# Reference: National Weather Service heat index equation
+# Valid for T >= 20°C and R >= 40%
+
+_heat_index_c_template: |
+  heat_index_c: >
+    {% set T = t_in_c | float %}
+    {% set R = rh_in | float %}
+    {% if T < 20 or R < 40 %}
+      {{ T }}
+    {% else %}
+      {% set c1 = -8.78469475556 %}
+      {% set c2 = 1.61139411 %}
+      {% set c3 = 2.33854883889 %}
+      {% set c4 = -0.14611605 %}
+      {% set c5 = -0.012308094 %}
+      {% set c6 = -0.0164248277778 %}
+      {% set c7 = 0.002211732 %}
+      {% set c8 = 0.00072546 %}
+      {% set c9 = -0.000003582 %}
+      {% set HI = c1 + c2*T + c3*R + c4*T*R + c5*T*T + c6*R*R + c7*T*T*R + c8*T*R*R + c9*T*T*R*R %}
+      {{ HI }}
+    {% endif %}
+
+# =============================================================================
+# EN 16798 / ASHRAE 55 ADAPTIVE COMFORT MODEL
+# =============================================================================
+# Calculates optimal indoor temperature based on outdoor conditions.
+# Used by: adaptive-fan-control, adaptive-comfort-control
+#
+# Formula: T_comfort = 0.33 * T_outdoor + 18.8 (Celsius)
+# Valid for outdoor temps 10-30°C per standard
+#
+# Comfort categories (tolerance around T_comfort):
+#   Category I:   +/- 2.0°C (strict, ~90% satisfaction)
+#   Category II:  +/- 3.0°C (normal, ~80% satisfaction)
+#   Category III: +/- 4.0°C (relaxed, ~65% satisfaction)
+
+_adaptive_comfort_template: |
+  # Clamp outdoor temp to valid range per EN 16798
+  t_rm_c: "{{ [[t_out_c | float, 10] | max, 30] | min }}"
+
+  # Calculate comfort temperature
+  comfort_temp_c: "{{ 0.33 * t_rm_c + 18.8 }}"
+
+  # Tolerance based on comfort category
+  tol_c: >
+    {% if comfort_category == 'I' %}
+      2.0
+    {% elif comfort_category == 'II' %}
+      3.0
+    {% else %}
+      4.0
+    {% endif %}
+
+  # Comfort band limits
+  comfort_upper_c: "{{ comfort_temp_c + tol_c | float }}"
+  comfort_lower_c: "{{ comfort_temp_c - tol_c | float }}"
+
+  # Convert to system units
+  comfort_temp_sys: "{{ (comfort_temp_c * 9/5 + 32) if is_imperial else comfort_temp_c }}"
+  comfort_upper_sys: "{{ (comfort_upper_c * 9/5 + 32) if is_imperial else comfort_upper_c }}"
+  comfort_lower_sys: "{{ (comfort_lower_c * 9/5 + 32) if is_imperial else comfort_lower_c }}"
+  tol_sys: "{{ (tol_c | float * 9/5) if is_imperial else tol_c | float }}"
+
+# =============================================================================
+# PSYCHROMETRIC CALCULATIONS
+# =============================================================================
+# Calculates humidity-related properties for ventilation decisions.
+# Used by: adaptive-comfort-control
+#
+# Formulas based on ASHRAE Fundamentals Handbook
+#
+# Requires:
+#   t_in_c, t_out_c = temperatures in Celsius
+#   rh_in, rh_out = relative humidity in %
+#   pressure_kpa = atmospheric pressure in kPa
+
+_psychrometrics_template: |
+  # Saturation vapor pressure (Magnus formula)
+  # P_sat = 0.61078 * exp((17.2694 * T) / (T + 237.3))
+  psat_in_kpa: >
+    {% if t_in_c is number %}
+      {{ 0.61078 * (e_const ** ((17.2694 * t_in_c) / (t_in_c + 237.3))) }}
+    {% else %}
+      {{ none }}
+    {% endif %}
+
+  psat_out_kpa: >
+    {% if t_out_c is number %}
+      {{ 0.61078 * (e_const ** ((17.2694 * t_out_c) / (t_out_c + 237.3))) }}
+    {% else %}
+      {{ none }}
+    {% endif %}
+
+  # Actual vapor pressure
+  pv_in_kpa: "{{ ((rh_in | float(50) / 100.0) * psat_in_kpa) if psat_in_kpa is number else none }}"
+  pv_out_kpa: "{{ ((rh_out | float(50) / 100.0) * psat_out_kpa) if psat_out_kpa is number else none }}"
+
+  # Dew point (inverse Magnus formula)
+  # T_dp = (237.3 * ln(P_v / 0.61078)) / (17.2694 - ln(P_v / 0.61078))
+  dp_in_c: >
+    {% if pv_in_kpa is number and pv_in_kpa | float(0) > 0.001 %}
+      {% set x = (pv_in_kpa / 0.61078) | log %}
+      {{ ((237.3 * x) / (17.2694 - x)) | round(2) }}
+    {% else %}
+      {{ none }}
+    {% endif %}
+
+  dp_out_c: >
+    {% if pv_out_kpa is number and pv_out_kpa | float(0) > 0.001 %}
+      {% set x = (pv_out_kpa / 0.61078) | log %}
+      {{ ((237.3 * x) / (17.2694 - x)) | round(2) }}
+    {% else %}
+      {{ none }}
+    {% endif %}
+
+  # Absolute humidity (g/m3)
+  # AH = (2.1674 * P_v / T_K) * 1000
+  ah_in: >
+    {% if t_in_c is number and pv_in_kpa is number %}
+      {% set Tk = t_in_c + 273.15 %}
+      {{ ((2.1674 * pv_in_kpa / Tk) * 1000.0) | round(2) }}
+    {% else %}
+      {{ none }}
+    {% endif %}
+
+  ah_out: >
+    {% if t_out_c is number and pv_out_kpa is number %}
+      {% set Tk = t_out_c + 273.15 %}
+      {{ ((2.1674 * pv_out_kpa / Tk) * 1000.0) | round(2) }}
+    {% else %}
+      {{ none }}
+    {% endif %}
+
+  # Humidity ratio (kg water / kg dry air)
+  w_in: >
+    {% if pressure_kpa is number and pv_in_kpa is number and (pressure_kpa - pv_in_kpa) > 0.1 %}
+      {{ 0.62198 * pv_in_kpa / (pressure_kpa - pv_in_kpa) }}
+    {% else %}
+      {{ none }}
+    {% endif %}
+
+  w_out: >
+    {% if pressure_kpa is number and pv_out_kpa is number and (pressure_kpa - pv_out_kpa) > 0.1 %}
+      {{ 0.62198 * pv_out_kpa / (pressure_kpa - pv_out_kpa) }}
+    {% else %}
+      {{ none }}
+    {% endif %}
+
+  # Enthalpy (kJ/kg dry air)
+  # h = 1.006 * T + w * (2501 + 1.86 * T)
+  h_in: >
+    {% if w_in is number %}
+      {{ (1.006 * t_in_c + w_in * (2501 + 1.86 * t_in_c)) | round(2) }}
+    {% else %}
+      {{ none }}
+    {% endif %}
+
+  h_out: >
+    {% if w_out is number %}
+      {{ (1.006 * t_out_c + w_out * (2501 + 1.86 * t_out_c)) | round(2) }}
+    {% else %}
+      {{ none }}
+    {% endif %}
+
+# =============================================================================
+# ATMOSPHERIC PRESSURE FROM ELEVATION
+# =============================================================================
+# Calculates atmospheric pressure using barometric formula.
+# Used by: adaptive-comfort-control (when no pressure sensor available)
+#
+# Formula: P = 101.325 * (1 - 0.0000225577 * h)^5.25588
+# Where h = elevation in meters
+#
+# Reference: U.S. Standard Atmosphere (1976)
+
+_pressure_from_elevation_template: |
+  pressure_kpa: >
+    {% if elevation_m is number %}
+      {{ 101.325 * ((1 - 0.0000225577 * elevation_m) ** 5.25588) }}
+    {% else %}
+      {{ 101.325 }}
+    {% endif %}
+
+# =============================================================================
+# SOLAR GEOMETRY CALCULATIONS
+# =============================================================================
+# Calculates sun position relative to window orientation.
+# Used by: adaptive-shades
+#
+# Requires:
+#   sun_azimuth, sun_elevation = from sun.sun entity
+#   window_orientation_deg = compass direction window faces (0=N, 90=E, 180=S, 270=W)
+#   sun_tolerance_deg = half-angle of sun exposure cone
+
+_solar_geometry_template: |
+  # Mathematical constants
+  pi: 3.141592653589793
+  e_const: 2.718281828459045
+  deg_to_rad: 0.017453292519943295
+
+  # Trigonometric calculations
+  cos_az_offset: "{{ ((sun_azimuth - window_orientation_deg) | float * deg_to_rad) | cos }}"
+  sin_elevation: "{{ (sun_elevation | float * deg_to_rad) | sin }}"
+  cos_elevation: "{{ (sun_elevation | float * deg_to_rad) | cos }}"
+
+  # Is sun hitting this window?
+  sun_on_window: >
+    {% set delta = (((sun_azimuth - window_orientation_deg + 540) % 360) - 180) | abs %}
+    {{ sun_elevation >= min_sun_elevation and delta <= sun_tolerance_deg }}
+
+# =============================================================================
+# ASHRAE CLEAR-SKY IRRADIANCE MODEL
+# =============================================================================
+# Calculates theoretical direct normal irradiance for clear sky.
+# Used by: adaptive-shades (to classify direct vs diffuse sun)
+#
+# Formula: I_dn = A * exp(-B / sin(elevation))
+# Where:
+#   A = apparent extraterrestrial irradiance (default: 1160 W/m2)
+#   B = atmospheric extinction coefficient (default: 0.14)
+#
+# Reference: ASHRAE Handbook - Fundamentals
+
+_clear_sky_irradiance_template: |
+  # Clear-sky direct normal irradiance
+  clear_sky_direct_normal: >
+    {% set sin_el = [sin_elevation, 0.017] | max %}
+    {% set exponent = (-clear_sky_B / sin_el) | float %}
+    {{ clear_sky_A * (e_const ** exponent) }}
+
+  # Direct component on vertical surface
+  direct_incidence_cos: "{{ cos_az_offset * cos_elevation }}"
+
+  direct_vertical_component: >
+    {% if direct_incidence_cos > 0 %}
+      {{ clear_sky_direct_normal * direct_incidence_cos }}
+    {% else %}
+      0
+    {% endif %}
+
+  # Detect if sun is direct (vs diffuse/cloudy)
+  direct_sun_detected: >
+    {% if measured_irradiance is not none and direct_vertical_component > direct_irradiance_floor %}
+      {{ measured_irradiance >= (direct_ratio_threshold * direct_vertical_component) }}
+    {% else %}
+      {{ sun_on_window and not weather_is_overcast }}
+    {% endif %}
+
+# =============================================================================
+# SLAT ANGLE CALCULATIONS (Venetian Blinds)
+# =============================================================================
+# Calculates optimal slat angle for glare control.
+# Used by: adaptive-shades
+#
+# Based on: Energies 13(7):1731 - Equation 8
+#
+# Requires:
+#   beta_deg = profile angle (function of sun position and window orientation)
+#   slat_gap_ratio = ratio of slat spacing to slat width (d/L)
+
+_slat_angle_template: |
+  # Profile angle calculation
+  beta_deg: >
+    {% if cos_az_offset == 0 %}
+      90
+    {% else %}
+      {% set tan_elev = (sun_elevation | float * deg_to_rad) | tan %}
+      {{ (tan_elev / cos_az_offset) | atan * 180 / pi }}
+    {% endif %}
+
+  beta_plus_90: "{{ beta_deg + 90 }}"
+
+  # Empirical diffuse angle
+  diffuse_empirical_angle: "{{ 120 - (0.66 * sun_elevation) }}"
+
+  # Optimal slat angle for glare limiting (Equation 8)
+  slat_star_deg: >
+    {% set tan_beta = (beta_deg | float * deg_to_rad) | tan %}
+    {% set ratio = slat_gap_ratio | float(0.9) %}
+    {% set radicand = tan_beta*tan_beta - (ratio*ratio) + 1 %}
+    {% if radicand <= 0 %}
+      {{ beta_plus_90 }}
+    {% else %}
+      {% set num = tan_beta + (radicand | sqrt) %}
+      {% set denom = 1 + ratio %}
+      {{ 2 * (num / denom) | atan * 180 / pi }}
+    {% endif %}
+
+# =============================================================================
+# TIME/SCHEDULE PARSING UTILITIES
+# =============================================================================
+# Robust time parsing for schedule comparisons.
+# Used by: bathroom-light-fan, adaptive-shades, adaptive-comfort
+#
+# Handles both HH:MM and HH:MM:SS formats
+
+_time_schedule_template: |
+  # Check if current time is within a schedule window
+  # Handles overnight schedules (e.g., 22:00 - 06:00)
+  in_schedule: >
+    {% if not schedule_start or not schedule_end %}
+      {{ false }}
+    {% else %}
+      {% set start_parts = schedule_start.split(':') if ':' in (schedule_start | string) else [] %}
+      {% set end_parts = schedule_end.split(':') if ':' in (schedule_end | string) else [] %}
+      {% if start_parts | length < 2 or end_parts | length < 2 %}
+        {{ false }}
+      {% else %}
+        {% set start_m = (start_parts[0] | int(0)) * 60 + (start_parts[1] | int(0)) %}
+        {% set end_m = (end_parts[0] | int(0)) * 60 + (end_parts[1] | int(0)) %}
+        {% set now_m = now().hour * 60 + now().minute %}
+        {% if start_m <= end_m %}
+          {{ start_m <= now_m < end_m }}
+        {% else %}
+          {{ now_m >= start_m or now_m < end_m }}
+        {% endif %}
+      {% endif %}
+    {% endif %}
+
+# =============================================================================
+# PRESENCE DETECTION
+# =============================================================================
+# Unified presence detection across different entity types.
+# Used by: bathroom-light-fan, adaptive-comfort, adaptive-shades
+
+_presence_detection_template: |
+  # Check if any presence entity indicates presence
+  # Supports: person, device_tracker, binary_sensor, input_boolean
+  presence_ok: >
+    {% set ents = presence_entities if presence_entities is defined and presence_entities is not none else [] %}
+    {% if ents | length == 0 %}
+      {{ true }}
+    {% else %}
+      {% set ns = namespace(found=false) %}
+      {% for e in ents %}
+        {% if e not in ['', 'unknown', 'unavailable', None] and states(e) in ['on', 'home', 'occupied', 'present'] %}
+          {% set ns.found = true %}
+        {% endif %}
+      {% endfor %}
+      {{ ns.found }}
+    {% endif %}
+
+# =============================================================================
+# SENSOR VALIDATION
+# =============================================================================
+# Validates sensor readings before use in calculations.
+# Prevents errors from unavailable/unknown states.
+
+_sensor_validation_template: |
+  # Check if a sensor has a valid numeric reading
+  sensor_valid: >
+    {% set state = states(sensor_entity) %}
+    {{ state not in ['unknown', 'unavailable', '', None] and state | float(none) is not none }}
+
+  # Get sensor value with fallback
+  sensor_value: >
+    {% set state = states(sensor_entity) %}
+    {% if state not in ['unknown', 'unavailable', '', None] %}
+      {{ state | float(default_value) }}
+    {% else %}
+      {{ default_value }}
+    {% endif %}
+
+# =============================================================================
+# CLIMATE ENTITY HELPERS
+# =============================================================================
+# Common patterns for reading climate entity attributes.
+# Used by: adaptive-comfort, adaptive-shades
+
+_climate_helpers_template: |
+  # Get effective heating setpoint (from climate or fallback)
+  effective_heating_setpoint: >
+    {% if climate_entity %}
+      {% set target_low = state_attr(climate_entity, 'target_temp_low') | float(none) %}
+      {% set target_temp = state_attr(climate_entity, 'temperature') | float(none) %}
+      {% if target_low is number %}
+        {{ target_low }}
+      {% elif target_temp is number %}
+        {{ target_temp }}
+      {% else %}
+        {{ heating_setpoint_fallback }}
+      {% endif %}
+    {% else %}
+      {{ heating_setpoint_fallback }}
+    {% endif %}
+
+  # Get effective cooling setpoint (from climate or fallback)
+  effective_cooling_setpoint: >
+    {% if climate_entity %}
+      {% set target_high = state_attr(climate_entity, 'target_temp_high') | float(none) %}
+      {% set target_temp = state_attr(climate_entity, 'temperature') | float(none) %}
+      {% if target_high is number %}
+        {{ target_high }}
+      {% elif target_temp is number %}
+        {{ target_temp }}
+      {% else %}
+        {{ cooling_setpoint_fallback }}
+      {% endif %}
+    {% else %}
+      {{ cooling_setpoint_fallback }}
+    {% endif %}
+
+  # Detect if climate is actively heating/cooling
+  climate_heating: >
+    {% if not climate_entity %}
+      {{ false }}
+    {% else %}
+      {% set action = state_attr(climate_entity, 'hvac_action') %}
+      {% set mode = states(climate_entity) %}
+      {{ action in ['heating'] or mode in ['heat'] }}
+    {% endif %}
+
+  climate_cooling: >
+    {% if not climate_entity %}
+      {{ false }}
+    {% else %}
+      {% set action = state_attr(climate_entity, 'hvac_action') %}
+      {% set mode = states(climate_entity) %}
+      {{ action in ['cooling'] or mode in ['cool'] }}
+    {% endif %}
+
+# =============================================================================
+# DEBUG LOGGING HELPERS
+# =============================================================================
+# Standardized debug logging patterns.
+# All blueprints use logbook.log with consistent formatting.
+
+_debug_logging_notes: |
+  # Standard debug levels used across blueprints:
+  #   off     - No logging
+  #   basic   - Key state changes and decisions
+  #   verbose - Detailed calculations and intermediate values
+  #
+  # Logging format (pipe-separated key=value):
+  #   "Action: description | key1=value1 | key2=value2 | (v{{ blueprint_version }})"
+  #
+  # Example condition:
+  #   - condition: template
+  #     value_template: "{{ debug_level in ['basic', 'verbose'] }}"
+  #
+  # Example log call:
+  #   - service: logbook.log
+  #     data:
+  #       name: "Blueprint Name"
+  #       entity_id: "{{ target_entity }}"
+  #       message: >-
+  #         Action: state changed | from={{ from_state }} | to={{ to_state }} | (v{{ blueprint_version }})
+
+# =============================================================================
+# USAGE EXAMPLES
+# =============================================================================
+
+_usage_examples: |
+  # Example: Adding heat index to your blueprint
+  #
+  # 1. Copy the _math_constants and _heat_index_c_template blocks
+  # 2. Define your input variables (t_in_c, rh_in)
+  # 3. Use heat_index_c in your comfort calculations
+  #
+  # variables:
+  #   e_const: 2.718281828459045
+  #   t_in_c: "{{ states(temp_sensor) | float(21) }}"
+  #   rh_in: "{{ states(humidity_sensor) | float(50) }}"
+  #   heat_index_c: >
+  #     {% set T = t_in_c | float %}
+  #     {% set R = rh_in | float %}
+  #     ... (copy from template above)
+
+  # Example: Adding adaptive comfort to your blueprint
+  #
+  # 1. Copy the _adaptive_comfort_template block
+  # 2. Define t_out_c, comfort_category, is_imperial
+  # 3. Use comfort_upper_sys and comfort_lower_sys for decisions
+
+  # Example: Using time schedule parsing
+  #
+  # variables:
+  #   schedule_start: !input quiet_hours_start
+  #   schedule_end: !input quiet_hours_end
+  #   in_quiet_hours: >
+  #     ... (copy in_schedule logic, rename variables)

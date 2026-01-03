@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
@@ -15,48 +14,30 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/home-assistant-blueprints/testfixtures"
+
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
 
-// wsUpgrader is used to upgrade HTTP connections to WebSocket
-var wsUpgrader = websocket.Upgrader{
-	CheckOrigin: func(_ *http.Request) bool { return true },
-}
-
-// testServer creates a test WebSocket server that handles messages
+// testServer creates a test WebSocket server that handles messages.
+// This is a wrapper around testfixtures.TestServer for backward compatibility.
 func testServer(t *testing.T, handler func(*websocket.Conn)) *httptest.Server {
 	t.Helper()
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		conn, err := wsUpgrader.Upgrade(w, r, nil)
-		if err != nil {
-			t.Fatalf("failed to upgrade: %v", err)
-		}
-		defer conn.Close()
-		handler(conn)
-	}))
+	return testfixtures.TestServer(t, handler)
 }
 
-// dialServer connects to a test server and returns a Client
+// dialServer connects to a test server and returns a Client.
+// This wraps testfixtures.DialServer and creates a Client.
 func dialServer(t *testing.T, server *httptest.Server) *Client {
 	t.Helper()
-	url := "ws" + strings.TrimPrefix(server.URL, "http")
-	conn, resp, err := websocket.DefaultDialer.Dial(url, nil)
-	require.NoError(t, err)
-	if resp != nil && resp.Body != nil {
-		resp.Body.Close()
-	}
+	conn := testfixtures.DialServer(t, server)
 	return New(conn)
 }
 
-// dialServerWithContext connects to a test server and returns a Client with context
+// dialServerWithContext connects to a test server and returns a Client with context.
 func dialServerWithContext(ctx context.Context, t *testing.T, server *httptest.Server) *Client {
 	t.Helper()
-	url := "ws" + strings.TrimPrefix(server.URL, "http")
-	conn, resp, err := websocket.DefaultDialer.Dial(url, nil)
-	require.NoError(t, err)
-	if resp != nil && resp.Body != nil {
-		resp.Body.Close()
-	}
+	conn := testfixtures.DialServer(t, server)
 	return NewWithContext(ctx, conn)
 }
 

@@ -241,8 +241,6 @@ validate-blueprint-go/
 │   │   └── registry.go      # Error registry and factories
 │   ├── shutdown/            # Graceful shutdown coordination
 │   │   └── shutdown.go
-│   ├── testfixtures/        # Test fixture utilities
-│   │   └── fixtures.go
 │   └── validator/           # Core validation package
 │       ├── actions.go       # Action/service validation
 │       ├── categories.go    # Category classification

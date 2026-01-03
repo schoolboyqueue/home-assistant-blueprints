@@ -11,7 +11,7 @@ PROJECT_NAME := ha-ws-client-go
 GO_LOCAL_PATH := github.com/home-assistant-blueprints/ha-ws-client-go
 
 # Optional overrides
-VERSION ?= 1.5.2
+VERSION ?= 1.5.3
 BUILD_DIR := build
 BUILD_PATH := ./cmd/ha-ws-client
 

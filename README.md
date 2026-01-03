@@ -156,10 +156,15 @@ HVAC-aware ceiling fan automation with EN 16798 adaptive comfort model, heat ind
 │   │   ├── bathroom_light_fan_control_pro.yaml
 │   │   ├── CHANGELOG.md
 │   │   └── README.md
-│   └── multi-switch-light-control/
-│       ├── multi_switch_light_control_pro.yaml
-│       ├── CHANGELOG.md
-│       └── README.md
+│   ├── multi-switch-light-control/
+│   │   ├── multi_switch_light_control_pro.yaml
+│   │   ├── CHANGELOG.md
+│   │   └── README.md
+│   └── shared/                       # Shared resources for blueprints
+│       ├── README.md
+│       ├── regional_profiles.json    # Climate presets database
+│       ├── regional_profile_helpers.yaml
+│       └── templates.yaml            # Reusable Jinja2 template macros
 ├── .github/
 │   └── workflows/
 │       ├── auto-tag-go-tools.yml  # Auto-tag on Go tool version changes
@@ -187,6 +192,11 @@ HVAC-aware ceiling fan automation with EN 16798 adaptive comfort model, heat ind
 │   │   │   └── common/           # Shared utilities
 │   │   ├── Makefile
 │   │   └── README.md
+│   ├── testfixtures/             # Shared test fixtures for Go tools
+│   │   ├── blueprint_fixtures.go # Blueprint test data
+│   │   ├── ha_fixtures.go        # Home Assistant test data
+│   │   ├── ws_server.go          # Mock WebSocket server
+│   │   └── types.go              # Shared test types
 │   └── shared.mk                 # Shared Makefile definitions
 └── README.md (this file)
 ```

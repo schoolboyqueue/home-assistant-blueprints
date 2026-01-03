@@ -1,12 +1,42 @@
-# Shared Regional Profile Database
+# Shared Resources for Home Assistant Blueprints
 
-This directory contains the centralized regional profile database for Home Assistant blueprints. It provides climate presets for U.S. states and international regions with seasonal bias adjustments, adaptive comfort baselines, and vendor-specific thermostat profiles.
+This directory contains shared resources for Home Assistant blueprints, including:
+
+1. **Regional Profile Database** - Climate presets for U.S. states and international regions
+2. **Template Macros** - Reusable Jinja2 calculation patterns (psychrometrics, solar geometry, adaptive comfort)
 
 ## Version
 
-**v1.0.0** (2025-12-31)
+**v1.1.0** (2026-01-03)
 
 ## Files
+
+### `templates.yaml` (NEW)
+
+Reusable Jinja2 template macros for common calculation patterns. This file serves as the **single source of truth** for mathematical formulas used across blueprints.
+
+**Included Templates:**
+
+| Template | Description | Used By |
+|----------|-------------|---------|
+| Unit Conversion | C/F temperature conversion | All temperature blueprints |
+| Heat Index | Rothfusz regression (feels-like temp) | adaptive-fan-control |
+| Adaptive Comfort | EN 16798 / ASHRAE 55 model | adaptive-fan, adaptive-comfort |
+| Psychrometrics | Dew point, enthalpy, humidity ratio | adaptive-comfort-control |
+| Atmospheric Pressure | Barometric formula from elevation | adaptive-comfort-control |
+| Solar Geometry | Sun position relative to window | adaptive-shades |
+| Clear-Sky Irradiance | ASHRAE clear-sky model | adaptive-shades |
+| Slat Angle | Venetian blind optimal angle | adaptive-shades |
+| Time Schedule | Overnight schedule parsing | bathroom-light-fan, adaptive-shades |
+| Presence Detection | Multi-entity presence check | All occupancy-based blueprints |
+| Sensor Validation | Safe sensor value extraction | All blueprints |
+| Climate Helpers | Thermostat attribute reading | adaptive-comfort, adaptive-shades |
+
+**Why This File Exists:**
+Home Assistant blueprints don't support external imports. This file documents the canonical formulas so:
+- Developers can copy-paste verified implementations
+- Formulas are documented with mathematical references
+- Changes can be audited in one place before propagating to blueprints
 
 ### `regional_profiles.json`
 
@@ -121,4 +151,94 @@ When updating this database:
 2. Update `regional_profile_helpers.yaml` with corresponding Jinja2 lookups
 3. Increment the version in both files
 4. Update the `lastUpdated` field in the JSON metadata
-5. Run `python3 scripts/validate-blueprint/validate-blueprint.py --all` to validate any blueprints using this data
+5. Run `validate-blueprint --all` to validate any blueprints using this data (see `scripts/validate-blueprint-go/`)
+
+## Using Template Macros
+
+### Example: Adding Heat Index to Your Blueprint
+
+```yaml
+variables:
+  # Required constants
+  e_const: 2.718281828459045
+
+  # Your input sensors
+  t_in_c: "{{ states(temp_sensor) | float(21) }}"
+  rh_in: "{{ states(humidity_sensor) | float(50) }}"
+
+  # Heat index calculation (copy from templates.yaml)
+  heat_index_c: >
+    {% set T = t_in_c | float %}
+    {% set R = rh_in | float %}
+    {% if T < 20 or R < 40 %}
+      {{ T }}
+    {% else %}
+      {% set c1 = -8.78469475556 %}
+      {% set c2 = 1.61139411 %}
+      {% set c3 = 2.33854883889 %}
+      {% set c4 = -0.14611605 %}
+      {% set c5 = -0.012308094 %}
+      {% set c6 = -0.0164248277778 %}
+      {% set c7 = 0.002211732 %}
+      {% set c8 = 0.00072546 %}
+      {% set c9 = -0.000003582 %}
+      {% set HI = c1 + c2*T + c3*R + c4*T*R + c5*T*T + c6*R*R + c7*T*T*R + c8*T*R*R + c9*T*T*R*R %}
+      {{ HI }}
+    {% endif %}
+```
+
+### Example: Adding Adaptive Comfort Model
+
+```yaml
+variables:
+  # Outdoor temperature (clamped to valid range)
+  t_rm_c: "{{ [[t_out_c | float, 10] | max, 30] | min }}"
+
+  # EN 16798 adaptive comfort formula
+  comfort_temp_c: "{{ 0.33 * t_rm_c + 18.8 }}"
+
+  # Tolerance based on category (I=strict, II=normal, III=relaxed)
+  tol_c: >
+    {% if comfort_category == 'I' %}2.0
+    {% elif comfort_category == 'II' %}3.0
+    {% else %}4.0{% endif %}
+
+  # Comfort band
+  comfort_upper_c: "{{ comfort_temp_c + tol_c | float }}"
+  comfort_lower_c: "{{ comfort_temp_c - tol_c | float }}"
+```
+
+### Example: Time Schedule Parsing (Overnight Support)
+
+```yaml
+variables:
+  schedule_start: !input quiet_hours_start
+  schedule_end: !input quiet_hours_end
+
+  in_quiet_hours: >
+    {% set start_parts = schedule_start.split(':') if ':' in (schedule_start | string) else [] %}
+    {% set end_parts = schedule_end.split(':') if ':' in (schedule_end | string) else [] %}
+    {% if start_parts | length < 2 or end_parts | length < 2 %}
+      {{ false }}
+    {% else %}
+      {% set start_m = (start_parts[0] | int(0)) * 60 + (start_parts[1] | int(0)) %}
+      {% set end_m = (end_parts[0] | int(0)) * 60 + (end_parts[1] | int(0)) %}
+      {% set now_m = now().hour * 60 + now().minute %}
+      {% if start_m <= end_m %}
+        {{ start_m <= now_m < end_m }}
+      {% else %}
+        {{ now_m >= start_m or now_m < end_m }}
+      {% endif %}
+    {% endif %}
+```
+
+## Template Development Guidelines
+
+When adding new shared templates:
+
+1. **Document the formula** with mathematical notation and references
+2. **Include required inputs** clearly in comments
+3. **Handle edge cases** (unavailable sensors, division by zero, etc.)
+4. **Provide unit conversion** variants if applicable
+5. **Test in isolation** before copying to blueprints
+6. **Update this README** with the new template in the table above

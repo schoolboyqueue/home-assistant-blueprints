@@ -24,8 +24,8 @@ if [[ ! -f "$VALIDATOR" ]]; then
     exit 0
 fi
 
-# Get staged YAML files in blueprints directory
-STAGED_BLUEPRINTS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^blueprints/[^/]+/.*\.yaml$' || true)
+# Get staged YAML files in blueprints directory (excluding shared/ which contains non-blueprint resources)
+STAGED_BLUEPRINTS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^blueprints/[^/]+/.*\.yaml$' | grep -v '^blueprints/shared/' || true)
 
 if [[ -z "$STAGED_BLUEPRINTS" ]]; then
     echo -e "${GREEN}No blueprint files staged for commit${NC}"

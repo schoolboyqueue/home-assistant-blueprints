@@ -30,6 +30,7 @@ jobs:
       build_validator: ${{ steps.check.outputs.build_validator }}
       release_version: ${{ steps.check.outputs.release_version }}
       release_tag: ${{ steps.check.outputs.release_tag }}
+      release_title: ${{ steps.check.outputs.release_title }}
       client_version: ${{ steps.check.outputs.client_version }}
       validator_version: ${{ steps.check.outputs.validator_version }}
     steps:
@@ -109,8 +110,19 @@ jobs:
           fi
           echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
 
+          # Determine release title based on what's being built
+          if [ "$BUILD_CLIENT" == "true" ] && [ "$BUILD_VALIDATOR" == "true" ]; then
+            RELEASE_TITLE="ha-ws-client-go v$CLIENT_VERSION, validate-blueprint-go v$VALIDATE_VERSION"
+          elif [ "$BUILD_CLIENT" == "true" ]; then
+            RELEASE_TITLE="ha-ws-client-go v$CLIENT_VERSION"
+          else
+            RELEASE_TITLE="validate-blueprint-go v$VALIDATE_VERSION"
+          fi
+          echo "release_title=$RELEASE_TITLE" >> $GITHUB_OUTPUT
+
           echo "Tag: $TAG_NAME"
           echo "Release tag: $RELEASE_TAG"
+          echo "Release title: $RELEASE_TITLE"
           echo "Build ha-ws-client-go: $BUILD_CLIENT (v$CLIENT_VERSION)"
           echo "Build validate-blueprint-go: $BUILD_VALIDATOR (v$VALIDATE_VERSION)"
 
@@ -306,7 +318,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.determine-builds.outputs.release_tag }}
-          name: Go Tools v${{ needs.determine-builds.outputs.release_version }}
+          name: ${{ needs.determine-builds.outputs.release_title }}
           body: ${{ steps.body.outputs.content }}
           files: |
             artifacts/*

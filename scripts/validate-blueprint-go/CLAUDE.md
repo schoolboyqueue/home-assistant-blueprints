@@ -17,8 +17,6 @@ validate-blueprint-go/
 │   │   └── registry.go          # Error registry and factories
 │   ├── shutdown/                # Graceful shutdown coordination
 │   │   └── shutdown.go          # Context-based shutdown handling
-│   ├── testfixtures/            # Test fixture utilities
-│   │   └── fixtures.go          # Test data helpers
 │   └── validator/               # Core validation package
 │       ├── actions.go           # Action/service validation
 │       ├── categories.go        # Category classification
@@ -87,12 +85,6 @@ The core validation logic is organized into focused files:
 | File | Purpose |
 |------|---------|
 | `shutdown.go` | Graceful shutdown coordination with context cancellation |
-
-### `internal/testfixtures`
-
-| File | Purpose |
-|------|---------|
-| `fixtures.go` | Test fixture utilities for unit tests |
 
 ## Development
 
