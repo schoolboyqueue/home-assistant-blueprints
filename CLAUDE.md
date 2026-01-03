@@ -12,10 +12,10 @@ This repository contains production-ready Home Assistant Blueprints for home aut
 
 ```bash
 # Validate a single blueprint
-./scripts/validate-blueprint-go/validate-blueprint <path/to/blueprint.yaml>
+./scripts/validate-blueprint-go/build/validate-blueprint <path/to/blueprint.yaml>
 
 # Validate all blueprints in the repository
-./scripts/validate-blueprint-go/validate-blueprint --all
+./scripts/validate-blueprint-go/build/validate-blueprint --all
 
 # Or use npm scripts
 npm run validate          # Validate all blueprints
@@ -166,3 +166,34 @@ The project website is served from `docs/` and must be kept in sync with bluepri
 **When removing a blueprint:**
 1. Remove the blueprint card from the gallery
 2. Update the blueprint count in the hero stats
+
+## Documentation Maintenance
+
+**Keep documentation in sync with code changes.** When making changes, update all affected documentation:
+
+### Files to Update
+
+| Change Type | Files to Update |
+|-------------|-----------------|
+| New blueprint | Root README.md (gallery + structure), docs/index.html, CLAUDE.md if patterns change |
+| New Go tool feature | Tool's README.md, CLAUDE.md (architecture if new files), CHANGELOG.md |
+| New Go tool internal package | Tool's README.md + CLAUDE.md (architecture sections), root README.md (structure) |
+| New workflow file | Root README.md (structure section) |
+| Changed directory structure | All README.md and CLAUDE.md files with architecture/structure sections |
+
+### Architecture Sections
+
+These files contain directory structure diagrams that must stay current:
+
+- `README.md` (root) - Repository structure
+- `scripts/ha-ws-client-go/README.md` - Architecture section
+- `scripts/ha-ws-client-go/CLAUDE.md` - Architecture section
+- `scripts/validate-blueprint-go/README.md` - Architecture section
+- `scripts/validate-blueprint-go/CLAUDE.md` - Architecture + Package Structure sections
+
+### Before Committing
+
+1. If you added/removed/renamed files, update relevant architecture sections
+2. If you added new commands or features, update README.md command tables
+3. If you changed tool behavior, update CLAUDE.md usage examples
+4. Run `git diff --stat` to see changed files and verify docs are updated

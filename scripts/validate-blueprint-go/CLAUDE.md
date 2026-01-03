@@ -258,3 +258,16 @@ make sizes             # Show binary sizes
 ```
 
 Binary sizes are ~5-8MB (vs ~50MB+ for Node.js equivalent).
+
+## Documentation Maintenance
+
+**Keep documentation in sync with code changes:**
+
+| Change Type | Files to Update |
+|-------------|-----------------|
+| New validation check | README.md (What It Checks tables), CLAUDE.md (Validation Flow) |
+| New internal package | README.md + CLAUDE.md (Architecture sections), CLAUDE.md (Package Structure), root README.md |
+| New validator file | README.md + CLAUDE.md (Architecture sections), CLAUDE.md (Package Structure table) |
+| Changed validation behavior | README.md (check descriptions), CLAUDE.md (examples) |
+
+Before committing structural changes, verify the Architecture and Package Structure sections in both README.md and CLAUDE.md reflect the current directory structure.
