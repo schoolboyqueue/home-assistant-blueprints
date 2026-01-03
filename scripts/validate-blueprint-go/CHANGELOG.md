@@ -5,6 +5,26 @@ All notable changes to validate-blueprint-go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-01-03
+
+### Added
+
+- ValidationContext struct for centralized state management during validation
+- Context-based validation API with cleaner separation of concerns
+- Comprehensive context tests (`context_test.go`)
+
+### Changed
+
+- Refactor validator to use ValidationContext pattern for cleaner state handling
+- Simplify main.go CLI logic with switch statement refactoring
+- Update urfave/cli dependency
+
+### Fixed
+
+- Fix unused parameter lint warning in runValidation
+- Fix unchecked error returns for cli.ShowAppHelp
+- Fix if-else chain converted to switch statement per linter recommendation
+
 ## [1.3.0] - 2026-01-03
 
 ### Added

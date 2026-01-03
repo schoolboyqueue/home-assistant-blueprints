@@ -2,23 +2,15 @@ package validator
 
 import "fmt"
 
-// BlueprintValidator validates Home Assistant Blueprint YAML files
+// BlueprintValidator validates Home Assistant Blueprint YAML files.
+// It embeds ValidationContext to encapsulate all validation state including
+// errors, warnings, used inputs, and blueprint data.
 type BlueprintValidator struct {
-	FilePath            string
-	Errors              []string
-	Warnings            []string
-	CategorizedErrors   []CategorizedError
-	CategorizedWarnings []CategorizedWarning
-	Data                map[string]interface{}
-	DefinedInputs       map[string]bool
-	UsedInputs          map[string]bool
-	InputDefaults       map[string]interface{}
-	InputSelectors      map[string]map[string]interface{}
-	EntityInputs        map[string]bool
-	InputDatetimeInputs map[string]bool
-	DefinedVariables    map[string]bool
-	JoinVariables       map[string]bool
-	NonzeroDefaultVars  map[string]bool
+	// Embed ValidationContext to provide access to all validation state
+	*ValidationContext
+
+	// FilePath is the path to the blueprint file being validated
+	FilePath string
 	// GroupByCategory controls whether errors/warnings are grouped by category in output
 	GroupByCategory bool
 }
@@ -26,23 +18,29 @@ type BlueprintValidator struct {
 // New creates a new validator instance
 func New(filePath string) *BlueprintValidator {
 	return &BlueprintValidator{
-		FilePath:            filePath,
-		Errors:              []string{},
-		Warnings:            []string{},
-		CategorizedErrors:   []CategorizedError{},
-		CategorizedWarnings: []CategorizedWarning{},
-		Data:                make(map[string]interface{}),
-		DefinedInputs:       make(map[string]bool),
-		UsedInputs:          make(map[string]bool),
-		InputDefaults:       make(map[string]interface{}),
-		InputSelectors:      make(map[string]map[string]interface{}),
-		EntityInputs:        make(map[string]bool),
-		InputDatetimeInputs: make(map[string]bool),
-		DefinedVariables:    make(map[string]bool),
-		JoinVariables:       make(map[string]bool),
-		NonzeroDefaultVars:  make(map[string]bool),
-		GroupByCategory:     true, // Enable categorized output by default
+		ValidationContext: NewValidationContext(),
+		FilePath:          filePath,
+		GroupByCategory:   true, // Enable categorized output by default
 	}
+}
+
+// NewWithContext creates a new validator instance with a pre-existing ValidationContext.
+// This allows sharing context between validators or reusing context for multiple validations.
+func NewWithContext(filePath string, ctx *ValidationContext) *BlueprintValidator {
+	if ctx == nil {
+		ctx = NewValidationContext()
+	}
+	return &BlueprintValidator{
+		ValidationContext: ctx,
+		FilePath:          filePath,
+		GroupByCategory:   true,
+	}
+}
+
+// Context returns the underlying ValidationContext.
+// This provides direct access to the context for advanced use cases.
+func (v *BlueprintValidator) Context() *ValidationContext {
+	return v.ValidationContext
 }
 
 // Validate runs all validation checks

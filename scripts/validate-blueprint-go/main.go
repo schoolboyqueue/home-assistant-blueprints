@@ -1,18 +1,5 @@
 // validate-blueprint - A comprehensive Home Assistant Blueprint validator
 //
-// This tool performs comprehensive validation of Home Assistant blueprint files:
-// 1. YAML syntax validation
-// 2. Blueprint schema validation (required keys, structure)
-// 3. Input/selector validation
-// 4. Template syntax checking
-// 5. Service call structure validation
-// 6. Version sync validation
-// 7. Trigger validation
-// 8. Condition validation
-// 9. Mode validation
-// 10. Input reference validation
-// And more...
-//
 // Usage:
 //
 //	validate-blueprint <blueprint.yaml>
@@ -20,6 +7,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -27,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
+	"github.com/urfave/cli/v3"
 
 	"github.com/home-assistant-blueprints/validate-blueprint-go/internal/validator"
 )
@@ -38,95 +27,54 @@ var (
 	GitCommit = "unknown"
 )
 
-// showHelp displays comprehensive usage information
-func showHelp() {
-	fmt.Print(`Usage: validate-blueprint <blueprint.yaml>
-       validate-blueprint --all
-       validate-blueprint --version
-       validate-blueprint --help
-
-validate-blueprint - A comprehensive Home Assistant Blueprint validator
-
-Description:
-  This tool performs comprehensive validation of Home Assistant blueprint files,
-  checking for common errors and best practices.
-
-Commands:
-  <blueprint.yaml>     Validate a single blueprint file
-  --all                Validate all blueprints in the repository
-  --version, -v        Show version information
-  --help, -h, help     Show this help message
-
-Validation Checks:
-  1.  YAML syntax validation
-  2.  Blueprint schema validation (required keys, structure)
-  3.  Input/selector validation
-  4.  Template syntax checking
-  5.  Service call structure validation
-  6.  Version sync validation
-  7.  Trigger validation
-  8.  Condition validation
-  9.  Mode validation
-  10. Input reference validation
-  11. Hysteresis boundary validation
-  12. Variable definition validation
-  13. README.md and CHANGELOG.md existence check
-
-Valid Selectors:
-  action, addon, area, attribute, boolean, color_rgb, color_temp, condition,
-  conversation_agent, country, date, datetime, device, duration, entity, file,
-  floor, icon, label, language, location, media, navigation, number, object,
-  select, state, target, template, text, theme, time, trigger, ui_action, ui_color
-
-Valid Modes:
-  single, restart, queued, parallel
-
-Valid Condition Types:
-  and, or, not, state, numeric_state, template, time, zone, trigger, sun, device
-
-Blueprint File Patterns (for --all):
-  The tool searches for files matching these patterns:
-  - *_pro.yaml
-  - *_pro_blueprint.yaml
-  - blueprint.yaml
-
-Exit Codes:
-  0    Validation passed (may have warnings)
-  1    Validation failed (has errors) or invalid usage
-
-Examples:
-  validate-blueprint my_automation.yaml
-  validate-blueprint blueprints/automation/motion_light.yaml
-  validate-blueprint --all
-
-`)
-}
-
-// isHelpRequested checks if any argument is a help flag
-func isHelpRequested(args []string) bool {
-	for _, arg := range args {
-		if arg == "--help" || arg == "-h" || arg == "help" {
-			return true
-		}
+func main() {
+	cmd := &cli.Command{
+		Name:      "validate-blueprint",
+		Usage:     "A comprehensive Home Assistant Blueprint validator",
+		Version:   Version,
+		ArgsUsage: "[blueprint.yaml]",
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:    "all",
+				Aliases: []string{"a"},
+				Usage:   "Validate all blueprints in the repository",
+			},
+		},
+		Action: runValidation,
 	}
-	return false
-}
 
-// isVersionRequested checks if any argument is a version flag
-func isVersionRequested(args []string) bool {
-	for _, arg := range args {
-		if arg == "--version" || arg == "-v" || arg == "version" {
-			return true
-		}
+	if err := cmd.Run(context.Background(), os.Args); err != nil {
+		os.Exit(1)
 	}
-	return false
 }
 
-// showVersion displays version information
-func showVersion() {
-	fmt.Printf("validate-blueprint %s\n", Version)
-	fmt.Printf("  Build time: %s\n", BuildTime)
-	fmt.Printf("  Git commit: %s\n", GitCommit)
+// runValidation is the main action for the CLI command
+func runValidation(_ context.Context, cmd *cli.Command) error {
+	validateAll := cmd.Bool("all")
+	args := cmd.Args()
+
+	// Handle no arguments (show help with error exit)
+	if args.Len() == 0 && !validateAll {
+		_ = cli.ShowAppHelp(cmd) //nolint:errcheck // error not relevant, we exit immediately
+		return cli.Exit("", 1)
+	}
+
+	// Execute the appropriate command
+	var success bool
+	switch {
+	case validateAll:
+		success = runValidateAll()
+	case args.Len() > 0:
+		success = validateSingle(args.First())
+	default:
+		_ = cli.ShowAppHelp(cmd) //nolint:errcheck // error not relevant, we exit immediately
+		return cli.Exit("", 1)
+	}
+
+	if !success {
+		return cli.Exit("", 1)
+	}
+	return nil
 }
 
 // findAllBlueprints finds all blueprint YAML files in the repository
@@ -179,8 +127,8 @@ func validateSingle(blueprintPath string) bool {
 	return v.Validate()
 }
 
-// validateAll validates all blueprints in the repository
-func validateAll() bool {
+// runValidateAll validates all blueprints in the repository
+func runValidateAll() bool {
 	// Navigate up from scripts/validate-blueprint-go/ to the repo root
 	execPath, err := os.Executable()
 	if err != nil {
@@ -278,33 +226,4 @@ func validateAll() bool {
 	fmt.Printf("Total: %d | Passed: %d | Failed: %d\n", len(results), passed, failed)
 
 	return failed == 0
-}
-
-func main() {
-	// Check for version first
-	if isVersionRequested(os.Args[1:]) {
-		showVersion()
-		os.Exit(0)
-	}
-
-	// Check for help
-	if len(os.Args) < 2 || isHelpRequested(os.Args[1:]) {
-		showHelp()
-		if len(os.Args) < 2 {
-			os.Exit(1)
-		}
-		os.Exit(0)
-	}
-
-	var success bool
-	if os.Args[1] == "--all" {
-		success = validateAll()
-	} else {
-		success = validateSingle(os.Args[1])
-	}
-
-	if success {
-		os.Exit(0)
-	}
-	os.Exit(1)
 }
