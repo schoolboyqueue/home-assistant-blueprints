@@ -1110,3 +1110,318 @@ func TestIntegration_HandleAutomationConfig_NonBlueprintAutomation(t *testing.T)
 	t.Logf("Config has %d triggers, %d actions",
 		len(result.Config.Trigger), len(result.Config.Action))
 }
+
+// =============================================================================
+// Monitor Handler Tests
+// =============================================================================
+
+func TestIntegration_WatchSubscription(t *testing.T) {
+	c := testClient(t)
+
+	// Test subscription to state trigger (similar to watch command)
+	trigger := map[string]any{
+		"platform":  "state",
+		"entity_id": "sun.sun",
+	}
+
+	eventCh := make(chan map[string]any, 1)
+	_, cleanup, err := c.SubscribeToTrigger(trigger, func(vars map[string]any) {
+		select {
+		case eventCh <- vars:
+		default:
+		}
+	}, 2*time.Second)
+	require.NoError(t, err)
+	defer cleanup()
+
+	// sun.sun changes slowly, so we may or may not get an event
+	// Just verify the subscription was set up correctly
+	select {
+	case event := <-eventCh:
+		assert.NotNil(t, event)
+		t.Logf("Received state change event: %v", event)
+	case <-time.After(2 * time.Second):
+		// Timeout is acceptable - sun.sun doesn't change frequently
+		t.Log("No state change within timeout (expected for slow-changing entity)")
+	}
+}
+
+func TestIntegration_WatchWithTestFixtures(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	// Set up subscription to watch test_switch
+	trigger := map[string]any{
+		"platform":  "state",
+		"entity_id": testInputBoolean,
+	}
+
+	eventCh := make(chan map[string]any, 1)
+	_, cleanup, err := c.SubscribeToTrigger(trigger, func(vars map[string]any) {
+		select {
+		case eventCh <- vars:
+		default:
+		}
+	}, 5*time.Second)
+	require.NoError(t, err)
+	defer cleanup()
+
+	// Toggle the input boolean to trigger an event
+	time.Sleep(100 * time.Millisecond) // Brief pause to ensure subscription is active
+	_, err = c.SendMessage("call_service", map[string]any{
+		"domain":  "input_boolean",
+		"service": "toggle",
+		"target": map[string]any{
+			"entity_id": testInputBoolean,
+		},
+	})
+	require.NoError(t, err)
+
+	// Wait for event
+	select {
+	case event := <-eventCh:
+		assert.NotNil(t, event)
+		// Verify event structure
+		if trigger, ok := event["trigger"].(map[string]any); ok {
+			t.Logf("Trigger platform: %v", trigger["platform"])
+			if toState, ok := trigger["to_state"].(map[string]any); ok {
+				t.Logf("New state: %v", toState["state"])
+			}
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for state change event")
+	}
+
+	// Toggle back to restore state
+	_, err = c.SendMessage("call_service", map[string]any{
+		"domain":  "input_boolean",
+		"service": "toggle",
+		"target": map[string]any{
+			"entity_id": testInputBoolean,
+		},
+	})
+	require.NoError(t, err)
+}
+
+func TestIntegration_MonitorMultipleEntities(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	// Get initial states
+	states, err := client.SendMessageTyped[[]types.HAState](c, "get_states", nil)
+	require.NoError(t, err)
+
+	// Find our test entities
+	var testEntities []string
+	for _, s := range states {
+		if s.EntityID == testInputBoolean || s.EntityID == testInputNumber {
+			testEntities = append(testEntities, s.EntityID)
+		}
+	}
+	require.GreaterOrEqual(t, len(testEntities), 2, "should have at least 2 test entities")
+
+	t.Logf("Found test entities for monitoring: %v", testEntities)
+
+	// Set up subscription for both entities (simulating monitor-multi)
+	trigger := map[string]any{
+		"platform":  "state",
+		"entity_id": testEntities,
+	}
+
+	eventCh := make(chan map[string]any, 2)
+	_, cleanup, err := c.SubscribeToTrigger(trigger, func(vars map[string]any) {
+		select {
+		case eventCh <- vars:
+		default:
+		}
+	}, 5*time.Second)
+	require.NoError(t, err)
+	defer cleanup()
+
+	// Trigger a change
+	time.Sleep(100 * time.Millisecond)
+	_, err = c.SendMessage("call_service", map[string]any{
+		"domain":  "input_boolean",
+		"service": "toggle",
+		"target": map[string]any{
+			"entity_id": testInputBoolean,
+		},
+	})
+	require.NoError(t, err)
+
+	// Wait for event
+	select {
+	case event := <-eventCh:
+		assert.NotNil(t, event)
+		t.Logf("Received multi-entity event: %+v", event)
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for multi-entity event")
+	}
+
+	// Restore state
+	_, err = c.SendMessage("call_service", map[string]any{
+		"domain":  "input_boolean",
+		"service": "toggle",
+		"target": map[string]any{
+			"entity_id": testInputBoolean,
+		},
+	})
+	require.NoError(t, err)
+}
+
+func TestIntegration_AnalyzePattern(t *testing.T) {
+	c := testClient(t)
+
+	// Test pattern-based entity filtering (used by analyze command)
+	states, err := client.SendMessageTyped[[]types.HAState](c, "get_states", nil)
+	require.NoError(t, err)
+
+	// Filter by pattern
+	var sunEntities []types.HAState
+	for _, s := range states {
+		if strings.HasPrefix(s.EntityID, "sun.") {
+			sunEntities = append(sunEntities, s)
+		}
+	}
+
+	assert.Greater(t, len(sunEntities), 0, "should have at least one sun.* entity")
+
+	for _, e := range sunEntities {
+		t.Logf("Found entity: %s = %s", e.EntityID, e.State)
+	}
+}
+
+func TestIntegration_AnalyzeInputPattern(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	states, err := client.SendMessageTyped[[]types.HAState](c, "get_states", nil)
+	require.NoError(t, err)
+
+	// Filter for input_* entities
+	var inputEntities []types.HAState
+	for _, s := range states {
+		if strings.HasPrefix(s.EntityID, "input_") {
+			inputEntities = append(inputEntities, s)
+		}
+	}
+
+	assert.GreaterOrEqual(t, len(inputEntities), 4,
+		"should have at least 4 input_* entities from fixtures")
+
+	t.Logf("Found %d input_* entities", len(inputEntities))
+	for _, e := range inputEntities {
+		t.Logf("  %s = %s", e.EntityID, e.State)
+	}
+}
+
+// =============================================================================
+// Compare and Device Health Handler Tests
+// =============================================================================
+
+func TestIntegration_CompareEntities(t *testing.T) {
+	c := testClient(t)
+
+	states, err := client.SendMessageTyped[[]types.HAState](c, "get_states", nil)
+	require.NoError(t, err)
+
+	// Find two entities to compare
+	var entity1, entity2 *types.HAState
+	for i := range states {
+		if strings.HasPrefix(states[i].EntityID, "sensor.") {
+			if entity1 == nil {
+				entity1 = &states[i]
+			} else if entity2 == nil {
+				entity2 = &states[i]
+				break
+			}
+		}
+	}
+
+	if entity1 == nil || entity2 == nil {
+		// Fall back to sun entities
+		for i := range states {
+			if states[i].EntityID == "sun.sun" {
+				entity1 = &states[i]
+				entity2 = &states[i] // Compare to itself
+				break
+			}
+		}
+	}
+
+	require.NotNil(t, entity1, "should find at least one entity to compare")
+	require.NotNil(t, entity2, "should find a second entity to compare")
+
+	t.Logf("Comparing %s vs %s", entity1.EntityID, entity2.EntityID)
+
+	// Verify both entities have expected fields
+	assert.NotEmpty(t, entity1.State)
+	assert.NotEmpty(t, entity2.State)
+}
+
+func TestIntegration_DeviceHealth(t *testing.T) {
+	c := testClient(t)
+
+	states, err := client.SendMessageTyped[[]types.HAState](c, "get_states", nil)
+	require.NoError(t, err)
+
+	// Find sun.sun for health check (always exists)
+	var sunEntity *types.HAState
+	for i := range states {
+		if states[i].EntityID == "sun.sun" {
+			sunEntity = &states[i]
+			break
+		}
+	}
+
+	require.NotNil(t, sunEntity, "sun.sun should exist")
+	assert.NotEmpty(t, sunEntity.LastUpdated, "should have last_updated")
+
+	// Parse the timestamp to verify it's valid
+	_, err = time.Parse(time.RFC3339, sunEntity.LastUpdated)
+	assert.NoError(t, err, "last_updated should be valid RFC3339")
+
+	t.Logf("sun.sun last updated: %s", sunEntity.LastUpdated)
+}
+
+func TestIntegration_DeviceHealthWithFixtures(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	states, err := client.SendMessageTyped[[]types.HAState](c, "get_states", nil)
+	require.NoError(t, err)
+
+	// Find test input boolean
+	var inputBoolEntity *types.HAState
+	for i := range states {
+		if states[i].EntityID == testInputBoolean {
+			inputBoolEntity = &states[i]
+			break
+		}
+	}
+
+	require.NotNil(t, inputBoolEntity, "%s should exist", testInputBoolean)
+	assert.NotEmpty(t, inputBoolEntity.LastUpdated)
+
+	// Calculate age
+	lastUpdated, err := time.Parse(time.RFC3339, inputBoolEntity.LastUpdated)
+	require.NoError(t, err)
+
+	age := time.Since(lastUpdated)
+	t.Logf("%s last updated %s ago", testInputBoolean, age.Round(time.Second))
+
+	// Recently triggered entity should be fresh
+	assert.Less(t, age, 24*time.Hour, "test entity should have been updated in last 24 hours")
+}

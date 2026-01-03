@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
 
 func TestFilterByPattern(t *testing.T) {
@@ -183,6 +185,293 @@ func TestRegistryConfig(t *testing.T) {
 	})
 }
 
+func TestEntityEntryFormatting(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		entry          types.EntityEntry
+		expectName     string
+		expectDisabled bool
+	}{
+		{
+			name: "entry with name",
+			entry: types.EntityEntry{
+				EntityID:     "light.kitchen",
+				Name:         "Kitchen Light",
+				OriginalName: "Kitchen Ceiling Light",
+				Platform:     "hue",
+			},
+			expectName:     "Kitchen Light",
+			expectDisabled: false,
+		},
+		{
+			name: "entry without name falls back to original",
+			entry: types.EntityEntry{
+				EntityID:     "sensor.temperature",
+				Name:         "",
+				OriginalName: "Temperature Sensor",
+				Platform:     "esphome",
+			},
+			expectName:     "Temperature Sensor",
+			expectDisabled: false,
+		},
+		{
+			name: "disabled entry",
+			entry: types.EntityEntry{
+				EntityID:   "switch.old_device",
+				Name:       "Old Switch",
+				DisabledBy: "user",
+			},
+			expectName:     "Old Switch",
+			expectDisabled: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			name := tt.entry.Name
+			if name == "" {
+				name = tt.entry.OriginalName
+			}
+			assert.Equal(t, tt.expectName, name)
+			assert.Equal(t, tt.expectDisabled, tt.entry.DisabledBy != "")
+		})
+	}
+}
+
+func TestDeviceEntryFormatting(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		entry      types.DeviceEntry
+		expectName string
+	}{
+		{
+			name: "device with user-defined name",
+			entry: types.DeviceEntry{
+				ID:           "abc123def456",
+				Name:         "Hue Bridge",
+				NameByUser:   "Living Room Hub",
+				Manufacturer: "Philips",
+				Model:        "BSB002",
+				AreaID:       "living_room",
+			},
+			expectName: "Living Room Hub",
+		},
+		{
+			name: "device with default name only",
+			entry: types.DeviceEntry{
+				ID:           "xyz789abc012",
+				Name:         "Motion Sensor",
+				Manufacturer: "Aqara",
+				Model:        "RTCGQ11LM",
+			},
+			expectName: "Motion Sensor",
+		},
+		{
+			name: "device with empty names",
+			entry: types.DeviceEntry{
+				ID:           "empty123",
+				Manufacturer: "Generic",
+				Model:        "Unknown",
+			},
+			expectName: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			name := tt.entry.Name
+			if tt.entry.NameByUser != "" {
+				name = tt.entry.NameByUser
+			}
+			assert.Equal(t, tt.expectName, name)
+		})
+	}
+}
+
+func TestAreaEntryFormatting(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		entry         types.AreaEntry
+		expectAliases int
+	}{
+		{
+			name: "area with aliases",
+			entry: types.AreaEntry{
+				AreaID:  "living_room",
+				Name:    "Living Room",
+				Aliases: []string{"Lounge", "Family Room"},
+			},
+			expectAliases: 2,
+		},
+		{
+			name: "area without aliases",
+			entry: types.AreaEntry{
+				AreaID: "bedroom",
+				Name:   "Master Bedroom",
+			},
+			expectAliases: 0,
+		},
+		{
+			name: "area with empty alias list",
+			entry: types.AreaEntry{
+				AreaID:  "kitchen",
+				Name:    "Kitchen",
+				Aliases: []string{},
+			},
+			expectAliases: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.NotEmpty(t, tt.entry.AreaID)
+			assert.NotEmpty(t, tt.entry.Name)
+			assert.Len(t, tt.entry.Aliases, tt.expectAliases)
+		})
+	}
+}
+
+func TestDeviceIDShortening(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		deviceID string
+		shortLen int
+		expected string
+	}{
+		{
+			name:     "standard UUID-like ID",
+			deviceID: "abc123def456ghi789",
+			shortLen: 8,
+			expected: "abc123de",
+		},
+		{
+			name:     "short ID stays same",
+			deviceID: "abcd",
+			shortLen: 8,
+			expected: "abcd",
+		},
+		{
+			name:     "exact length",
+			deviceID: "12345678",
+			shortLen: 8,
+			expected: "12345678",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var result string
+			if len(tt.deviceID) > tt.shortLen {
+				result = tt.deviceID[:tt.shortLen]
+			} else {
+				result = tt.deviceID
+			}
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestPatternToRegex(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		pattern string
+		match   string
+		expect  bool
+	}{
+		{
+			name:    "glob star at end",
+			pattern: "light.*",
+			match:   "light.kitchen",
+			expect:  true,
+		},
+		{
+			name:    "glob star at start",
+			pattern: "*.kitchen",
+			match:   "light.kitchen",
+			expect:  true,
+		},
+		{
+			name:    "glob star in middle",
+			pattern: "sensor.*_temperature",
+			match:   "sensor.kitchen_temperature",
+			expect:  true,
+		},
+		{
+			name:    "double glob star",
+			pattern: "*temperature*",
+			match:   "sensor.kitchen_temperature_celsius",
+			expect:  true,
+		},
+		{
+			name:    "no match",
+			pattern: "light.*",
+			match:   "sensor.temperature",
+			expect:  false,
+		},
+		{
+			name:    "case insensitive",
+			pattern: "LIGHT.*",
+			match:   "light.kitchen",
+			expect:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Convert glob to regex (same logic as WithPattern middleware)
+			regexPattern := regexp.QuoteMeta(tt.pattern)
+			regexPattern = regexp.MustCompile(`\\\*`).ReplaceAllString(regexPattern, ".*")
+			re := regexp.MustCompile("(?i)" + regexPattern)
+
+			result := re.MatchString(tt.match)
+			assert.Equal(t, tt.expect, result)
+		})
+	}
+}
+
+func TestEmptyMatchFields(t *testing.T) {
+	t.Parallel()
+
+	type item struct {
+		Value string
+	}
+
+	items := []item{
+		{Value: "test1"},
+		{Value: "test2"},
+	}
+
+	// MatchFields that returns empty slice should never match
+	matchFields := func(_ item) []string {
+		return []string{}
+	}
+
+	re := regexp.MustCompile(".*")
+	result := filterByPattern(items, re, matchFields)
+
+	assert.Nil(t, result)
+}
+
 // Benchmark for filterByPattern
 func BenchmarkFilterByPattern(b *testing.B) {
 	type item struct {
@@ -208,5 +497,42 @@ func BenchmarkFilterByPattern(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = filterByPattern(items, re, matchFields)
+	}
+}
+
+// Benchmark for pattern to regex conversion
+func BenchmarkPatternToRegex(b *testing.B) {
+	patterns := []string{
+		"light.*",
+		"*temperature*",
+		"sensor.kitchen_*",
+		"binary_sensor.*_motion",
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		pattern := patterns[i%len(patterns)]
+		regexPattern := regexp.QuoteMeta(pattern)
+		regexPattern = regexp.MustCompile(`\\\*`).ReplaceAllString(regexPattern, ".*")
+		_ = regexp.MustCompile("(?i)" + regexPattern)
+	}
+}
+
+// Benchmark for MatchFields with multiple fields
+func BenchmarkMatchFields(b *testing.B) {
+	entries := []types.EntityEntry{
+		{EntityID: "light.kitchen", Name: "Kitchen Light", OriginalName: "Kitchen Ceiling"},
+		{EntityID: "sensor.temp", Name: "Temperature", OriginalName: "Temp Sensor"},
+		{EntityID: "switch.fan", Name: "", OriginalName: "Ceiling Fan"},
+	}
+
+	matchFields := func(e types.EntityEntry) []string {
+		return []string{e.EntityID, e.Name, e.OriginalName}
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		e := entries[i%len(entries)]
+		_ = matchFields(e)
 	}
 }
