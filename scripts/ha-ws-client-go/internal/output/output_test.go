@@ -799,6 +799,139 @@ func TestResult_ErrorMarshal(t *testing.T) {
 	assert.Contains(t, string(data), `"error":"Entity not found"`)
 }
 
+// TestPrintCompact_Struct tests compact output for typed structs (like HAState)
+func TestPrintCompact_Struct(t *testing.T) {
+	original := globalConfig
+	defer func() { globalConfig = original }()
+
+	globalConfig = &Config{Format: FormatCompact}
+
+	// Define a struct similar to HAState
+	type TestState struct {
+		EntityID   string         `json:"entity_id"`
+		State      string         `json:"state"`
+		Attributes map[string]any `json:"attributes,omitempty"`
+	}
+
+	state := TestState{
+		EntityID:   "light.kitchen",
+		State:      "on",
+		Attributes: map[string]any{"brightness": 255},
+	}
+
+	output := captureOutput(t, func() {
+		printCompact(state)
+	})
+
+	assert.Equal(t, "light.kitchen=on\n", output)
+}
+
+func TestStructToMap(t *testing.T) {
+	t.Parallel()
+
+	t.Run("valid struct", func(t *testing.T) {
+		t.Parallel()
+		type TestStruct struct {
+			Name  string `json:"name"`
+			Value int    `json:"value"`
+		}
+		s := TestStruct{Name: "test", Value: 42}
+		m := structToMap(s)
+
+		require.NotNil(t, m)
+		assert.Equal(t, "test", m["name"])
+		assert.Equal(t, float64(42), m["value"]) // JSON numbers are float64
+	})
+
+	t.Run("nil value", func(t *testing.T) {
+		t.Parallel()
+		m := structToMap(nil)
+		assert.Nil(t, m)
+	})
+
+	t.Run("non-struct primitive", func(t *testing.T) {
+		t.Parallel()
+		m := structToMap("string value")
+		assert.Nil(t, m)
+	})
+
+	t.Run("slice returns nil", func(t *testing.T) {
+		t.Parallel()
+		m := structToMap([]string{"a", "b"})
+		assert.Nil(t, m)
+	})
+}
+
+func TestPrintCompactMap(t *testing.T) {
+	original := globalConfig
+	defer func() { globalConfig = original }()
+
+	globalConfig = &Config{Format: FormatCompact}
+
+	t.Run("entity state format", func(t *testing.T) {
+		output := captureOutput(t, func() {
+			printCompactMap(map[string]any{
+				"entity_id": "sensor.temp",
+				"state":     "23.5",
+			})
+		})
+		assert.Equal(t, "sensor.temp=23.5\n", output)
+	})
+
+	t.Run("trace info format", func(t *testing.T) {
+		output := captureOutput(t, func() {
+			printCompactMap(map[string]any{
+				"item_id": "test_automation",
+				"run_id":  "run123",
+				"timestamp": map[string]any{
+					"start": "2024-01-01T00:00:00Z",
+				},
+			})
+		})
+		assert.Contains(t, output, "test_automation")
+		assert.Contains(t, output, "run123")
+		assert.Contains(t, output, "2024-01-01T00:00:00Z")
+	})
+
+	t.Run("generic map format", func(t *testing.T) {
+		output := captureOutput(t, func() {
+			printCompactMap(map[string]any{
+				"key1": "value1",
+				"key2": 42,
+			})
+		})
+		assert.Contains(t, output, "key1=value1")
+		assert.Contains(t, output, "key2=42")
+	})
+}
+
+func TestData_CompactFormat_WithStruct(t *testing.T) {
+	original := globalConfig
+	defer func() { globalConfig = original }()
+
+	globalConfig = &Config{Format: FormatCompact}
+
+	// Simulate HAState struct behavior
+	type EntityState struct {
+		EntityID    string         `json:"entity_id"`
+		State       string         `json:"state"`
+		Attributes  map[string]any `json:"attributes,omitempty"`
+		LastChanged string         `json:"last_changed,omitempty"`
+	}
+
+	state := EntityState{
+		EntityID:    "switch.garage",
+		State:       "off",
+		LastChanged: "2024-01-01T12:00:00Z",
+	}
+
+	output := captureOutput(t, func() {
+		Data(state, WithCommand("state"))
+	})
+
+	assert.Equal(t, "switch.garage=off\n", output)
+}
+
 // Note: Concurrent config access is not tested because the CLI runs
 // single-threaded - commands execute sequentially, not in parallel.
 // The global config pattern is appropriate for this use case.

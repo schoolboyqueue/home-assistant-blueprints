@@ -53,12 +53,22 @@ func handleTraces(ctx *Context) error {
 			for _, s := range states {
 				if s.EntityID == entityID {
 					if lastTriggered, ok := s.Attributes["last_triggered"].(string); ok && lastTriggered != "" {
-						output.Message(fmt.Sprintf("No stored traces for %s", entityID))
-						output.Message(fmt.Sprintf("However, last_triggered: %s", lastTriggered))
-						output.Message("")
-						output.Message("Traces may be disabled or cleared. Check:")
-						output.Message("  - Settings > Automations > (automation) > Stored Traces")
-						output.Message("  - Trace storage limit (default: 5)")
+						if output.IsJSON() {
+							// Output a single JSON object with all the info
+							output.Data(map[string]any{
+								"entity_id":      entityID,
+								"traces":         []any{},
+								"last_triggered": lastTriggered,
+								"message":        "No stored traces. Traces may be disabled or cleared.",
+							}, output.WithCommand("traces"), output.WithCount(0))
+						} else {
+							output.Message(fmt.Sprintf("No stored traces for %s", entityID))
+							output.Message(fmt.Sprintf("However, last_triggered: %s", lastTriggered))
+							output.Message("")
+							output.Message("Traces may be disabled or cleared. Check:")
+							output.Message("  - Settings > Automations > (automation) > Stored Traces")
+							output.Message("  - Trace storage limit (default: 5)")
+						}
 						return nil
 					}
 					break

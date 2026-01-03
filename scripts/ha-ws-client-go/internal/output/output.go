@@ -384,42 +384,68 @@ func printCompact(data any) {
 }
 
 func printCompactItem(item any) {
+	// First try to convert struct to map using JSON marshaling
+	// This handles typed structs like HAState gracefully
 	switch v := item.(type) {
 	case map[string]any:
-		// Entity state
-		if entityID, ok := v["entity_id"].(string); ok {
-			if state, ok := v["state"].(string); ok {
-				fmt.Printf("%s=%s\n", entityID, state)
-				return
-			}
-		}
-		// Trace info
-		if runID, ok := v["run_id"].(string); ok {
-			if itemID, ok := v["item_id"].(string); ok {
-				timestamp := ""
-				if ts, ok := v["timestamp"].(map[string]any); ok {
-					if start, ok := ts["start"].(string); ok {
-						timestamp = start
-					}
-				}
-				fmt.Printf("%s %s %s\n", itemID, runID, timestamp)
-				return
-			}
-		}
-		// Generic: print key=value pairs
-		var pairs []string
-		for k, val := range v {
-			if val != nil {
-				pairs = append(pairs, fmt.Sprintf("%s=%v", k, val))
-			}
-			if len(pairs) >= 5 {
-				break
-			}
-		}
-		fmt.Println(strings.Join(pairs, " "))
+		printCompactMap(v)
 	default:
+		// Try to convert struct to map via JSON
+		if m := structToMap(item); m != nil {
+			printCompactMap(m)
+			return
+		}
 		fmt.Printf("%v\n", item)
 	}
+}
+
+// structToMap converts a struct to map[string]any via JSON marshaling.
+// Returns nil if the conversion fails or the result is not a map.
+func structToMap(item any) map[string]any {
+	data, err := json.Marshal(item)
+	if err != nil {
+		return nil
+	}
+	var m map[string]any
+	if err := json.Unmarshal(data, &m); err != nil {
+		return nil
+	}
+	return m
+}
+
+// printCompactMap handles compact output for map types.
+func printCompactMap(v map[string]any) {
+	// Entity state
+	if entityID, ok := v["entity_id"].(string); ok {
+		if state, ok := v["state"].(string); ok {
+			fmt.Printf("%s=%s\n", entityID, state)
+			return
+		}
+	}
+	// Trace info
+	if runID, ok := v["run_id"].(string); ok {
+		if itemID, ok := v["item_id"].(string); ok {
+			timestamp := ""
+			if ts, ok := v["timestamp"].(map[string]any); ok {
+				if start, ok := ts["start"].(string); ok {
+					timestamp = start
+				}
+			}
+			fmt.Printf("%s %s %s\n", itemID, runID, timestamp)
+			return
+		}
+	}
+	// Generic: print key=value pairs
+	var pairs []string
+	for k, val := range v {
+		if val != nil {
+			pairs = append(pairs, fmt.Sprintf("%s=%v", k, val))
+		}
+		if len(pairs) >= 5 {
+			break
+		}
+	}
+	fmt.Println(strings.Join(pairs, " "))
 }
 
 func printDefault(data any) {

@@ -5,6 +5,24 @@ All notable changes to ha-ws-client-go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-01-02
+
+### Fixed
+
+- Fix `state --compact` output displaying raw Go struct instead of formatted `entity_id=state` format
+  - The issue occurred because typed structs (like HAState) weren't being converted to maps before compact formatting
+  - Added `structToMap()` helper that uses JSON marshaling to convert any struct to `map[string]any`
+- Fix `traces --json` output producing multiple JSON lines instead of a single JSON object when no traces exist
+  - When an automation has `last_triggered` but no stored traces, the info is now returned as a single JSON object with `entity_id`, `traces`, `last_triggered`, and `message` fields
+
+### Added
+
+- Add unit tests for struct-to-map conversion and compact output formatting
+  - `TestPrintCompact_Struct` - verifies typed structs output correctly in compact mode
+  - `TestStructToMap` - tests JSON-based struct conversion edge cases
+  - `TestPrintCompactMap` - tests entity state, trace info, and generic map formats
+  - `TestData_CompactFormat_WithStruct` - integration test for Data() with struct input
+
 ## [1.3.0] - 2026-01-02
 
 ### Added
