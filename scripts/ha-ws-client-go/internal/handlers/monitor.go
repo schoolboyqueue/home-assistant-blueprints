@@ -36,7 +36,7 @@ func handleMonitor(ctx *Context) error {
 	entityID := ctx.Config.Args[0]
 	seconds := ctx.Config.OptionalInt
 
-	output.Message(fmt.Sprintf("Monitoring %s for %d seconds...", entityID, seconds))
+	output.Message(fmt.Sprintf("Monitoring %s for %d seconds... (Ctrl+C to stop)", entityID, seconds))
 
 	trigger := map[string]any{
 		"platform":  "state",
@@ -74,9 +74,15 @@ func handleMonitor(ctx *Context) error {
 
 	defer cleanup()
 
-	<-time.After(time.Duration(seconds) * time.Second)
+	// Wait for timeout or context cancellation (graceful shutdown)
+	select {
+	case <-time.After(time.Duration(seconds) * time.Second):
+		output.Message(fmt.Sprintf("Monitoring complete. %d state changes observed.", changeCount))
+	case <-ctx.Done():
+		output.Message(fmt.Sprintf("Monitoring interrupted. %d state changes observed.", changeCount))
+		return nil // Return nil for graceful shutdown, not an error
+	}
 
-	output.Message(fmt.Sprintf("Monitoring complete. %d state changes observed.", changeCount))
 	return nil
 }
 
@@ -113,7 +119,7 @@ func HandleMonitorMulti(ctx *Context) error {
 		return errors.New("usage: monitor-multi <entity>... [seconds]")
 	}
 
-	output.Message(fmt.Sprintf("Monitoring %d entities for %d seconds (concurrent subscriptions)...", len(entities), seconds))
+	output.Message(fmt.Sprintf("Monitoring %d entities for %d seconds... (Ctrl+C to stop)", len(entities), seconds))
 
 	// Thread-safe counter for state changes
 	var changeCount atomic.Int64
@@ -122,18 +128,24 @@ func HandleMonitorMulti(ctx *Context) error {
 	var cleanupsMu sync.Mutex
 	cleanups := make([]func(), 0, len(entities))
 
+	// Use the handler's context for batch execution (supports cancellation)
+	batchCtx := ctx.Ctx
+	if batchCtx == nil {
+		batchCtx = context.Background()
+	}
+
 	// Use batch executor to subscribe concurrently
 	results := BatchExecutor(
-		context.Background(),
+		batchCtx,
 		entities,
 		func(e string) string { return e },
-		func(_ context.Context, _ int, entityID string) (subscriptionResult, error) {
+		func(execCtx context.Context, _ int, entityID string) (subscriptionResult, error) {
 			trigger := map[string]any{
 				"platform":  "state",
 				"entity_id": entityID,
 			}
 
-			_, cleanup, err := ctx.Client.SubscribeToTrigger(trigger, func(vars map[string]any) {
+			_, cleanup, err := ctx.Client.SubscribeToTriggerWithContext(execCtx, trigger, func(vars map[string]any) {
 				count := changeCount.Add(1)
 				if triggerData, ok := vars["trigger"].(map[string]any); ok {
 					if toState, ok := triggerData["to_state"].(map[string]any); ok {
@@ -198,10 +210,15 @@ func HandleMonitorMulti(ctx *Context) error {
 
 	output.Message(fmt.Sprintf("Successfully subscribed to %d/%d entities", len(successful), len(entities)))
 
-	// Wait for monitoring duration
-	<-time.After(time.Duration(seconds) * time.Second)
+	// Wait for monitoring duration or context cancellation
+	select {
+	case <-time.After(time.Duration(seconds) * time.Second):
+		output.Message(fmt.Sprintf("Monitoring complete. %d state changes observed.", changeCount.Load()))
+	case <-ctx.Done():
+		output.Message(fmt.Sprintf("Monitoring interrupted. %d state changes observed.", changeCount.Load()))
+		return nil // Return nil for graceful shutdown
+	}
 
-	output.Message(fmt.Sprintf("Monitoring complete. %d state changes observed.", changeCount.Load()))
 	return nil
 }
 

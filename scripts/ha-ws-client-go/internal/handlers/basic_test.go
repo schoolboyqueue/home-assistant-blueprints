@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -187,6 +188,7 @@ func TestContext_Initialization(t *testing.T) {
 		assert.Nil(t, ctx.FromTime)
 		assert.Nil(t, ctx.ToTime)
 		assert.Nil(t, ctx.Config)
+		assert.Nil(t, ctx.Ctx)
 	})
 
 	t.Run("context with args", func(t *testing.T) {
@@ -210,6 +212,136 @@ func TestContext_Initialization(t *testing.T) {
 		assert.NotNil(t, ctx.FromTime)
 		assert.NotNil(t, ctx.ToTime)
 		assert.True(t, ctx.ToTime.After(*ctx.FromTime))
+	})
+
+	t.Run("context with context.Context", func(t *testing.T) {
+		t.Parallel()
+		goCtx := context.Background()
+		ctx := &Context{
+			Ctx: goCtx,
+		}
+		assert.NotNil(t, ctx.Ctx)
+		assert.Equal(t, goCtx, ctx.Ctx)
+	})
+}
+
+func TestContext_Done(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil context returns nil channel", func(t *testing.T) {
+		t.Parallel()
+		ctx := &Context{}
+		assert.Nil(t, ctx.Done())
+	})
+
+	t.Run("with context returns done channel", func(t *testing.T) {
+		t.Parallel()
+		goCtx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ctx := &Context{Ctx: goCtx}
+
+		// Channel should not be closed initially
+		select {
+		case <-ctx.Done():
+			t.Error("expected done channel to not be closed initially")
+		default:
+			// Expected
+		}
+	})
+
+	t.Run("done channel closes on cancel", func(t *testing.T) {
+		t.Parallel()
+		goCtx, cancel := context.WithCancel(context.Background())
+
+		ctx := &Context{Ctx: goCtx}
+
+		// Cancel the context
+		cancel()
+
+		// Channel should be closed after cancel
+		select {
+		case <-ctx.Done():
+			// Expected
+		case <-time.After(100 * time.Millisecond):
+			t.Error("expected done channel to be closed after cancel")
+		}
+	})
+}
+
+func TestContext_Err(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil context returns nil error", func(t *testing.T) {
+		t.Parallel()
+		ctx := &Context{}
+		assert.Nil(t, ctx.Err())
+	})
+
+	t.Run("uncanceled context returns nil error", func(t *testing.T) {
+		t.Parallel()
+		goCtx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ctx := &Context{Ctx: goCtx}
+		assert.Nil(t, ctx.Err())
+	})
+
+	t.Run("canceled context returns context.Canceled", func(t *testing.T) {
+		t.Parallel()
+		goCtx, cancel := context.WithCancel(context.Background())
+
+		ctx := &Context{Ctx: goCtx}
+
+		// Cancel the context
+		cancel()
+
+		// Should return context.Canceled
+		assert.Equal(t, context.Canceled, ctx.Err())
+	})
+
+	t.Run("timed out context returns context.DeadlineExceeded", func(t *testing.T) {
+		t.Parallel()
+		goCtx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+		defer cancel()
+
+		ctx := &Context{Ctx: goCtx}
+
+		// Wait for timeout
+		time.Sleep(10 * time.Millisecond)
+
+		// Should return context.DeadlineExceeded
+		assert.Equal(t, context.DeadlineExceeded, ctx.Err())
+	})
+}
+
+func TestContext_DoneAndErrConsistency(t *testing.T) {
+	t.Parallel()
+
+	t.Run("done and err are consistent", func(t *testing.T) {
+		t.Parallel()
+		goCtx, cancel := context.WithCancel(context.Background())
+
+		ctx := &Context{Ctx: goCtx}
+
+		// Before cancel, Done() should not be ready and Err() should be nil
+		select {
+		case <-ctx.Done():
+			t.Error("Done() should not be ready before cancel")
+		default:
+			assert.Nil(t, ctx.Err())
+		}
+
+		// Cancel
+		cancel()
+
+		// After cancel, Done() should be ready and Err() should be non-nil
+		select {
+		case <-ctx.Done():
+			assert.NotNil(t, ctx.Err())
+		case <-time.After(100 * time.Millisecond):
+			t.Error("Done() should be ready after cancel")
+		}
 	})
 }
 

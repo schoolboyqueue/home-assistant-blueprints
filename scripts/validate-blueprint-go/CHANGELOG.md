@@ -5,6 +5,24 @@ All notable changes to validate-blueprint-go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-01-03
+
+### Added
+
+- Graceful shutdown coordination with new `internal/shutdown` package
+  - `Coordinator` type for managing shutdown lifecycle with configurable grace periods
+  - Signal handling for SIGINT/SIGTERM with proper cleanup
+  - Context-aware validation for interruptible batch operations
+- Context propagation for cancellation support during batch validation
+  - `runValidateAllWithContext` replaces `runValidateAll` for interrupt handling
+- User feedback during batch validation ("Ctrl+C to interrupt" message)
+- Exit code 130 for SIGINT interruption (standard Unix convention)
+
+### Changed
+
+- Refactor main.go to use shutdown coordinator for signal handling
+- Update batch validation to check context for early termination
+
 ## [1.5.0] - 2026-01-03
 
 ### Added

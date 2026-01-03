@@ -5,6 +5,26 @@ All notable changes to ha-ws-client-go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-01-03
+
+### Added
+
+- Graceful shutdown coordination with new `internal/shutdown` package
+  - `Coordinator` type for managing shutdown lifecycle with configurable grace periods
+  - Signal handling for SIGINT/SIGTERM with proper cleanup sequencing
+  - `PartialResult` tracker for reporting progress on interruption
+  - `WrapContext` helper for combining parent context with shutdown coordination
+- Context propagation throughout the application for cancellation support
+  - `NewWithContext` constructor for creating context-aware WebSocket clients
+  - `Ctx` field in handler context for graceful operation cancellation
+- Exit code 130 for SIGINT interruption (standard Unix convention)
+
+### Changed
+
+- Refactor main.go to use shutdown coordinator for signal handling
+- Update client creation to pass context for cancellation awareness
+- Improve handler wrapper to propagate context through command execution
+
 ## [1.3.1] - 2026-01-02
 
 ### Fixed

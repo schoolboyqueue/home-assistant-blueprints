@@ -16,6 +16,7 @@ import (
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/client"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/handlers"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/output"
+	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/shutdown"
 )
 
 // Version information - set by ldflags during build
@@ -31,6 +32,18 @@ const (
 )
 
 func main() {
+	// Create shutdown coordinator with signal handling
+	coord, ctx := shutdown.New(
+		shutdown.WithGracePeriod(5*time.Second),
+		shutdown.WithOnShutdown(func(reason string) {
+			output.Message(fmt.Sprintf("\nShutting down: %s", reason))
+		}),
+		shutdown.WithOnCleanupTimeout(func() {
+			output.Message("Warning: cleanup timed out, some operations may not have completed")
+		}),
+	)
+	coord.HandleSignals()
+
 	cmd := &cli.Command{
 		Name:    "ha-ws-client",
 		Usage:   "Home Assistant WebSocket API client",
@@ -80,7 +93,11 @@ func main() {
 		Commands: buildCommands(),
 	}
 
-	if err := cmd.Run(context.Background(), os.Args); err != nil {
+	if err := cmd.Run(ctx, os.Args); err != nil {
+		// Check if it was an interrupt
+		if coord.IsShuttingDown() {
+			os.Exit(130) // Standard exit code for SIGINT
+		}
 		os.Exit(1)
 	}
 }
@@ -107,7 +124,7 @@ func buildCommands() []*cli.Command {
 
 // wrapHandler wraps a handlers.Context function into a cli.ActionFunc
 func wrapHandler(handler func(*handlers.Context) error) cli.ActionFunc {
-	return func(_ context.Context, cmd *cli.Command) error {
+	return func(ctx context.Context, cmd *cli.Command) error {
 		// Parse time flags from root command
 		var fromTime, toTime *time.Time
 		if fromStr := cmd.String("from"); fromStr != "" {
@@ -148,7 +165,7 @@ func wrapHandler(handler func(*handlers.Context) error) cli.ActionFunc {
 			return cli.Exit("Error: SUPERVISOR_TOKEN environment variable not set", 1)
 		}
 
-		// Connect to WebSocket
+		// Connect to WebSocket with context for cancellation
 		header := http.Header{}
 		header.Set("Authorization", "Bearer "+token)
 
@@ -167,14 +184,15 @@ func wrapHandler(handler func(*handlers.Context) error) cli.ActionFunc {
 			return cli.Exit(fmt.Sprintf("Authentication failed: %v", err), 1)
 		}
 
-		// Create client
-		haClient := client.New(conn)
+		// Create client with context for graceful shutdown
+		haClient := client.NewWithContext(ctx, conn)
 
 		// Build args array with command name first (for backward compatibility with handlers)
 		args := append([]string{cmd.Name}, cmd.Args().Slice()...)
 
-		// Create handler context
+		// Create handler context with context.Context for cancellation
 		handlerCtx := &handlers.Context{
+			Ctx:      ctx,
 			Client:   haClient,
 			Args:     args,
 			FromTime: fromTime,
@@ -183,6 +201,10 @@ func wrapHandler(handler func(*handlers.Context) error) cli.ActionFunc {
 
 		// Execute handler
 		if err := handler(handlerCtx); err != nil {
+			// Check if it was a context cancellation (graceful shutdown)
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			var clientErr *client.HAClientError
 			if errors.As(err, &clientErr) {
 				output.Error(err, clientErr.Code)

@@ -2,6 +2,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -34,11 +35,29 @@ func init() {
 
 // Context holds the execution context for handlers.
 type Context struct {
+	Ctx      context.Context // Context for cancellation and timeouts
 	Client   *client.Client
 	Args     []string
 	FromTime *time.Time
 	ToTime   *time.Time
 	Config   *HandlerConfig // Populated by middleware
+}
+
+// Done returns a channel that's closed when the context is canceled.
+// This is a convenience method for use in select statements.
+func (c *Context) Done() <-chan struct{} {
+	if c.Ctx == nil {
+		return nil
+	}
+	return c.Ctx.Done()
+}
+
+// Err returns the context's error if it has been canceled.
+func (c *Context) Err() error {
+	if c.Ctx == nil {
+		return nil
+	}
+	return c.Ctx.Err()
 }
 
 // ErrEntityNotFound indicates an entity was not found.
@@ -332,7 +351,7 @@ func HandleTemplate(ctx *Context) error {
 	}
 	defer cleanup()
 
-	// Wait for result or timeout
+	// Wait for result, timeout, or context cancellation
 	select {
 	case result := <-resultChan:
 		if output.IsJSON() {
@@ -345,6 +364,8 @@ func HandleTemplate(ctx *Context) error {
 		}
 	case err := <-errChan:
 		return err
+	case <-ctx.Done():
+		return ctx.Err()
 	case <-time.After(5 * time.Second):
 		return errors.New("template render timeout")
 	}

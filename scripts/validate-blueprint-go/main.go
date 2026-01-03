@@ -13,10 +13,12 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v3"
 
+	"github.com/home-assistant-blueprints/validate-blueprint-go/internal/shutdown"
 	"github.com/home-assistant-blueprints/validate-blueprint-go/internal/validator"
 )
 
@@ -28,6 +30,15 @@ var (
 )
 
 func main() {
+	// Create shutdown coordinator with signal handling
+	coord, ctx := shutdown.New(
+		shutdown.WithGracePeriod(5*time.Second),
+		shutdown.WithOnShutdown(func(reason string) {
+			fmt.Fprintf(os.Stderr, "\n%s\n", reason)
+		}),
+	)
+	coord.HandleSignals()
+
 	cmd := &cli.Command{
 		Name:      "validate-blueprint",
 		Usage:     "A comprehensive Home Assistant Blueprint validator",
@@ -43,13 +54,17 @@ func main() {
 		Action: runValidation,
 	}
 
-	if err := cmd.Run(context.Background(), os.Args); err != nil {
+	if err := cmd.Run(ctx, os.Args); err != nil {
+		// Check if it was an interrupt
+		if coord.IsShuttingDown() {
+			os.Exit(130) // Standard exit code for SIGINT
+		}
 		os.Exit(1)
 	}
 }
 
 // runValidation is the main action for the CLI command
-func runValidation(_ context.Context, cmd *cli.Command) error {
+func runValidation(ctx context.Context, cmd *cli.Command) error {
 	validateAll := cmd.Bool("all")
 	args := cmd.Args()
 
@@ -63,7 +78,7 @@ func runValidation(_ context.Context, cmd *cli.Command) error {
 	var success bool
 	switch {
 	case validateAll:
-		success = runValidateAll()
+		success = runValidateAllWithContext(ctx)
 	case args.Len() > 0:
 		success = validateSingle(args.First())
 	default:
@@ -127,8 +142,10 @@ func validateSingle(blueprintPath string) bool {
 	return v.Validate()
 }
 
-// runValidateAll validates all blueprints in the repository
-func runValidateAll() bool {
+// runValidateAllWithContext validates all blueprints with context support for interruption.
+//
+//nolint:gocyclo // Complexity is acceptable for main orchestration function
+func runValidateAllWithContext(ctx context.Context) bool {
 	// Navigate up from scripts/validate-blueprint-go/ to the repo root
 	execPath, err := os.Executable()
 	if err != nil {
@@ -178,25 +195,52 @@ func runValidateAll() bool {
 		return false
 	}
 
-	fmt.Printf("Found %d blueprint(s) to validate\n\n", len(blueprints))
+	fmt.Printf("Found %d blueprint(s) to validate (Ctrl+C to interrupt)\n\n", len(blueprints))
+
+	// Track partial results for graceful shutdown reporting
+	partialResult := shutdown.NewPartialResult(len(blueprints))
 
 	type result struct {
 		path    string
 		success bool
 	}
 	var results []result
+	interrupted := false
 
 	for _, bp := range blueprints {
+		// Check for context cancellation before each validation
+		select {
+		case <-ctx.Done():
+			interrupted = true
+			completed, total, _, _, _ := partialResult.Summary()
+			fmt.Printf("\nValidation interrupted after %d/%d blueprints\n", completed, total)
+			goto summary
+		default:
+		}
+
 		v := validator.New(bp)
 		success := v.Validate()
 		results = append(results, result{path: bp, success: success})
+
+		// Track partial results
+		if success {
+			partialResult.RecordPass(bp)
+		} else {
+			partialResult.RecordFail(bp, "validation failed")
+		}
+
 		fmt.Println(strings.Repeat("-", 80))
 		fmt.Println()
 	}
 
+summary:
 	// Summary
 	fmt.Println(strings.Repeat("=", 80))
-	fmt.Println("SUMMARY")
+	if interrupted {
+		fmt.Println("PARTIAL SUMMARY (interrupted)")
+	} else {
+		fmt.Println("SUMMARY")
+	}
 	fmt.Println(strings.Repeat("=", 80))
 
 	passed := 0
@@ -209,6 +253,7 @@ func runValidateAll() bool {
 
 	green := color.New(color.FgGreen).SprintFunc()
 	red := color.New(color.FgRed).SprintFunc()
+	yellow := color.New(color.FgYellow).SprintFunc()
 
 	for _, r := range results {
 		relPath, relErr := filepath.Rel(repoRoot, r.path)
@@ -223,7 +268,14 @@ func runValidateAll() bool {
 	}
 
 	fmt.Println()
-	fmt.Printf("Total: %d | Passed: %d | Failed: %d\n", len(results), passed, failed)
+	if interrupted {
+		skipped := len(blueprints) - len(results)
+		fmt.Printf("Completed: %d | Passed: %d | Failed: %d | %s: %d\n",
+			len(results), passed, failed, yellow("Skipped"), skipped)
+	} else {
+		fmt.Printf("Total: %d | Passed: %d | Failed: %d\n", len(results), passed, failed)
+	}
 
-	return failed == 0
+	// Return false if any failures or if interrupted
+	return failed == 0 && !interrupted
 }

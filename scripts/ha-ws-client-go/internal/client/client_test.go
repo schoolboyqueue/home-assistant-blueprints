@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -45,6 +46,18 @@ func dialServer(t *testing.T, server *httptest.Server) *Client {
 		resp.Body.Close()
 	}
 	return New(conn)
+}
+
+// dialServerWithContext connects to a test server and returns a Client with context
+func dialServerWithContext(ctx context.Context, t *testing.T, server *httptest.Server) *Client {
+	t.Helper()
+	url := "ws" + strings.TrimPrefix(server.URL, "http")
+	conn, resp, err := websocket.DefaultDialer.Dial(url, nil)
+	require.NoError(t, err)
+	if resp != nil && resp.Body != nil {
+		resp.Body.Close()
+	}
+	return NewWithContext(ctx, conn)
 }
 
 func TestHAClientError_Error(t *testing.T) {
@@ -776,4 +789,385 @@ func BenchmarkSendMessage(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+}
+
+// ============================================================================
+// Context-aware tests for graceful shutdown functionality
+// ============================================================================
+
+func TestNewWithContext(t *testing.T) {
+	server := testServer(t, func(_ *websocket.Conn) {
+		time.Sleep(100 * time.Millisecond)
+	})
+	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	client := dialServerWithContext(ctx, t, server)
+	defer client.Close()
+
+	assert.NotNil(t, client)
+	assert.NotNil(t, client.ctx)
+	assert.NotNil(t, client.cancel)
+	assert.NotNil(t, client.Context())
+}
+
+func TestClient_Context(t *testing.T) {
+	server := testServer(t, func(_ *websocket.Conn) {
+		time.Sleep(100 * time.Millisecond)
+	})
+	defer server.Close()
+
+	ctx := context.Background()
+	client := dialServerWithContext(ctx, t, server)
+	defer client.Close()
+
+	// Context() should return a child context (not the same as parent)
+	clientCtx := client.Context()
+	assert.NotNil(t, clientCtx)
+
+	// Context should not be canceled initially
+	select {
+	case <-clientCtx.Done():
+		t.Error("expected context to not be canceled initially")
+	default:
+		// Expected
+	}
+}
+
+func TestClient_ContextCancellation(t *testing.T) {
+	server := testServer(t, func(_ *websocket.Conn) {
+		time.Sleep(500 * time.Millisecond)
+	})
+	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	client := dialServerWithContext(ctx, t, server)
+
+	// Cancel the context
+	cancel()
+
+	// Wait for the done channel to be closed
+	select {
+	case <-client.Done():
+		// Expected - client should stop when context is canceled
+	case <-time.After(1 * time.Second):
+		t.Fatal("done channel not closed after context cancellation")
+	}
+}
+
+func TestClient_SendMessageWithContext_Cancellation(t *testing.T) {
+	server := testServer(t, func(conn *websocket.Conn) {
+		// Read request but don't respond, simulating a slow server
+		_, _, _ = conn.ReadMessage() //nolint:errcheck // intentionally ignoring error
+		time.Sleep(5 * time.Second)
+	})
+	defer server.Close()
+
+	client := dialServer(t, server)
+	defer client.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Start a goroutine to cancel the context after a short delay
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+
+	// This should be canceled
+	resp, err := client.SendMessageWithContext(ctx, "ping", nil)
+	assert.Nil(t, resp)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "canceled")
+}
+
+func TestClient_SendMessageWithContext_Timeout(t *testing.T) {
+	server := testServer(t, func(conn *websocket.Conn) {
+		// Read request but don't respond, simulating a slow server
+		_, _, _ = conn.ReadMessage() //nolint:errcheck // intentionally ignoring error
+		time.Sleep(5 * time.Second)
+	})
+	defer server.Close()
+
+	client := dialServer(t, server)
+	defer client.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	// This should timeout
+	resp, err := client.SendMessageWithContext(ctx, "ping", nil)
+	assert.Nil(t, resp)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "canceled")
+}
+
+func TestClient_SubscribeToTriggerWithContext_Cancellation(t *testing.T) {
+	server := testServer(t, func(conn *websocket.Conn) {
+		// Read request but don't respond, simulating a slow server
+		_, _, _ = conn.ReadMessage() //nolint:errcheck // intentionally ignoring error
+		time.Sleep(5 * time.Second)
+	})
+	defer server.Close()
+
+	client := dialServer(t, server)
+	defer client.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Start a goroutine to cancel the context after a short delay
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+
+	// This should be canceled
+	_, _, err := client.SubscribeToTriggerWithContext(ctx, map[string]any{
+		"platform":  "state",
+		"entity_id": "light.test",
+	}, func(map[string]any) {}, 5*time.Second)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "canceled")
+}
+
+func TestClient_SubscribeToTemplateWithContext_Cancellation(t *testing.T) {
+	server := testServer(t, func(conn *websocket.Conn) {
+		// Read request but don't respond, simulating a slow server
+		_, _, _ = conn.ReadMessage() //nolint:errcheck // intentionally ignoring error
+		time.Sleep(5 * time.Second)
+	})
+	defer server.Close()
+
+	client := dialServer(t, server)
+	defer client.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Start a goroutine to cancel the context after a short delay
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+
+	// This should be canceled
+	_, _, err := client.SubscribeToTemplateWithContext(ctx, "{{ states('sensor.temp') }}", func(string) {}, 5*time.Second)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "canceled")
+}
+
+func TestClient_ClearSubscriptions(t *testing.T) {
+	eventReceived := make(chan bool, 1)
+
+	server := testServer(t, func(conn *websocket.Conn) {
+		// Read subscription request
+		_, data, err := conn.ReadMessage()
+		require.NoError(t, err)
+
+		var req map[string]any
+		err = json.Unmarshal(data, &req)
+		require.NoError(t, err)
+
+		reqID, _ := req["id"].(float64) //nolint:errcheck // test knows the format
+		id := int(reqID)
+
+		// Send subscription confirmation
+		success := true
+		resp := types.HAMessage{
+			ID:      id,
+			Type:    "result",
+			Success: &success,
+		}
+		err = conn.WriteJSON(resp)
+		require.NoError(t, err)
+
+		// Send event after a delay
+		time.Sleep(50 * time.Millisecond)
+		event := types.HAMessage{
+			ID:   id,
+			Type: "event",
+			Event: &types.HAEvent{
+				Variables: map[string]any{
+					"trigger": map[string]any{
+						"platform": "state",
+					},
+				},
+			},
+		}
+		err = conn.WriteJSON(event)
+		require.NoError(t, err)
+
+		time.Sleep(200 * time.Millisecond)
+	})
+	defer server.Close()
+
+	client := dialServer(t, server)
+	defer client.Close()
+
+	// Subscribe
+	_, _, err := client.SubscribeToTrigger(map[string]any{
+		"platform":  "state",
+		"entity_id": "light.test",
+	}, func(map[string]any) {
+		eventReceived <- true
+	}, 5*time.Second)
+	require.NoError(t, err)
+
+	// Verify subscription count
+	assert.Equal(t, 1, client.SubscriptionCount())
+
+	// Clear subscriptions
+	client.ClearSubscriptions()
+
+	// Verify subscriptions are cleared
+	assert.Equal(t, 0, client.SubscriptionCount())
+
+	// Event should not be received since subscription was cleared
+	select {
+	case <-eventReceived:
+		t.Error("should not receive event after ClearSubscriptions")
+	case <-time.After(150 * time.Millisecond):
+		// Expected - no event received
+	}
+}
+
+func TestClient_SubscriptionCount(t *testing.T) {
+	server := testServer(t, func(conn *websocket.Conn) {
+		for i := 0; i < 3; i++ {
+			// Read subscription request
+			_, data, err := conn.ReadMessage()
+			if err != nil {
+				return
+			}
+
+			var req map[string]any
+			if err := json.Unmarshal(data, &req); err != nil {
+				return
+			}
+
+			reqID, _ := req["id"].(float64) //nolint:errcheck // test knows the format
+
+			// Send subscription confirmation
+			success := true
+			resp := types.HAMessage{
+				ID:      int(reqID),
+				Type:    "result",
+				Success: &success,
+			}
+			if err := conn.WriteJSON(resp); err != nil {
+				return
+			}
+		}
+
+		time.Sleep(500 * time.Millisecond)
+	})
+	defer server.Close()
+
+	client := dialServer(t, server)
+	defer client.Close()
+
+	// Initially zero subscriptions
+	assert.Equal(t, 0, client.SubscriptionCount())
+
+	// Create first subscription
+	_, cleanup1, err := client.SubscribeToTrigger(map[string]any{
+		"platform":  "state",
+		"entity_id": "light.test1",
+	}, func(map[string]any) {}, 0)
+	require.NoError(t, err)
+	assert.Equal(t, 1, client.SubscriptionCount())
+
+	// Create second subscription
+	_, cleanup2, err := client.SubscribeToTrigger(map[string]any{
+		"platform":  "state",
+		"entity_id": "light.test2",
+	}, func(map[string]any) {}, 0)
+	require.NoError(t, err)
+	assert.Equal(t, 2, client.SubscriptionCount())
+
+	// Cleanup first subscription
+	cleanup1()
+	assert.Equal(t, 1, client.SubscriptionCount())
+
+	// Cleanup is idempotent
+	cleanup1()
+	assert.Equal(t, 1, client.SubscriptionCount())
+
+	// Cleanup second subscription
+	cleanup2()
+	assert.Equal(t, 0, client.SubscriptionCount())
+}
+
+func TestClient_CloseWithContext(t *testing.T) {
+	server := testServer(t, func(_ *websocket.Conn) {
+		time.Sleep(500 * time.Millisecond)
+	})
+	defer server.Close()
+
+	ctx := context.Background()
+	client := dialServerWithContext(ctx, t, server)
+
+	// Close should cancel the context
+	err := client.Close()
+	require.NoError(t, err)
+
+	// Client's context should be canceled after close
+	select {
+	case <-client.Context().Done():
+		// Expected
+	case <-time.After(100 * time.Millisecond):
+		t.Error("expected client context to be canceled after close")
+	}
+}
+
+func TestClient_SubscriptionAutoCleanupOnContextCancel(t *testing.T) {
+	server := testServer(t, func(conn *websocket.Conn) {
+		// Read subscription request
+		_, data, err := conn.ReadMessage()
+		require.NoError(t, err)
+
+		var req map[string]any
+		err = json.Unmarshal(data, &req)
+		require.NoError(t, err)
+
+		reqID, _ := req["id"].(float64) //nolint:errcheck // test knows the format
+
+		// Send subscription confirmation
+		success := true
+		resp := types.HAMessage{
+			ID:      int(reqID),
+			Type:    "result",
+			Success: &success,
+		}
+		err = conn.WriteJSON(resp)
+		require.NoError(t, err)
+
+		time.Sleep(500 * time.Millisecond)
+	})
+	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	client := dialServerWithContext(ctx, t, server)
+	defer client.Close()
+
+	// Create subscription with timeout (which enables auto-cleanup on context cancel)
+	_, _, err := client.SubscribeToTriggerWithContext(ctx, map[string]any{
+		"platform":  "state",
+		"entity_id": "light.test",
+	}, func(map[string]any) {}, 10*time.Second) // Long timeout, but should cleanup on cancel
+	require.NoError(t, err)
+
+	assert.Equal(t, 1, client.SubscriptionCount())
+
+	// Cancel context
+	cancel()
+
+	// Wait for cleanup goroutine to run
+	time.Sleep(50 * time.Millisecond)
+
+	// Subscription should be cleaned up
+	assert.Equal(t, 0, client.SubscriptionCount())
 }
