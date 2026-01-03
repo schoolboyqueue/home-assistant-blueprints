@@ -1,5 +1,11 @@
 # Adaptive Shades Pro - Changelog
 
+## [1.13.12] - 2026-01-03
+
+### Fixed
+
+- **False manual detection on attribute-only updates**: When a cover's position changed but its state remained the same (e.g., "open" at 50% → "open" at 60%), the `trigger.to_state.last_changed` timestamp was stale (from the last state change, not the position change). This caused `seconds_since_cmd` to be negative (cover's `last_changed` older than the helper timestamp), which failed the `>= 0 and < grace_seconds` check and incorrectly flagged the change as manual. Now explicitly handles negative `seconds_since_cmd` as "attribute-only update, not manual" — matching the fix already present in `auto_override_active` but missing from `manual_change_detected`.
+
 ## [1.13.11] - 2026-01-01
 
 ### Changed

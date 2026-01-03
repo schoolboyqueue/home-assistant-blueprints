@@ -1,16 +1,16 @@
 blueprint:
-  name: "Adaptive Shades Pro v1.13.11"
-  description: >-
-    Automatically positions vertical shades (blackout or zebra) using solar geometry and comfort signals.
-    Implements the venetian blind strategy from Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
-    and temperature bands (winter/intermediate/summer) with distinct occupied vs unoccupied behavior. Select your shade and orientation,
-    optionally add irradiance/temperature/lux sensors, and the blueprint will balance solar gain, glare control, and cooling load.
+  name: Adaptive Shades Pro v1.13.12
+  description: 'Automatically positions vertical shades (blackout or zebra) using
+    solar geometry and comfort signals. Implements the venetian blind strategy from
+    Energies 13(7):1731: uses direct-vs-diffuse detection, clear-sky irradiance comparison,
+    and temperature bands (winter/intermediate/summer) with distinct occupied vs unoccupied
+    behavior. Select your shade and orientation, optionally add irradiance/temperature/lux
+    sensors, and the blueprint will balance solar gain, glare control, and cooling
+    load.'
   domain: automation
-  author: "Jeremy Carter"
-  source_url: https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/adaptive-shades/adaptive_shades_pro.yaml
-
+  author: Jeremy Carter
+  source_url: https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/adaptive-shades/adaptive_shades_pro.yaml
   input:
-
     core:
       name: Core Setup
       icon: mdi:blinds
@@ -18,248 +18,293 @@ blueprint:
       input:
         cover_target:
           name: Shade cover(s)
-          description: One or more vertical shades (covers) to control. Works with blackout or zebra style shades that support position.
+          description: One or more vertical shades (covers) to control. Works with
+            blackout or zebra style shades that support position.
           selector:
             entity:
-              domain: cover
+              domain:
+              - cover
               multiple: true
+              reorder: false
         window_orientation_deg:
           name: Window orientation (degrees)
-          description: >-
-            Direction the window faces, in degrees. Use 0° for North, 90° for East, 180° for South,
-            270° for West. For diagonals, you can approximate: 45° = NE, 135° = SE, 225° = SW,
-            315° = NW. Exact degrees are optional; a close compass direction is usually sufficient.
+          description: 'Direction the window faces, in degrees. Use 0° for North,
+            90° for East, 180° for South, 270° for West. For diagonals, you can approximate:
+            45° = NE, 135° = SE, 225° = SW, 315° = NW. Exact degrees are optional;
+            a close compass direction is usually sufficient.'
           default: 180
           selector:
             number:
-              min: 0
-              max: 359
-              unit_of_measurement: "°"
-              step: 1
+              min: 0.0
+              max: 359.0
+              unit_of_measurement: °
+              step: 1.0
+              mode: slider
         sun_entity:
           name: Sun entity
-          description: >-
-            Sun entity to use for elevation/azimuth and sunrise/sunset.
+          description: Sun entity to use for elevation/azimuth and sunrise/sunset.
             Normally this should be 'sun.sun'.
           default: sun.sun
           selector:
             entity:
-              domain: sun
+              domain:
+              - sun
+              multiple: false
+              reorder: false
         sun_tolerance_deg:
           name: Sun exposure cone (degrees)
-          description: >-
-            Half-angle around the window direction where the sun counts as "on this window".
-            Most users can leave this at 45°. Try 30° if the shade reacts too often, or 60°
-            if it does not react enough. This does not need to be exact.
+          description: Half-angle around the window direction where the sun counts
+            as "on this window". Most users can leave this at 45°. Try 30° if the
+            shade reacts too often, or 60° if it does not react enough. This does
+            not need to be exact.
           default: 45
           selector:
             number:
-              min: 5
-              max: 90
-              step: 1
-              unit_of_measurement: "°"
+              min: 5.0
+              max: 90.0
+              step: 1.0
+              unit_of_measurement: °
+              mode: slider
         admit_position_pct:
           name: Preferred open position (%)
-          description: Position used to admit daylight/solar gain. 0 = fully open, 100 = fully closed.
+          description: Position used to admit daylight/solar gain. 0 = fully open,
+            100 = fully closed.
           default: 20
           selector:
             number:
-              min: 0
-              max: 100
-              step: 1
-              unit_of_measurement: "%"
+              min: 0.0
+              max: 100.0
+              step: 1.0
+              unit_of_measurement: '%'
+              mode: slider
         dim_position_pct:
           name: Preferred dimmed position (%)
           description: Position for filtered light with minimal glare.
           default: 50
           selector:
             number:
-              min: 0
-              max: 100
-              step: 1
-              unit_of_measurement: "%"
+              min: 0.0
+              max: 100.0
+              step: 1.0
+              unit_of_measurement: '%'
+              mode: slider
         block_position_pct:
           name: Glare block position (%)
-          description: Position used to block glare or excessive heat when the sun is on the window. 0 = fully open, 100 = fully closed.
+          description: Position used to block glare or excessive heat when the sun
+            is on the window. 0 = fully open, 100 = fully closed.
           default: 85
           selector:
             number:
-              min: 0
-              max: 100
-              step: 1
-              unit_of_measurement: "%"
+              min: 0.0
+              max: 100.0
+              step: 1.0
+              unit_of_measurement: '%'
+              mode: slider
         night_position_pct:
           name: Night/quiet hours position (%)
-          description: >-
-            Position used during quiet hours and after sunset. This is independent of the glare block position,
-            allowing you to set a different level for nighttime privacy vs daytime glare control. 0 = fully open, 100 = fully closed.
+          description: Position used during quiet hours and after sunset. This is
+            independent of the glare block position, allowing you to set a different
+            level for nighttime privacy vs daytime glare control. 0 = fully open,
+            100 = fully closed.
           default: 85
           selector:
             number:
-              min: 0
-              max: 100
-              step: 1
-              unit_of_measurement: "%"
+              min: 0.0
+              max: 100.0
+              step: 1.0
+              unit_of_measurement: '%'
+              mode: slider
         position_hysteresis:
           name: Minimum position change (%)
-          description: >-
-            Minimum position change required before the shade will move. Prevents small, frequent adjustments.
-            Set higher (e.g., 5-10%) if your shades move too often; set lower (e.g., 1-2%) for more precise control.
+          description: Minimum position change required before the shade will move.
+            Prevents small, frequent adjustments. Set higher (e.g., 5-10%) if your
+            shades move too often; set lower (e.g., 1-2%) for more precise control.
           default: 3
           selector:
             number:
-              min: 1
-              max: 15
-              step: 1
-              unit_of_measurement: "%"
+              min: 1.0
+              max: 15.0
+              step: 1.0
+              unit_of_measurement: '%'
+              mode: slider
         shading_mode:
           name: Shading mode
-          description: >-
-            Select 'slat' for venetian/vertical-louver shades that support tilt, or 'zebra' for
-            banded zebra/roller shades that use position only. If unsure, choose 'zebra' for
-            typical fabric roller blinds and 'slat' only for tilt-capable venetian-style covers.
+          description: Select 'slat' for venetian/vertical-louver shades that support
+            tilt, or 'zebra' for banded zebra/roller shades that use position only.
+            If unsure, choose 'zebra' for typical fabric roller blinds and 'slat'
+            only for tilt-capable venetian-style covers.
           default: slat
           selector:
             select:
               options:
-                - slat
-                - zebra
+              - slat
+              - zebra
+              custom_value: false
+              multiple: false
+              sort: false
         inverted_shades:
           name: Inverted shades
-          description: >-
-            Enable if your shade reports 0% as fully closed and 100% as fully open. This inverts
-            the admit/dim/block positions so they map correctly to the device.
+          description: Enable if your shade reports 0% as fully closed and 100% as
+            fully open. This inverts the admit/dim/block positions so they map correctly
+            to the device.
           default: false
           selector:
             boolean: {}
-
     sensors_and_targets:
       name: Comfort & Sensor Inputs
       icon: mdi:thermometer-auto
-      description: Optional comfort and glare sensors. Blueprint falls back to sun geometry when sensors are omitted.
+      description: Optional comfort and glare sensors. Blueprint falls back to sun
+        geometry when sensors are omitted.
       input:
         indoor_temp_sensor:
           name: (Optional) Indoor temperature
-          description: Temperature sensor inside the room. Used to bias shades open for heating or closed for cooling.
-          default: ""
+          description: Temperature sensor inside the room. Used to bias shades open
+            for heating or closed for cooling.
+          default: ''
           selector:
             entity:
-              domain: sensor
+              domain:
+              - sensor
+              multiple: false
+              reorder: false
         outdoor_temp_sensor:
           name: (Optional) Outdoor temperature
-          description: Outdoor temperature sensor. Used to gauge cooling load versus solar gain potential.
-          default: ""
+          description: Outdoor temperature sensor. Used to gauge cooling load versus
+            solar gain potential.
+          default: ''
           selector:
             entity:
-              domain: sensor
+              domain:
+              - sensor
+              multiple: false
+              reorder: false
         indoor_lux_sensor:
           name: (Optional) Indoor illuminance
-          description: Illuminance sensor near the window to detect glare. Leave empty to rely on sun geometry alone.
-          default: ""
+          description: Illuminance sensor near the window to detect glare. Leave empty
+            to rely on sun geometry alone.
+          default: ''
           selector:
             entity:
-              domain: sensor
+              domain:
+              - sensor
+              multiple: false
+              reorder: false
         climate_entity:
           name: (Optional) Climate entity
-          description: >-
-            HVAC climate entity for this room (e.g. climate.living_room). When set, the shade will
-            bias behavior based on whether the system is actively heating or cooling.
-          default: ""
+          description: HVAC climate entity for this room (e.g. climate.living_room).
+            When set, the shade will bias behavior based on whether the system is
+            actively heating or cooling.
+          default: ''
           selector:
             entity:
-              domain: climate
+              domain:
+              - climate
+              multiple: false
+              reorder: false
         weather_entity:
           name: (Optional) Weather entity
-          description: >-
-            Weather entity (e.g. weather.home) used to bias shading on cloudy or rainy days.
-            Leave empty to ignore weather and rely on irradiance and sun position only.
-          default: ""
+          description: Weather entity (e.g. weather.home) used to bias shading on
+            cloudy or rainy days. Leave empty to ignore weather and rely on irradiance
+            and sun position only.
+          default: ''
           selector:
             entity:
-              domain: weather
+              domain:
+              - weather
+              multiple: false
+              reorder: false
         cooling_setpoint:
           name: Cooling comfort upper bound
-          description: >-
-            Temperature (°C or °F) at which shades should bias toward blocking heat when no climate entity is provided.
-            If a climate entity is set, its target cooling setpoint will be used instead.
+          description: Temperature (°C or °F) at which shades should bias toward blocking
+            heat when no climate entity is provided. If a climate entity is set, its
+            target cooling setpoint will be used instead.
           default: 25
           selector:
             number:
-              min: 0
-              max: 120
+              min: 0.0
+              max: 120.0
               step: 0.5
+              mode: slider
         heating_setpoint:
           name: Heating comfort lower bound
-          description: >-
-            Temperature (°C or °F) at which shades should bias toward admitting solar gain when no climate entity is provided.
-            If a climate entity is set, its target heating setpoint will be used instead.
+          description: Temperature (°C or °F) at which shades should bias toward admitting
+            solar gain when no climate entity is provided. If a climate entity is
+            set, its target heating setpoint will be used instead.
           default: 20
           selector:
             number:
-              min: 0
-              max: 120
+              min: 0.0
+              max: 120.0
               step: 0.5
+              mode: slider
         comfort_margin:
           name: Comfort margin
-          description: Hysteresis around the comfort setpoints to reduce chatter. Same units as sensors.
+          description: Hysteresis around the comfort setpoints to reduce chatter.
+            Same units as sensors.
           default: 0.5
           selector:
             number:
-              min: 0
-              max: 3
+              min: 0.0
+              max: 3.0
               step: 0.1
+              mode: slider
         glare_lux_threshold:
           name: Glare illuminance threshold (lux)
-          description: >-
-            Base glare threshold. If indoor illuminance rises above this (adjusted by the room profile),
-            shades move toward the block/dim position when the sun is on the window.
+          description: Base glare threshold. If indoor illuminance rises above this
+            (adjusted by the room profile), shades move toward the block/dim position
+            when the sun is on the window.
           default: 1200
           selector:
             number:
-              min: 100
-              max: 40000
-              step: 100
+              min: 100.0
+              max: 40000.0
+              step: 100.0
+              mode: slider
         room_profile:
           name: Room profile
-          description: >-
-            High-level behavior preset for this room. 'office' is more sensitive to glare on screens,
-            'bedroom' tolerates a bit more light before reacting, and 'living' is balanced. You can
-            still fine-tune the glare threshold below.
+          description: High-level behavior preset for this room. 'office' is more
+            sensitive to glare on screens, 'bedroom' tolerates a bit more light before
+            reacting, and 'living' is balanced. You can still fine-tune the glare
+            threshold below.
           default: living
           selector:
             select:
               options:
-                - living
-                - office
-                - bedroom
+              - living
+              - office
+              - bedroom
+              custom_value: false
+              multiple: false
+              sort: false
         window_contacts:
           name: (Optional) Window contact sensors
-          description: >-
-            Optional: one window contact sensor per shade, in the same order as the Shade cover(s)
-            list in Core Setup. When a mapped window sensor is open, that shade is forced fully open
-            and will not close for glare or cooling until the window is closed again.
+          description: 'Optional: one window contact sensor per shade, in the same
+            order as the Shade cover(s) list in Core Setup. When a mapped window sensor
+            is open, that shade is forced fully open and will not close for glare
+            or cooling until the window is closed again.'
           default: []
           selector:
             entity:
-              domain: binary_sensor
+              domain:
+              - binary_sensor
               device_class:
-                - window
-                - door
+              - window
+              - door
               multiple: true
+              reorder: false
         window_open_delay:
           name: Window open delay (seconds)
-          description: >-
-            How long a window/door must stay open before the shade opens. Set to 0 for immediate
-            response. Use a delay (e.g., 30-60 seconds) to avoid shade movements when briefly
-            opening a window.
+          description: How long a window/door must stay open before the shade opens.
+            Set to 0 for immediate response. Use a delay (e.g., 30-60 seconds) to
+            avoid shade movements when briefly opening a window.
           default: 0
           selector:
             number:
-              min: 0
-              max: 300
-              step: 5
-              unit_of_measurement: "s"
-
+              min: 0.0
+              max: 300.0
+              step: 5.0
+              unit_of_measurement: s
+              mode: slider
     scheduling_and_overrides:
       name: Scheduling & Overrides
       icon: mdi:clock-check
@@ -267,94 +312,114 @@ blueprint:
       input:
         presence_entity:
           name: (Optional) Presence entity
-          description: When provided, shades adjust only if this entity is 'on' or 'home'. Leave empty to ignore presence.
-          default: ""
+          description: When provided, shades adjust only if this entity is 'on' or
+            'home'. Leave empty to ignore presence.
+          default: ''
           selector:
             entity:
               filter:
-                - domain: person
-                - domain: device_tracker
-                - domain: binary_sensor
-                - domain: input_boolean
+              - domain:
+                - person
+              - domain:
+                - device_tracker
+              - domain:
+                - binary_sensor
+              - domain:
+                - input_boolean
+              multiple: false
+              reorder: false
         presence_required:
           name: Require presence to move
-          description: If true, automation moves only when the presence entity looks present (on/home/occupied/present). If false, presence affects glare behavior but movement is allowed.
+          description: If true, automation moves only when the presence entity looks
+            present (on/home/occupied/present). If false, presence affects glare behavior
+            but movement is allowed.
           default: false
           selector:
             boolean: {}
         manual_override:
           name: (Optional) Manual override helper
-          description: When this input_boolean is 'on', shade adjustments pause. Turn off to resume automation.
-          default: ""
+          description: When this input_boolean is 'on', shade adjustments pause. Turn
+            off to resume automation.
+          default: ''
           selector:
             entity:
-              domain: input_boolean
+              domain:
+              - input_boolean
+              multiple: false
+              reorder: false
         manual_timeout_minutes:
           name: Manual adjustment timeout (minutes)
-          description: >-
-            When the shade is manually adjusted, pause automatic movement for this many minutes.
-            Set to 0 to disable automatic manual override detection.
+          description: When the shade is manually adjusted, pause automatic movement
+            for this many minutes. Set to 0 to disable automatic manual override detection.
           default: 60
           selector:
             number:
-              min: 0
-              max: 240
-              step: 5
+              min: 0.0
+              max: 240.0
+              step: 5.0
+              mode: slider
         last_command_helper:
           name: (Optional) Last command timestamp helper
-          description: >-
-            An input_datetime helper to track when this automation last commanded shades.
-            Create one helper per automation instance with "Date and time" mode enabled
-            (Settings → Devices & Services → Helpers → Create Helper → Date and/or time → enable both Date and Time).
-            This enables reliable detection of manual adjustments from physical remotes or buttons
-            by comparing cover state changes against the last automation command time.
-            Without this helper, only Home Assistant UI changes are detected as manual.
-          default: ""
+          description: An input_datetime helper to track when this automation last
+            commanded shades. Create one helper per automation instance with "Date
+            and time" mode enabled (Settings → Devices & Services → Helpers → Create
+            Helper → Date and/or time → enable both Date and Time). This enables reliable
+            detection of manual adjustments from physical remotes or buttons by comparing
+            cover state changes against the last automation command time. Without
+            this helper, only Home Assistant UI changes are detected as manual.
+          default: ''
           selector:
             entity:
-              domain: input_datetime
+              domain:
+              - input_datetime
+              multiple: false
+              reorder: false
         quiet_hours_start:
           name: (Optional) Quiet hours start
-          description: >-
-            Optional extra time-of-day window to stop moving shades (keeps last position), regardless of
-            sunrise/sunset. Night behavior is already controlled by the sun entity; use quiet hours only
-            if you want an additional "do not move" window. Leave empty to disable quiet hours.
-          default: ""
+          description: Optional extra time-of-day window to stop moving shades (keeps
+            last position), regardless of sunrise/sunset. Night behavior is already
+            controlled by the sun entity; use quiet hours only if you want an additional
+            "do not move" window. Leave empty to disable quiet hours.
+          default: ''
           selector:
             time: {}
         quiet_hours_end:
           name: (Optional) Quiet hours end
-          description: >-
-            Time-of-day to resume movement after the optional quiet hours window. This is independent of
-            sunrise/sunset; leave empty (along with quiet_hours_start) to let the shade follow only the
-            sun-based and comfort logic.
-          default: ""
+          description: Time-of-day to resume movement after the optional quiet hours
+            window. This is independent of sunrise/sunset; leave empty (along with
+            quiet_hours_start) to let the shade follow only the sun-based and comfort
+            logic.
+          default: ''
           selector:
             time: {}
-
     irradiance:
       name: Solar Irradiance (Optional, Advanced)
       icon: mdi:white-balance-sunny
-      description: >-
-        Advanced: vertical-plane irradiance to detect direct sun per the paper. Leave all fields at their defaults
-        (or the whole section empty) unless you have a dedicated solarimeter and want to tune the clear-sky model.
+      description: 'Advanced: vertical-plane irradiance to detect direct sun per the
+        paper. Leave all fields at their defaults (or the whole section empty) unless
+        you have a dedicated solarimeter and want to tune the clear-sky model.'
       input:
         vertical_irradiance_sensor:
           name: (Optional) Vertical irradiance sensor
-          description: Solarimeter on the same facade (W/m²). If set, used with clear-sky model to classify direct vs diffuse.
-          default: ""
+          description: Solarimeter on the same facade (W/m²). If set, used with clear-sky
+            model to classify direct vs diffuse.
+          default: ''
           selector:
             entity:
-              domain: sensor
+              domain:
+              - sensor
+              multiple: false
+              reorder: false
         clear_sky_A:
           name: Clear-sky coefficient A
           description: ASHRAE clear-sky A coefficient (default 1160 W/m²).
           default: 1160
           selector:
             number:
-              min: 200
-              max: 1400
-              step: 10
+              min: 200.0
+              max: 1400.0
+              step: 10.0
+              mode: slider
         clear_sky_B:
           name: Clear-sky coefficient B
           description: ASHRAE clear-sky B coefficient (default 0.14).
@@ -364,62 +429,70 @@ blueprint:
               min: 0.05
               max: 0.6
               step: 0.01
+              mode: slider
         direct_ratio_threshold:
           name: Direct sun detection ratio
-          description: >-
-            Advanced: measured/theoretical direct irradiance ratio to classify direct sun. Lower is more permissive.
-            The default (0.35) suits most locations; you usually do not need to change this.
+          description: 'Advanced: measured/theoretical direct irradiance ratio to
+            classify direct sun. Lower is more permissive. The default (0.35) suits
+            most locations; you usually do not need to change this.'
           default: 0.35
           selector:
             number:
               min: 0.1
-              max: 1
+              max: 1.0
               step: 0.05
+              mode: slider
         direct_irradiance_floor:
           name: Direct irradiance floor (W/m²)
-          description: Minimum theoretical direct component before checking ratios (avoids noise at low sun angles).
+          description: Minimum theoretical direct component before checking ratios
+            (avoids noise at low sun angles).
           default: 50
           selector:
             number:
-              min: 0
-              max: 400
-              step: 10
+              min: 0.0
+              max: 400.0
+              step: 10.0
+              mode: slider
         diffuse_glare_threshold:
           name: Diffuse threshold (W/m²)
-          description: Threshold used in diffuse mode per paper (G < 300 W/m²). Keeps original 300 default.
+          description: Threshold used in diffuse mode per paper (G < 300 W/m²). Keeps
+            original 300 default.
           default: 300
           selector:
             number:
-              min: 100
-              max: 800
-              step: 10
-
+              min: 100.0
+              max: 800.0
+              step: 10.0
+              mode: slider
     slat_geometry:
       name: Slat Geometry (Optional, Advanced)
       icon: mdi:angle-acute
-      description: >-
-        Advanced: used for the glare-limiting angle (Equation 8) in slat mode. The default ratio (~0.9) matches
-        typical venetian slats. You normally do not need to measure or change these values.
+      description: 'Advanced: used for the glare-limiting angle (Equation 8) in slat
+        mode. The default ratio (~0.9) matches typical venetian slats. You normally
+        do not need to measure or change these values.'
       input:
         slat_gap_ratio:
           name: Slat gap to width ratio (d/L)
-          description: Ratio of slat spacing to slat width. Leave default (0.9) for zebra/venetian-like behavior.
+          description: Ratio of slat spacing to slat width. Leave default (0.9) for
+            zebra/venetian-like behavior.
           default: 0.9
           selector:
             number:
               min: 0.2
               max: 1.5
               step: 0.05
+              mode: slider
         max_tilt_angle:
           name: Maximum tilt angle (degrees)
-          description: Cap for computed slat angle (0 deg fully open, 180 deg fully closed). Used when mapping to cover position.
+          description: Cap for computed slat angle (0 deg fully open, 180 deg fully
+            closed). Used when mapping to cover position.
           default: 175
           selector:
             number:
-              min: 90
-              max: 180
-              step: 1
-
+              min: 90.0
+              max: 180.0
+              step: 1.0
+              mode: slider
     diagnostics:
       name: Diagnostics & Logging
       icon: mdi:bug
@@ -427,32 +500,28 @@ blueprint:
       input:
         debug_level:
           name: Debug level
-          description: >-
-            off = no logbook messages; basic = only key decisions (pause and movements);
-            verbose = includes "no-move" cycles to help with tuning and debugging.
+          description: off = no logbook messages; basic = only key decisions (pause
+            and movements); verbose = includes "no-move" cycles to help with tuning
+            and debugging.
           default: basic
           selector:
             select:
               options:
-                - label: "Off"
-                  value: "off"
-                - label: "Basic"
-                  value: "basic"
-                - label: "Verbose"
-                  value: "verbose"
-
+              - label: 'Off'
+                value: 'off'
+              - label: Basic
+                value: basic
+              - label: Verbose
+                value: verbose
+              custom_value: false
+              multiple: false
+              sort: false
 variables:
-  blueprint_version: "1.13.11"
+  blueprint_version: 1.13.12
   cover_target: !input cover_target
-  base_cover: >-
-    {% set ct = cover_target | default('') %}
-    {% if ct is string %}
-      {{ ct }}
-    {% elif ct is sequence and (ct | length > 0) %}
-      {{ ct[0] }}
-    {% else %}
-      ""
-    {% endif %}
+  base_cover: "{% set ct = cover_target | default('') %} {% if ct is string %}\n  {{
+    ct }}\n{% elif ct is sequence and (ct | length > 0) %}\n  {{ ct[0] }}\n{% else
+    %}\n  \"\"\n{% endif %}"
   window_orientation_deg: !input window_orientation_deg
   sun_tolerance_deg: !input sun_tolerance_deg
   admit_position_pct: !input admit_position_pct
@@ -491,774 +560,512 @@ variables:
   slat_gap_ratio: !input slat_gap_ratio
   max_tilt_angle: !input max_tilt_angle
   debug_level: !input debug_level
-  debug_basic: "{{ debug_level in ['basic', 'verbose'] }}"
-  debug_verbose: "{{ debug_level == 'verbose' }}"
-  triggered_by_cover: "{{ trigger.id == 'cover_changed' if trigger is defined and trigger.id is defined else false }}"
-  triggered_cover_entity: "{{ trigger.entity_id if triggered_by_cover else none }}"
-  manual_change_detected: >-
-    {% if not triggered_by_cover %}
-      {{ false }}
-    {% else %}
-      {# Ignore state changes while cover is actively moving (opening/closing) #}
-      {% set cover_state = trigger.to_state.state if trigger.to_state is defined else '' %}
-      {% if cover_state in ['opening', 'closing'] %}
-        {{ false }}
-      {% else %}
-        {% set ctx = trigger.to_state.context if trigger.to_state is defined else none %}
-        {% if ctx is none %}
-          {{ false }}
-        {% else %}
-          {# UI changes have user_id; automations/scripts have parent_id; device reports have neither #}
-          {% set user_id = ctx.user_id | default('') %}
-          {% set parent_id = ctx.parent_id | default('') %}
-          {% set from_ui = user_id is string and (user_id | length > 0) %}
-          {% set from_automation = parent_id is string and (parent_id | length > 0) %}
-          {% if from_ui %}
-            {# Explicit UI interaction is always manual #}
-            {{ true }}
-          {% elif from_automation %}
-            {# Change from an automation/script - not manual #}
-            {{ false }}
-          {% else %}
-            {# Device state report - check helper timestamp if available #}
-            {% set helper_entity = last_command_helper if last_command_helper not in ['', none] else none %}
-            {% set helper_ts = state_attr(helper_entity, 'timestamp') if helper_entity else none %}
-            {% set now_ts = as_timestamp(now()) %}
-            {% set max_helper_age = (manual_timeout_minutes | float) * 120 %}
-            {% set helper_age = (now_ts - helper_ts) if helper_ts is number else 999999 %}
-            {# Reject future timestamps (helper_age < 0) and stale timestamps #}
-            {% set has_valid_helper = helper_ts is number and helper_ts > 0 and helper_age >= 0 and helper_age < max_helper_age %}
-            {% if has_valid_helper %}
-              {# Check if cover changed within grace period of our last command #}
-              {% set cover_changed_ts = as_timestamp(trigger.to_state.last_changed) if trigger.to_state.last_changed is defined else now_ts %}
-              {% set seconds_since_cmd = cover_changed_ts - helper_ts %}
-              {% set grace_seconds = 90 %}
-              {% if seconds_since_cmd >= 0 and seconds_since_cmd < grace_seconds %}
-                {# Cover changed shortly after our command - not manual #}
-                {{ false }}
-              {% else %}
-                {# Cover changed outside grace period - manual #}
-                {{ true }}
-              {% endif %}
-            {% else %}
-              {# No valid helper - cannot determine, assume not manual to avoid false positives #}
-              {{ false }}
-            {% endif %}
-          {% endif %}
-        {% endif %}
-      {% endif %}
-    {% endif %}
+  debug_basic: '{{ debug_level in [''basic'', ''verbose''] }}'
+  debug_verbose: '{{ debug_level == ''verbose'' }}'
+  triggered_by_cover: '{{ trigger.id == ''cover_changed'' if trigger is defined and
+    trigger.id is defined else false }}'
+  triggered_cover_entity: '{{ trigger.entity_id if triggered_by_cover else none }}'
+  manual_change_detected: "{% if not triggered_by_cover %}\n  {{ false }}\n{% else
+    %}\n  {# Ignore state changes while cover is actively moving (opening/closing)
+    #}\n  {% set cover_state = trigger.to_state.state if trigger.to_state is defined
+    else '' %}\n  {% if cover_state in ['opening', 'closing'] %}\n    {{ false }}\n
+    \ {% else %}\n    {% set ctx = trigger.to_state.context if trigger.to_state is
+    defined else none %}\n    {% if ctx is none %}\n      {{ false }}\n    {% else
+    %}\n      {# UI changes have user_id; automations/scripts have parent_id; device
+    reports have neither #}\n      {% set user_id = ctx.user_id | default('') %}\n
+    \     {% set parent_id = ctx.parent_id | default('') %}\n      {% set from_ui
+    = user_id is string and (user_id | length > 0) %}\n      {% set from_automation
+    = parent_id is string and (parent_id | length > 0) %}\n      {% if from_ui %}\n
+    \       {# Explicit UI interaction is always manual #}\n        {{ true }}\n      {%
+    elif from_automation %}\n        {# Change from an automation/script - not manual
+    #}\n        {{ false }}\n      {% else %}\n        {# Device state report - check
+    helper timestamp if available #}\n        {% set helper_entity = last_command_helper
+    if last_command_helper not in ['', none] else none %}\n        {% set helper_ts
+    = state_attr(helper_entity, 'timestamp') if helper_entity else none %}\n        {%
+    set now_ts = as_timestamp(now()) %}\n        {% set max_helper_age = (manual_timeout_minutes
+    | float) * 120 %}\n        {% set helper_age = (now_ts - helper_ts) if helper_ts
+    is number else 999999 %}\n        {# Reject future timestamps (helper_age < 0)
+    and stale timestamps #}\n        {% set has_valid_helper = helper_ts is number
+    and helper_ts > 0 and helper_age >= 0 and helper_age < max_helper_age %}\n        {%
+    if has_valid_helper %}\n          {# Check if cover changed within grace period
+    of our last command #}\n          {% set cover_changed_ts = as_timestamp(trigger.to_state.last_changed)
+    if trigger.to_state.last_changed is defined else now_ts %}\n          {% set seconds_since_cmd
+    = cover_changed_ts - helper_ts %}\n          {% set grace_seconds = 90 %}\n          {%
+    if seconds_since_cmd < 0 %}\n            {# Cover last_changed is before our command - attribute-only update, not manual #}\n            {{
+    false }}\n          {% elif seconds_since_cmd < grace_seconds %}\n            {#
+    Cover changed shortly after our command - not manual #}\n            {{ false
+    }}\n          {% else %}\n            {# Cover changed outside grace period -
+    manual #}\n            {{ true }}\n          {% endif %}\n        {% else %}\n
+    \         {# No valid helper - cannot determine, assume not manual to avoid false
+    positives #}\n          {{ false }}\n        {% endif %}\n      {% endif %}\n
+    \   {% endif %}\n  {% endif %}\n{% endif %}"
   pi: 3.141592653589793
   e_const: 2.718281828459045
   deg_to_rad: 0.017453292519943295
-  sun_above_horizon: "{{ is_state(sun_entity, 'above_horizon') }}"
-  min_sun_elevation: "{{ 1 if sun_above_horizon else 90 }}"
-  night_block_angle_deg: >-
-    {# At night/quiet hours, use the dedicated night position, expressed as an angle out of 180°. #}
-    {{ (night_position_pct | float(85) / 100.0) * 180.0 }}
-  climate_hvac_mode: "{{ state_attr(climate_entity, 'hvac_mode') if climate_entity else none }}"
-  climate_hvac_action: "{{ state_attr(climate_entity, 'hvac_action') if climate_entity else none }}"
-  climate_target_high: "{{ state_attr(climate_entity, 'target_temp_high') | float(none) if climate_entity else none }}"
-  climate_target_low: "{{ state_attr(climate_entity, 'target_temp_low') | float(none) if climate_entity else none }}"
-  climate_target_temp: >-
-    {% if climate_entity %}
-      {% set t = state_attr(climate_entity, 'temperature') | float(none) %}
-      {% if t is number %}
-        {{ t }}
-      {% else %}
-        {{ state_attr(climate_entity, 'target_temperature') | float(none) }}
-      {% endif %}
-    {% else %}
-      {{ none }}
-    {% endif %}
-  climate_heating: >-
-    {% if not climate_entity %}
-      {{ false }}
-    {% else %}
-      {{ climate_hvac_action in ['heating'] or climate_hvac_mode in ['heat'] }}
-    {% endif %}
-  climate_cooling: >-
-    {% if not climate_entity %}
-      {{ false }}
-    {% else %}
-      {{ climate_hvac_action in ['cooling'] or climate_hvac_mode in ['cool'] }}
-    {% endif %}
-  cover_supported_features: "{{ state_attr(base_cover, 'supported_features') | int(0) if base_cover else 0 }}"
-  cover_supports_tilt: "{{ (cover_supported_features | bitwise_and(16)) > 0 }}"
-  sun_azimuth: "{{ state_attr(sun_entity, 'azimuth') | float(0) }}"
-  sun_elevation: "{{ state_attr(sun_entity, 'elevation') | float(-90) }}"
-  weather_state: "{{ states(weather_entity) if weather_entity else none }}"
-  weather_is_overcast: >-
-    {% if not weather_state %}
-      {{ false }}
-    {% else %}
-      {% set s = weather_state %}
-      {{ s in ['cloudy', 'overcast', 'rainy', 'pouring', 'snowy', 'hail', 'partlycloudy'] }}
-    {% endif %}
-  effective_heating_setpoint: >-
-    {% if climate_entity %}
-      {% if climate_target_high is number %}
-        {{ climate_target_high }}
-      {% elif climate_target_temp is number %}
-        {{ climate_target_temp }}
-      {% else %}
-        {{ heating_setpoint }}
-      {% endif %}
-    {% else %}
-      {{ heating_setpoint }}
-    {% endif %}
-  effective_cooling_setpoint: >-
-    {% if climate_entity %}
-      {% if climate_target_low is number %}
-        {{ climate_target_low }}
-      {% elif climate_target_temp is number %}
-        {{ climate_target_temp }}
-      {% else %}
-        {{ cooling_setpoint }}
-      {% endif %}
-    {% else %}
-      {{ cooling_setpoint }}
-    {% endif %}
-  # Normalize azimuth delta to [-180, 180] then take absolute value to test if the sun is hitting the window.
-  sun_on_window: >-
-    {% set delta = (((sun_azimuth - window_orientation_deg + 540) % 360) - 180) | abs %}
-    {{ sun_elevation >= min_sun_elevation and delta <= sun_tolerance_deg }}
-  indoor_temp: "{{ states(indoor_temp_sensor | default('')) | float(none) if indoor_temp_sensor else none }}"
-  outdoor_temp: "{{ states(outdoor_temp_sensor | default('')) | float(none) if outdoor_temp_sensor else none }}"
-  indoor_lux: "{{ states(indoor_lux_sensor | default('')) | float(none) if indoor_lux_sensor else none }}"
-  presence_present: >-
-    {% if not presence_entity %}
-      {{ false }}
-    {% else %}
-      {% set s = states(presence_entity) %}
-      {{ s in ['on', 'home', 'occupied', 'present'] }}
-    {% endif %}
-  presence_ok: >-
-    {% if not presence_entity %}
-      {{ true }}
-    {% elif not presence_required %}
-      {{ true }}
-    {% else %}
-      {{ presence_present }}
-    {% endif %}
-  occupied: >-
-    {% if not presence_entity %}
-      {{ true }}
-    {% else %}
-      {{ presence_present }}
-    {% endif %}
-  manual_override_active: >-
-    {% set mo = manual_override | default('') %}
-    {{ mo != '' and is_state(mo, 'on') }}
-  auto_override_active: >-
-    {# Manual override detection using timestamp helper (if configured) or UI context. #}
-    {# With helper: detects any cover change that wasn't shortly after our command. #}
-    {# Without helper: only detects UI-initiated changes (user_id present). #}
-    {% if manual_timeout_minutes | int(0) <= 0 or not base_cover %}
-      {{ false }}
-    {% else %}
-      {% set s = states[base_cover] %}
-      {% if s is none or s.last_changed is none %}
-        {{ false }}
-      {% elif s.state in ['opening', 'closing'] %}
-        {# Cover is still moving - don't evaluate manual detection yet #}
-        {{ false }}
-      {% else %}
-        {% set delta_minutes = (as_timestamp(now()) - as_timestamp(s.last_changed)) / 60 %}
-        {% set ctx = s.context if s.context is defined else none %}
-        {% set user_id = ctx.user_id | default('') if ctx else '' %}
-        {% set parent_id = ctx.parent_id | default('') if ctx else '' %}
-        {% set from_ui = user_id is string and (user_id | length > 0) %}
-        {% set from_automation = parent_id is string and (parent_id | length > 0) %}
-        {# Check if helper is configured and has a recent timestamp #}
-        {% set helper_entity = last_command_helper if last_command_helper not in ['', none] else none %}
-        {% set helper_ts = state_attr(helper_entity, 'timestamp') if helper_entity else none %}
-        {% set now_ts = as_timestamp(now()) %}
-        {% set cover_changed_ts = as_timestamp(s.last_changed) %}
-        {# Helper is only valid if timestamp is recent (within 2x manual timeout) #}
-        {# This handles fresh helpers that haven't been set yet #}
-        {# Also reject future timestamps (helper_age < 0) which indicate corrupt/invalid data #}
-        {% set max_helper_age = (manual_timeout_minutes | float) * 120 %}
-        {% set helper_age = (now_ts - helper_ts) if helper_ts is number else 999999 %}
-        {% set has_valid_helper = helper_ts is number and helper_ts > 0 and helper_age >= 0 and helper_age < max_helper_age %}
-        {# Grace period: cover changes within 90s of our command are considered ours #}
-        {% set grace_seconds = 90 %}
-        {% set seconds_since_cmd = (cover_changed_ts - helper_ts) if has_valid_helper else 0 %}
-        {# Cover change is "ours" if it happened within grace period AFTER our command #}
-        {% set is_our_result = has_valid_helper and seconds_since_cmd >= 0 and seconds_since_cmd < grace_seconds %}
-        {# Cover changed BEFORE our command means it's old state, not manual #}
-        {% set changed_before_cmd = has_valid_helper and seconds_since_cmd < 0 %}
-        {# Determine if manual #}
-        {% if from_ui %}
-          {% set is_manual = true %}
-        {% elif from_automation %}
-          {% set is_manual = false %}
-        {% elif changed_before_cmd %}
-          {# Cover's last change was before our command - it's old state, not manual #}
-          {% set is_manual = false %}
-        {% elif has_valid_helper %}
-          {% set is_manual = not is_our_result %}
-        {% else %}
-          {% set is_manual = false %}
-        {% endif %}
-        {{ is_manual and (delta_minutes < (manual_timeout_minutes | float)) }}
-      {% endif %}
-    {% endif %}
-  in_quiet_hours: >-
-    {% if not quiet_hours_start or not quiet_hours_end %}
-      {{ false }}
-    {% else %}
-      {# Parse time strings flexibly - handles both HH:MM and HH:MM:SS formats #}
-      {% set start_parts = quiet_hours_start.split(':') if ':' in (quiet_hours_start | string) else [] %}
-      {% set end_parts = quiet_hours_end.split(':') if ':' in (quiet_hours_end | string) else [] %}
-      {% if start_parts | length < 2 or end_parts | length < 2 %}
-        {{ false }}
-      {% else %}
-        {% set start_m = (start_parts[0] | int(0)) * 60 + (start_parts[1] | int(0)) %}
-        {% set end_m = (end_parts[0] | int(0)) * 60 + (end_parts[1] | int(0)) %}
-        {% set now_m = now().hour * 60 + now().minute %}
-        {% if start_m <= end_m %}
-          {{ start_m <= now_m < end_m }}
-        {% else %}
-          {{ now_m >= start_m or now_m < end_m }}
-        {% endif %}
-      {% endif %}
-    {% endif %}
-  cooling_needed: >-
-    {% if indoor_temp is not none %}
-      {{ indoor_temp >= (effective_cooling_setpoint - comfort_margin) or climate_cooling }}
-    {% elif climate_cooling %}
-      {{ true }}
-    {% else %}
-      {{ false }}
-    {% endif %}
-  heating_needed: >-
-    {% if indoor_temp is not none %}
-      {{ indoor_temp <= (effective_heating_setpoint + comfort_margin) or climate_heating }}
-    {% elif climate_heating %}
-      {{ true }}
-    {% else %}
-      {{ false }}
-    {% endif %}
-  measured_irradiance: "{{ states(vertical_irradiance_sensor | default('')) | float(none) if vertical_irradiance_sensor else none }}"
-  cos_az_offset: "{{ ((sun_azimuth - window_orientation_deg) | float * deg_to_rad) | cos }}"
-  sin_elevation: "{{ (sun_elevation | float * deg_to_rad) | sin }}"
-  cos_elevation: "{{ (sun_elevation | float * deg_to_rad) | cos }}"
-  clear_sky_direct_normal: >-
-    {% set sin_el = [sin_elevation, 0.017] | max %}
-    {% set exponent = (-clear_sky_B / sin_el) | float %}
-    {{ clear_sky_A * (e_const ** exponent) }}
-  direct_incidence_cos: "{{ cos_az_offset * cos_elevation }}"
-  direct_vertical_component: >-
-    {% if direct_incidence_cos > 0 %}
-      {{ clear_sky_direct_normal * direct_incidence_cos }}
-    {% else %}
-      0
-    {% endif %}
-  direct_sun_detected: >-
-    {% if measured_irradiance is not none and direct_vertical_component > direct_irradiance_floor %}
-      {{ measured_irradiance >= (direct_ratio_threshold * direct_vertical_component) }}
-    {% else %}
-      {# Fall back to sun geometry, but suppress "direct sun" when weather is clearly overcast #}
-      {{ sun_on_window and not weather_is_overcast }}
-    {% endif %}
-  effective_glare_lux_threshold: >-
-    {% if room_profile == 'office' %}
-      {{ (glare_lux_threshold * 0.8) | round(0) }}
-    {% elif room_profile == 'bedroom' %}
-      {{ (glare_lux_threshold * 1.2) | round(0) }}
-    {% else %}
-      {{ glare_lux_threshold }}
-    {% endif %}
-  glare_detected: >-
-    {% if indoor_lux is not none %}
-      {{ indoor_lux >= effective_glare_lux_threshold }}
-    {% else %}
-      {{ false }}
-    {% endif %}
-  beta_deg: >-
-    {% if cos_az_offset == 0 %}
-      90
-    {% else %}
-      {% set tan_elev = (sun_elevation | float * deg_to_rad) | tan %}
-      {{ (tan_elev / cos_az_offset) | atan * 180 / pi }}
-    {% endif %}
-  beta_plus_90: "{{ beta_deg + 90 }}"
-  diffuse_empirical_angle: "{{ 120 - (0.66 * sun_elevation) }}"
-  slat_star_deg: >-
-    {% set tan_beta = (beta_deg | float * deg_to_rad) | tan %}
-    {% set ratio = slat_gap_ratio | float(0.9) %}
-    {% set radicand = tan_beta*tan_beta - (ratio*ratio) + 1 %}
-    {% if radicand <= 0 %}
-      {{ beta_plus_90 }}
-    {% else %}
-      {% set num = tan_beta + (radicand | sqrt) %}
-      {% set denom = 1 + ratio %}
-      {{ 2 * (num / denom) | atan * 180 / pi }}
-    {% endif %}
-  mode_temp: >-
-    {% set t = indoor_temp %}
-    {% set heat_sp = effective_heating_setpoint %}
-    {% set cool_sp = effective_cooling_setpoint %}
-    {% if t is none and not climate_entity %}
-      unknown
-    {% elif climate_entity %}
-      {# Climate mode takes precedence when clearly heating or cooling #}
-      {% if climate_hvac_action in ['heating'] %}
-        winter
-      {% elif climate_hvac_action in ['cooling'] %}
-        summer
-      {% elif t is none %}
-        unknown
-      {% elif t <= (heat_sp + comfort_margin) %}
-        winter
-      {% elif t >= (cool_sp - comfort_margin) %}
-        summer
-      {% else %}
-        intermediate
-      {% endif %}
-    {% else %}
-      {# No climate entity: derive purely from temperature and setpoints #}
-      {% if t <= (heat_sp + comfort_margin) %}
-        winter
-      {% elif t >= (cool_sp - comfort_margin) %}
-        summer
-      {% else %}
-        intermediate
-      {% endif %}
-    {% endif %}
-  target_angle_deg: >-
-    {# Pause paths #}
-    {% if manual_override_active or auto_override_active or in_quiet_hours or not presence_ok %}
-      {{ none }}
-    {% elif not sun_above_horizon %}
-      {# Sun is below horizon: fully close to night block position. #}
-      {{ night_block_angle_deg }}
-    {% elif not direct_sun_detected and not sun_on_window %}
-      {{ admit_position_pct / 100 * 180 }}
-    {% else %}
-      {% set G = measured_irradiance %}
-      {% set angle = none %}
-      {% if not occupied %}
-        {% if mode_temp == 'winter' %}
-          {% if not direct_sun_detected %}
-            {% set angle = 110 %}
-          {% else %}
-            {% if beta_deg < 65 %}
-              {% set angle = beta_plus_90 %}
-            {% elif G is not none and G > diffuse_glare_threshold %}
-              {% set angle = beta_plus_90 %}
-            {% else %}
-              {% set angle = diffuse_empirical_angle %}
-            {% endif %}
-          {% endif %}
-        {% elif mode_temp == 'summer' %}
-          {% set angle = max_tilt_angle %}
-        {% elif mode_temp == 'intermediate' %}
-          {% set angle = 80 %}
-        {% else %}
-          {% set angle = block_position_pct / 100 * 180 %}
-        {% endif %}
-      {% else %}
-        {% if mode_temp == 'winter' %}
-          {% if not direct_sun_detected %}
-            {% set angle = 110 %}
-          {% else %}
-            {% set angle = slat_star_deg %}
-          {% endif %}
-        {% elif mode_temp == 'summer' %}
-          {% set angle = 45 %}
-        {% elif mode_temp == 'intermediate' %}
-          {% if not direct_sun_detected %}
-            {% set angle = 80 %}
-          {% else %}
-            {% set angle = slat_star_deg %}
-          {% endif %}
-        {% else %}
-          {% set angle = block_position_pct / 100 * 180 %}
-        {% endif %}
-      {% endif %}
-      {% if angle is none %}
-        {{ none }}
-      {% else %}
-        {{ [0, [angle, max_tilt_angle] | min] | max }}
-      {% endif %}
-    {% endif %}
-  slat_target_position: >-
-    {% if shading_mode != 'slat' %}
-      {{ none }}
-    {% else %}
-      {% if target_angle_deg is none %}
-        {{ none }}
-      {% else %}
-        {{ (target_angle_deg / 180 * 100) | round(0) }}
-      {% endif %}
-    {% endif %}
-  zebra_target_position: >-
-    {% if shading_mode != 'zebra' %}
-      {{ none }}
-    {% else %}
-      {% if not sun_above_horizon %}
-        {{ night_position_pct }}
-      {% else %}
-      {% set frontlit = direct_sun_detected or sun_on_window %}
-      {% set mode = mode_temp %}
-      {% set occ = occupied %}
-      {% set glare = glare_detected %}
-
-      {% if not occ %}
-        {# UNOCCUPIED:
-           - Summer: bias to blocking when frontlit & cooling is a concern
-           - Winter: bias to admitting when not frontlit & heating is a concern
-           - Otherwise: sit in the middle (dim) to avoid extremes
-        #}
-        {% if mode == 'summer' %}
-          {% if frontlit and cooling_needed %}
-            {{ block_position_pct }}
-          {% else %}
-            {{ dim_position_pct }}
-          {% endif %}
-        {% elif mode == 'winter' %}
-          {% if not frontlit and heating_needed %}
-            {{ admit_position_pct }}
-          {% else %}
-            {{ dim_position_pct }}
-          {% endif %}
-        {% else %}
-          {{ dim_position_pct }}
-        {% endif %}
-
-      {% else %}
-        {# OCCUPIED:
-           - When frontlit, glare drives behavior strongly.
-           - In summer, if there is sun but no glare, err more closed.
-           - When not frontlit, admit light.
-        #}
-        {% if frontlit %}
-          {% if glare %}
-            {{ block_position_pct }}
-          {% elif mode == 'summer' %}
-            {{ [dim_position_pct, block_position_pct] | max }}
-          {% else %}
-            {{ dim_position_pct }}
-          {% endif %}
-        {% else %}
-          {{ admit_position_pct }}
-        {% endif %}
-      {% endif %}
-      {% endif %}
-    {% endif %}
-  desired_position_room: >-
-    {% if shading_mode == 'slat' %}
-      {{ slat_target_position }}
-    {% elif shading_mode == 'zebra' %}
-      {{ zebra_target_position }}
-    {% else %}
-      {{ none }}
-    {% endif %}
-
+  sun_above_horizon: '{{ is_state(sun_entity, ''above_horizon'') }}'
+  min_sun_elevation: '{{ 1 if sun_above_horizon else 90 }}'
+  night_block_angle_deg: '{# At night/quiet hours, use the dedicated night position,
+    expressed as an angle out of 180°. #} {{ (night_position_pct | float(85) / 100.0)
+    * 180.0 }}'
+  climate_hvac_mode: '{{ state_attr(climate_entity, ''hvac_mode'') if climate_entity
+    else none }}'
+  climate_hvac_action: '{{ state_attr(climate_entity, ''hvac_action'') if climate_entity
+    else none }}'
+  climate_target_high: '{{ state_attr(climate_entity, ''target_temp_high'') | float(none)
+    if climate_entity else none }}'
+  climate_target_low: '{{ state_attr(climate_entity, ''target_temp_low'') | float(none)
+    if climate_entity else none }}'
+  climate_target_temp: "{% if climate_entity %}\n  {% set t = state_attr(climate_entity,
+    'temperature') | float(none) %}\n  {% if t is number %}\n    {{ t }}\n  {% else
+    %}\n    {{ state_attr(climate_entity, 'target_temperature') | float(none) }}\n
+    \ {% endif %}\n{% else %}\n  {{ none }}\n{% endif %}"
+  climate_heating: "{% if not climate_entity %}\n  {{ false }}\n{% else %}\n  {{ climate_hvac_action
+    in ['heating'] or climate_hvac_mode in ['heat'] }}\n{% endif %}"
+  climate_cooling: "{% if not climate_entity %}\n  {{ false }}\n{% else %}\n  {{ climate_hvac_action
+    in ['cooling'] or climate_hvac_mode in ['cool'] }}\n{% endif %}"
+  cover_supported_features: '{{ state_attr(base_cover, ''supported_features'') | int(0)
+    if base_cover else 0 }}'
+  cover_supports_tilt: '{{ (cover_supported_features | bitwise_and(16)) > 0 }}'
+  sun_azimuth: '{{ state_attr(sun_entity, ''azimuth'') | float(0) }}'
+  sun_elevation: '{{ state_attr(sun_entity, ''elevation'') | float(-90) }}'
+  weather_state: '{{ states(weather_entity) if weather_entity else none }}'
+  weather_is_overcast: "{% if not weather_state %}\n  {{ false }}\n{% else %}\n  {%
+    set s = weather_state %}\n  {{ s in ['cloudy', 'overcast', 'rainy', 'pouring',
+    'snowy', 'hail', 'partlycloudy'] }}\n{% endif %}"
+  effective_heating_setpoint: "{% if climate_entity %}\n  {% if climate_target_high
+    is number %}\n    {{ climate_target_high }}\n  {% elif climate_target_temp is
+    number %}\n    {{ climate_target_temp }}\n  {% else %}\n    {{ heating_setpoint
+    }}\n  {% endif %}\n{% else %}\n  {{ heating_setpoint }}\n{% endif %}"
+  effective_cooling_setpoint: "{% if climate_entity %}\n  {% if climate_target_low
+    is number %}\n    {{ climate_target_low }}\n  {% elif climate_target_temp is number
+    %}\n    {{ climate_target_temp }}\n  {% else %}\n    {{ cooling_setpoint }}\n
+    \ {% endif %}\n{% else %}\n  {{ cooling_setpoint }}\n{% endif %}"
+  sun_on_window: '{% set delta = (((sun_azimuth - window_orientation_deg + 540) %
+    360) - 180) | abs %} {{ sun_elevation >= min_sun_elevation and delta <= sun_tolerance_deg
+    }}'
+  indoor_temp: '{{ states(indoor_temp_sensor | default('''')) | float(none) if indoor_temp_sensor
+    else none }}'
+  outdoor_temp: '{{ states(outdoor_temp_sensor | default('''')) | float(none) if outdoor_temp_sensor
+    else none }}'
+  indoor_lux: '{{ states(indoor_lux_sensor | default('''')) | float(none) if indoor_lux_sensor
+    else none }}'
+  presence_present: "{% if not presence_entity %}\n  {{ false }}\n{% else %}\n  {%
+    set s = states(presence_entity) %}\n  {{ s in ['on', 'home', 'occupied', 'present']
+    }}\n{% endif %}"
+  presence_ok: "{% if not presence_entity %}\n  {{ true }}\n{% elif not presence_required
+    %}\n  {{ true }}\n{% else %}\n  {{ presence_present }}\n{% endif %}"
+  occupied: "{% if not presence_entity %}\n  {{ true }}\n{% else %}\n  {{ presence_present
+    }}\n{% endif %}"
+  manual_override_active: '{% set mo = manual_override | default('''') %} {{ mo !=
+    '''' and is_state(mo, ''on'') }}'
+  auto_override_active: "{# Manual override detection using timestamp helper (if configured)
+    or UI context. #} {# With helper: detects any cover change that wasn't shortly
+    after our command. #} {# Without helper: only detects UI-initiated changes (user_id
+    present). #} {% if manual_timeout_minutes | int(0) <= 0 or not base_cover %}\n
+    \ {{ false }}\n{% else %}\n  {% set s = states[base_cover] %}\n  {% if s is none
+    or s.last_changed is none %}\n    {{ false }}\n  {% elif s.state in ['opening',
+    'closing'] %}\n    {# Cover is still moving - don't evaluate manual detection
+    yet #}\n    {{ false }}\n  {% else %}\n    {% set delta_minutes = (as_timestamp(now())
+    - as_timestamp(s.last_changed)) / 60 %}\n    {% set ctx = s.context if s.context
+    is defined else none %}\n    {% set user_id = ctx.user_id | default('') if ctx
+    else '' %}\n    {% set parent_id = ctx.parent_id | default('') if ctx else ''
+    %}\n    {% set from_ui = user_id is string and (user_id | length > 0) %}\n    {%
+    set from_automation = parent_id is string and (parent_id | length > 0) %}\n    {#
+    Check if helper is configured and has a recent timestamp #}\n    {% set helper_entity
+    = last_command_helper if last_command_helper not in ['', none] else none %}\n
+    \   {% set helper_ts = state_attr(helper_entity, 'timestamp') if helper_entity
+    else none %}\n    {% set now_ts = as_timestamp(now()) %}\n    {% set cover_changed_ts
+    = as_timestamp(s.last_changed) %}\n    {# Helper is only valid if timestamp is
+    recent (within 2x manual timeout) #}\n    {# This handles fresh helpers that haven't
+    been set yet #}\n    {# Also reject future timestamps (helper_age < 0) which indicate
+    corrupt/invalid data #}\n    {% set max_helper_age = (manual_timeout_minutes |
+    float) * 120 %}\n    {% set helper_age = (now_ts - helper_ts) if helper_ts is
+    number else 999999 %}\n    {% set has_valid_helper = helper_ts is number and helper_ts
+    > 0 and helper_age >= 0 and helper_age < max_helper_age %}\n    {# Grace period:
+    cover changes within 90s of our command are considered ours #}\n    {% set grace_seconds
+    = 90 %}\n    {% set seconds_since_cmd = (cover_changed_ts - helper_ts) if has_valid_helper
+    else 0 %}\n    {# Cover change is \"ours\" if it happened within grace period
+    AFTER our command #}\n    {% set is_our_result = has_valid_helper and seconds_since_cmd
+    >= 0 and seconds_since_cmd < grace_seconds %}\n    {# Cover changed BEFORE our
+    command means it's old state, not manual #}\n    {% set changed_before_cmd = has_valid_helper
+    and seconds_since_cmd < 0 %}\n    {# Determine if manual #}\n    {% if from_ui
+    %}\n      {% set is_manual = true %}\n    {% elif from_automation %}\n      {%
+    set is_manual = false %}\n    {% elif changed_before_cmd %}\n      {# Cover's
+    last change was before our command - it's old state, not manual #}\n      {% set
+    is_manual = false %}\n    {% elif has_valid_helper %}\n      {% set is_manual
+    = not is_our_result %}\n    {% else %}\n      {% set is_manual = false %}\n    {%
+    endif %}\n    {{ is_manual and (delta_minutes < (manual_timeout_minutes | float))
+    }}\n  {% endif %}\n{% endif %}"
+  in_quiet_hours: "{% if not quiet_hours_start or not quiet_hours_end %}\n  {{ false
+    }}\n{% else %}\n  {# Parse time strings flexibly - handles both HH:MM and HH:MM:SS
+    formats #}\n  {% set start_parts = quiet_hours_start.split(':') if ':' in (quiet_hours_start
+    | string) else [] %}\n  {% set end_parts = quiet_hours_end.split(':') if ':' in
+    (quiet_hours_end | string) else [] %}\n  {% if start_parts | length < 2 or end_parts
+    | length < 2 %}\n    {{ false }}\n  {% else %}\n    {% set start_m = (start_parts[0]
+    | int(0)) * 60 + (start_parts[1] | int(0)) %}\n    {% set end_m = (end_parts[0]
+    | int(0)) * 60 + (end_parts[1] | int(0)) %}\n    {% set now_m = now().hour * 60
+    + now().minute %}\n    {% if start_m <= end_m %}\n      {{ start_m <= now_m <
+    end_m }}\n    {% else %}\n      {{ now_m >= start_m or now_m < end_m }}\n    {%
+    endif %}\n  {% endif %}\n{% endif %}"
+  cooling_needed: "{% if indoor_temp is not none %}\n  {{ indoor_temp >= (effective_cooling_setpoint
+    - comfort_margin) or climate_cooling }}\n{% elif climate_cooling %}\n  {{ true
+    }}\n{% else %}\n  {{ false }}\n{% endif %}"
+  heating_needed: "{% if indoor_temp is not none %}\n  {{ indoor_temp <= (effective_heating_setpoint
+    + comfort_margin) or climate_heating }}\n{% elif climate_heating %}\n  {{ true
+    }}\n{% else %}\n  {{ false }}\n{% endif %}"
+  measured_irradiance: '{{ states(vertical_irradiance_sensor | default('''')) | float(none)
+    if vertical_irradiance_sensor else none }}'
+  cos_az_offset: '{{ ((sun_azimuth - window_orientation_deg) | float * deg_to_rad)
+    | cos }}'
+  sin_elevation: '{{ (sun_elevation | float * deg_to_rad) | sin }}'
+  cos_elevation: '{{ (sun_elevation | float * deg_to_rad) | cos }}'
+  clear_sky_direct_normal: '{% set sin_el = [sin_elevation, 0.017] | max %} {% set
+    exponent = (-clear_sky_B / sin_el) | float %} {{ clear_sky_A * (e_const ** exponent)
+    }}'
+  direct_incidence_cos: '{{ cos_az_offset * cos_elevation }}'
+  direct_vertical_component: "{% if direct_incidence_cos > 0 %}\n  {{ clear_sky_direct_normal
+    * direct_incidence_cos }}\n{% else %}\n  0\n{% endif %}"
+  direct_sun_detected: "{% if measured_irradiance is not none and direct_vertical_component
+    > direct_irradiance_floor %}\n  {{ measured_irradiance >= (direct_ratio_threshold
+    * direct_vertical_component) }}\n{% else %}\n  {# Fall back to sun geometry, but
+    suppress \"direct sun\" when weather is clearly overcast #}\n  {{ sun_on_window
+    and not weather_is_overcast }}\n{% endif %}"
+  effective_glare_lux_threshold: "{% if room_profile == 'office' %}\n  {{ (glare_lux_threshold
+    * 0.8) | round(0) }}\n{% elif room_profile == 'bedroom' %}\n  {{ (glare_lux_threshold
+    * 1.2) | round(0) }}\n{% else %}\n  {{ glare_lux_threshold }}\n{% endif %}"
+  glare_detected: "{% if indoor_lux is not none %}\n  {{ indoor_lux >= effective_glare_lux_threshold
+    }}\n{% else %}\n  {{ false }}\n{% endif %}"
+  beta_deg: "{% if cos_az_offset == 0 %}\n  90\n{% else %}\n  {% set tan_elev = (sun_elevation
+    | float * deg_to_rad) | tan %}\n  {{ (tan_elev / cos_az_offset) | atan * 180 /
+    pi }}\n{% endif %}"
+  beta_plus_90: '{{ beta_deg + 90 }}'
+  diffuse_empirical_angle: '{{ 120 - (0.66 * sun_elevation) }}'
+  slat_star_deg: "{% set tan_beta = (beta_deg | float * deg_to_rad) | tan %} {% set
+    ratio = slat_gap_ratio | float(0.9) %} {% set radicand = tan_beta*tan_beta - (ratio*ratio)
+    + 1 %} {% if radicand <= 0 %}\n  {{ beta_plus_90 }}\n{% else %}\n  {% set num
+    = tan_beta + (radicand | sqrt) %}\n  {% set denom = 1 + ratio %}\n  {{ 2 * (num
+    / denom) | atan * 180 / pi }}\n{% endif %}"
+  mode_temp: "{% set t = indoor_temp %} {% set heat_sp = effective_heating_setpoint
+    %} {% set cool_sp = effective_cooling_setpoint %} {% if t is none and not climate_entity
+    %}\n  unknown\n{% elif climate_entity %}\n  {# Climate mode takes precedence when
+    clearly heating or cooling #}\n  {% if climate_hvac_action in ['heating'] %}\n
+    \   winter\n  {% elif climate_hvac_action in ['cooling'] %}\n    summer\n  {%
+    elif t is none %}\n    unknown\n  {% elif t <= (heat_sp + comfort_margin) %}\n
+    \   winter\n  {% elif t >= (cool_sp - comfort_margin) %}\n    summer\n  {% else
+    %}\n    intermediate\n  {% endif %}\n{% else %}\n  {# No climate entity: derive
+    purely from temperature and setpoints #}\n  {% if t <= (heat_sp + comfort_margin)
+    %}\n    winter\n  {% elif t >= (cool_sp - comfort_margin) %}\n    summer\n  {%
+    else %}\n    intermediate\n  {% endif %}\n{% endif %}"
+  target_angle_deg: "{# Pause paths #} {% if manual_override_active or auto_override_active
+    or in_quiet_hours or not presence_ok %}\n  {{ none }}\n{% elif not sun_above_horizon
+    %}\n  {# Sun is below horizon: fully close to night block position. #}\n  {{ night_block_angle_deg
+    }}\n{% elif not direct_sun_detected and not sun_on_window %}\n  {{ admit_position_pct
+    / 100 * 180 }}\n{% else %}\n  {% set G = measured_irradiance %}\n  {% set angle
+    = none %}\n  {% if not occupied %}\n    {% if mode_temp == 'winter' %}\n      {%
+    if not direct_sun_detected %}\n        {% set angle = 110 %}\n      {% else %}\n
+    \       {% if beta_deg < 65 %}\n          {% set angle = beta_plus_90 %}\n        {%
+    elif G is not none and G > diffuse_glare_threshold %}\n          {% set angle
+    = beta_plus_90 %}\n        {% else %}\n          {% set angle = diffuse_empirical_angle
+    %}\n        {% endif %}\n      {% endif %}\n    {% elif mode_temp == 'summer'
+    %}\n      {% set angle = max_tilt_angle %}\n    {% elif mode_temp == 'intermediate'
+    %}\n      {% set angle = 80 %}\n    {% else %}\n      {% set angle = block_position_pct
+    / 100 * 180 %}\n    {% endif %}\n  {% else %}\n    {% if mode_temp == 'winter'
+    %}\n      {% if not direct_sun_detected %}\n        {% set angle = 110 %}\n      {%
+    else %}\n        {% set angle = slat_star_deg %}\n      {% endif %}\n    {% elif
+    mode_temp == 'summer' %}\n      {% set angle = 45 %}\n    {% elif mode_temp ==
+    'intermediate' %}\n      {% if not direct_sun_detected %}\n        {% set angle
+    = 80 %}\n      {% else %}\n        {% set angle = slat_star_deg %}\n      {% endif
+    %}\n    {% else %}\n      {% set angle = block_position_pct / 100 * 180 %}\n    {%
+    endif %}\n  {% endif %}\n  {% if angle is none %}\n    {{ none }}\n  {% else %}\n
+    \   {{ [0, [angle, max_tilt_angle] | min] | max }}\n  {% endif %}\n{% endif %}"
+  slat_target_position: "{% if shading_mode != 'slat' %}\n  {{ none }}\n{% else %}\n
+    \ {% if target_angle_deg is none %}\n    {{ none }}\n  {% else %}\n    {{ (target_angle_deg
+    / 180 * 100) | round(0) }}\n  {% endif %}\n{% endif %}"
+  zebra_target_position: "{% if shading_mode != 'zebra' %}\n  {{ none }}\n{% else
+    %}\n  {% if not sun_above_horizon %}\n    {{ night_position_pct }}\n  {% else
+    %}\n  {% set frontlit = direct_sun_detected or sun_on_window %}\n  {% set mode
+    = mode_temp %}\n  {% set occ = occupied %}\n  {% set glare = glare_detected %}\n\n
+    \ {% if not occ %}\n    {# UNOCCUPIED:\n       - Summer: bias to blocking when
+    frontlit & cooling is a concern\n       - Winter: bias to admitting when not frontlit
+    & heating is a concern\n       - Otherwise: sit in the middle (dim) to avoid extremes\n
+    \   #}\n    {% if mode == 'summer' %}\n      {% if frontlit and cooling_needed
+    %}\n        {{ block_position_pct }}\n      {% else %}\n        {{ dim_position_pct
+    }}\n      {% endif %}\n    {% elif mode == 'winter' %}\n      {% if not frontlit
+    and heating_needed %}\n        {{ admit_position_pct }}\n      {% else %}\n        {{
+    dim_position_pct }}\n      {% endif %}\n    {% else %}\n      {{ dim_position_pct
+    }}\n    {% endif %}\n\n  {% else %}\n    {# OCCUPIED:\n       - When frontlit,
+    glare drives behavior strongly.\n       - In summer, if there is sun but no glare,
+    err more closed.\n       - When not frontlit, admit light.\n    #}\n    {% if
+    frontlit %}\n      {% if glare %}\n        {{ block_position_pct }}\n      {%
+    elif mode == 'summer' %}\n        {{ [dim_position_pct, block_position_pct] |
+    max }}\n      {% else %}\n        {{ dim_position_pct }}\n      {% endif %}\n
+    \   {% else %}\n      {{ admit_position_pct }}\n    {% endif %}\n  {% endif %}\n
+    \ {% endif %}\n{% endif %}"
+  desired_position_room: "{% if shading_mode == 'slat' %}\n  {{ slat_target_position
+    }}\n{% elif shading_mode == 'zebra' %}\n  {{ zebra_target_position }}\n{% else
+    %}\n  {{ none }}\n{% endif %}"
 trigger:
-  - platform: time_pattern
-    minutes: "/5"
-  - platform: state
-    entity_id: !input sun_entity
-  - platform: state
-    entity_id: !input cover_target
-    id: cover_changed
-  - platform: state
-    entity_id: !input window_contacts
-    to: "on"
-    id: window_opened
-  - platform: state
-    entity_id: !input window_contacts
-    to: "off"
-    id: window_closed
-  - platform: homeassistant
-    event: start
-
+- platform: time_pattern
+  minutes: /5
+- platform: state
+  entity_id: !input sun_entity
+- platform: state
+  entity_id: !input cover_target
+  id: cover_changed
+- platform: state
+  entity_id: !input window_contacts
+  to: 'on'
+  id: window_opened
+- platform: state
+  entity_id: !input window_contacts
+  to: 'off'
+  id: window_closed
+- platform: homeassistant
+  event: start
 condition: []
-
 action:
-  # When a window opens and delay is configured, wait for the delay period
-  - choose:
-      - conditions: "{{ trigger.id == 'window_opened' and (window_open_delay | int(0)) > 0 }}"
-        sequence:
-          - delay:
-              seconds: "{{ window_open_delay | int(0) }}"
-          # After delay, verify the window is still open before proceeding
-          - condition: template
-            value_template: "{{ is_state(trigger.entity_id, 'on') }}"
-  - choose:
-      - conditions: "{{ triggered_by_cover and manual_change_detected }}"
-        sequence:
-          - condition: template
-            value_template: "{{ debug_basic }}"
-          - service: logbook.log
-            data:
-              name: "Adaptive Shades"
-              message: >-
-                Paused: manual adjustment detected | cover={{ triggered_cover_entity }} | pause={{ manual_timeout_minutes }}min (v{{ blueprint_version }})
-              domain: cover
-          - stop: "Manual change detected, pausing automation"
-      - conditions: "{{ manual_override_active }}"
-        sequence:
-          - condition: template
-            value_template: "{{ debug_basic }}"
-          - service: logbook.log
-            data:
-              name: "Adaptive Shades"
-              message: "Paused: manual override ON (v{{ blueprint_version }})"
-              domain: cover
-          - stop: "Manual override active"
-      - conditions: "{{ in_quiet_hours }}"
-        sequence:
-          - condition: template
-            value_template: "{{ debug_basic }}"
-          - service: logbook.log
-            data:
-              name: "Adaptive Shades"
-              message: "Paused: quiet hours active (v{{ blueprint_version }})"
-              domain: cover
-          - stop: "Quiet hours active"
-      - conditions: "{{ not presence_ok }}"
-        sequence:
-          - condition: template
-            value_template: "{{ debug_basic }}"
-          - service: logbook.log
-            data:
-              name: "Adaptive Shades"
-              message: "Skipped: presence requirement not met (v{{ blueprint_version }})"
-              domain: cover
-          - stop: "Presence requirement not met"
-  - repeat:
-      for_each: "{{ cover_target if cover_target is sequence else [cover_target] }}"
-      sequence:
-        - variables:
-            this_cover: "{{ repeat.item }}"
-            idx: "{{ repeat.index - 1 }}"
-            this_window: >-
-              {% set sensors = window_contacts %}
-              {% if sensors is sequence and (sensors | length > idx) %}
-                {{ sensors[idx] }}
-              {% else %}
-                ""
-              {% endif %}
-            this_window_open: >-
-              {% if not this_window or not is_state(this_window, 'on') %}
-                {{ false }}
-              {% elif window_open_delay | int(0) <= 0 %}
-                {{ true }}
-              {% else %}
-                {% set w = states[this_window] %}
-                {% if w is none or w.last_changed is none %}
-                  {{ false }}
-                {% else %}
-                  {% set open_seconds = (as_timestamp(now()) - as_timestamp(w.last_changed)) %}
-                  {{ open_seconds >= (window_open_delay | int(0)) }}
-                {% endif %}
-              {% endif %}
-            this_current_position: "{{ state_attr(this_cover, 'current_position') }}"
-            this_current_tilt: "{{ state_attr(this_cover, 'current_tilt_position') if cover_supports_tilt else none }}"
-            this_target_base: "{{ desired_position_room }}"
-            this_auto_override_active: >-
-              {% if manual_timeout_minutes | int(0) <= 0 %}
-                {{ false }}
-              {% else %}
-                {% set s = states[this_cover] %}
-                {% if s is none or s.last_changed is none %}
-                  {{ false }}
-                {% elif s.state in ['opening', 'closing'] %}
-                  {# Cover is still moving - don't evaluate manual detection yet #}
-                  {{ false }}
-                {% else %}
-                  {% set delta_minutes = (as_timestamp(now()) - as_timestamp(s.last_changed)) / 60 %}
-                  {% set ctx = s.context if s.context is defined else none %}
-                  {% set user_id = ctx.user_id | default('') if ctx else '' %}
-                  {% set parent_id = ctx.parent_id | default('') if ctx else '' %}
-                  {% set from_ui = user_id is string and (user_id | length > 0) %}
-                  {% set from_automation = parent_id is string and (parent_id | length > 0) %}
-                  {# Check if helper is configured and has a recent timestamp #}
-                  {% set helper_entity = last_command_helper if last_command_helper not in ['', none] else none %}
-                  {% set helper_ts = state_attr(helper_entity, 'timestamp') if helper_entity else none %}
-                  {% set now_ts = as_timestamp(now()) %}
-                  {# Helper is only valid if timestamp is recent (within 2x manual timeout) #}
-                  {# This handles fresh helpers that haven't been set yet #}
-                  {# Also reject future timestamps (helper_age < 0) which indicate corrupt/invalid data #}
-                  {% set max_helper_age = (manual_timeout_minutes | float) * 120 %}
-                  {% set helper_age = (now_ts - helper_ts) if helper_ts is number else 999999 %}
-                  {% set has_valid_helper = helper_ts is number and helper_ts > 0 and helper_age >= 0 and helper_age < max_helper_age %}
-                  {% set cover_changed_ts = as_timestamp(s.last_changed) %}
-                  {# Grace period: cover changes within 90s of our command are considered ours #}
-                  {% set grace_seconds = 90 %}
-                  {% set seconds_since_cmd = (cover_changed_ts - helper_ts) if has_valid_helper else 0 %}
-                  {# Cover change is "ours" if it happened within grace period AFTER our command #}
-                  {% set is_our_result = has_valid_helper and seconds_since_cmd >= 0 and seconds_since_cmd < grace_seconds %}
-                  {# Cover changed BEFORE our command means it's old state, not manual #}
-                  {% set changed_before_cmd = has_valid_helper and seconds_since_cmd < 0 %}
-                  {# Determine if manual: #}
-                  {# 1. UI change (user_id present) = always manual #}
-                  {# 2. Automation change (parent_id present) = never manual #}
-                  {# 3. Cover changed before our last command = not manual (old state) #}
-                  {# 4. Device report with valid helper: manual if NOT within grace period #}
-                  {# 5. No valid helper: cannot determine, assume not manual #}
-                  {% if from_ui %}
-                    {% set is_manual = true %}
-                  {% elif from_automation %}
-                    {% set is_manual = false %}
-                  {% elif changed_before_cmd %}
-                    {# Cover's last change was before our command - it's old state, not manual #}
-                    {% set is_manual = false %}
-                  {% elif has_valid_helper %}
-                    {# Valid helper: manual if change wasn't shortly after our command #}
-                    {% set is_manual = not is_our_result %}
-                  {% else %}
-                    {# No valid helper: cannot reliably detect, assume not manual #}
-                    {% set is_manual = false %}
-                  {% endif %}
-                  {{ is_manual and (delta_minutes < (manual_timeout_minutes | float)) }}
-                {% endif %}
-              {% endif %}
-            this_target_position: >-
-              {% if this_target_base is none %}
-                {{ none }}
-              {% elif this_window_open | bool %}
-                {# Window is open: force shade fully open #}
-                {% if inverted_shades %}
-                  100
-                {% else %}
-                  0
-                {% endif %}
-              {% elif inverted_shades %}
-                {{ 100 - (this_target_base | int) }}
-              {% else %}
-                {{ this_target_base | int }}
-              {% endif %}
-            this_target_tilt: >-
-              {% if cover_supports_tilt and shading_mode == 'slat' and this_target_position is not none %}
-                {{ this_target_position | int }}
-              {% else %}
-                {{ none }}
-              {% endif %}
-
-        - choose:
-            - conditions:
-                - condition: template
-                  value_template: "{{ this_auto_override_active }}"
-              sequence:
-                - choose:
-                    - conditions:
-                        - condition: template
-                          value_template: "{{ debug_basic }}"
-                      sequence:
-                        - service: logbook.log
-                          data:
-                            name: "Adaptive Shades"
-                            message: "Paused: manual adjustment timeout | cover={{ this_cover }} (v{{ blueprint_version }})"
-                            domain: cover
-        # Skip remaining actions for this cover if manual override active
+- choose:
+  - conditions: '{{ trigger.id == ''window_opened'' and (window_open_delay | int(0))
+      > 0 }}'
+    sequence:
+    - delay:
+        seconds: '{{ window_open_delay | int(0) }}'
+    - condition: template
+      value_template: '{{ is_state(trigger.entity_id, ''on'') }}'
+- choose:
+  - conditions: '{{ triggered_by_cover and manual_change_detected }}'
+    sequence:
+    - condition: template
+      value_template: '{{ debug_basic }}'
+    - service: logbook.log
+      data:
+        name: Adaptive Shades
+        message: 'Paused: manual adjustment detected | cover={{ triggered_cover_entity
+          }} | pause={{ manual_timeout_minutes }}min (v{{ blueprint_version }})'
+        domain: cover
+    - stop: Manual change detected, pausing automation
+  - conditions: '{{ manual_override_active }}'
+    sequence:
+    - condition: template
+      value_template: '{{ debug_basic }}'
+    - service: logbook.log
+      data:
+        name: Adaptive Shades
+        message: 'Paused: manual override ON (v{{ blueprint_version }})'
+        domain: cover
+    - stop: Manual override active
+  - conditions: '{{ in_quiet_hours }}'
+    sequence:
+    - condition: template
+      value_template: '{{ debug_basic }}'
+    - service: logbook.log
+      data:
+        name: Adaptive Shades
+        message: 'Paused: quiet hours active (v{{ blueprint_version }})'
+        domain: cover
+    - stop: Quiet hours active
+  - conditions: '{{ not presence_ok }}'
+    sequence:
+    - condition: template
+      value_template: '{{ debug_basic }}'
+    - service: logbook.log
+      data:
+        name: Adaptive Shades
+        message: 'Skipped: presence requirement not met (v{{ blueprint_version }})'
+        domain: cover
+    - stop: Presence requirement not met
+- repeat:
+    for_each: '{{ cover_target if cover_target is sequence else [cover_target] }}'
+    sequence:
+    - variables:
+        this_cover: '{{ repeat.item }}'
+        idx: '{{ repeat.index - 1 }}'
+        this_window: "{% set sensors = window_contacts %} {% if sensors is sequence
+          and (sensors | length > idx) %}\n  {{ sensors[idx] }}\n{% else %}\n  \"\"\n{%
+          endif %}"
+        this_window_open: "{% if not this_window or not is_state(this_window, 'on')
+          %}\n  {{ false }}\n{% elif window_open_delay | int(0) <= 0 %}\n  {{ true
+          }}\n{% else %}\n  {% set w = states[this_window] %}\n  {% if w is none or
+          w.last_changed is none %}\n    {{ false }}\n  {% else %}\n    {% set open_seconds
+          = (as_timestamp(now()) - as_timestamp(w.last_changed)) %}\n    {{ open_seconds
+          >= (window_open_delay | int(0)) }}\n  {% endif %}\n{% endif %}"
+        this_current_position: '{{ state_attr(this_cover, ''current_position'') }}'
+        this_current_tilt: '{{ state_attr(this_cover, ''current_tilt_position'') if
+          cover_supports_tilt else none }}'
+        this_target_base: '{{ desired_position_room }}'
+        this_auto_override_active: "{% if manual_timeout_minutes | int(0) <= 0 %}\n
+          \ {{ false }}\n{% else %}\n  {% set s = states[this_cover] %}\n  {% if s
+          is none or s.last_changed is none %}\n    {{ false }}\n  {% elif s.state
+          in ['opening', 'closing'] %}\n    {# Cover is still moving - don't evaluate
+          manual detection yet #}\n    {{ false }}\n  {% else %}\n    {% set delta_minutes
+          = (as_timestamp(now()) - as_timestamp(s.last_changed)) / 60 %}\n    {% set
+          ctx = s.context if s.context is defined else none %}\n    {% set user_id
+          = ctx.user_id | default('') if ctx else '' %}\n    {% set parent_id = ctx.parent_id
+          | default('') if ctx else '' %}\n    {% set from_ui = user_id is string
+          and (user_id | length > 0) %}\n    {% set from_automation = parent_id is
+          string and (parent_id | length > 0) %}\n    {# Check if helper is configured
+          and has a recent timestamp #}\n    {% set helper_entity = last_command_helper
+          if last_command_helper not in ['', none] else none %}\n    {% set helper_ts
+          = state_attr(helper_entity, 'timestamp') if helper_entity else none %}\n
+          \   {% set now_ts = as_timestamp(now()) %}\n    {# Helper is only valid
+          if timestamp is recent (within 2x manual timeout) #}\n    {# This handles
+          fresh helpers that haven't been set yet #}\n    {# Also reject future timestamps
+          (helper_age < 0) which indicate corrupt/invalid data #}\n    {% set max_helper_age
+          = (manual_timeout_minutes | float) * 120 %}\n    {% set helper_age = (now_ts
+          - helper_ts) if helper_ts is number else 999999 %}\n    {% set has_valid_helper
+          = helper_ts is number and helper_ts > 0 and helper_age >= 0 and helper_age
+          < max_helper_age %}\n    {% set cover_changed_ts = as_timestamp(s.last_changed)
+          %}\n    {# Grace period: cover changes within 90s of our command are considered
+          ours #}\n    {% set grace_seconds = 90 %}\n    {% set seconds_since_cmd
+          = (cover_changed_ts - helper_ts) if has_valid_helper else 0 %}\n    {# Cover
+          change is \"ours\" if it happened within grace period AFTER our command
+          #}\n    {% set is_our_result = has_valid_helper and seconds_since_cmd >=
+          0 and seconds_since_cmd < grace_seconds %}\n    {# Cover changed BEFORE
+          our command means it's old state, not manual #}\n    {% set changed_before_cmd
+          = has_valid_helper and seconds_since_cmd < 0 %}\n    {# Determine if manual:
+          #}\n    {# 1. UI change (user_id present) = always manual #}\n    {# 2.
+          Automation change (parent_id present) = never manual #}\n    {# 3. Cover
+          changed before our last command = not manual (old state) #}\n    {# 4. Device
+          report with valid helper: manual if NOT within grace period #}\n    {# 5.
+          No valid helper: cannot determine, assume not manual #}\n    {% if from_ui
+          %}\n      {% set is_manual = true %}\n    {% elif from_automation %}\n      {%
+          set is_manual = false %}\n    {% elif changed_before_cmd %}\n      {# Cover's
+          last change was before our command - it's old state, not manual #}\n      {%
+          set is_manual = false %}\n    {% elif has_valid_helper %}\n      {# Valid
+          helper: manual if change wasn't shortly after our command #}\n      {% set
+          is_manual = not is_our_result %}\n    {% else %}\n      {# No valid helper:
+          cannot reliably detect, assume not manual #}\n      {% set is_manual = false
+          %}\n    {% endif %}\n    {{ is_manual and (delta_minutes < (manual_timeout_minutes
+          | float)) }}\n  {% endif %}\n{% endif %}"
+        this_target_position: "{% if this_target_base is none %}\n  {{ none }}\n{%
+          elif this_window_open | bool %}\n  {# Window is open: force shade fully
+          open #}\n  {% if inverted_shades %}\n    100\n  {% else %}\n    0\n  {%
+          endif %}\n{% elif inverted_shades %}\n  {{ 100 - (this_target_base | int)
+          }}\n{% else %}\n  {{ this_target_base | int }}\n{% endif %}"
+        this_target_tilt: "{% if cover_supports_tilt and shading_mode == 'slat' and
+          this_target_position is not none %}\n  {{ this_target_position | int }}\n{%
+          else %}\n  {{ none }}\n{% endif %}"
+    - choose:
+      - conditions:
         - condition: template
-          value_template: "{{ not this_auto_override_active }}"
-
+          value_template: '{{ this_auto_override_active }}'
+        sequence:
         - choose:
-            - conditions:
-                - condition: template
-                  value_template: "{{ debug_verbose }}"
-                - condition: template
-                  value_template: "{{ this_target_position is none }}"
-              sequence:
-                - service: logbook.log
-                  data:
-                    name: "Adaptive Shades"
-                    message: >-
-                      No movement: target=none | cover={{ this_cover }} | sun_on_window={{ sun_on_window }} | direct_sun={{ direct_sun_detected }} | mode_temp={{ mode_temp }} (v{{ blueprint_version }})
-                    domain: cover
-
-        - choose:
-            - conditions:
-                - condition: template
-                  value_template: "{{ debug_verbose }}"
-                - condition: template
-                  value_template: >-
-                    {% if cover_supports_tilt and shading_mode == 'slat' %}
-                      {{ this_target_tilt is not none and this_current_tilt is not none and (this_current_tilt - this_target_tilt) | abs < position_hysteresis }}
-                    {% else %}
-                      {{ this_current_position is not none and this_target_position is not none and (this_current_position - this_target_position) | abs < position_hysteresis }}
-                    {% endif %}
-              sequence:
-                - service: logbook.log
-                  data:
-                    name: "Adaptive Shades"
-                    message: >-
-                      No movement: below hysteresis | cover={{ this_cover }} | current={{ this_current_position }} | target={{ this_target_position }} (v{{ blueprint_version }})
-                    domain: cover
-
+          - conditions:
+            - condition: template
+              value_template: '{{ debug_basic }}'
+            sequence:
+            - service: logbook.log
+              data:
+                name: Adaptive Shades
+                message: 'Paused: manual adjustment timeout | cover={{ this_cover
+                  }} (v{{ blueprint_version }})'
+                domain: cover
+    - condition: template
+      value_template: '{{ not this_auto_override_active }}'
+    - choose:
+      - conditions:
         - condition: template
-          value_template: "{{ this_target_position is not none }}"
+          value_template: '{{ debug_verbose }}'
         - condition: template
-          value_template: >-
-            {% if cover_supports_tilt and shading_mode == 'slat' %}
-              {{ this_target_tilt is not none and (this_current_tilt is none or (this_current_tilt - this_target_tilt) | abs >= position_hysteresis) }}
-            {% else %}
-              {{ this_current_position is none or (this_current_position - this_target_position) | abs >= position_hysteresis }}
-            {% endif %}
-
+          value_template: '{{ this_target_position is none }}'
+        sequence:
+        - service: logbook.log
+          data:
+            name: Adaptive Shades
+            message: 'No movement: target=none | cover={{ this_cover }} | sun_on_window={{
+              sun_on_window }} | direct_sun={{ direct_sun_detected }} | mode_temp={{
+              mode_temp }} (v{{ blueprint_version }})'
+            domain: cover
+    - choose:
+      - conditions:
+        - condition: template
+          value_template: '{{ debug_verbose }}'
+        - condition: template
+          value_template: "{% if cover_supports_tilt and shading_mode == 'slat' %}\n
+            \ {{ this_target_tilt is not none and this_current_tilt is not none and
+            (this_current_tilt - this_target_tilt) | abs < position_hysteresis }}\n{%
+            else %}\n  {{ this_current_position is not none and this_target_position
+            is not none and (this_current_position - this_target_position) | abs <
+            position_hysteresis }}\n{% endif %}"
+        sequence:
+        - service: logbook.log
+          data:
+            name: Adaptive Shades
+            message: 'No movement: below hysteresis | cover={{ this_cover }} | current={{
+              this_current_position }} | target={{ this_target_position }} (v{{ blueprint_version
+              }})'
+            domain: cover
+    - condition: template
+      value_template: '{{ this_target_position is not none }}'
+    - condition: template
+      value_template: "{% if cover_supports_tilt and shading_mode == 'slat' %}\n  {{
+        this_target_tilt is not none and (this_current_tilt is none or (this_current_tilt
+        - this_target_tilt) | abs >= position_hysteresis) }}\n{% else %}\n  {{ this_current_position
+        is none or (this_current_position - this_target_position) | abs >= position_hysteresis
+        }}\n{% endif %}"
+    - choose:
+      - conditions:
+        - condition: template
+          value_template: '{{ is_state(this_cover, ''unavailable'') or is_state(this_cover,
+            ''unknown'') }}'
+        sequence:
+        - service: logbook.log
+          data:
+            name: Adaptive Shades
+            message: 'No movement: cover unavailable | cover={{ this_cover }} (v{{
+              blueprint_version }})'
+            domain: cover
+      - conditions:
+        - condition: template
+          value_template: '{{ is_state(this_cover, ''opening'') or is_state(this_cover,
+            ''closing'') }}'
+        sequence:
         - choose:
-            - conditions:
-                - condition: template
-                  value_template: "{{ is_state(this_cover, 'unavailable') or is_state(this_cover, 'unknown') }}"
-              sequence:
-                - service: logbook.log
-                  data:
-                    name: "Adaptive Shades"
-                    message: "No movement: cover unavailable | cover={{ this_cover }} (v{{ blueprint_version }})"
-                    domain: cover
-            - conditions:
-                - condition: template
-                  value_template: "{{ is_state(this_cover, 'opening') or is_state(this_cover, 'closing') }}"
-              sequence:
-                - choose:
-                    - conditions:
-                        - condition: template
-                          value_template: "{{ debug_verbose }}"
-                      sequence:
-                        - service: logbook.log
-                          data:
-                            name: "Adaptive Shades"
-                            message: "Waiting: cover is moving | cover={{ this_cover }} (v{{ blueprint_version }})"
-                            domain: cover
-            - conditions: []
-              sequence:
-                # Record command timestamp BEFORE sending command (for manual detection)
-                - choose:
-                    - conditions: "{{ last_command_helper not in ['', none] }}"
-                      sequence:
-                        - service: input_datetime.set_datetime
-                          target:
-                            entity_id: "{{ last_command_helper }}"
-                          data:
-                            datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
-                - choose:
-                    - conditions: "{{ cover_supports_tilt and shading_mode == 'slat' }}"
-                      sequence:
-                        - service: cover.set_cover_tilt_position
-                          target:
-                            entity_id: "{{ this_cover }}"
-                          data:
-                            tilt_position: "{{ this_target_tilt | int }}"
-                    - conditions: []
-                      sequence:
-                        - service: cover.set_cover_position
-                          target:
-                            entity_id: "{{ this_cover }}"
-                          data:
-                            position: "{{ this_target_position | int }}"
-                - condition: template
-                  value_template: "{{ debug_basic }}"
-                - service: logbook.log
-                  data:
-                    name: "Adaptive Shades"
-                    message: >-
-                      Shade set: {{ this_cover }}={{ this_target_position | int }}% | sun_on_window={{ sun_on_window }} | heating={{ heating_needed }} | cooling={{ cooling_needed }} | glare={{ glare_detected }} | az={{ sun_azimuth | round(1) }}° | el={{ sun_elevation | round(1) }}° (v{{ blueprint_version }})
-                    domain: cover
-
+          - conditions:
+            - condition: template
+              value_template: '{{ debug_verbose }}'
+            sequence:
+            - service: logbook.log
+              data:
+                name: Adaptive Shades
+                message: 'Waiting: cover is moving | cover={{ this_cover }} (v{{ blueprint_version
+                  }})'
+                domain: cover
+      - conditions: []
+        sequence:
+        - choose:
+          - conditions: '{{ last_command_helper not in ['''', none] }}'
+            sequence:
+            - service: input_datetime.set_datetime
+              target:
+                entity_id: '{{ last_command_helper }}'
+              data:
+                datetime: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
+        - choose:
+          - conditions: '{{ cover_supports_tilt and shading_mode == ''slat'' }}'
+            sequence:
+            - service: cover.set_cover_tilt_position
+              target:
+                entity_id: '{{ this_cover }}'
+              data:
+                tilt_position: '{{ this_target_tilt | int }}'
+          - conditions: []
+            sequence:
+            - service: cover.set_cover_position
+              target:
+                entity_id: '{{ this_cover }}'
+              data:
+                position: '{{ this_target_position | int }}'
+        - condition: template
+          value_template: '{{ debug_basic }}'
+        - service: logbook.log
+          data:
+            name: Adaptive Shades
+            message: 'Shade set: {{ this_cover }}={{ this_target_position | int }}%
+              | sun_on_window={{ sun_on_window }} | heating={{ heating_needed }} |
+              cooling={{ cooling_needed }} | glare={{ glare_detected }} | az={{ sun_azimuth
+              | round(1) }}° | el={{ sun_elevation | round(1) }}° (v{{ blueprint_version
+              }})'
+            domain: cover
 mode: restart
