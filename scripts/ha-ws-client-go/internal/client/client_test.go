@@ -674,22 +674,37 @@ func TestClient_Done(t *testing.T) {
 
 func TestClient_ReadLoop_InvalidJSON(t *testing.T) {
 	server := testServer(t, func(conn *websocket.Conn) {
-		// Send invalid JSON
-		err := conn.WriteMessage(websocket.TextMessage, []byte("not json"))
-		require.NoError(t, err)
+		// Wait for the client's request first
+		_, data, readErr := conn.ReadMessage()
+		if readErr != nil {
+			return
+		}
 
-		// Send valid message after
+		// Parse request to get ID
+		var req map[string]any
+		if unmarshalErr := json.Unmarshal(data, &req); unmarshalErr != nil {
+			return
+		}
+		idVal, ok := req["id"].(float64)
+		if !ok {
+			return
+		}
+		id := int(idVal)
+
+		// Send invalid JSON first
+		writeErr := conn.WriteMessage(websocket.TextMessage, []byte("not json"))
+		require.NoError(t, writeErr)
+
+		// Send valid response with matching ID
 		success := true
 		resp := types.HAMessage{
-			ID:      1,
+			ID:      id,
 			Type:    "result",
 			Success: &success,
 			Result:  "ok",
 		}
-		err = conn.WriteJSON(resp)
-		require.NoError(t, err)
-
-		time.Sleep(200 * time.Millisecond)
+		writeErr = conn.WriteJSON(resp)
+		require.NoError(t, writeErr)
 	})
 	defer server.Close()
 
