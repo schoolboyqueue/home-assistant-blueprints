@@ -139,6 +139,11 @@ func buildUpdateCommand() *cli.Command {
 				Aliases: []string{"c"},
 				Usage:   "Only check for updates, don't install",
 			},
+			&cli.BoolFlag{
+				Name:    "list",
+				Aliases: []string{"l"},
+				Usage:   "List all available versions",
+			},
 			&cli.StringFlag{
 				Name:    "version",
 				Aliases: []string{"v"},
@@ -152,6 +157,7 @@ func buildUpdateCommand() *cli.Command {
 // runUpdate handles the update command (bypasses WebSocket connection).
 func runUpdate(_ context.Context, cmd *cli.Command) error {
 	checkOnly := cmd.Bool("check")
+	listVersions := cmd.Bool("list")
 	targetVersion := cmd.String("version")
 
 	updater, err := selfupdate.NewUpdater(
@@ -164,6 +170,10 @@ func runUpdate(_ context.Context, cmd *cli.Command) error {
 		return cli.Exit(fmt.Sprintf("Error: %v", err), 1)
 	}
 
+	if listVersions {
+		return runListVersions(updater)
+	}
+
 	if checkOnly {
 		return runUpdateCheck(updater)
 	}
@@ -173,6 +183,18 @@ func runUpdate(_ context.Context, cmd *cli.Command) error {
 	}
 
 	return runUpdateInstall(updater)
+}
+
+// runListVersions lists all available versions from GitHub.
+func runListVersions(updater *selfupdate.Updater) error {
+	if err := updater.PrintAvailableVersions(); err != nil {
+		var rateLimitErr *selfupdate.RateLimitError
+		if errors.As(err, &rateLimitErr) {
+			return cli.Exit(fmt.Sprintf("Error: %v\nPlease wait and try again later.", rateLimitErr), 1)
+		}
+		return cli.Exit(fmt.Sprintf("Error listing versions: %v", err), 1)
+	}
+	return nil
 }
 
 // runUpdateCheck checks for updates and displays version information.

@@ -72,6 +72,9 @@ make build-all
 # Check for updates
 ./build/validate-blueprint update --check
 
+# List all available versions
+./build/validate-blueprint update --list
+
 # Update to the latest version
 ./build/validate-blueprint update
 

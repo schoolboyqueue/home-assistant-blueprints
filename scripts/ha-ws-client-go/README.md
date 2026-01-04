@@ -166,6 +166,7 @@ ha-ws-client stats-multi sensor.temp_kitchen sensor.temp_bedroom sensor.temp_liv
 |---------|-------------|
 | `update` | Check for and install the latest version |
 | `update --check` | Check for updates without installing |
+| `update --list` | List all available versions |
 | `update --version <version>` | Install a specific version (e.g., `1.6.0`) |
 
 ## Output Formats

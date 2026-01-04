@@ -395,6 +395,31 @@ func (u *Updater) ListAvailableVersions() ([]string, error) {
 	return versions, nil
 }
 
+// PrintAvailableVersions lists all available versions to the configured output.
+// It marks the current version with "(current)" suffix.
+func (u *Updater) PrintAvailableVersions() error {
+	versions, err := u.ListAvailableVersions()
+	if err != nil {
+		return err
+	}
+
+	if len(versions) == 0 {
+		fmt.Fprintln(u.output, "No versions available.")
+		return nil
+	}
+
+	fmt.Fprintf(u.output, "Available versions (%d):\n", len(versions))
+	for _, v := range versions {
+		if v == u.CurrentVersion {
+			fmt.Fprintf(u.output, "  - %s (current)\n", v)
+		} else {
+			fmt.Fprintf(u.output, "  - %s\n", v)
+		}
+	}
+
+	return nil
+}
+
 // extractVersionForRelease extracts the version for this tool from a release.
 // Requires versions.json asset in the release.
 func (u *Updater) extractVersionForRelease(release *Release) (string, error) {

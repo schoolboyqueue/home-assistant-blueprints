@@ -590,3 +590,133 @@ func TestUpdateError_NoVersion(t *testing.T) {
 		t.Errorf("Error() = %q, want %q", err.Error(), expected)
 	}
 }
+
+func TestUpdater_PrintAvailableVersions(t *testing.T) {
+	versionsJSON160 := `{"ha-ws-client-go": "1.6.0"}`
+	versionsJSON154 := `{"ha-ws-client-go": "1.5.4"}`
+	versionsJSON153 := `{"ha-ws-client-go": "1.5.3"}`
+
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/test/test/releases":
+			releases := []Release{
+				{
+					TagName: "v1.6.0",
+					Assets: []Asset{
+						{Name: "ha-ws-client-linux-amd64", BrowserDownloadURL: "https://example.com/binary"},
+						{Name: "versions.json", BrowserDownloadURL: server.URL + "/versions-1.6.0.json"},
+					},
+				},
+				{
+					TagName: "v1.5.4",
+					Assets: []Asset{
+						{Name: "ha-ws-client-linux-amd64", BrowserDownloadURL: "https://example.com/binary"},
+						{Name: "versions.json", BrowserDownloadURL: server.URL + "/versions-1.5.4.json"},
+					},
+				},
+				{
+					TagName: "v1.5.3",
+					Assets: []Asset{
+						{Name: "ha-ws-client-linux-amd64", BrowserDownloadURL: "https://example.com/binary"},
+						{Name: "versions.json", BrowserDownloadURL: server.URL + "/versions-1.5.3.json"},
+					},
+				},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(releases)
+		case "/versions-1.6.0.json":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(versionsJSON160))
+		case "/versions-1.5.4.json":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(versionsJSON154))
+		case "/versions-1.5.3.json":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(versionsJSON153))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client := NewGitHubClient(
+		WithBaseURL(server.URL),
+		WithRepository("test", "test"),
+	)
+
+	var buf bytes.Buffer
+	u, err := NewUpdater("ha-ws-client", "ha-ws-client-go", "1.5.4",
+		WithGitHubClient(client),
+		WithOutput(&buf),
+	)
+	if err != nil {
+		t.Fatalf("NewUpdater() error = %v", err)
+	}
+
+	err = u.PrintAvailableVersions()
+	if err != nil {
+		t.Fatalf("PrintAvailableVersions() error = %v", err)
+	}
+
+	output := buf.String()
+
+	// Check header
+	if !bytes.Contains([]byte(output), []byte("Available versions (3):")) {
+		t.Errorf("output should contain version count header, got: %s", output)
+	}
+
+	// Check all versions are listed
+	if !bytes.Contains([]byte(output), []byte("1.6.0")) {
+		t.Errorf("output should contain 1.6.0, got: %s", output)
+	}
+	if !bytes.Contains([]byte(output), []byte("1.5.4 (current)")) {
+		t.Errorf("output should mark 1.5.4 as current, got: %s", output)
+	}
+	if !bytes.Contains([]byte(output), []byte("1.5.3")) {
+		t.Errorf("output should contain 1.5.3, got: %s", output)
+	}
+}
+
+func TestUpdater_PrintAvailableVersions_NoVersions(t *testing.T) {
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/test/test/releases":
+			// Return releases without versions.json
+			releases := []Release{
+				{
+					TagName: "v1.6.0",
+					Assets: []Asset{
+						{Name: "ha-ws-client-linux-amd64", BrowserDownloadURL: "https://example.com/binary"},
+						// No versions.json
+					},
+				},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(releases)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client := NewGitHubClient(
+		WithBaseURL(server.URL),
+		WithRepository("test", "test"),
+	)
+
+	var buf bytes.Buffer
+	u, err := NewUpdater("ha-ws-client", "ha-ws-client-go", "1.5.4",
+		WithGitHubClient(client),
+		WithOutput(&buf),
+	)
+	if err != nil {
+		t.Fatalf("NewUpdater() error = %v", err)
+	}
+
+	err = u.PrintAvailableVersions()
+	if err == nil {
+		t.Fatal("PrintAvailableVersions() should return error when no versions found")
+	}
+}
