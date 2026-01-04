@@ -372,8 +372,8 @@ func TestUpdater_UpdateWithVerification(t *testing.T) {
 	// Override getBinaryPath to use our test binary
 	// Since we can't easily mock os.Executable(), we'll test the components individually
 
-	// Test download function
-	tempPath, err := u.download(server.URL+"/binary", int64(len(binaryContent)))
+	// Test download function (use system temp dir for test)
+	tempPath, err := u.download(server.URL+"/binary", int64(len(binaryContent)), os.TempDir())
 	if err != nil {
 		t.Fatalf("download() error = %v", err)
 	}

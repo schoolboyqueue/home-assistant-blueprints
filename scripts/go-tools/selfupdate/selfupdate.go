@@ -207,8 +207,9 @@ func (u *Updater) UpdateToVersion(version string) error {
 		return NewUpdateError("replace", u.ToolName, targetVersion, err)
 	}
 
-	// Download to temp file
-	tempPath, err := u.download(asset.BrowserDownloadURL, asset.Size)
+	// Download to temp file in same directory as binary (for atomic rename)
+	targetDir := filepath.Dir(binaryPath)
+	tempPath, err := u.download(asset.BrowserDownloadURL, asset.Size, targetDir)
 	if err != nil {
 		return NewUpdateError("download", u.ToolName, targetVersion, err)
 	}
@@ -269,8 +270,9 @@ func (u *Updater) checkWritable(dir string) error {
 	return os.Remove(testFile)
 }
 
-// download downloads the binary from the given URL to a temp file.
-func (u *Updater) download(url string, size int64) (string, error) {
+// download downloads the binary from the given URL to a temp file in the target directory.
+// The target directory should be the same filesystem as the final destination to enable atomic rename.
+func (u *Updater) download(url string, size int64, targetDir string) (string, error) {
 	client := &http.Client{Timeout: u.downloadTimeout}
 
 	req, err := http.NewRequest(http.MethodGet, url, nil)
@@ -289,9 +291,8 @@ func (u *Updater) download(url string, size int64) (string, error) {
 		return "", &DownloadError{URL: url, StatusCode: resp.StatusCode}
 	}
 
-	// Create temp file in the same directory as the binary (for atomic rename)
-	// Using system temp dir instead to avoid permission issues during download
-	tempFile, err := os.CreateTemp("", "selfupdate-*")
+	// Create temp file in the target directory (same filesystem for atomic rename)
+	tempFile, err := os.CreateTemp(targetDir, ".selfupdate-*")
 	if err != nil {
 		return "", fmt.Errorf("creating temp file: %w", err)
 	}
@@ -322,6 +323,8 @@ func (u *Updater) download(url string, size int64) (string, error) {
 }
 
 // replaceBinary atomically replaces the current binary with the new one.
+// On Unix, this uses atomic rename. On Windows, we rename the old binary first
+// since a running exe can be renamed but not overwritten.
 func (u *Updater) replaceBinary(tempPath, binaryPath string) error {
 	// Get the current binary's permissions
 	info, err := os.Stat(binaryPath)
@@ -334,11 +337,18 @@ func (u *Updater) replaceBinary(tempPath, binaryPath string) error {
 		return fmt.Errorf("setting permissions: %w", err)
 	}
 
-	// On Windows, we can't rename over the running binary
-	// Try to rename the old binary first
+	// Strategy: rename old binary out of the way, then rename new binary into place.
+	// This works on both Unix and Windows:
+	// - Unix: allows atomic rename over existing file, but this approach also works
+	// - Windows: running exe can be renamed but not overwritten, so we must rename it first
 	oldPath := binaryPath + ".old"
+
+	// Remove any leftover .old file from previous updates
+	os.Remove(oldPath)
+
+	// Rename current binary to .old
 	if err := os.Rename(binaryPath, oldPath); err != nil {
-		// If rename fails (e.g., on Unix where this isn't needed), try direct rename
+		// On Unix, try direct rename (atomic overwrite)
 		if err := os.Rename(tempPath, binaryPath); err != nil {
 			return fmt.Errorf("replacing binary: %w", err)
 		}
@@ -348,12 +358,14 @@ func (u *Updater) replaceBinary(tempPath, binaryPath string) error {
 	// Move new binary into place
 	if err := os.Rename(tempPath, binaryPath); err != nil {
 		// Try to restore the old binary
-		os.Rename(oldPath, binaryPath)
+		if restoreErr := os.Rename(oldPath, binaryPath); restoreErr != nil {
+			return fmt.Errorf("replacing binary failed and could not restore: %w (restore error: %v)", err, restoreErr)
+		}
 		return fmt.Errorf("replacing binary: %w", err)
 	}
 
-	// Clean up old binary
-	os.Remove(oldPath)
+	// Clean up old binary (may fail on Windows if still running - that's ok)
+	_ = os.Remove(oldPath)
 
 	return nil
 }
