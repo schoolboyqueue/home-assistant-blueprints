@@ -31,6 +31,9 @@ BUILD_TIME := $(shell date -u '+%Y-%m-%d_%H:%M:%S')
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 LDFLAGS := -ldflags "-s -w -X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME) -X main.GitCommit=$(GIT_COMMIT)"
 
+# ARM version for selfupdate package (set per-target for ARM builds)
+SELFUPDATE_PKG := github.com/home-assistant-blueprints/selfupdate
+
 # Go parameters
 GOCMD := go
 GOBUILD := $(GOCMD) build
@@ -243,13 +246,13 @@ build-linux-arm64:
 .PHONY: build-linux-armv7
 build-linux-armv7:
 	@mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-armv7 $(BUILD_PATH)
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 $(GOBUILD) -ldflags "-s -w -X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME) -X main.GitCommit=$(GIT_COMMIT) -X $(SELFUPDATE_PKG).ArmVersion=7" -o $(BUILD_DIR)/$(BINARY_NAME)-linux-armv7 $(BUILD_PATH)
 
 # Build for Linux ARM v6 (Raspberry Pi Zero, Pi 1)
 .PHONY: build-linux-armv6
 build-linux-armv6:
 	@mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=6 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-armv6 $(BUILD_PATH)
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=6 $(GOBUILD) -ldflags "-s -w -X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME) -X main.GitCommit=$(GIT_COMMIT) -X $(SELFUPDATE_PKG).ArmVersion=6" -o $(BUILD_DIR)/$(BINARY_NAME)-linux-armv6 $(BUILD_PATH)
 
 # Build for macOS AMD64
 .PHONY: build-darwin-amd64

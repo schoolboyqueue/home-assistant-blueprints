@@ -5,6 +5,20 @@ All notable changes to ha-ws-client-go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-01-04
+
+### Added
+
+- Add `update` command for self-updating the binary from GitHub releases
+  - `update --check` to check for available updates
+  - `update --version=X.Y.Z` to install a specific version
+  - `update` to install the latest version
+- Add shared `selfupdate` package in `scripts/go-tools/selfupdate` for update functionality
+
+### Changed
+
+- Update build system to embed ARM version for correct binary selection on ARM platforms
+
 ## [1.5.4] - 2026-01-03
 
 ### Fixed

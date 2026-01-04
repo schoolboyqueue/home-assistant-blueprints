@@ -18,6 +18,7 @@ import (
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/handlers"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/output"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/shutdown"
+	"github.com/home-assistant-blueprints/selfupdate"
 )
 
 // Version information - set by ldflags during build
@@ -108,7 +109,7 @@ func main() {
 func buildCommands() []*cli.Command {
 	// Get all registered commands from the handlers package
 	registeredCmds := handlers.GetAllCommands()
-	commands := make([]*cli.Command, 0, len(registeredCmds))
+	commands := make([]*cli.Command, 0, len(registeredCmds)+1) // +1 for update command
 
 	for _, cmd := range registeredCmds {
 		commands = append(commands, &cli.Command{
@@ -120,7 +121,164 @@ func buildCommands() []*cli.Command {
 		})
 	}
 
+	// Add update command (bypasses WebSocket handler wrapper)
+	commands = append(commands, buildUpdateCommand())
+
 	return commands
+}
+
+// buildUpdateCommand creates the update command that doesn't require WebSocket connection.
+func buildUpdateCommand() *cli.Command {
+	return &cli.Command{
+		Name:     "update",
+		Usage:    "Check for and install updates",
+		Category: "Utility",
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:    "check",
+				Aliases: []string{"c"},
+				Usage:   "Only check for updates, don't install",
+			},
+			&cli.StringFlag{
+				Name:    "version",
+				Aliases: []string{"v"},
+				Usage:   "Install a specific version (e.g., 1.6.0)",
+			},
+		},
+		Action: runUpdate,
+	}
+}
+
+// runUpdate handles the update command (bypasses WebSocket connection).
+func runUpdate(_ context.Context, cmd *cli.Command) error {
+	checkOnly := cmd.Bool("check")
+	targetVersion := cmd.String("version")
+
+	updater, err := selfupdate.NewUpdater(
+		"ha-ws-client",
+		"ha-ws-client-go",
+		Version,
+		selfupdate.WithOutput(os.Stderr),
+	)
+	if err != nil {
+		return cli.Exit(fmt.Sprintf("Error: %v", err), 1)
+	}
+
+	if checkOnly {
+		return runUpdateCheck(updater)
+	}
+
+	if targetVersion != "" {
+		return runUpdateToVersion(updater, targetVersion)
+	}
+
+	return runUpdateInstall(updater)
+}
+
+// runUpdateCheck checks for updates and displays version information.
+func runUpdateCheck(updater *selfupdate.Updater) error {
+	result, err := updater.Check()
+	if err != nil {
+		// Handle specific error types with user-friendly messages
+		var rateLimitErr *selfupdate.RateLimitError
+		if errors.As(err, &rateLimitErr) {
+			return cli.Exit(fmt.Sprintf("Error: %v\nPlease wait and try again later.", rateLimitErr), 1)
+		}
+		return cli.Exit(fmt.Sprintf("Error checking for updates: %v", err), 1)
+	}
+
+	fmt.Printf("Current version: %s\n", result.CurrentVersion)
+	fmt.Printf("Latest version:  %s\n", result.LatestVersion)
+
+	if result.UpdateAvailable {
+		fmt.Printf("\nA new version is available! Run 'ha-ws-client update' to install.\n")
+	} else {
+		fmt.Printf("\nYou are running the latest version.\n")
+	}
+
+	return nil
+}
+
+// runUpdateToVersion downloads and installs a specific version.
+func runUpdateToVersion(updater *selfupdate.Updater, version string) error {
+	// Check if version exists and show warning for downgrades
+	result, err := updater.Check()
+	if err != nil {
+		var rateLimitErr *selfupdate.RateLimitError
+		if errors.As(err, &rateLimitErr) {
+			return cli.Exit(fmt.Sprintf("Error: %v\nPlease wait and try again later.", rateLimitErr), 1)
+		}
+		return cli.Exit(fmt.Sprintf("Error checking for updates: %v", err), 1)
+	}
+
+	// Warn if downgrading
+	if result.CurrentVersion != "dev" && version < result.CurrentVersion {
+		fmt.Printf("Warning: Installing older version %s (current: %s)\n", version, result.CurrentVersion)
+	}
+
+	fmt.Printf("Installing version %s...\n", version)
+
+	if err := updater.UpdateToVersion(version); err != nil {
+		if errors.Is(err, selfupdate.ErrVersionNotFound) {
+			// List available versions to help user
+			versions, listErr := updater.ListAvailableVersions()
+			if listErr == nil && len(versions) > 0 {
+				fmt.Printf("\nAvailable versions:\n")
+				for _, v := range versions {
+					fmt.Printf("  - %s\n", v)
+				}
+			}
+			return cli.Exit(fmt.Sprintf("Error: Version %s not found.", version), 1)
+		}
+		if errors.Is(err, selfupdate.ErrPermissionDenied) {
+			return cli.Exit("Error: Permission denied. Try running with elevated privileges.", 1)
+		}
+		if errors.Is(err, selfupdate.ErrChecksumMismatch) {
+			return cli.Exit("Error: Downloaded file verification failed. Please try again.", 1)
+		}
+		return cli.Exit(fmt.Sprintf("Error updating: %v", err), 1)
+	}
+
+	fmt.Printf("\nSuccessfully installed version %s!\n", version)
+	return nil
+}
+
+// runUpdateInstall downloads and installs the latest version.
+func runUpdateInstall(updater *selfupdate.Updater) error {
+	// First check if update is available
+	result, err := updater.Check()
+	if err != nil {
+		var rateLimitErr *selfupdate.RateLimitError
+		if errors.As(err, &rateLimitErr) {
+			return cli.Exit(fmt.Sprintf("Error: %v\nPlease wait and try again later.", rateLimitErr), 1)
+		}
+		return cli.Exit(fmt.Sprintf("Error checking for updates: %v", err), 1)
+	}
+
+	if !result.UpdateAvailable {
+		fmt.Printf("Already at latest version (%s).\n", result.CurrentVersion)
+		return nil
+	}
+
+	fmt.Printf("Updating from %s to %s...\n", result.CurrentVersion, result.LatestVersion)
+
+	if err := updater.Update(); err != nil {
+		// Handle specific error types
+		if errors.Is(err, selfupdate.ErrAlreadyLatest) {
+			fmt.Printf("Already at latest version (%s).\n", result.CurrentVersion)
+			return nil
+		}
+		if errors.Is(err, selfupdate.ErrPermissionDenied) {
+			return cli.Exit("Error: Permission denied. Try running with elevated privileges.", 1)
+		}
+		if errors.Is(err, selfupdate.ErrChecksumMismatch) {
+			return cli.Exit("Error: Downloaded file verification failed. Please try again.", 1)
+		}
+		return cli.Exit(fmt.Sprintf("Error updating: %v", err), 1)
+	}
+
+	fmt.Printf("\nSuccessfully updated to version %s!\n", result.LatestVersion)
+	return nil
 }
 
 // wrapHandler wraps a handlers.Context function into a cli.ActionFunc

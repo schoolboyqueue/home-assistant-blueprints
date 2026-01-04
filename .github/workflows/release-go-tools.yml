@@ -208,7 +208,12 @@ jobs:
           VERSION: ${{ needs.determine-builds.outputs.validator_version }}
         run: |
           cd scripts/validate-blueprint-go
-          go build -ldflags "-s -w -X main.Version=$VERSION -X main.BuildTime=$(date -u '+%Y-%m-%d_%H:%M:%S') -X main.GitCommit=${GITHUB_SHA::7}" -o ../../dist/validate-blueprint-${{ matrix.suffix }}${{ matrix.ext }} .
+          LDFLAGS="-s -w -X main.Version=$VERSION -X main.BuildTime=$(date -u '+%Y-%m-%d_%H:%M:%S') -X main.GitCommit=${GITHUB_SHA::7}"
+          # Add ARM version for selfupdate package on ARM builds
+          if [ -n "$GOARM" ]; then
+            LDFLAGS="$LDFLAGS -X github.com/home-assistant-blueprints/selfupdate.ArmVersion=$GOARM"
+          fi
+          go build -ldflags "$LDFLAGS" -o ../../dist/validate-blueprint-${{ matrix.suffix }}${{ matrix.ext }} .
 
       - name: Build ha-ws-client
         if: needs.determine-builds.outputs.build_client == 'true'
@@ -220,7 +225,12 @@ jobs:
           VERSION: ${{ needs.determine-builds.outputs.client_version }}
         run: |
           cd scripts/ha-ws-client-go
-          go build -ldflags "-s -w -X main.Version=$VERSION -X main.BuildTime=$(date -u '+%Y-%m-%d_%H:%M:%S') -X main.GitCommit=${GITHUB_SHA::7}" -o ../../dist/ha-ws-client-${{ matrix.suffix }}${{ matrix.ext }} ./cmd/ha-ws-client
+          LDFLAGS="-s -w -X main.Version=$VERSION -X main.BuildTime=$(date -u '+%Y-%m-%d_%H:%M:%S') -X main.GitCommit=${GITHUB_SHA::7}"
+          # Add ARM version for selfupdate package on ARM builds
+          if [ -n "$GOARM" ]; then
+            LDFLAGS="$LDFLAGS -X github.com/home-assistant-blueprints/selfupdate.ArmVersion=$GOARM"
+          fi
+          go build -ldflags "$LDFLAGS" -o ../../dist/ha-ws-client-${{ matrix.suffix }}${{ matrix.ext }} ./cmd/ha-ws-client
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
