@@ -36,9 +36,10 @@ validate-blueprint-go/
 ├── go.mod                       # Go module definition
 ├── go.sum                       # Dependency checksums
 ├── Makefile                     # Build, format, lint, test targets
-├── .golangci.yml                # Linter configuration
-├── .editorconfig                # Editor settings
+├── CHANGELOG.md                 # Version history (Keep a Changelog format)
 ├── README.md                    # User documentation
+├── .editorconfig                # Editor settings
+├── ../.golangci.yml             # Shared linter config (at scripts/ level)
 └── build/                       # Build output directory (created by make build)
     └── validate-blueprint       # Built binary
 ```
@@ -267,9 +268,10 @@ Binary sizes are ~5-8MB (vs ~50MB+ for Node.js equivalent).
 
 | Change Type | Files to Update |
 |-------------|-----------------|
-| New validation check | README.md (What It Checks tables), CLAUDE.md (Validation Flow) |
+| New validation check | README.md (What It Checks tables), CLAUDE.md (Validation Flow), CHANGELOG.md |
 | New internal package | README.md + CLAUDE.md (Architecture sections), CLAUDE.md (Package Structure), root README.md |
 | New validator file | README.md + CLAUDE.md (Architecture sections), CLAUDE.md (Package Structure table) |
-| Changed validation behavior | README.md (check descriptions), CLAUDE.md (examples) |
+| Changed validation behavior | README.md (check descriptions), CLAUDE.md (examples), CHANGELOG.md |
+| Version release | Makefile (VERSION), CHANGELOG.md (new entry with date) |
 
 Before committing structural changes, verify the Architecture and Package Structure sections in both README.md and CLAUDE.md reflect the current directory structure.

@@ -6,7 +6,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This repository contains production-ready Home Assistant Blueprints for home automation. Blueprints are YAML files with Jinja2 templating that define reusable automation templates for Home Assistant.
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+
 ## Commands
+
+### npm Scripts
+
+| Script | Description |
+|--------|-------------|
+| `npm run validate` | Validate all blueprints |
+| `npm run validate:single <path>` | Validate a single blueprint |
+| `npm run go:init` | Download Go dependencies |
+| `npm run go:tools` | Install Go dev tools (golangci-lint, gofumpt, goimports) |
+| `npm run go:build` | Build Go tools |
+| `npm run go:test` | Run Go tests |
+| `npm run go:lint` | Run Go linters |
+| `npm run go:format` | Format Go code |
+| `npm run go:vet` | Run go vet |
+| `npm run go:check` | Run all Go checks (format, lint, vet, test) |
+| `npm run go:clean` | Clean Go build artifacts |
+| `npm run docs:check` | Check docs with Biome |
+| `npm run docs:fix` | Fix docs issues with Biome |
 
 ### Validate Blueprints
 
@@ -180,12 +200,15 @@ The project website is served from `docs/` and must be kept in sync with bluepri
 | New Go tool internal package | Tool's README.md + CLAUDE.md (architecture sections), root README.md (structure) |
 | New workflow file | Root README.md (structure section) |
 | Changed directory structure | All README.md and CLAUDE.md files with architecture/structure sections |
+| New npm script | package.json, CLAUDE.md (npm Scripts table), CONTRIBUTING.md (Available npm Scripts) |
+| Contribution process change | CONTRIBUTING.md, CLAUDE.md if it affects documented workflows |
 
 ### Architecture Sections
 
 These files contain directory structure diagrams that must stay current:
 
 - `README.md` (root) - Repository structure
+- `CONTRIBUTING.md` - Development setup and npm scripts table
 - `scripts/ha-ws-client-go/README.md` - Architecture section
 - `scripts/ha-ws-client-go/CLAUDE.md` - Architecture section
 - `scripts/validate-blueprint-go/README.md` - Architecture section
