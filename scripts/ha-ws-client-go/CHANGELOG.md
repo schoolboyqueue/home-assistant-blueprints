@@ -5,6 +5,16 @@ All notable changes to ha-ws-client-go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.4] - 2026-01-03
+
+### Fixed
+
+- Add thread-safety to global output configuration with mutex locks to prevent race conditions in concurrent access
+
+### Added
+
+- Add unit tests for handlers with mock WebSocket client
+
 ## [1.5.3] - 2026-01-03
 
 ### Changed

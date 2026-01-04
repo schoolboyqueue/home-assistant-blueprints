@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -38,21 +39,30 @@ func DefaultConfig() *Config {
 	}
 }
 
-var globalConfig = DefaultConfig()
+var (
+	globalConfig   = DefaultConfig()
+	globalConfigMu sync.RWMutex
+)
 
 // GetConfig returns the current output configuration.
 func GetConfig() *Config {
+	globalConfigMu.RLock()
+	defer globalConfigMu.RUnlock()
 	return globalConfig
 }
 
 // SetConfig sets the output configuration.
 func SetConfig(cfg *Config) {
+	globalConfigMu.Lock()
+	defer globalConfigMu.Unlock()
 	globalConfig = cfg
 }
 
 // ConfigureFromFlags sets the output configuration from parsed CLI flags.
 // This integrates with the cli package's flag parsing.
 func ConfigureFromFlags(format string, noHeaders, noTimestamps, showAge bool, maxItems int) {
+	globalConfigMu.Lock()
+	defer globalConfigMu.Unlock()
 	switch format {
 	case "json":
 		globalConfig.Format = FormatJSON
@@ -80,16 +90,22 @@ type Result struct {
 
 // IsJSON returns true if JSON output mode is enabled.
 func IsJSON() bool {
+	globalConfigMu.RLock()
+	defer globalConfigMu.RUnlock()
 	return globalConfig.Format == FormatJSON
 }
 
 // IsCompact returns true if compact output mode is enabled.
 func IsCompact() bool {
+	globalConfigMu.RLock()
+	defer globalConfigMu.RUnlock()
 	return globalConfig.Format == FormatCompact
 }
 
 // ShowAge returns true if --show-age flag is set.
 func ShowAge() bool {
+	globalConfigMu.RLock()
+	defer globalConfigMu.RUnlock()
 	return globalConfig.ShowAge
 }
 
@@ -100,7 +116,11 @@ func Data(data any, opts ...Option) {
 		opt(o)
 	}
 
-	switch globalConfig.Format {
+	globalConfigMu.RLock()
+	cfg := *globalConfig
+	globalConfigMu.RUnlock()
+
+	switch cfg.Format {
 	case FormatJSON:
 		result := Result{Success: true, Data: data}
 		if o.command != "" {
@@ -120,7 +140,7 @@ func Data(data any, opts ...Option) {
 		}
 		printCompact(data)
 	default:
-		if o.summary != "" && globalConfig.ShowHeaders {
+		if o.summary != "" && cfg.ShowHeaders {
 			fmt.Println(o.summary)
 		}
 		printDefault(data)
@@ -129,7 +149,11 @@ func Data(data any, opts ...Option) {
 
 // Message outputs a simple message.
 func Message(msg string) {
-	switch globalConfig.Format {
+	globalConfigMu.RLock()
+	format := globalConfig.Format
+	globalConfigMu.RUnlock()
+
+	switch format {
 	case FormatJSON:
 		result := Result{Success: true, Message: msg}
 		jsonBytes, _ := json.Marshal(result)
@@ -142,7 +166,12 @@ func Message(msg string) {
 // Error outputs an error message.
 func Error(err error, code string) {
 	msg := err.Error()
-	switch globalConfig.Format {
+
+	globalConfigMu.RLock()
+	format := globalConfig.Format
+	globalConfigMu.RUnlock()
+
+	switch format {
 	case FormatJSON:
 		result := Result{Success: false, Error: msg}
 		jsonBytes, _ := json.Marshal(result)
@@ -169,7 +198,10 @@ func List[T any](items []T, opts ...ListOption[T]) {
 		opt(o)
 	}
 
-	cfg := globalConfig
+	globalConfigMu.RLock()
+	cfg := *globalConfig
+	globalConfigMu.RUnlock()
+
 	count := len(items)
 	displayItems := items
 	if cfg.MaxItems > 0 && count > cfg.MaxItems {
@@ -217,7 +249,11 @@ func List[T any](items []T, opts ...ListOption[T]) {
 
 // Entity outputs entity state data.
 func Entity(entityID, state string, attributes map[string]any) {
-	switch globalConfig.Format {
+	globalConfigMu.RLock()
+	format := globalConfig.Format
+	globalConfigMu.RUnlock()
+
+	switch format {
 	case FormatJSON:
 		data := map[string]any{
 			"entity_id":  entityID,
@@ -247,7 +283,10 @@ func Timeline[T any](entries []T, opts ...TimelineOption[T]) {
 		opt(o)
 	}
 
-	cfg := globalConfig
+	globalConfigMu.RLock()
+	cfg := *globalConfig
+	globalConfigMu.RUnlock()
+
 	count := len(entries)
 	displayEntries := entries
 	if cfg.MaxItems > 0 && count > cfg.MaxItems {
@@ -460,7 +499,11 @@ func printDefaultItem(item any) {
 
 // FormatTime formats a time for display.
 func FormatTime(t time.Time) string {
-	if globalConfig.Format == FormatCompact {
+	globalConfigMu.RLock()
+	format := globalConfig.Format
+	globalConfigMu.RUnlock()
+
+	if format == FormatCompact {
 		return t.Format(time.RFC3339)
 	}
 	return t.Local().Format("2006-01-02 15:04:05")

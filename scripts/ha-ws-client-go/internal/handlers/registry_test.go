@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/home-assistant-blueprints/testfixtures"
+
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
 
@@ -535,4 +537,302 @@ func BenchmarkMatchFields(b *testing.B) {
 		e := entries[i%len(entries)]
 		_ = matchFields(e)
 	}
+}
+
+// =====================================
+// Handler Integration Tests
+// =====================================
+
+func TestFilteredRegistryHandler_WithPattern(t *testing.T) {
+	t.Parallel()
+
+	// Create entity registry entries
+	entities := EntityRegistryResult(
+		testfixtures.NewEntityEntry("light.kitchen", "Kitchen Light", "hue"),
+		testfixtures.NewEntityEntry("light.bedroom", "Bedroom Light", "hue"),
+		testfixtures.NewEntityEntry("sensor.temperature", "Temperature", "esphome"),
+		testfixtures.NewEntityEntry("sensor.humidity", "Humidity", "esphome"),
+	)
+
+	router := NewMessageRouter(t).
+		OnSuccess("config/entity_registry/list", entities)
+
+	// Create pattern regex for "light.*"
+	pattern := regexp.MustCompile("(?i)light.*")
+	ctx, cleanup := NewTestContext(t, router,
+		WithHandlerConfig(&HandlerConfig{Pattern: pattern}))
+	defer cleanup()
+
+	// Capture output
+	_, restoreOutput := CaptureOutput()
+	defer restoreOutput()
+
+	// Create and call the handler
+	handler := FilteredRegistryHandler(RegistryConfig[types.EntityEntry]{
+		MessageType: "config/entity_registry/list",
+		Title:       "Entity registry",
+		Command:     "entities",
+		MatchFields: func(e types.EntityEntry) []string {
+			return []string{e.EntityID, e.Name, e.OriginalName}
+		},
+		Formatter: func(e types.EntityEntry, _ int) string {
+			return e.EntityID
+		},
+	})
+
+	err := handler(ctx)
+	assert.NoError(t, err)
+}
+
+func TestFilteredRegistryHandler_WithoutPattern(t *testing.T) {
+	t.Parallel()
+
+	// Create entity registry entries
+	entities := EntityRegistryResult(
+		testfixtures.NewEntityEntry("light.kitchen", "Kitchen Light", "hue"),
+		testfixtures.NewEntityEntry("sensor.temperature", "Temperature", "esphome"),
+	)
+
+	router := NewMessageRouter(t).
+		OnSuccess("config/entity_registry/list", entities)
+
+	// No pattern configured (nil Pattern)
+	ctx, cleanup := NewTestContext(t, router,
+		WithHandlerConfig(&HandlerConfig{}))
+	defer cleanup()
+
+	// Capture output
+	_, restoreOutput := CaptureOutput()
+	defer restoreOutput()
+
+	// Create and call the handler
+	handler := FilteredRegistryHandler(RegistryConfig[types.EntityEntry]{
+		MessageType: "config/entity_registry/list",
+		Title:       "Entity registry",
+		Command:     "entities",
+		MatchFields: func(e types.EntityEntry) []string {
+			return []string{e.EntityID, e.Name, e.OriginalName}
+		},
+		Formatter: func(e types.EntityEntry, _ int) string {
+			return e.EntityID
+		},
+	})
+
+	err := handler(ctx)
+	assert.NoError(t, err)
+}
+
+func TestFilteredRegistryHandler_ServerError(t *testing.T) {
+	t.Parallel()
+
+	router := NewMessageRouter(t).
+		OnError("config/entity_registry/list", "server_error", "Registry unavailable")
+
+	ctx, cleanup := NewTestContext(t, router,
+		WithHandlerConfig(&HandlerConfig{}))
+	defer cleanup()
+
+	handler := FilteredRegistryHandler(RegistryConfig[types.EntityEntry]{
+		MessageType: "config/entity_registry/list",
+		Title:       "Entity registry",
+		Command:     "entities",
+		MatchFields: func(e types.EntityEntry) []string {
+			return []string{e.EntityID}
+		},
+		Formatter: func(e types.EntityEntry, _ int) string {
+			return e.EntityID
+		},
+	})
+
+	err := handler(ctx)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "Registry unavailable")
+}
+
+func TestFilteredRegistryHandler_EmptyResult(t *testing.T) {
+	t.Parallel()
+
+	// Empty entity list
+	entities := EntityRegistryResult()
+
+	router := NewMessageRouter(t).
+		OnSuccess("config/entity_registry/list", entities)
+
+	ctx, cleanup := NewTestContext(t, router,
+		WithHandlerConfig(&HandlerConfig{}))
+	defer cleanup()
+
+	// Capture output
+	_, restoreOutput := CaptureOutput()
+	defer restoreOutput()
+
+	handler := FilteredRegistryHandler(RegistryConfig[types.EntityEntry]{
+		MessageType: "config/entity_registry/list",
+		Title:       "Entity registry",
+		Command:     "entities",
+		MatchFields: func(e types.EntityEntry) []string {
+			return []string{e.EntityID}
+		},
+		Formatter: func(e types.EntityEntry, _ int) string {
+			return e.EntityID
+		},
+	})
+
+	err := handler(ctx)
+	assert.NoError(t, err)
+}
+
+func TestFilteredRegistryHandler_PatternNoMatch(t *testing.T) {
+	t.Parallel()
+
+	// Create entities that won't match the pattern
+	entities := EntityRegistryResult(
+		testfixtures.NewEntityEntry("sensor.temperature", "Temperature", "esphome"),
+		testfixtures.NewEntityEntry("sensor.humidity", "Humidity", "esphome"),
+	)
+
+	router := NewMessageRouter(t).
+		OnSuccess("config/entity_registry/list", entities)
+
+	// Pattern that won't match any entities
+	pattern := regexp.MustCompile("(?i)light.*")
+	ctx, cleanup := NewTestContext(t, router,
+		WithHandlerConfig(&HandlerConfig{Pattern: pattern}))
+	defer cleanup()
+
+	// Capture output
+	_, restoreOutput := CaptureOutput()
+	defer restoreOutput()
+
+	handler := FilteredRegistryHandler(RegistryConfig[types.EntityEntry]{
+		MessageType: "config/entity_registry/list",
+		Title:       "Entity registry",
+		Command:     "entities",
+		MatchFields: func(e types.EntityEntry) []string {
+			return []string{e.EntityID, e.Name}
+		},
+		Formatter: func(e types.EntityEntry, _ int) string {
+			return e.EntityID
+		},
+	})
+
+	err := handler(ctx)
+	assert.NoError(t, err)
+}
+
+func TestHandleAreas_Success(t *testing.T) {
+	t.Parallel()
+
+	areas := AreaRegistryResult(
+		testfixtures.NewAreaEntry("living_room", "Living Room"),
+		testfixtures.NewAreaEntry("bedroom", "Master Bedroom"),
+		testfixtures.AreaEntry{
+			AreaID:  "kitchen",
+			Name:    "Kitchen",
+			Aliases: []string{"Cooking Area", "Food Prep"},
+		},
+	)
+
+	router := NewMessageRouter(t).
+		OnSuccess("config/area_registry/list", areas)
+
+	ctx, cleanup := NewTestContext(t, router)
+	defer cleanup()
+
+	// Capture output
+	_, restoreOutput := CaptureOutput()
+	defer restoreOutput()
+
+	err := HandleAreas(ctx)
+	assert.NoError(t, err)
+}
+
+func TestHandleAreas_EmptyResult(t *testing.T) {
+	t.Parallel()
+
+	areas := AreaRegistryResult()
+
+	router := NewMessageRouter(t).
+		OnSuccess("config/area_registry/list", areas)
+
+	ctx, cleanup := NewTestContext(t, router)
+	defer cleanup()
+
+	// Capture output
+	_, restoreOutput := CaptureOutput()
+	defer restoreOutput()
+
+	err := HandleAreas(ctx)
+	assert.NoError(t, err)
+}
+
+func TestHandleAreas_ServerError(t *testing.T) {
+	t.Parallel()
+
+	router := NewMessageRouter(t).
+		OnError("config/area_registry/list", "not_found", "Area registry not available")
+
+	ctx, cleanup := NewTestContext(t, router)
+	defer cleanup()
+
+	err := HandleAreas(ctx)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "Area registry not available")
+}
+
+func TestHandleEntities_Success(t *testing.T) {
+	t.Parallel()
+
+	entities := EntityRegistryResult(
+		testfixtures.NewEntityEntry("light.kitchen", "Kitchen Light", "hue"),
+		testfixtures.EntityEntry{
+			EntityID:     "switch.disabled",
+			Name:         "Disabled Switch",
+			OriginalName: "Old Switch",
+			Platform:     "zwave",
+			DisabledBy:   "user",
+		},
+	)
+
+	router := NewMessageRouter(t).
+		OnSuccess("config/entity_registry/list", entities)
+
+	ctx, cleanup := NewTestContext(t, router, WithArgs())
+	defer cleanup()
+
+	// Capture output
+	_, restoreOutput := CaptureOutput()
+	defer restoreOutput()
+
+	err := HandleEntities(ctx)
+	assert.NoError(t, err)
+}
+
+func TestHandleDevices_Success(t *testing.T) {
+	t.Parallel()
+
+	devices := DeviceRegistryResult(
+		testfixtures.NewDeviceEntry("abc123def456", "Hue Bridge", "Philips", "BSB002"),
+		testfixtures.DeviceEntry{
+			ID:           "xyz789abc012ghi345",
+			Name:         "Motion Sensor",
+			NameByUser:   "Front Door Motion",
+			Manufacturer: "Aqara",
+			Model:        "RTCGQ11LM",
+			AreaID:       "entry",
+		},
+	)
+
+	router := NewMessageRouter(t).
+		OnSuccess("config/device_registry/list", devices)
+
+	ctx, cleanup := NewTestContext(t, router, WithArgs())
+	defer cleanup()
+
+	// Capture output
+	_, restoreOutput := CaptureOutput()
+	defer restoreOutput()
+
+	err := HandleDevices(ctx)
+	assert.NoError(t, err)
 }

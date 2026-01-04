@@ -7,11 +7,15 @@ on:
     paths:
       - 'scripts/validate-blueprint-go/**'
       - 'scripts/ha-ws-client-go/**'
+      - 'scripts/testfixtures/**'
+      - 'scripts/.golangci.yml'
       - '.github/workflows/ci-go-tools.yml'
   pull_request:
     paths:
       - 'scripts/validate-blueprint-go/**'
       - 'scripts/ha-ws-client-go/**'
+      - 'scripts/testfixtures/**'
+      - 'scripts/.golangci.yml'
       - '.github/workflows/ci-go-tools.yml'
 
 jobs:

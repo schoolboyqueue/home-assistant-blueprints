@@ -5,6 +5,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/home-assistant-blueprints/testfixtures"
 
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
@@ -690,4 +693,1229 @@ func BenchmarkSysLogEntryGetMessage(b *testing.B) {
 		e := entries[i%len(entries)]
 		_ = e.GetMessage()
 	}
+}
+
+// =====================================
+// Handler Function Tests
+// =====================================
+
+func TestHandleLogbook(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns logbook entries successfully", func(t *testing.T) {
+		t.Parallel()
+
+		now := time.Now()
+		entries := []testfixtures.LogbookEntry{
+			testfixtures.NewLogbookEntry("light.kitchen", "on", "turned on", now.Add(-1*time.Hour)),
+			testfixtures.NewLogbookEntry("light.kitchen", "off", "turned off", now.Add(-30*time.Minute)),
+		}
+
+		router := NewMessageRouter(t).OnSuccess("logbook/get_events", entries)
+
+		timeRange := &types.TimeRange{
+			StartTime: now.Add(-24 * time.Hour),
+			EndTime:   now,
+		}
+		config := &HandlerConfig{
+			Args:      []string{"light.kitchen"},
+			TimeRange: timeRange,
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("logbook", "light.kitchen"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		// Capture output
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := handleLogbook(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("handles empty results", func(t *testing.T) {
+		t.Parallel()
+
+		router := NewMessageRouter(t).OnSuccess("logbook/get_events", []testfixtures.LogbookEntry{})
+
+		now := time.Now()
+		timeRange := &types.TimeRange{
+			StartTime: now.Add(-24 * time.Hour),
+			EndTime:   now,
+		}
+		config := &HandlerConfig{
+			Args:      []string{"light.nonexistent"},
+			TimeRange: timeRange,
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("logbook", "light.nonexistent"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := handleLogbook(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("returns error on client failure", func(t *testing.T) {
+		t.Parallel()
+
+		router := NewMessageRouter(t).OnError("logbook/get_events", "error", "connection failed")
+
+		now := time.Now()
+		timeRange := &types.TimeRange{
+			StartTime: now.Add(-24 * time.Hour),
+			EndTime:   now,
+		}
+		config := &HandlerConfig{
+			Args:      []string{"light.kitchen"},
+			TimeRange: timeRange,
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("logbook", "light.kitchen"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		err := handleLogbook(ctx)
+		require.Error(t, err)
+	})
+}
+
+func TestHandleHistory(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns history successfully", func(t *testing.T) {
+		t.Parallel()
+
+		now := time.Now()
+		historyStates := []testfixtures.HistoryState{
+			testfixtures.NewHistoryState("72.5", now.Add(-2*time.Hour)),
+			testfixtures.NewHistoryState("73.0", now.Add(-1*time.Hour)),
+			testfixtures.NewHistoryState("72.8", now),
+		}
+
+		result := HistoryResult("sensor.temperature", historyStates...)
+		router := NewMessageRouter(t).OnSuccess("history/history_during_period", result)
+
+		timeRange := &types.TimeRange{
+			StartTime: now.Add(-24 * time.Hour),
+			EndTime:   now,
+		}
+		config := &HandlerConfig{
+			Args:      []string{"sensor.temperature"},
+			TimeRange: timeRange,
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("history", "sensor.temperature"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := handleHistory(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("handles empty history", func(t *testing.T) {
+		t.Parallel()
+
+		result := HistoryResult("sensor.temperature")
+		router := NewMessageRouter(t).OnSuccess("history/history_during_period", result)
+
+		now := time.Now()
+		timeRange := &types.TimeRange{
+			StartTime: now.Add(-24 * time.Hour),
+			EndTime:   now,
+		}
+		config := &HandlerConfig{
+			Args:      []string{"sensor.temperature"},
+			TimeRange: timeRange,
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("history", "sensor.temperature"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := handleHistory(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("handles entity not in response", func(t *testing.T) {
+		t.Parallel()
+
+		// Response contains different entity than requested
+		result := map[string][]testfixtures.HistoryState{
+			"sensor.other": {},
+		}
+		router := NewMessageRouter(t).OnSuccess("history/history_during_period", result)
+
+		now := time.Now()
+		timeRange := &types.TimeRange{
+			StartTime: now.Add(-24 * time.Hour),
+			EndTime:   now,
+		}
+		config := &HandlerConfig{
+			Args:      []string{"sensor.temperature"},
+			TimeRange: timeRange,
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("history", "sensor.temperature"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := handleHistory(ctx)
+		require.NoError(t, err) // Should not error, just empty output
+	})
+
+	t.Run("returns error on client failure", func(t *testing.T) {
+		t.Parallel()
+
+		router := NewMessageRouter(t).OnError("history/history_during_period", "error", "server error")
+
+		now := time.Now()
+		timeRange := &types.TimeRange{
+			StartTime: now.Add(-24 * time.Hour),
+			EndTime:   now,
+		}
+		config := &HandlerConfig{
+			Args:      []string{"sensor.temperature"},
+			TimeRange: timeRange,
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("history", "sensor.temperature"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		err := handleHistory(ctx)
+		require.Error(t, err)
+	})
+}
+
+func TestHandleHistoryFull(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns history with attributes", func(t *testing.T) {
+		t.Parallel()
+
+		now := time.Now()
+		historyStates := []testfixtures.HistoryState{
+			testfixtures.NewHistoryStateWithAttrs("on", now.Add(-2*time.Hour), map[string]any{
+				"brightness": 255,
+				"color_temp": 4000,
+			}),
+			testfixtures.NewHistoryStateWithAttrs("off", now.Add(-1*time.Hour), map[string]any{
+				"brightness": 0,
+			}),
+		}
+
+		result := HistoryResult("light.kitchen", historyStates...)
+		router := NewMessageRouter(t).OnSuccess("history/history_during_period", result)
+
+		timeRange := &types.TimeRange{
+			StartTime: now.Add(-24 * time.Hour),
+			EndTime:   now,
+		}
+		config := &HandlerConfig{
+			Args:      []string{"light.kitchen"},
+			TimeRange: timeRange,
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("history-full", "light.kitchen"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := handleHistoryFull(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("handles states without attributes", func(t *testing.T) {
+		t.Parallel()
+
+		now := time.Now()
+		historyStates := []testfixtures.HistoryState{
+			testfixtures.NewHistoryState("on", now.Add(-1*time.Hour)),
+			testfixtures.NewHistoryState("off", now),
+		}
+
+		result := HistoryResult("light.kitchen", historyStates...)
+		router := NewMessageRouter(t).OnSuccess("history/history_during_period", result)
+
+		timeRange := &types.TimeRange{
+			StartTime: now.Add(-24 * time.Hour),
+			EndTime:   now,
+		}
+		config := &HandlerConfig{
+			Args:      []string{"light.kitchen"},
+			TimeRange: timeRange,
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("history-full", "light.kitchen"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := handleHistoryFull(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("uses Attributes field when A is nil", func(t *testing.T) {
+		t.Parallel()
+
+		now := time.Now()
+		// Simulate full format response (Attributes field instead of A)
+		historyStates := []testfixtures.HistoryState{
+			{
+				State:       "on",
+				LastUpdated: now.Format(time.RFC3339),
+				Attributes: map[string]any{
+					"friendly_name": "Kitchen Light",
+					"brightness":    200,
+				},
+			},
+		}
+
+		result := HistoryResult("light.kitchen", historyStates...)
+		router := NewMessageRouter(t).OnSuccess("history/history_during_period", result)
+
+		timeRange := &types.TimeRange{
+			StartTime: now.Add(-24 * time.Hour),
+			EndTime:   now,
+		}
+		config := &HandlerConfig{
+			Args:      []string{"light.kitchen"},
+			TimeRange: timeRange,
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("history-full", "light.kitchen"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := handleHistoryFull(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("returns error on client failure", func(t *testing.T) {
+		t.Parallel()
+
+		router := NewMessageRouter(t).OnError("history/history_during_period", "error", "database error")
+
+		now := time.Now()
+		timeRange := &types.TimeRange{
+			StartTime: now.Add(-24 * time.Hour),
+			EndTime:   now,
+		}
+		config := &HandlerConfig{
+			Args:      []string{"light.kitchen"},
+			TimeRange: timeRange,
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("history-full", "light.kitchen"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		err := handleHistoryFull(ctx)
+		require.Error(t, err)
+	})
+}
+
+func TestHandleAttrs(t *testing.T) {
+	t.Parallel()
+
+	t.Run("displays attribute changes", func(t *testing.T) {
+		t.Parallel()
+
+		now := time.Now()
+		historyStates := []testfixtures.HistoryState{
+			testfixtures.NewHistoryStateWithAttrs("72.5", now.Add(-2*time.Hour), map[string]any{
+				"unit_of_measurement": "°F",
+				"device_class":        "temperature",
+			}),
+			testfixtures.NewHistoryStateWithAttrs("73.0", now.Add(-1*time.Hour), map[string]any{
+				"unit_of_measurement": "°F",
+				"device_class":        "temperature",
+			}),
+			testfixtures.NewHistoryStateWithAttrs("72.8", now, map[string]any{
+				"unit_of_measurement": "°F",
+				"device_class":        "temperature",
+			}),
+		}
+
+		result := HistoryResult("sensor.temperature", historyStates...)
+		router := NewMessageRouter(t).OnSuccess("history/history_during_period", result)
+
+		timeRange := &types.TimeRange{
+			StartTime: now.Add(-24 * time.Hour),
+			EndTime:   now,
+		}
+		config := &HandlerConfig{
+			Args:      []string{"sensor.temperature"},
+			TimeRange: timeRange,
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("attrs", "sensor.temperature"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := handleAttrs(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("handles states without attributes", func(t *testing.T) {
+		t.Parallel()
+
+		now := time.Now()
+		historyStates := []testfixtures.HistoryState{
+			testfixtures.NewHistoryState("on", now.Add(-1*time.Hour)),
+			testfixtures.NewHistoryState("off", now),
+		}
+
+		result := HistoryResult("switch.light", historyStates...)
+		router := NewMessageRouter(t).OnSuccess("history/history_during_period", result)
+
+		timeRange := &types.TimeRange{
+			StartTime: now.Add(-24 * time.Hour),
+			EndTime:   now,
+		}
+		config := &HandlerConfig{
+			Args:      []string{"switch.light"},
+			TimeRange: timeRange,
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("attrs", "switch.light"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := handleAttrs(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("handles empty history", func(t *testing.T) {
+		t.Parallel()
+
+		result := HistoryResult("sensor.temperature")
+		router := NewMessageRouter(t).OnSuccess("history/history_during_period", result)
+
+		now := time.Now()
+		timeRange := &types.TimeRange{
+			StartTime: now.Add(-24 * time.Hour),
+			EndTime:   now,
+		}
+		config := &HandlerConfig{
+			Args:      []string{"sensor.temperature"},
+			TimeRange: timeRange,
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("attrs", "sensor.temperature"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := handleAttrs(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("returns error on client failure", func(t *testing.T) {
+		t.Parallel()
+
+		router := NewMessageRouter(t).OnError("history/history_during_period", "error", "timeout")
+
+		now := time.Now()
+		timeRange := &types.TimeRange{
+			StartTime: now.Add(-24 * time.Hour),
+			EndTime:   now,
+		}
+		config := &HandlerConfig{
+			Args:      []string{"sensor.temperature"},
+			TimeRange: timeRange,
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("attrs", "sensor.temperature"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		err := handleAttrs(ctx)
+		require.Error(t, err)
+	})
+}
+
+func TestHandleTimeline(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns multi-entity timeline sorted by time", func(t *testing.T) {
+		t.Parallel()
+
+		now := time.Now()
+
+		// Create history states for multiple entities
+		result := map[string][]testfixtures.HistoryState{
+			"light.kitchen": {
+				testfixtures.NewHistoryState("on", now.Add(-2*time.Hour)),
+				testfixtures.NewHistoryState("off", now.Add(-30*time.Minute)),
+			},
+			"light.bedroom": {
+				testfixtures.NewHistoryState("off", now.Add(-3*time.Hour)),
+				testfixtures.NewHistoryState("on", now.Add(-1*time.Hour)),
+			},
+		}
+
+		router := NewMessageRouter(t).OnSuccess("history/history_during_period", result)
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("timeline", "4", "light.kitchen", "light.bedroom"),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := HandleTimeline(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("handles empty results", func(t *testing.T) {
+		t.Parallel()
+
+		result := map[string][]types.HistoryState{}
+		router := NewMessageRouter(t).OnSuccess("history/history_during_period", result)
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("timeline", "4", "light.nonexistent"),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := HandleTimeline(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("returns error with missing arguments", func(t *testing.T) {
+		t.Parallel()
+
+		router := NewMessageRouter(t)
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("timeline", "4"), // Missing entity
+		)
+		defer cleanup()
+
+		err := HandleTimeline(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "missing")
+	})
+
+	t.Run("returns error with invalid hours", func(t *testing.T) {
+		t.Parallel()
+
+		router := NewMessageRouter(t)
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("timeline", "not-a-number", "light.kitchen"),
+		)
+		defer cleanup()
+
+		err := HandleTimeline(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid")
+	})
+
+	t.Run("returns error on client failure", func(t *testing.T) {
+		t.Parallel()
+
+		router := NewMessageRouter(t).OnError("history/history_during_period", "error", "connection failed")
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("timeline", "4", "light.kitchen"),
+		)
+		defer cleanup()
+
+		err := HandleTimeline(ctx)
+		require.Error(t, err)
+	})
+}
+
+// MockSysLogEntry creates a SysLogEntry for testing.
+func MockSysLogEntry(level, source, message string) types.SysLogEntry {
+	return types.SysLogEntry{
+		Level:     level,
+		Source:    []any{source, 123},
+		Message:   message,
+		Timestamp: float64(time.Now().Unix()),
+	}
+}
+
+func TestHandleSyslog(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns syslog entries", func(t *testing.T) {
+		t.Parallel()
+
+		entries := []types.SysLogEntry{
+			MockSysLogEntry("ERROR", "homeassistant/core.py", "Failed to load component"),
+			MockSysLogEntry("WARNING", "homeassistant/components/sensor.py", "Sensor unavailable"),
+		}
+
+		router := NewMessageRouter(t).OnSuccess("system_log/list", entries)
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("syslog"),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := HandleSyslog(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("handles empty syslog", func(t *testing.T) {
+		t.Parallel()
+
+		entries := []types.SysLogEntry{}
+		router := NewMessageRouter(t).OnSuccess("system_log/list", entries)
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("syslog"),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := HandleSyslog(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("handles entries with string source", func(t *testing.T) {
+		t.Parallel()
+
+		entries := []types.SysLogEntry{
+			{
+				Level:   "ERROR",
+				Source:  []string{"custom_component.py", "42"},
+				Message: "Custom error",
+			},
+		}
+
+		router := NewMessageRouter(t).OnSuccess("system_log/list", entries)
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("syslog"),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := HandleSyslog(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("handles entries with array message", func(t *testing.T) {
+		t.Parallel()
+
+		entries := []types.SysLogEntry{
+			{
+				Level:   "WARNING",
+				Source:  []any{"test.py", 1},
+				Message: []any{"Primary message", "Additional detail"},
+			},
+		}
+
+		router := NewMessageRouter(t).OnSuccess("system_log/list", entries)
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("syslog"),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := HandleSyslog(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("returns error on client failure", func(t *testing.T) {
+		t.Parallel()
+
+		router := NewMessageRouter(t).OnError("system_log/list", "error", "permission denied")
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("syslog"),
+		)
+		defer cleanup()
+
+		err := HandleSyslog(ctx)
+		require.Error(t, err)
+	})
+}
+
+// MockStatEntry creates a StatEntry for testing.
+func MockStatEntry(start, minVal, maxVal, mean, sum float64) types.StatEntry {
+	return types.StatEntry{
+		Start: start,
+		Min:   minVal,
+		Max:   maxVal,
+		Mean:  mean,
+		Sum:   sum,
+	}
+}
+
+// StatisticsResult creates a statistics query result.
+func StatisticsResult(entityID string, stats ...types.StatEntry) map[string][]types.StatEntry {
+	return map[string][]types.StatEntry{
+		entityID: stats,
+	}
+}
+
+func TestHandleStats(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns statistics successfully", func(t *testing.T) {
+		t.Parallel()
+
+		now := time.Now()
+		baseTime := float64(now.Add(-2 * time.Hour).Unix())
+
+		stats := []types.StatEntry{
+			MockStatEntry(baseTime, 70.0, 75.0, 72.5, 290.0),
+			MockStatEntry(baseTime+3600, 68.0, 78.0, 73.0, 292.0),
+			MockStatEntry(baseTime+7200, 72.0, 76.0, 74.0, 296.0),
+		}
+
+		result := StatisticsResult("sensor.temperature", stats...)
+		router := NewMessageRouter(t).OnSuccess("recorder/statistics_during_period", result)
+
+		timeRange := &types.TimeRange{
+			StartTime: now.Add(-24 * time.Hour),
+			EndTime:   now,
+		}
+		config := &HandlerConfig{
+			Args:      []string{"sensor.temperature"},
+			TimeRange: timeRange,
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("stats", "sensor.temperature"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := handleStats(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("handles no statistics found", func(t *testing.T) {
+		t.Parallel()
+
+		result := map[string][]types.StatEntry{}
+		router := NewMessageRouter(t).OnSuccess("recorder/statistics_during_period", result)
+
+		now := time.Now()
+		timeRange := &types.TimeRange{
+			StartTime: now.Add(-24 * time.Hour),
+			EndTime:   now,
+		}
+		config := &HandlerConfig{
+			Args:      []string{"sensor.temperature"},
+			TimeRange: timeRange,
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("stats", "sensor.temperature"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := handleStats(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("handles empty statistics array", func(t *testing.T) {
+		t.Parallel()
+
+		result := StatisticsResult("sensor.temperature")
+		router := NewMessageRouter(t).OnSuccess("recorder/statistics_during_period", result)
+
+		now := time.Now()
+		timeRange := &types.TimeRange{
+			StartTime: now.Add(-24 * time.Hour),
+			EndTime:   now,
+		}
+		config := &HandlerConfig{
+			Args:      []string{"sensor.temperature"},
+			TimeRange: timeRange,
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("stats", "sensor.temperature"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := handleStats(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("returns error on client failure", func(t *testing.T) {
+		t.Parallel()
+
+		router := NewMessageRouter(t).OnError("recorder/statistics_during_period", "error", "database error")
+
+		now := time.Now()
+		timeRange := &types.TimeRange{
+			StartTime: now.Add(-24 * time.Hour),
+			EndTime:   now,
+		}
+		config := &HandlerConfig{
+			Args:      []string{"sensor.temperature"},
+			TimeRange: timeRange,
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("stats", "sensor.temperature"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		err := handleStats(ctx)
+		require.Error(t, err)
+	})
+}
+
+func TestHandleStatsMulti(t *testing.T) {
+	// Note: Multi-entity concurrent requests cause websocket write race conditions
+	// in unit tests. Use single entity tests to verify handler behavior.
+	t.Parallel()
+
+	t.Run("returns statistics for single entity", func(t *testing.T) {
+		t.Parallel()
+
+		now := time.Now()
+		baseTime := float64(now.Add(-2 * time.Hour).Unix())
+
+		// Mock handler that returns stats for the requested entity
+		router := NewMessageRouter(t).On("recorder/statistics_during_period", func(_ string, data map[string]any) any {
+			statIDs, ok := data["statistic_ids"].([]any)
+			if !ok || len(statIDs) == 0 {
+				return map[string][]types.StatEntry{}
+			}
+			entityID, ok := statIDs[0].(string)
+			if !ok {
+				return map[string][]types.StatEntry{}
+			}
+			return map[string][]types.StatEntry{
+				entityID: {
+					MockStatEntry(baseTime, 70.0, 75.0, 72.5, 290.0),
+					MockStatEntry(baseTime+3600, 68.0, 78.0, 73.0, 292.0),
+				},
+			}
+		})
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("stats-multi", "sensor.temp1"),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := HandleStatsMulti(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("handles hours parameter", func(t *testing.T) {
+		t.Parallel()
+
+		now := time.Now()
+		baseTime := float64(now.Add(-2 * time.Hour).Unix())
+
+		router := NewMessageRouter(t).On("recorder/statistics_during_period", func(_ string, data map[string]any) any {
+			statIDs, ok := data["statistic_ids"].([]any)
+			if !ok || len(statIDs) == 0 {
+				return map[string][]types.StatEntry{}
+			}
+			entityID, ok := statIDs[0].(string)
+			if !ok {
+				return map[string][]types.StatEntry{}
+			}
+			return map[string][]types.StatEntry{
+				entityID: {MockStatEntry(baseTime, 70.0, 75.0, 72.5, 290.0)},
+			}
+		})
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("stats-multi", "sensor.temp1", "48"), // 48 hours
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := HandleStatsMulti(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("handles empty stats response", func(t *testing.T) {
+		t.Parallel()
+
+		// Mock handler that returns empty stats
+		router := NewMessageRouter(t).On("recorder/statistics_during_period", func(_ string, _ map[string]any) any {
+			return map[string][]types.StatEntry{}
+		})
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("stats-multi", "sensor.temp1"),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := HandleStatsMulti(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("returns error with missing arguments", func(t *testing.T) {
+		t.Parallel()
+
+		router := NewMessageRouter(t)
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("stats-multi"), // Missing entity IDs
+		)
+		defer cleanup()
+
+		err := HandleStatsMulti(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "missing")
+	})
+
+	t.Run("handles error response", func(t *testing.T) {
+		t.Parallel()
+
+		router := NewMessageRouter(t).OnError("recorder/statistics_during_period", "not_found", "Entity not found")
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("stats-multi", "sensor.nonexistent"),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := HandleStatsMulti(ctx)
+		// Handler continues on errors but may have no results
+		require.NoError(t, err)
+	})
+}
+
+func TestHandleContext(t *testing.T) {
+	t.Parallel()
+
+	t.Run("finds states by entity context", func(t *testing.T) {
+		t.Parallel()
+
+		targetContext := &types.HAContext{ID: "ctx-target", ParentID: ""}
+		relatedContext := &types.HAContext{ID: "ctx-related", ParentID: "ctx-target"}
+
+		states := []types.HAState{
+			{EntityID: "automation.trigger", State: "on", Context: targetContext},
+			{EntityID: "light.kitchen", State: "on", Context: relatedContext},
+			{EntityID: "sensor.unrelated", State: "72", Context: &types.HAContext{ID: "other"}},
+		}
+
+		router := NewMessageRouter(t).OnSuccess("get_states", states)
+
+		config := &HandlerConfig{
+			Args: []string{"automation.trigger"},
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("context", "automation.trigger"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := handleContext(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("finds states by context ID directly", func(t *testing.T) {
+		t.Parallel()
+
+		states := []types.HAState{
+			{EntityID: "automation.trigger", State: "on", Context: &types.HAContext{ID: "ctx-123"}},
+			{EntityID: "light.kitchen", State: "on", Context: &types.HAContext{ID: "ctx-123"}},
+			{EntityID: "sensor.unrelated", State: "72", Context: &types.HAContext{ID: "other"}},
+		}
+
+		router := NewMessageRouter(t).OnSuccess("get_states", states)
+
+		config := &HandlerConfig{
+			Args: []string{"ctx-123"}, // Using context ID directly
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("context", "ctx-123"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := handleContext(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("handles no matching context", func(t *testing.T) {
+		t.Parallel()
+
+		states := []types.HAState{
+			{EntityID: "light.kitchen", State: "on", Context: &types.HAContext{ID: "other"}},
+		}
+
+		router := NewMessageRouter(t).OnSuccess("get_states", states)
+
+		config := &HandlerConfig{
+			Args: []string{"ctx-nonexistent"},
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("context", "ctx-nonexistent"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := handleContext(ctx)
+		require.NoError(t, err) // Returns no error, just shows no matches found
+	})
+
+	t.Run("handles entity with parent context", func(t *testing.T) {
+		t.Parallel()
+
+		parentContext := &types.HAContext{ID: "parent-ctx"}
+		childContext := &types.HAContext{ID: "child-ctx", ParentID: "parent-ctx"}
+
+		states := []types.HAState{
+			{EntityID: "automation.parent", State: "on", Context: parentContext},
+			{EntityID: "light.kitchen", State: "on", Context: childContext},
+			{EntityID: "light.bedroom", State: "off", Context: childContext},
+		}
+
+		router := NewMessageRouter(t).OnSuccess("get_states", states)
+
+		config := &HandlerConfig{
+			Args: []string{"light.kitchen"}, // Has parent context
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("context", "light.kitchen"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := handleContext(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("handles nil context on states", func(t *testing.T) {
+		t.Parallel()
+
+		states := []types.HAState{
+			{EntityID: "light.kitchen", State: "on", Context: nil},
+			{EntityID: "sensor.temp", State: "72", Context: &types.HAContext{ID: "ctx-a"}},
+		}
+
+		router := NewMessageRouter(t).OnSuccess("get_states", states)
+
+		config := &HandlerConfig{
+			Args: []string{"ctx-a"},
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("context", "ctx-a"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := handleContext(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("returns error on client failure", func(t *testing.T) {
+		t.Parallel()
+
+		router := NewMessageRouter(t).OnError("get_states", "error", "connection failed")
+
+		config := &HandlerConfig{
+			Args: []string{"light.kitchen"},
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("context", "light.kitchen"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		err := handleContext(ctx)
+		require.Error(t, err)
+	})
+}
+
+func TestOutputNoContextMatches(t *testing.T) {
+	t.Parallel()
+
+	t.Run("with target entity and parent context", func(t *testing.T) {
+		t.Parallel()
+
+		targetEntity := &types.HAState{
+			EntityID: "light.kitchen",
+			State:    "on",
+			Context:  &types.HAContext{ID: "ctx-123", ParentID: "parent-ctx"},
+		}
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := outputNoContextMatches("light.kitchen", "ctx-123", targetEntity)
+		require.NoError(t, err)
+	})
+
+	t.Run("with target entity without parent context", func(t *testing.T) {
+		t.Parallel()
+
+		targetEntity := &types.HAState{
+			EntityID: "light.kitchen",
+			State:    "on",
+			Context:  &types.HAContext{ID: "ctx-123"},
+		}
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := outputNoContextMatches("light.kitchen", "ctx-123", targetEntity)
+		require.NoError(t, err)
+	})
+
+	t.Run("with nil target entity (context ID lookup)", func(t *testing.T) {
+		t.Parallel()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := outputNoContextMatches("ctx-unknown", "ctx-unknown", nil)
+		require.NoError(t, err)
+	})
+}
+
+func TestHandleWatch(t *testing.T) {
+	t.Parallel()
+
+	// Note: handleWatch is complex to test because it uses subscriptions
+	// The tests here verify the basic setup and error paths
+
+	t.Run("returns error on subscription failure", func(t *testing.T) {
+		t.Parallel()
+
+		router := NewMessageRouter(t).OnError("subscribe_trigger", "error", "subscription failed")
+
+		config := &HandlerConfig{
+			Args:        []string{"light.kitchen"},
+			OptionalInt: 1, // 1 second timeout for quick test
+		}
+
+		ctx, cleanup := NewTestContext(t, router,
+			WithArgs("watch", "light.kitchen", "1"),
+			WithHandlerConfig(config),
+		)
+		defer cleanup()
+
+		_, restoreOutput := CaptureOutput()
+		defer restoreOutput()
+
+		err := handleWatch(ctx)
+		require.Error(t, err)
+	})
 }
