@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
 
 func TestFormatDuration(t *testing.T) {
@@ -680,4 +683,935 @@ func BenchmarkAttributeComparison(b *testing.B) {
 			}
 		}
 	}
+}
+
+// =====================================
+// Handler Unit Tests
+// =====================================
+
+func TestHandlePing(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		setupRouter func(*MessageRouter)
+		expectError bool
+		description string
+	}{
+		{
+			name: "success with latency",
+			setupRouter: func(r *MessageRouter) {
+				r.OnSuccess("ping", nil)
+			},
+			expectError: false,
+			description: "Successful ping returns latency",
+		},
+		{
+			name: "websocket error",
+			setupRouter: func(r *MessageRouter) {
+				r.OnError("ping", "connection_error", "Connection failed")
+			},
+			expectError: true,
+			description: "WebSocket error returns error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewMessageRouter(t)
+			tt.setupRouter(router)
+
+			ctx, cleanup := NewTestContext(t, router)
+			defer cleanup()
+
+			err := HandlePing(ctx)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHandleState(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		entityID    string
+		states      []types.HAState
+		expectError bool
+		description string
+	}{
+		{
+			name:     "entity found",
+			entityID: "light.kitchen",
+			states: []types.HAState{
+				MockState("light.kitchen", "on"),
+				MockState("light.bedroom", "off"),
+			},
+			expectError: false,
+			description: "Returns state when entity is found",
+		},
+		{
+			name:     "entity not found",
+			entityID: "light.nonexistent",
+			states: []types.HAState{
+				MockState("light.kitchen", "on"),
+			},
+			expectError: true,
+			description: "Returns error when entity is not found",
+		},
+		{
+			name:     "with attributes",
+			entityID: "light.kitchen",
+			states: []types.HAState{
+				MockStateWithAttrs("light.kitchen", "on", map[string]any{
+					"brightness":    255,
+					"color_mode":    "rgb",
+					"friendly_name": "Kitchen Light",
+				}),
+			},
+			expectError: false,
+			description: "Returns state with attributes",
+		},
+		{
+			name:        "empty states list",
+			entityID:    "light.any",
+			states:      []types.HAState{},
+			expectError: true,
+			description: "Returns error when no states exist",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewMessageRouter(t)
+			router.OnSuccess("get_states", tt.states)
+
+			config := &HandlerConfig{
+				Args: []string{tt.entityID},
+			}
+
+			ctx, cleanup := NewTestContext(t, router,
+				WithArgs("state", tt.entityID),
+				WithHandlerConfig(config),
+			)
+			defer cleanup()
+
+			err := handleState(ctx)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHandleStateWebSocketError(t *testing.T) {
+	t.Parallel()
+
+	router := NewMessageRouter(t).OnError("get_states", "connection_error", "Connection failed")
+
+	config := &HandlerConfig{
+		Args: []string{"light.kitchen"},
+	}
+
+	ctx, cleanup := NewTestContext(t, router,
+		WithArgs("state", "light.kitchen"),
+		WithHandlerConfig(config),
+	)
+	defer cleanup()
+
+	err := handleState(ctx)
+	assert.Error(t, err)
+}
+
+func TestHandleStates(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		states      []types.HAState
+		expectError bool
+		description string
+	}{
+		{
+			name: "with multiple states",
+			states: []types.HAState{
+				MockState("light.kitchen", "on"),
+				MockState("light.bedroom", "off"),
+				MockState("sensor.temperature", "23.5"),
+			},
+			expectError: false,
+			description: "Returns sample of states",
+		},
+		{
+			name:        "empty states",
+			states:      []types.HAState{},
+			expectError: false,
+			description: "Handles empty state list",
+		},
+		{
+			name: "many states (tests limit)",
+			states: func() []types.HAState {
+				states := make([]types.HAState, 50)
+				for i := 0; i < 50; i++ {
+					states[i] = MockState(fmt.Sprintf("sensor.test_%d", i), fmt.Sprintf("%d", i))
+				}
+				return states
+			}(),
+			expectError: false,
+			description: "Limits output to configured max",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewMessageRouter(t)
+			router.OnSuccess("get_states", tt.states)
+
+			ctx, cleanup := NewTestContext(t, router, WithArgs("states"))
+			defer cleanup()
+
+			err := HandleStates(ctx)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHandleStatesWebSocketError(t *testing.T) {
+	t.Parallel()
+
+	router := NewMessageRouter(t).OnError("get_states", "connection_error", "Connection failed")
+
+	ctx, cleanup := NewTestContext(t, router, WithArgs("states"))
+	defer cleanup()
+
+	err := HandleStates(ctx)
+	assert.Error(t, err)
+}
+
+func TestHandleStatesJSON(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		states      []types.HAState
+		expectError bool
+		description string
+	}{
+		{
+			name: "returns all states as JSON",
+			states: []types.HAState{
+				MockState("light.kitchen", "on"),
+				MockState("light.bedroom", "off"),
+				MockState("sensor.temperature", "23.5"),
+			},
+			expectError: false,
+			description: "Returns all states in JSON format",
+		},
+		{
+			name:        "empty states",
+			states:      []types.HAState{},
+			expectError: false,
+			description: "Handles empty state list",
+		},
+		{
+			name: "states with timestamps",
+			states: []types.HAState{
+				MockStateWithTimestamps("light.kitchen", "on"),
+				MockStateWithTimestamps("sensor.temperature", "23.5"),
+			},
+			expectError: false,
+			description: "Includes timestamp information",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewMessageRouter(t)
+			router.OnSuccess("get_states", tt.states)
+
+			ctx, cleanup := NewTestContext(t, router, WithArgs("states-json"))
+			defer cleanup()
+
+			err := HandleStatesJSON(ctx)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHandleStatesJSONWebSocketError(t *testing.T) {
+	t.Parallel()
+
+	router := NewMessageRouter(t).OnError("get_states", "connection_error", "Connection failed")
+
+	ctx, cleanup := NewTestContext(t, router, WithArgs("states-json"))
+	defer cleanup()
+
+	err := HandleStatesJSON(ctx)
+	assert.Error(t, err)
+}
+
+func TestHandleStatesFilter(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		pattern     string
+		states      []types.HAState
+		expectError bool
+		description string
+	}{
+		{
+			name:    "pattern matches entities",
+			pattern: "light.*",
+			states: []types.HAState{
+				MockState("light.kitchen", "on"),
+				MockState("light.bedroom", "off"),
+				MockState("sensor.temperature", "23.5"),
+			},
+			expectError: false,
+			description: "Filters states matching pattern",
+		},
+		{
+			name:    "no matches",
+			pattern: "switch.*",
+			states: []types.HAState{
+				MockState("light.kitchen", "on"),
+				MockState("sensor.temperature", "23.5"),
+			},
+			expectError: false,
+			description: "Handles no matches gracefully",
+		},
+		{
+			name:    "exact match pattern",
+			pattern: "sensor.temperature",
+			states: []types.HAState{
+				MockState("light.kitchen", "on"),
+				MockState("sensor.temperature", "23.5"),
+			},
+			expectError: false,
+			description: "Matches exact entity ID",
+		},
+		{
+			name:    "with timestamps for age display",
+			pattern: "light.*",
+			states: []types.HAState{
+				MockStateWithTimestamps("light.kitchen", "on"),
+				MockStateWithTimestamps("light.bedroom", "off"),
+			},
+			expectError: false,
+			description: "Includes age information",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewMessageRouter(t)
+			router.OnSuccess("get_states", tt.states)
+
+			// Build the regex pattern (same logic as middleware)
+			pattern := tt.pattern
+			pattern = strings.ReplaceAll(pattern, ".", `\.`)
+			pattern = strings.ReplaceAll(pattern, "*", ".*")
+			pattern = "(?i)^" + pattern + "$"
+			re, err := regexp.Compile(pattern)
+			assert.NoError(t, err)
+
+			config := &HandlerConfig{
+				Args:    []string{tt.pattern},
+				Pattern: re,
+			}
+
+			ctx, cleanup := NewTestContext(t, router,
+				WithArgs("states-filter", tt.pattern),
+				WithHandlerConfig(config),
+			)
+			defer cleanup()
+
+			err = handleStatesFilter(ctx)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHandleStatesFilterWebSocketError(t *testing.T) {
+	t.Parallel()
+
+	router := NewMessageRouter(t).OnError("get_states", "connection_error", "Connection failed")
+
+	re := regexp.MustCompile("light.*")
+	config := &HandlerConfig{
+		Args:    []string{"light.*"},
+		Pattern: re,
+	}
+
+	ctx, cleanup := NewTestContext(t, router,
+		WithArgs("states-filter", "light.*"),
+		WithHandlerConfig(config),
+	)
+	defer cleanup()
+
+	err := handleStatesFilter(ctx)
+	assert.Error(t, err)
+}
+
+func TestHandleConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		config      types.HAConfig
+		expectError bool
+		description string
+	}{
+		{
+			name:        "full config",
+			config:      MockHAConfig(),
+			expectError: false,
+			description: "Returns HA configuration",
+		},
+		{
+			name: "minimal config",
+			config: types.HAConfig{
+				Version:      "2024.1.0",
+				LocationName: "Home",
+				State:        "RUNNING",
+			},
+			expectError: false,
+			description: "Handles minimal config",
+		},
+		{
+			name: "config with many components",
+			config: types.HAConfig{
+				Version:      "2024.6.0",
+				LocationName: "Smart Home",
+				TimeZone:     "Europe/London",
+				State:        "RUNNING",
+				Components:   []string{"homeassistant", "automation", "script", "scene", "light", "switch", "sensor", "binary_sensor", "climate", "media_player"},
+			},
+			expectError: false,
+			description: "Handles config with many components",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewMessageRouter(t)
+			router.OnSuccess("get_config", tt.config)
+
+			ctx, cleanup := NewTestContext(t, router, WithArgs("config"))
+			defer cleanup()
+
+			err := HandleConfig(ctx)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHandleConfigWebSocketError(t *testing.T) {
+	t.Parallel()
+
+	router := NewMessageRouter(t).OnError("get_config", "connection_error", "Connection failed")
+
+	ctx, cleanup := NewTestContext(t, router, WithArgs("config"))
+	defer cleanup()
+
+	err := HandleConfig(ctx)
+	assert.Error(t, err)
+}
+
+func TestHandleServices(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		services    map[string]map[string]any
+		expectError bool
+		description string
+	}{
+		{
+			name: "multiple domains with services",
+			services: map[string]map[string]any{
+				"light": {
+					"turn_on":  map[string]any{"description": "Turn on a light"},
+					"turn_off": map[string]any{"description": "Turn off a light"},
+					"toggle":   map[string]any{"description": "Toggle a light"},
+				},
+				"switch": {
+					"turn_on":  map[string]any{"description": "Turn on a switch"},
+					"turn_off": map[string]any{"description": "Turn off a switch"},
+				},
+				"homeassistant": {
+					"reload_all": map[string]any{"description": "Reload all configs"},
+				},
+			},
+			expectError: false,
+			description: "Lists services by domain",
+		},
+		{
+			name:        "empty services",
+			services:    map[string]map[string]any{},
+			expectError: false,
+			description: "Handles empty service list",
+		},
+		{
+			name: "single domain",
+			services: map[string]map[string]any{
+				"automation": {
+					"trigger": map[string]any{"description": "Trigger an automation"},
+					"reload":  map[string]any{"description": "Reload automations"},
+				},
+			},
+			expectError: false,
+			description: "Handles single domain",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewMessageRouter(t)
+			router.OnSuccess("get_services", tt.services)
+
+			ctx, cleanup := NewTestContext(t, router, WithArgs("services"))
+			defer cleanup()
+
+			err := HandleServices(ctx)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHandleServicesWebSocketError(t *testing.T) {
+	t.Parallel()
+
+	router := NewMessageRouter(t).OnError("get_services", "connection_error", "Connection failed")
+
+	ctx, cleanup := NewTestContext(t, router, WithArgs("services"))
+	defer cleanup()
+
+	err := HandleServices(ctx)
+	assert.Error(t, err)
+}
+
+func TestHandleCall(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		args        []string
+		config      *HandlerConfig
+		response    any
+		expectError bool
+		description string
+	}{
+		{
+			name: "simple service call",
+			args: []string{"call", "light", "turn_on"},
+			config: &HandlerConfig{
+				Args: []string{"light", "turn_on"},
+			},
+			response:    map[string]any{"success": true},
+			expectError: false,
+			description: "Calls service successfully",
+		},
+		{
+			name: "service call with JSON data",
+			args: []string{"call", "light", "turn_on", `{"entity_id":"light.kitchen","brightness":255}`},
+			config: &HandlerConfig{
+				Args: []string{"light", "turn_on"},
+			},
+			response:    map[string]any{"success": true},
+			expectError: false,
+			description: "Calls service with data",
+		},
+		{
+			name: "service call with invalid JSON",
+			args: []string{"call", "light", "turn_on", `{invalid json}`},
+			config: &HandlerConfig{
+				Args: []string{"light", "turn_on"},
+			},
+			response:    nil,
+			expectError: true,
+			description: "Returns error for invalid JSON",
+		},
+		{
+			name: "service call with response data",
+			args: []string{"call", "homeassistant", "reload_all"},
+			config: &HandlerConfig{
+				Args: []string{"homeassistant", "reload_all"},
+			},
+			response: map[string]any{
+				"context": map[string]any{
+					"id":        "ctx-123",
+					"parent_id": nil,
+					"user_id":   "user-456",
+				},
+			},
+			expectError: false,
+			description: "Returns service response",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewMessageRouter(t)
+			router.OnSuccess("call_service", tt.response)
+
+			ctx, cleanup := NewTestContext(t, router,
+				WithArgs(tt.args...),
+				WithHandlerConfig(tt.config),
+			)
+			defer cleanup()
+
+			err := handleCall(ctx)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHandleCallWebSocketError(t *testing.T) {
+	t.Parallel()
+
+	router := NewMessageRouter(t).OnError("call_service", "service_not_found", "Service not found")
+
+	config := &HandlerConfig{
+		Args: []string{"nonexistent", "service"},
+	}
+
+	ctx, cleanup := NewTestContext(t, router,
+		WithArgs("call", "nonexistent", "service"),
+		WithHandlerConfig(config),
+	)
+	defer cleanup()
+
+	err := handleCall(ctx)
+	assert.Error(t, err)
+}
+
+func TestHandleDeviceHealth(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC()
+	recentUpdate := now.Add(-5 * time.Minute).Format(time.RFC3339)
+	staleUpdate := now.Add(-2 * time.Hour).Format(time.RFC3339)
+
+	tests := []struct {
+		name        string
+		entityID    string
+		states      []types.HAState
+		expectError bool
+		description string
+	}{
+		{
+			name:     "ok status - recent update",
+			entityID: "cover.living_room_shade",
+			states: []types.HAState{
+				{
+					EntityID:    "cover.living_room_shade",
+					State:       "open",
+					LastUpdated: recentUpdate,
+				},
+			},
+			expectError: false,
+			description: "Returns ok status for recent updates",
+		},
+		{
+			name:     "stale status - old update",
+			entityID: "cover.old_shade",
+			states: []types.HAState{
+				{
+					EntityID:    "cover.old_shade",
+					State:       "open",
+					LastUpdated: staleUpdate,
+				},
+			},
+			expectError: false,
+			description: "Returns stale status for old updates",
+		},
+		{
+			name:     "entity not found",
+			entityID: "cover.nonexistent",
+			states: []types.HAState{
+				{EntityID: "cover.other", State: "open", LastUpdated: recentUpdate},
+			},
+			expectError: true,
+			description: "Returns error when entity not found",
+		},
+		{
+			name:     "with related entities",
+			entityID: "cover.guest_bedroom_window_shade",
+			states: []types.HAState{
+				{
+					EntityID:    "cover.guest_bedroom_window_shade",
+					State:       "open",
+					LastUpdated: recentUpdate,
+				},
+				{
+					EntityID:    "sensor.guest_bedroom_window_shade_battery",
+					State:       "85",
+					LastUpdated: recentUpdate,
+				},
+				{
+					EntityID:    "sensor.guest_bedroom_window_shade_signal",
+					State:       "-45",
+					LastUpdated: staleUpdate,
+				},
+			},
+			expectError: false,
+			description: "Includes related entities in health check",
+		},
+		{
+			name:        "invalid entity ID format",
+			entityID:    "invalid_no_domain",
+			states:      []types.HAState{},
+			expectError: true,
+			description: "Returns error for invalid entity ID format",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewMessageRouter(t)
+			router.OnSuccess("get_states", tt.states)
+
+			config := &HandlerConfig{
+				Args: []string{tt.entityID},
+			}
+
+			ctx, cleanup := NewTestContext(t, router,
+				WithArgs("device-health", tt.entityID),
+				WithHandlerConfig(config),
+			)
+			defer cleanup()
+
+			err := handleDeviceHealth(ctx)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHandleDeviceHealthWebSocketError(t *testing.T) {
+	t.Parallel()
+
+	router := NewMessageRouter(t).OnError("get_states", "connection_error", "Connection failed")
+
+	config := &HandlerConfig{
+		Args: []string{"cover.test"},
+	}
+
+	ctx, cleanup := NewTestContext(t, router,
+		WithArgs("device-health", "cover.test"),
+		WithHandlerConfig(config),
+	)
+	defer cleanup()
+
+	err := handleDeviceHealth(ctx)
+	assert.Error(t, err)
+}
+
+func TestHandleCompare(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC()
+	recentUpdate := now.Add(-5 * time.Minute).Format(time.RFC3339)
+
+	tests := []struct {
+		name        string
+		entity1     string
+		entity2     string
+		states      []types.HAState
+		expectError bool
+		description string
+	}{
+		{
+			name:    "same state values",
+			entity1: "light.kitchen",
+			entity2: "light.bedroom",
+			states: []types.HAState{
+				{EntityID: "light.kitchen", State: "on", LastUpdated: recentUpdate, Attributes: map[string]any{"brightness": 255}},
+				{EntityID: "light.bedroom", State: "on", LastUpdated: recentUpdate, Attributes: map[string]any{"brightness": 255}},
+			},
+			expectError: false,
+			description: "Compares entities with matching states",
+		},
+		{
+			name:    "different state values",
+			entity1: "light.kitchen",
+			entity2: "light.bedroom",
+			states: []types.HAState{
+				{EntityID: "light.kitchen", State: "on", LastUpdated: recentUpdate, Attributes: map[string]any{"brightness": 255}},
+				{EntityID: "light.bedroom", State: "off", LastUpdated: recentUpdate, Attributes: map[string]any{"brightness": 0}},
+			},
+			expectError: false,
+			description: "Compares entities with different states",
+		},
+		{
+			name:    "first entity not found",
+			entity1: "light.nonexistent",
+			entity2: "light.bedroom",
+			states: []types.HAState{
+				{EntityID: "light.bedroom", State: "on", LastUpdated: recentUpdate},
+			},
+			expectError: true,
+			description: "Returns error when first entity not found",
+		},
+		{
+			name:    "second entity not found",
+			entity1: "light.kitchen",
+			entity2: "light.nonexistent",
+			states: []types.HAState{
+				{EntityID: "light.kitchen", State: "on", LastUpdated: recentUpdate},
+			},
+			expectError: true,
+			description: "Returns error when second entity not found",
+		},
+		{
+			name:    "different attribute sets",
+			entity1: "light.kitchen",
+			entity2: "light.bedroom",
+			states: []types.HAState{
+				{
+					EntityID:    "light.kitchen",
+					State:       "on",
+					LastUpdated: recentUpdate,
+					Attributes: map[string]any{
+						"brightness":    255,
+						"color_mode":    "rgb",
+						"rgb_color":     []any{255, 0, 0},
+						"friendly_name": "Kitchen Light",
+					},
+				},
+				{
+					EntityID:    "light.bedroom",
+					State:       "on",
+					LastUpdated: recentUpdate,
+					Attributes: map[string]any{
+						"brightness":    128,
+						"color_mode":    "color_temp",
+						"color_temp":    400,
+						"friendly_name": "Bedroom Light",
+					},
+				},
+			},
+			expectError: false,
+			description: "Identifies attribute differences",
+		},
+		{
+			name:    "empty attributes",
+			entity1: "sensor.temperature",
+			entity2: "sensor.humidity",
+			states: []types.HAState{
+				{EntityID: "sensor.temperature", State: "23.5", LastUpdated: recentUpdate, Attributes: map[string]any{}},
+				{EntityID: "sensor.humidity", State: "45", LastUpdated: recentUpdate, Attributes: map[string]any{}},
+			},
+			expectError: false,
+			description: "Handles entities with empty attributes",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewMessageRouter(t)
+			router.OnSuccess("get_states", tt.states)
+
+			config := &HandlerConfig{
+				Args: []string{tt.entity1, tt.entity2},
+			}
+
+			ctx, cleanup := NewTestContext(t, router,
+				WithArgs("compare", tt.entity1, tt.entity2),
+				WithHandlerConfig(config),
+			)
+			defer cleanup()
+
+			err := handleCompare(ctx)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHandleCompareWebSocketError(t *testing.T) {
+	t.Parallel()
+
+	router := NewMessageRouter(t).OnError("get_states", "connection_error", "Connection failed")
+
+	config := &HandlerConfig{
+		Args: []string{"light.kitchen", "light.bedroom"},
+	}
+
+	ctx, cleanup := NewTestContext(t, router,
+		WithArgs("compare", "light.kitchen", "light.bedroom"),
+		WithHandlerConfig(config),
+	)
+	defer cleanup()
+
+	err := handleCompare(ctx)
+	assert.Error(t, err)
 }

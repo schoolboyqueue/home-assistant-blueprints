@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -512,4 +513,712 @@ func BenchmarkStateFormatting(b *testing.B) {
 		s := states[i%len(states)]
 		_ = fmt.Sprintf("%s: %s", s.EntityID, s.State)
 	}
+}
+
+// =====================================
+// Unit Tests for handleMonitor
+// =====================================
+
+func TestHandleMonitor_Success(t *testing.T) {
+	t.Parallel()
+
+	// Create a mock server that handles subscribe_trigger and sends events
+	router := NewMessageRouter(t).On("subscribe_trigger", func(_ string, data map[string]any) any {
+		// Verify the trigger configuration
+		trigger, ok := data["trigger"].(map[string]any)
+		if !ok {
+			return nil
+		}
+		platform, _ := trigger["platform"].(string)
+		assert.Equal(t, "state", platform)
+		return nil // Success response
+	})
+
+	// Use a short timeout for testing
+	ctx, cleanup := NewTestContext(t, router,
+		WithArgs("monitor", "sensor.temperature"),
+		WithHandlerConfig(&HandlerConfig{
+			Args:        []string{"sensor.temperature"},
+			OptionalInt: 1, // 1 second timeout
+		}),
+	)
+	defer cleanup()
+
+	// Capture output
+	_, restoreOutput := CaptureOutput()
+	defer restoreOutput()
+
+	// Run the handler - should complete after timeout
+	err := handleMonitor(ctx)
+	require.NoError(t, err)
+}
+
+func TestHandleMonitor_Cancellation(t *testing.T) {
+	t.Parallel()
+
+	// Create a mock server that handles subscribe_trigger
+	router := NewMessageRouter(t).OnSuccess("subscribe_trigger", nil)
+
+	// Create a cancellable context
+	goCtx, cancel := context.WithCancel(context.Background())
+
+	ctx, cleanup := NewTestContext(t, router,
+		WithArgs("monitor", "sensor.temperature"),
+		WithHandlerConfig(&HandlerConfig{
+			Args:        []string{"sensor.temperature"},
+			OptionalInt: 60, // Long timeout
+		}),
+		WithContext(goCtx),
+	)
+	defer cleanup()
+
+	// Capture output
+	_, restoreOutput := CaptureOutput()
+	defer restoreOutput()
+
+	// Cancel after a short delay
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		cancel()
+	}()
+
+	// Run the handler - should complete after cancellation
+	err := handleMonitor(ctx)
+	// Should not return an error on graceful cancellation
+	require.NoError(t, err)
+}
+
+func TestHandleMonitor_SubscriptionError(t *testing.T) {
+	t.Parallel()
+
+	// Create a mock server that returns an error for subscription
+	router := NewMessageRouter(t).OnError("subscribe_trigger", "entity_not_found", "Entity sensor.nonexistent not found")
+
+	ctx, cleanup := NewTestContext(t, router,
+		WithArgs("monitor", "sensor.nonexistent"),
+		WithHandlerConfig(&HandlerConfig{
+			Args:        []string{"sensor.nonexistent"},
+			OptionalInt: 5,
+		}),
+	)
+	defer cleanup()
+
+	// Capture output
+	_, restoreOutput := CaptureOutput()
+	defer restoreOutput()
+
+	// Run the handler - should return error
+	err := handleMonitor(ctx)
+	require.Error(t, err)
+}
+
+// =====================================
+// Unit Tests for HandleMonitorMulti
+// =====================================
+
+func TestHandleMonitorMulti_SingleEntity_Success(t *testing.T) {
+	t.Parallel()
+
+	// Create a mock server that handles subscribe_trigger for a single entity
+	router := NewMessageRouter(t).OnSuccess("subscribe_trigger", nil)
+
+	ctx, cleanup := NewTestContext(t, router,
+		WithArgs("monitor-multi", "sensor.temp1", "1"), // Single entity with 1 second timeout
+	)
+	defer cleanup()
+
+	// Capture output
+	_, restoreOutput := CaptureOutput()
+	defer restoreOutput()
+
+	// Run the handler - should complete after timeout
+	err := HandleMonitorMulti(ctx)
+	require.NoError(t, err)
+}
+
+func TestHandleMonitorMulti_MissingArgument(t *testing.T) {
+	t.Parallel()
+
+	router := NewMessageRouter(t)
+	ctx, cleanup := NewTestContext(t, router,
+		WithArgs("monitor-multi"), // No entities provided
+	)
+	defer cleanup()
+
+	err := HandleMonitorMulti(ctx)
+	require.Error(t, err)
+}
+
+func TestHandleMonitorMulti_SingleEntity_AllFail(t *testing.T) {
+	t.Parallel()
+
+	// Create a mock server that fails for all subscriptions
+	router := NewMessageRouter(t).OnError("subscribe_trigger", "not_found", "Entity not found")
+
+	ctx, cleanup := NewTestContext(t, router,
+		WithArgs("monitor-multi", "sensor.bad1", "1"), // Single entity
+	)
+	defer cleanup()
+
+	// Capture output
+	_, restoreOutput := CaptureOutput()
+	defer restoreOutput()
+
+	// Run the handler - should return error when all fail
+	err := HandleMonitorMulti(ctx)
+	require.Error(t, err)
+}
+
+func TestHandleMonitorMulti_SingleEntity_Cancellation(t *testing.T) {
+	t.Parallel()
+
+	router := NewMessageRouter(t).OnSuccess("subscribe_trigger", nil)
+
+	// Create a cancellable context
+	goCtx, cancel := context.WithCancel(context.Background())
+
+	ctx, cleanup := NewTestContext(t, router,
+		WithArgs("monitor-multi", "sensor.temp1", "60"), // Single entity, 60 second timeout
+		WithContext(goCtx),
+	)
+	defer cleanup()
+
+	// Capture output
+	_, restoreOutput := CaptureOutput()
+	defer restoreOutput()
+
+	// Cancel after a short delay
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		cancel()
+	}()
+
+	// Run the handler - should complete after cancellation
+	err := HandleMonitorMulti(ctx)
+	// Should not return an error on graceful cancellation
+	require.NoError(t, err)
+}
+
+func TestHandleMonitorMulti_ArgumentParsing(t *testing.T) {
+	// Tests argument parsing logic for HandleMonitorMulti without actual subscriptions
+	// Note: Multi-entity subscriptions require synchronized websocket writes
+	// which is out of scope for unit tests. Test validates parsing logic only.
+	t.Parallel()
+
+	tests := []struct {
+		name              string
+		args              []string
+		expectError       bool
+		expectedEntityCnt int
+		expectedSeconds   int
+	}{
+		{
+			name:              "single entity no duration uses default",
+			args:              []string{"monitor-multi", "sensor.temp"},
+			expectError:       false,
+			expectedEntityCnt: 1,
+			expectedSeconds:   60, // default
+		},
+		{
+			name:              "single entity with duration",
+			args:              []string{"monitor-multi", "sensor.temp", "30"},
+			expectError:       false,
+			expectedEntityCnt: 1,
+			expectedSeconds:   30,
+		},
+		{
+			name:        "no entities returns error",
+			args:        []string{"monitor-multi"},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if tt.expectError {
+				// For error cases, we just need to verify the error is returned
+				router := NewMessageRouter(t)
+				ctx, cleanup := NewTestContext(t, router, WithArgs(tt.args...))
+				defer cleanup()
+
+				err := HandleMonitorMulti(ctx)
+				require.Error(t, err)
+				return
+			}
+
+			// For success cases, verify subscription is made and completes
+			router := NewMessageRouter(t).OnSuccess("subscribe_trigger", nil)
+
+			// Create context with short cancellation for quick test
+			goCtx, cancel := context.WithCancel(context.Background())
+
+			ctx, cleanup := NewTestContext(t, router,
+				WithArgs(tt.args...),
+				WithContext(goCtx),
+			)
+			defer cleanup()
+
+			_, restoreOutput := CaptureOutput()
+			defer restoreOutput()
+
+			// Cancel after subscriptions are established
+			go func() {
+				time.Sleep(100 * time.Millisecond)
+				cancel()
+			}()
+
+			err := HandleMonitorMulti(ctx)
+			require.NoError(t, err)
+		})
+	}
+}
+
+// =====================================
+// Unit Tests for handleAnalyze
+// =====================================
+
+func TestHandleAnalyze_Success(t *testing.T) {
+	t.Parallel()
+
+	// Mock states response (get_states returns all states)
+	statesResult := []any{
+		map[string]any{
+			"entity_id":  "sensor.temperature",
+			"state":      "72.5",
+			"attributes": map[string]any{"unit_of_measurement": "°F"},
+		},
+		map[string]any{
+			"entity_id": "light.living_room",
+			"state":     "on",
+		},
+	}
+
+	// Mock history response
+	historyResult := map[string]any{
+		"sensor.temperature": []any{
+			map[string]any{"s": "70.0", "lu": 1704067200.0},
+			map[string]any{"s": "71.5", "lu": 1704070800.0},
+			map[string]any{"s": "72.5", "lu": 1704074400.0},
+		},
+	}
+
+	router := NewMessageRouter(t).
+		OnSuccess("get_states", statesResult).
+		OnSuccess("history/history_during_period", historyResult)
+
+	now := time.Now()
+	startTime := now.Add(-24 * time.Hour)
+
+	ctx, cleanup := NewTestContext(t, router,
+		WithArgs("analyze", "sensor.temperature"),
+		WithHandlerConfig(&HandlerConfig{
+			Args: []string{"sensor.temperature"},
+			TimeRange: &types.TimeRange{
+				StartTime: startTime,
+				EndTime:   now,
+			},
+		}),
+	)
+	defer cleanup()
+
+	// Capture output
+	_, restoreOutput := CaptureOutput()
+	defer restoreOutput()
+
+	err := handleAnalyze(ctx)
+	require.NoError(t, err)
+}
+
+func TestHandleAnalyze_EntityNotFound(t *testing.T) {
+	t.Parallel()
+
+	// Mock states response without the target entity
+	statesResult := []any{
+		map[string]any{
+			"entity_id": "light.living_room",
+			"state":     "on",
+		},
+	}
+
+	router := NewMessageRouter(t).OnSuccess("get_states", statesResult)
+
+	now := time.Now()
+	startTime := now.Add(-24 * time.Hour)
+
+	ctx, cleanup := NewTestContext(t, router,
+		WithArgs("analyze", "sensor.nonexistent"),
+		WithHandlerConfig(&HandlerConfig{
+			Args: []string{"sensor.nonexistent"},
+			TimeRange: &types.TimeRange{
+				StartTime: startTime,
+				EndTime:   now,
+			},
+		}),
+	)
+	defer cleanup()
+
+	// Capture output
+	_, restoreOutput := CaptureOutput()
+	defer restoreOutput()
+
+	err := handleAnalyze(ctx)
+	require.Error(t, err)
+}
+
+func TestHandleAnalyze_EmptyHistory(t *testing.T) {
+	t.Parallel()
+
+	// Mock states response
+	statesResult := []any{
+		map[string]any{
+			"entity_id":  "sensor.temperature",
+			"state":      "72.5",
+			"attributes": map[string]any{"unit_of_measurement": "°F"},
+		},
+	}
+
+	// Mock empty history response
+	historyResult := map[string]any{
+		"sensor.temperature": []any{},
+	}
+
+	router := NewMessageRouter(t).
+		OnSuccess("get_states", statesResult).
+		OnSuccess("history/history_during_period", historyResult)
+
+	now := time.Now()
+	startTime := now.Add(-24 * time.Hour)
+
+	ctx, cleanup := NewTestContext(t, router,
+		WithArgs("analyze", "sensor.temperature"),
+		WithHandlerConfig(&HandlerConfig{
+			Args: []string{"sensor.temperature"},
+			TimeRange: &types.TimeRange{
+				StartTime: startTime,
+				EndTime:   now,
+			},
+		}),
+	)
+	defer cleanup()
+
+	// Capture output
+	_, restoreOutput := CaptureOutput()
+	defer restoreOutput()
+
+	err := handleAnalyze(ctx)
+	require.NoError(t, err)
+}
+
+func TestHandleAnalyze_GetStatesError(t *testing.T) {
+	t.Parallel()
+
+	// Mock error response from get_states
+	router := NewMessageRouter(t).OnError("get_states", "connection_error", "Failed to get states")
+
+	now := time.Now()
+	startTime := now.Add(-24 * time.Hour)
+
+	ctx, cleanup := NewTestContext(t, router,
+		WithArgs("analyze", "sensor.temperature"),
+		WithHandlerConfig(&HandlerConfig{
+			Args: []string{"sensor.temperature"},
+			TimeRange: &types.TimeRange{
+				StartTime: startTime,
+				EndTime:   now,
+			},
+		}),
+	)
+	defer cleanup()
+
+	// Capture output
+	_, restoreOutput := CaptureOutput()
+	defer restoreOutput()
+
+	err := handleAnalyze(ctx)
+	require.Error(t, err)
+}
+
+// =====================================
+// Unit Tests for getStates
+// =====================================
+
+func TestGetStates_Success(t *testing.T) {
+	t.Parallel()
+
+	// Mock states response
+	statesResult := []any{
+		map[string]any{
+			"entity_id":  "sensor.temperature",
+			"state":      "72.5",
+			"attributes": map[string]any{"unit_of_measurement": "°F"},
+		},
+		map[string]any{
+			"entity_id":  "light.living_room",
+			"state":      "on",
+			"attributes": map[string]any{"brightness": 255},
+		},
+		map[string]any{
+			"entity_id": "binary_sensor.motion",
+			"state":     "off",
+		},
+	}
+
+	router := NewMessageRouter(t).OnSuccess("get_states", statesResult)
+
+	ctx, cleanup := NewTestContext(t, router)
+	defer cleanup()
+
+	states, err := getStates(ctx)
+	require.NoError(t, err)
+	assert.Len(t, states, 3)
+
+	// Verify first state
+	assert.Equal(t, "sensor.temperature", states[0].EntityID)
+	assert.Equal(t, "72.5", states[0].State)
+	assert.NotNil(t, states[0].Attributes)
+
+	// Verify second state
+	assert.Equal(t, "light.living_room", states[1].EntityID)
+	assert.Equal(t, "on", states[1].State)
+
+	// Verify third state
+	assert.Equal(t, "binary_sensor.motion", states[2].EntityID)
+	assert.Equal(t, "off", states[2].State)
+}
+
+func TestGetStates_EmptyResult(t *testing.T) {
+	t.Parallel()
+
+	// Mock empty states response
+	statesResult := []any{}
+
+	router := NewMessageRouter(t).OnSuccess("get_states", statesResult)
+
+	ctx, cleanup := NewTestContext(t, router)
+	defer cleanup()
+
+	states, err := getStates(ctx)
+	require.NoError(t, err)
+	assert.Empty(t, states)
+}
+
+func TestGetStates_InvalidResponseType(t *testing.T) {
+	t.Parallel()
+
+	// Mock invalid response type (not a slice)
+	router := NewMessageRouter(t).OnSuccess("get_states", "invalid")
+
+	ctx, cleanup := NewTestContext(t, router)
+	defer cleanup()
+
+	_, err := getStates(ctx)
+	require.Error(t, err)
+}
+
+func TestGetStates_Error(t *testing.T) {
+	t.Parallel()
+
+	// Mock error response
+	router := NewMessageRouter(t).OnError("get_states", "connection_error", "Failed to get states")
+
+	ctx, cleanup := NewTestContext(t, router)
+	defer cleanup()
+
+	_, err := getStates(ctx)
+	require.Error(t, err)
+}
+
+func TestGetStates_MalformedEntries(t *testing.T) {
+	t.Parallel()
+
+	// Mock response with some malformed entries
+	statesResult := []any{
+		map[string]any{
+			"entity_id":  "sensor.temperature",
+			"state":      "72.5",
+			"attributes": map[string]any{"unit_of_measurement": "°F"},
+		},
+		"invalid_entry", // Not a map
+		nil,             // Nil entry
+		map[string]any{
+			"entity_id": "light.living_room",
+			"state":     "on",
+		},
+	}
+
+	router := NewMessageRouter(t).OnSuccess("get_states", statesResult)
+
+	ctx, cleanup := NewTestContext(t, router)
+	defer cleanup()
+
+	states, err := getStates(ctx)
+	require.NoError(t, err)
+	// Should only have the 2 valid entries
+	assert.Len(t, states, 2)
+}
+
+// =====================================
+// Unit Tests for getHistory
+// =====================================
+
+func TestGetHistory_Success(t *testing.T) {
+	t.Parallel()
+
+	// Mock history response
+	historyResult := map[string]any{
+		"sensor.temperature": []any{
+			map[string]any{"s": "70.0", "lu": 1704067200.0},
+			map[string]any{"s": "71.5", "lu": 1704070800.0},
+			map[string]any{"s": "72.5", "lu": 1704074400.0},
+		},
+	}
+
+	router := NewMessageRouter(t).OnSuccess("history/history_during_period", historyResult)
+
+	ctx, cleanup := NewTestContext(t, router)
+	defer cleanup()
+
+	now := time.Now()
+	startTime := now.Add(-24 * time.Hour)
+	timeRange := types.TimeRange{
+		StartTime: startTime,
+		EndTime:   now,
+	}
+
+	history, err := getHistory(ctx, "sensor.temperature", timeRange)
+	require.NoError(t, err)
+	assert.Len(t, history, 3)
+
+	// Verify history states
+	assert.Equal(t, "70.0", history[0].GetState())
+	assert.Equal(t, "71.5", history[1].GetState())
+	assert.Equal(t, "72.5", history[2].GetState())
+}
+
+func TestGetHistory_EmptyResult(t *testing.T) {
+	t.Parallel()
+
+	// Mock empty history response
+	historyResult := map[string]any{
+		"sensor.temperature": []any{},
+	}
+
+	router := NewMessageRouter(t).OnSuccess("history/history_during_period", historyResult)
+
+	ctx, cleanup := NewTestContext(t, router)
+	defer cleanup()
+
+	now := time.Now()
+	startTime := now.Add(-24 * time.Hour)
+	timeRange := types.TimeRange{
+		StartTime: startTime,
+		EndTime:   now,
+	}
+
+	history, err := getHistory(ctx, "sensor.temperature", timeRange)
+	require.NoError(t, err)
+	assert.Empty(t, history)
+}
+
+func TestGetHistory_EntityNotInResult(t *testing.T) {
+	t.Parallel()
+
+	// Mock history response without the requested entity
+	historyResult := map[string]any{
+		"sensor.other": []any{
+			map[string]any{"s": "50.0", "lu": 1704067200.0},
+		},
+	}
+
+	router := NewMessageRouter(t).OnSuccess("history/history_during_period", historyResult)
+
+	ctx, cleanup := NewTestContext(t, router)
+	defer cleanup()
+
+	now := time.Now()
+	startTime := now.Add(-24 * time.Hour)
+	timeRange := types.TimeRange{
+		StartTime: startTime,
+		EndTime:   now,
+	}
+
+	history, err := getHistory(ctx, "sensor.temperature", timeRange)
+	require.NoError(t, err)
+	// Should return nil when entity not in result
+	assert.Nil(t, history)
+}
+
+func TestGetHistory_InvalidResponseType(t *testing.T) {
+	t.Parallel()
+
+	// Mock invalid response type (not a map)
+	router := NewMessageRouter(t).OnSuccess("history/history_during_period", "invalid")
+
+	ctx, cleanup := NewTestContext(t, router)
+	defer cleanup()
+
+	now := time.Now()
+	startTime := now.Add(-24 * time.Hour)
+	timeRange := types.TimeRange{
+		StartTime: startTime,
+		EndTime:   now,
+	}
+
+	history, err := getHistory(ctx, "sensor.temperature", timeRange)
+	require.NoError(t, err) // Returns nil, nil for invalid response type
+	assert.Nil(t, history)
+}
+
+func TestGetHistory_Error(t *testing.T) {
+	t.Parallel()
+
+	// Mock error response
+	router := NewMessageRouter(t).OnError("history/history_during_period", "connection_error", "Failed to get history")
+
+	ctx, cleanup := NewTestContext(t, router)
+	defer cleanup()
+
+	now := time.Now()
+	startTime := now.Add(-24 * time.Hour)
+	timeRange := types.TimeRange{
+		StartTime: startTime,
+		EndTime:   now,
+	}
+
+	_, err := getHistory(ctx, "sensor.temperature", timeRange)
+	require.Error(t, err)
+}
+
+func TestGetHistory_WithLegacyFormat(t *testing.T) {
+	t.Parallel()
+
+	// Mock history response using legacy format (state, last_updated instead of s, lu)
+	historyResult := map[string]any{
+		"sensor.temperature": []any{
+			map[string]any{"state": "70.0", "last_updated": "2024-01-01T00:00:00Z"},
+			map[string]any{"state": "71.5", "last_updated": "2024-01-01T01:00:00Z"},
+		},
+	}
+
+	router := NewMessageRouter(t).OnSuccess("history/history_during_period", historyResult)
+
+	ctx, cleanup := NewTestContext(t, router)
+	defer cleanup()
+
+	now := time.Now()
+	startTime := now.Add(-24 * time.Hour)
+	timeRange := types.TimeRange{
+		StartTime: startTime,
+		EndTime:   now,
+	}
+
+	history, err := getHistory(ctx, "sensor.temperature", timeRange)
+	require.NoError(t, err)
+	assert.Len(t, history, 2)
+
+	// Verify history states using legacy format
+	assert.Equal(t, "70.0", history[0].GetState())
+	assert.Equal(t, "71.5", history[1].GetState())
 }

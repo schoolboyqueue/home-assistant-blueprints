@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -504,4 +505,1257 @@ func BenchmarkStripAutomationPrefix(b *testing.B) {
 		input := inputs[i%len(inputs)]
 		_ = stripAutomationPrefix(input)
 	}
+}
+
+// =====================================
+// Handler Unit Tests
+// =====================================
+
+func TestHandleTraces(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		args        []string
+		traces      []types.TraceInfo
+		expectError bool
+		description string
+	}{
+		{
+			name: "success with traces",
+			args: []string{},
+			traces: []types.TraceInfo{
+				MockTraceInfoFull("kitchen_lights", "run-001", "stopped", "finished"),
+				MockTraceInfoFull("kitchen_lights", "run-002", "stopped", "finished"),
+			},
+			expectError: false,
+			description: "Returns list of traces when traces exist",
+		},
+		{
+			name:        "empty results",
+			args:        []string{},
+			traces:      []types.TraceInfo{},
+			expectError: false,
+			description: "Returns empty list when no traces exist",
+		},
+		{
+			name: "with automation filter",
+			args: []string{"kitchen_lights"},
+			traces: []types.TraceInfo{
+				MockTraceInfoFull("kitchen_lights", "run-001", "stopped", "finished"),
+			},
+			expectError: false,
+			description: "Returns filtered traces for specific automation",
+		},
+		{
+			name: "with numeric automation ID",
+			args: []string{"1764091895602"},
+			traces: []types.TraceInfo{
+				MockTraceInfo("1764091895602", "run-001", "finished"),
+			},
+			expectError: false,
+			description: "Works with numeric automation IDs (internal IDs)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Create router with appropriate handlers
+			router := NewMessageRouter(t)
+
+			// Handle trace/list
+			router.OnSuccess("trace/list", tt.traces)
+
+			// Handle get_states for ID resolution (for non-numeric IDs)
+			router.OnSuccess("get_states", []types.HAState{
+				MockStateWithAttrs("automation.kitchen_lights", "on", map[string]any{
+					"id":             "12345",
+					"last_triggered": "2024-01-15T10:00:00Z",
+				}),
+			})
+
+			// Set up config with automation ID if provided
+			var config *HandlerConfig
+			if len(tt.args) > 0 {
+				config = &HandlerConfig{
+					AutomationID: tt.args[0],
+					Args:         tt.args,
+				}
+			} else {
+				config = &HandlerConfig{}
+			}
+
+			ctx, cleanup := NewTestContext(t, router, WithArgs(tt.args...), WithHandlerConfig(config))
+			defer cleanup()
+
+			err := handleTraces(ctx)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHandleTracesWithFromTimeFilter(t *testing.T) {
+	t.Parallel()
+
+	// Create traces with timestamps
+	now := time.Now().UTC()
+	old := now.Add(-24 * time.Hour)
+
+	traces := []types.TraceInfo{
+		{
+			ItemID:          "kitchen_lights",
+			RunID:           "run-new",
+			ScriptExecution: "finished",
+			Timestamp: &types.Timestamp{
+				Start: now.Format(time.RFC3339),
+			},
+		},
+		{
+			ItemID:          "kitchen_lights",
+			RunID:           "run-old",
+			ScriptExecution: "finished",
+			Timestamp: &types.Timestamp{
+				Start: old.Format(time.RFC3339),
+			},
+		},
+	}
+
+	router := NewMessageRouter(t).OnSuccess("trace/list", traces)
+
+	// Filter to only traces after 12 hours ago
+	filterTime := now.Add(-12 * time.Hour)
+
+	ctx, cleanup := NewTestContext(t, router,
+		WithFromTime(filterTime),
+		WithHandlerConfig(&HandlerConfig{}),
+	)
+	defer cleanup()
+
+	err := handleTraces(ctx)
+	assert.NoError(t, err)
+}
+
+func TestHandleTracesWebSocketError(t *testing.T) {
+	t.Parallel()
+
+	router := NewMessageRouter(t).OnError("trace/list", "unknown_error", "Something went wrong")
+
+	ctx, cleanup := NewTestContext(t, router, WithHandlerConfig(&HandlerConfig{}))
+	defer cleanup()
+
+	err := handleTraces(ctx)
+	assert.Error(t, err)
+}
+
+func TestHandleTrace(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		config      *HandlerConfig
+		traceDetail types.TraceDetail
+		expectError bool
+	}{
+		{
+			name: "success case",
+			config: &HandlerConfig{
+				AutomationID: "kitchen_lights",
+				Args:         []string{"kitchen_lights", "run-001"},
+			},
+			traceDetail: MockTraceDetail("kitchen_lights", "run-001"),
+			expectError: false,
+		},
+		{
+			name: "with numeric automation ID",
+			config: &HandlerConfig{
+				AutomationID: "1764091895602",
+				Args:         []string{"1764091895602", "run-002"},
+			},
+			traceDetail: MockTraceDetail("1764091895602", "run-002"),
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewMessageRouter(t)
+			router.OnSuccess("trace/get", tt.traceDetail)
+			// For ID resolution
+			router.OnSuccess("get_states", []types.HAState{
+				MockStateWithAttrs("automation.kitchen_lights", "on", map[string]any{
+					"id": "12345",
+				}),
+			})
+
+			ctx, cleanup := NewTestContext(t, router, WithHandlerConfig(tt.config))
+			defer cleanup()
+
+			err := handleTrace(ctx)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHandleTraceError(t *testing.T) {
+	t.Parallel()
+
+	router := NewMessageRouter(t).OnError("trace/get", "trace_not_found", "Trace not found")
+	router.OnSuccess("get_states", []types.HAState{})
+
+	config := &HandlerConfig{
+		AutomationID: "kitchen_lights",
+		Args:         []string{"kitchen_lights", "invalid-run"},
+	}
+
+	ctx, cleanup := NewTestContext(t, router, WithHandlerConfig(config))
+	defer cleanup()
+
+	err := handleTrace(ctx)
+	assert.Error(t, err)
+}
+
+func TestHandleTraceLatest(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		config      *HandlerConfig
+		traces      []types.TraceInfo
+		traceDetail types.TraceDetail
+		expectError bool
+	}{
+		{
+			name: "success with traces",
+			config: &HandlerConfig{
+				AutomationID: "kitchen_lights",
+				Args:         []string{"kitchen_lights"},
+			},
+			traces: []types.TraceInfo{
+				MockTraceInfoFull("kitchen_lights", "run-003", "stopped", "finished"),
+				MockTraceInfoFull("kitchen_lights", "run-002", "stopped", "finished"),
+			},
+			traceDetail: MockTraceDetail("kitchen_lights", "run-003"),
+			expectError: false,
+		},
+		{
+			name: "no traces available",
+			config: &HandlerConfig{
+				AutomationID: "empty_automation",
+				Args:         []string{"empty_automation"},
+			},
+			traces:      []types.TraceInfo{},
+			traceDetail: types.TraceDetail{},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewMessageRouter(t)
+			router.OnSuccess("trace/list", tt.traces)
+			router.OnSuccess("trace/get", tt.traceDetail)
+			router.OnSuccess("get_states", []types.HAState{
+				MockStateWithAttrs("automation.kitchen_lights", "on", map[string]any{
+					"id": "12345",
+				}),
+			})
+
+			ctx, cleanup := NewTestContext(t, router, WithHandlerConfig(tt.config))
+			defer cleanup()
+
+			err := handleTraceLatest(ctx)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHandleTraceSummary(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		config      *HandlerConfig
+		traces      []types.TraceInfo
+		traceDetail types.TraceDetail
+		expectError bool
+	}{
+		{
+			name: "success with mixed states",
+			config: &HandlerConfig{
+				AutomationID: "kitchen_lights",
+				Args:         []string{"kitchen_lights"},
+			},
+			traces: []types.TraceInfo{
+				MockTraceInfoFull("kitchen_lights", "run-003", "stopped", "finished"),
+				MockTraceInfoFull("kitchen_lights", "run-002", "stopped", "finished"),
+				MockTraceInfoFull("kitchen_lights", "run-001", "stopped", "error"),
+			},
+			traceDetail: MockTraceDetail("kitchen_lights", "run-003"),
+			expectError: false,
+		},
+		{
+			name: "no traces - prints message",
+			config: &HandlerConfig{
+				AutomationID: "empty_automation",
+				Args:         []string{"empty_automation"},
+			},
+			traces:      []types.TraceInfo{},
+			traceDetail: types.TraceDetail{},
+			expectError: false, // Prints message but doesn't return error
+		},
+		{
+			name: "with error in trace",
+			config: &HandlerConfig{
+				AutomationID: "failing_automation",
+				Args:         []string{"failing_automation"},
+			},
+			traces: []types.TraceInfo{
+				MockTraceInfoFull("failing_automation", "run-001", "stopped", "error"),
+			},
+			traceDetail: types.TraceDetail{
+				ItemID:          "failing_automation",
+				RunID:           "run-001",
+				ScriptExecution: "error",
+				Error:           "Service not available",
+				Trigger:         map[string]any{"platform": "state"},
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewMessageRouter(t)
+			router.OnSuccess("trace/list", tt.traces)
+			router.OnSuccess("trace/get", tt.traceDetail)
+			router.OnSuccess("get_states", []types.HAState{})
+
+			ctx, cleanup := NewTestContext(t, router, WithHandlerConfig(tt.config))
+			defer cleanup()
+
+			err := handleTraceSummary(ctx)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHandleTraceVars(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		config      *HandlerConfig
+		traceDetail types.TraceDetail
+		expectError bool
+	}{
+		{
+			name: "with variables",
+			config: &HandlerConfig{
+				AutomationID: "kitchen_lights",
+				Args:         []string{"kitchen_lights", "run-001"},
+			},
+			traceDetail: types.TraceDetail{
+				ItemID:          "kitchen_lights",
+				RunID:           "run-001",
+				ScriptExecution: "finished",
+				Trace: map[string][]types.TraceStep{
+					"action/0": {
+						{
+							Path:      "action/0",
+							Timestamp: time.Now().UTC().Format(time.RFC3339),
+							Variables: map[string]any{
+								"trigger": map[string]any{"platform": "state", "entity_id": "sensor.motion"},
+								"target":  "light.kitchen",
+							},
+						},
+					},
+					"action/1": {
+						{
+							Path:      "action/1",
+							Timestamp: time.Now().UTC().Format(time.RFC3339),
+							ChangedVariables: map[string]any{
+								"result": "success",
+							},
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "empty variables",
+			config: &HandlerConfig{
+				AutomationID: "simple_automation",
+				Args:         []string{"simple_automation", "run-002"},
+			},
+			traceDetail: types.TraceDetail{
+				ItemID:          "simple_automation",
+				RunID:           "run-002",
+				ScriptExecution: "finished",
+				Trace:           map[string][]types.TraceStep{}, // No trace steps with variables
+			},
+			expectError: false,
+		},
+		{
+			name: "nil trace map",
+			config: &HandlerConfig{
+				AutomationID: "minimal_automation",
+				Args:         []string{"minimal_automation", "run-003"},
+			},
+			traceDetail: types.TraceDetail{
+				ItemID:          "minimal_automation",
+				RunID:           "run-003",
+				ScriptExecution: "finished",
+				Trace:           nil, // No trace at all
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewMessageRouter(t)
+			router.OnSuccess("trace/get", tt.traceDetail)
+			router.OnSuccess("get_states", []types.HAState{})
+
+			ctx, cleanup := NewTestContext(t, router, WithHandlerConfig(tt.config))
+			defer cleanup()
+
+			err := handleTraceVars(ctx)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHandleTraceTimeline(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC()
+
+	tests := []struct {
+		name        string
+		config      *HandlerConfig
+		traceDetail types.TraceDetail
+		expectError bool
+	}{
+		{
+			name: "with steps",
+			config: &HandlerConfig{
+				AutomationID: "kitchen_lights",
+				Args:         []string{"kitchen_lights", "run-001"},
+			},
+			traceDetail: types.TraceDetail{
+				ItemID:          "kitchen_lights",
+				RunID:           "run-001",
+				ScriptExecution: "finished",
+				Trace: map[string][]types.TraceStep{
+					"trigger/0": {
+						{
+							Path:      "trigger/0",
+							Timestamp: now.Add(-2 * time.Second).Format(time.RFC3339),
+						},
+					},
+					"action/0": {
+						{
+							Path:      "action/0",
+							Timestamp: now.Add(-1 * time.Second).Format(time.RFC3339),
+						},
+					},
+					"action/1": {
+						{
+							Path:      "action/1",
+							Timestamp: now.Format(time.RFC3339),
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "with errors in steps",
+			config: &HandlerConfig{
+				AutomationID: "failing_automation",
+				Args:         []string{"failing_automation", "run-002"},
+			},
+			traceDetail: types.TraceDetail{
+				ItemID:          "failing_automation",
+				RunID:           "run-002",
+				ScriptExecution: "error",
+				Trace: map[string][]types.TraceStep{
+					"trigger/0": {
+						{
+							Path:      "trigger/0",
+							Timestamp: now.Add(-2 * time.Second).Format(time.RFC3339),
+						},
+					},
+					"action/0": {
+						{
+							Path:      "action/0",
+							Timestamp: now.Add(-1 * time.Second).Format(time.RFC3339),
+							Error:     "Service 'light.turn_on' not found",
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "empty trace",
+			config: &HandlerConfig{
+				AutomationID: "minimal_automation",
+				Args:         []string{"minimal_automation", "run-003"},
+			},
+			traceDetail: types.TraceDetail{
+				ItemID:          "minimal_automation",
+				RunID:           "run-003",
+				ScriptExecution: "finished",
+				Trace:           nil,
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewMessageRouter(t)
+			router.OnSuccess("trace/get", tt.traceDetail)
+			router.OnSuccess("get_states", []types.HAState{})
+
+			ctx, cleanup := NewTestContext(t, router, WithHandlerConfig(tt.config))
+			defer cleanup()
+
+			err := handleTraceTimeline(ctx)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHandleTraceTrigger(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		config      *HandlerConfig
+		traceDetail types.TraceDetail
+		expectError bool
+	}{
+		{
+			name: "with trigger",
+			config: &HandlerConfig{
+				AutomationID: "kitchen_lights",
+				Args:         []string{"kitchen_lights", "run-001"},
+			},
+			traceDetail: types.TraceDetail{
+				ItemID:          "kitchen_lights",
+				RunID:           "run-001",
+				ScriptExecution: "finished",
+				Trigger: map[string]any{
+					"platform":  "state",
+					"entity_id": "binary_sensor.motion",
+					"from":      "off",
+					"to":        "on",
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "nil trigger",
+			config: &HandlerConfig{
+				AutomationID: "time_automation",
+				Args:         []string{"time_automation", "run-002"},
+			},
+			traceDetail: types.TraceDetail{
+				ItemID:          "time_automation",
+				RunID:           "run-002",
+				ScriptExecution: "finished",
+				Trigger:         nil,
+			},
+			expectError: false, // Prints message but no error
+		},
+		{
+			name: "with time trigger",
+			config: &HandlerConfig{
+				AutomationID: "sunset_automation",
+				Args:         []string{"sunset_automation", "run-003"},
+			},
+			traceDetail: types.TraceDetail{
+				ItemID:          "sunset_automation",
+				RunID:           "run-003",
+				ScriptExecution: "finished",
+				Trigger: map[string]any{
+					"platform": "sun",
+					"event":    "sunset",
+					"offset":   "-00:30:00",
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "with event trigger",
+			config: &HandlerConfig{
+				AutomationID: "event_automation",
+				Args:         []string{"event_automation", "run-004"},
+			},
+			traceDetail: types.TraceDetail{
+				ItemID:          "event_automation",
+				RunID:           "run-004",
+				ScriptExecution: "finished",
+				Trigger: map[string]any{
+					"platform":   "event",
+					"event_type": "homeassistant_started",
+				},
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewMessageRouter(t)
+			router.OnSuccess("trace/get", tt.traceDetail)
+			router.OnSuccess("get_states", []types.HAState{})
+
+			ctx, cleanup := NewTestContext(t, router, WithHandlerConfig(tt.config))
+			defer cleanup()
+
+			err := handleTraceTrigger(ctx)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHandleTraceActions(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC()
+
+	tests := []struct {
+		name        string
+		config      *HandlerConfig
+		traceDetail types.TraceDetail
+		expectError bool
+	}{
+		{
+			name: "with actions",
+			config: &HandlerConfig{
+				AutomationID: "kitchen_lights",
+				Args:         []string{"kitchen_lights", "run-001"},
+			},
+			traceDetail: types.TraceDetail{
+				ItemID:          "kitchen_lights",
+				RunID:           "run-001",
+				ScriptExecution: "finished",
+				Trace: map[string][]types.TraceStep{
+					"action/0": {
+						{
+							Path:      "action/0",
+							Timestamp: now.Format(time.RFC3339),
+							Result: &types.TraceResult{
+								Enabled: true,
+								Response: map[string]any{
+									"success": true,
+								},
+							},
+						},
+					},
+					"action/1": {
+						{
+							Path:      "action/1",
+							Timestamp: now.Add(1 * time.Second).Format(time.RFC3339),
+							Result: &types.TraceResult{
+								Enabled: true,
+							},
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "no action steps",
+			config: &HandlerConfig{
+				AutomationID: "trigger_only",
+				Args:         []string{"trigger_only", "run-002"},
+			},
+			traceDetail: types.TraceDetail{
+				ItemID:          "trigger_only",
+				RunID:           "run-002",
+				ScriptExecution: "finished",
+				Trace: map[string][]types.TraceStep{
+					"trigger/0": {
+						{
+							Path:      "trigger/0",
+							Timestamp: now.Format(time.RFC3339),
+						},
+					},
+					"condition/0": {
+						{
+							Path:      "condition/0",
+							Timestamp: now.Add(1 * time.Second).Format(time.RFC3339),
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "nil trace",
+			config: &HandlerConfig{
+				AutomationID: "minimal_automation",
+				Args:         []string{"minimal_automation", "run-003"},
+			},
+			traceDetail: types.TraceDetail{
+				ItemID:          "minimal_automation",
+				RunID:           "run-003",
+				ScriptExecution: "finished",
+				Trace:           nil,
+			},
+			expectError: false,
+		},
+		{
+			name: "action with nil result",
+			config: &HandlerConfig{
+				AutomationID: "simple_action",
+				Args:         []string{"simple_action", "run-004"},
+			},
+			traceDetail: types.TraceDetail{
+				ItemID:          "simple_action",
+				RunID:           "run-004",
+				ScriptExecution: "finished",
+				Trace: map[string][]types.TraceStep{
+					"action/0": {
+						{
+							Path:      "action/0",
+							Timestamp: now.Format(time.RFC3339),
+							Result:    nil,
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewMessageRouter(t)
+			router.OnSuccess("trace/get", tt.traceDetail)
+			router.OnSuccess("get_states", []types.HAState{})
+
+			ctx, cleanup := NewTestContext(t, router, WithHandlerConfig(tt.config))
+			defer cleanup()
+
+			err := handleTraceActions(ctx)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHandleTraceDebug(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		config      *HandlerConfig
+		traceDetail types.TraceDetail
+		expectError bool
+	}{
+		{
+			name: "comprehensive trace",
+			config: &HandlerConfig{
+				AutomationID: "kitchen_lights",
+				Args:         []string{"kitchen_lights", "run-001"},
+			},
+			traceDetail: MockTraceDetailWithTrigger("kitchen_lights", "run-001", map[string]any{
+				"platform":  "state",
+				"entity_id": "binary_sensor.motion",
+			}),
+			expectError: false,
+		},
+		{
+			name: "with automation prefix",
+			config: &HandlerConfig{
+				AutomationID: "automation.living_room",
+				Args:         []string{"automation.living_room", "run-002"},
+			},
+			traceDetail: MockTraceDetail("living_room", "run-002"),
+			expectError: false,
+		},
+		{
+			name: "with numeric ID",
+			config: &HandlerConfig{
+				AutomationID: "1764091895602",
+				Args:         []string{"1764091895602", "run-003"},
+			},
+			traceDetail: MockTraceDetail("1764091895602", "run-003"),
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewMessageRouter(t)
+			router.OnSuccess("trace/get", tt.traceDetail)
+			router.OnSuccess("get_states", []types.HAState{})
+
+			ctx, cleanup := NewTestContext(t, router, WithHandlerConfig(tt.config))
+			defer cleanup()
+
+			err := handleTraceDebug(ctx)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHandleTraceDebugError(t *testing.T) {
+	t.Parallel()
+
+	router := NewMessageRouter(t).OnError("trace/get", "trace_not_found", "Trace not found")
+	router.OnSuccess("get_states", []types.HAState{})
+
+	config := &HandlerConfig{
+		AutomationID: "invalid_automation",
+		Args:         []string{"invalid_automation", "invalid-run"},
+	}
+
+	ctx, cleanup := NewTestContext(t, router, WithHandlerConfig(config))
+	defer cleanup()
+
+	err := handleTraceDebug(ctx)
+	assert.Error(t, err)
+}
+
+func TestHandleAutomationConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		config      *HandlerConfig
+		traces      []types.TraceInfo
+		traceDetail types.TraceDetail
+		apiConfig   map[string]any
+		expectError bool
+	}{
+		{
+			name: "from trace with config",
+			config: &HandlerConfig{
+				Args: []string{"kitchen_lights"},
+			},
+			traces: []types.TraceInfo{
+				MockTraceInfoFull("kitchen_lights", "run-001", "stopped", "finished"),
+			},
+			traceDetail: MockTraceDetailWithConfig("kitchen_lights", "run-001", &types.AutomationConfig{
+				ID:    "kitchen_lights",
+				Alias: "Kitchen Lights",
+				Trigger: []any{
+					map[string]any{"platform": "state", "entity_id": "binary_sensor.motion"},
+				},
+				Action: []any{
+					map[string]any{"service": "light.turn_on", "target": map[string]any{"entity_id": "light.kitchen"}},
+				},
+			}),
+			apiConfig:   nil,
+			expectError: false,
+		},
+		{
+			name: "from API fallback",
+			config: &HandlerConfig{
+				Args: []string{"api_automation"},
+			},
+			traces:      []types.TraceInfo{}, // No traces available
+			traceDetail: types.TraceDetail{},
+			apiConfig: map[string]any{
+				"config": map[string]any{
+					"id":    "api_automation",
+					"alias": "API Automation",
+					"trigger": []any{
+						map[string]any{"platform": "time", "at": "08:00:00"},
+					},
+					"action": []any{
+						map[string]any{"service": "light.turn_on"},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "minimal config - blueprint with no traces",
+			config: &HandlerConfig{
+				Args: []string{"blueprint_auto"},
+			},
+			traces:      []types.TraceInfo{},
+			traceDetail: types.TraceDetail{},
+			apiConfig: map[string]any{
+				"config": map[string]any{
+					"id":    "blueprint_auto",
+					"alias": "Blueprint Automation",
+					// No trigger/action - blueprint automation with no stored traces
+				},
+			},
+			expectError: false, // Should print message but not error
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewMessageRouter(t)
+			router.OnSuccess("trace/list", tt.traces)
+			router.OnSuccess("trace/get", tt.traceDetail)
+			if tt.apiConfig != nil {
+				router.OnSuccess("automation/config", tt.apiConfig)
+			}
+			router.OnSuccess("get_states", []types.HAState{})
+
+			ctx, cleanup := NewTestContext(t, router, WithHandlerConfig(tt.config))
+			defer cleanup()
+
+			err := handleAutomationConfig(ctx)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHandleAutomationConfigError(t *testing.T) {
+	t.Parallel()
+
+	router := NewMessageRouter(t)
+	router.OnSuccess("trace/list", []types.TraceInfo{})
+	router.OnError("automation/config", "not_found", "Automation not found")
+	router.OnSuccess("get_states", []types.HAState{})
+
+	config := &HandlerConfig{
+		Args: []string{"nonexistent_automation"},
+	}
+
+	ctx, cleanup := NewTestContext(t, router, WithHandlerConfig(config))
+	defer cleanup()
+
+	err := handleAutomationConfig(ctx)
+	assert.Error(t, err)
+}
+
+func TestHandleBlueprintInputs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		config      *HandlerConfig
+		apiConfig   map[string]any
+		expectError bool
+	}{
+		{
+			name: "with blueprint",
+			config: &HandlerConfig{
+				Args: []string{"blueprint_automation"},
+			},
+			apiConfig: map[string]any{
+				"config": map[string]any{
+					"id":    "blueprint_automation",
+					"alias": "Blueprint Automation",
+					"use_blueprint": map[string]any{
+						"path": "homeassistant/motion_light.yaml",
+						"input": map[string]any{
+							"motion_entity": "binary_sensor.hallway_motion",
+							"light_target":  "light.hallway",
+							"wait_time":     120,
+						},
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "no blueprint",
+			config: &HandlerConfig{
+				Args: []string{"regular_automation"},
+			},
+			apiConfig: map[string]any{
+				"config": map[string]any{
+					"id":    "regular_automation",
+					"alias": "Regular Automation",
+					"trigger": []any{
+						map[string]any{"platform": "state"},
+					},
+					// No use_blueprint
+				},
+			},
+			expectError: false, // Prints message but no error
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewMessageRouter(t)
+			router.OnSuccess("automation/config", tt.apiConfig)
+
+			ctx, cleanup := NewTestContext(t, router, WithHandlerConfig(tt.config))
+			defer cleanup()
+
+			err := handleBlueprintInputs(ctx)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHandleBlueprintInputsError(t *testing.T) {
+	t.Parallel()
+
+	router := NewMessageRouter(t).OnError("automation/config", "not_found", "Automation not found")
+
+	config := &HandlerConfig{
+		Args: []string{"nonexistent_automation"},
+	}
+
+	ctx, cleanup := NewTestContext(t, router, WithHandlerConfig(config))
+	defer cleanup()
+
+	err := handleBlueprintInputs(ctx)
+	assert.Error(t, err)
+}
+
+// =====================================
+// getTraceDetail Tests
+// =====================================
+
+func TestGetTraceDetail(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		automationID string
+		runID        string
+		traceDetail  types.TraceDetail
+		expectError  bool
+	}{
+		{
+			name:         "success case",
+			automationID: "kitchen_lights",
+			runID:        "run-001",
+			traceDetail:  MockTraceDetail("kitchen_lights", "run-001"),
+			expectError:  false,
+		},
+		{
+			name:         "with automation prefix",
+			automationID: "automation.kitchen_lights",
+			runID:        "run-002",
+			traceDetail:  MockTraceDetail("kitchen_lights", "run-002"),
+			expectError:  false,
+		},
+		{
+			name:         "with numeric ID",
+			automationID: "1764091895602",
+			runID:        "run-003",
+			traceDetail:  MockTraceDetail("1764091895602", "run-003"),
+			expectError:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewMessageRouter(t)
+			router.OnSuccess("trace/get", tt.traceDetail)
+			router.OnSuccess("get_states", []types.HAState{})
+
+			ctx, cleanup := NewTestContext(t, router, WithHandlerConfig(&HandlerConfig{}))
+			defer cleanup()
+
+			result, err := getTraceDetail(ctx.Client, tt.automationID, tt.runID)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Nil(t, result)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, result)
+				assert.Equal(t, tt.runID, result.RunID)
+			}
+		})
+	}
+}
+
+func TestGetTraceDetailError(t *testing.T) {
+	t.Parallel()
+
+	router := NewMessageRouter(t).OnError("trace/get", "trace_not_found", "Trace not found")
+	router.OnSuccess("get_states", []types.HAState{})
+
+	ctx, cleanup := NewTestContext(t, router, WithHandlerConfig(&HandlerConfig{}))
+	defer cleanup()
+
+	result, err := getTraceDetail(ctx.Client, "kitchen_lights", "invalid-run")
+	assert.Error(t, err)
+	assert.Nil(t, result)
+}
+
+// =====================================
+// resolveAutomationInternalID Tests
+// =====================================
+
+func TestResolveAutomationInternalID(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		automationID string
+		states       []types.HAState
+		expectedID   string
+		description  string
+	}{
+		{
+			name:         "numeric ID passthrough",
+			automationID: "1764091895602",
+			states:       []types.HAState{},
+			expectedID:   "1764091895602",
+			description:  "Numeric IDs should pass through unchanged",
+		},
+		{
+			name:         "empty string passthrough",
+			automationID: "",
+			states:       []types.HAState{},
+			expectedID:   "",
+			description:  "Empty string should return empty",
+		},
+		{
+			name:         "entity name resolved to ID",
+			automationID: "guest_bedroom_adaptive_shade",
+			states: []types.HAState{
+				MockStateWithAttrs("automation.guest_bedroom_adaptive_shade", "on", map[string]any{
+					"id":             "1764091895602",
+					"last_triggered": "2024-01-15T10:00:00Z",
+				}),
+			},
+			expectedID:  "1764091895602",
+			description: "Entity name should be resolved to internal ID via get_states",
+		},
+		{
+			name:         "entity name not found - fallback",
+			automationID: "nonexistent_automation",
+			states: []types.HAState{
+				MockStateWithAttrs("automation.kitchen_lights", "on", map[string]any{
+					"id": "12345",
+				}),
+			},
+			expectedID:  "nonexistent_automation",
+			description: "Non-existent entity should fall back to original ID",
+		},
+		{
+			name:         "entity without ID attribute - fallback",
+			automationID: "old_automation",
+			states: []types.HAState{
+				MockStateWithAttrs("automation.old_automation", "on", map[string]any{
+					"last_triggered": "2024-01-15T10:00:00Z",
+					// No "id" attribute
+				}),
+			},
+			expectedID:  "old_automation",
+			description: "Entity without ID attribute should fall back to original",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewMessageRouter(t)
+			router.OnSuccess("get_states", tt.states)
+
+			ctx, cleanup := NewTestContext(t, router, WithHandlerConfig(&HandlerConfig{}))
+			defer cleanup()
+
+			result := resolveAutomationInternalID(ctx.Client, tt.automationID)
+			assert.Equal(t, tt.expectedID, result, tt.description)
+		})
+	}
+}
+
+func TestResolveAutomationInternalIDWithGetStatesError(t *testing.T) {
+	t.Parallel()
+
+	router := NewMessageRouter(t).OnError("get_states", "connection_error", "Connection failed")
+
+	ctx, cleanup := NewTestContext(t, router, WithHandlerConfig(&HandlerConfig{}))
+	defer cleanup()
+
+	// When get_states fails, it should fall back to the original ID
+	result := resolveAutomationInternalID(ctx.Client, "kitchen_lights")
+	assert.Equal(t, "kitchen_lights", result)
 }

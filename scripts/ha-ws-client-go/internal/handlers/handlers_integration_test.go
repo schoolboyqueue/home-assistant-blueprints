@@ -1037,6 +1037,309 @@ func TestIntegration_HandleTraces_WithTraces(t *testing.T) {
 }
 
 // =============================================================================
+// Trace Detail Command Tests
+// =============================================================================
+
+// getTestTraceRunID is a helper that retrieves a valid run_id for trace tests.
+// It ensures a trace exists by triggering the test automation if needed.
+func getTestTraceRunID(t *testing.T, c *client.Client) string {
+	t.Helper()
+
+	// First, trigger the automation to ensure we have a trace
+	_, err := c.SendMessage("call_service", map[string]any{
+		"domain":  "input_number",
+		"service": "set_value",
+		"target": map[string]any{
+			"entity_id": testInputNumber,
+		},
+		"service_data": map[string]any{
+			"value": 25.0 + float64(time.Now().Unix()%10), // Vary value to ensure change
+		},
+	})
+	require.NoError(t, err)
+
+	time.Sleep(1 * time.Second)
+
+	// Get traces for the test automation
+	traces, err := client.SendMessageTyped[[]types.TraceInfo](c, "trace/list", map[string]any{
+		"domain":  "automation",
+		"item_id": testAutomationID,
+	})
+	require.NoError(t, err)
+
+	if len(traces) == 0 {
+		t.Skip("No traces available for test automation - skipping")
+	}
+
+	return traces[0].RunID
+}
+
+func TestIntegration_HandleTrace_WithValidRunID(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	runID := getTestTraceRunID(t, c)
+
+	// Call the trace command with valid run_id
+	ctx := testContext(t, c, "trace", testAutomationID, runID)
+	err := handlers.HandleTrace(ctx)
+	assert.NoError(t, err)
+
+	// Also verify the trace data structure directly
+	trace, err := client.SendMessageTyped[types.TraceDetail](c, "trace/get", map[string]any{
+		"domain":  "automation",
+		"item_id": testAutomationID,
+		"run_id":  runID,
+	})
+	require.NoError(t, err)
+
+	// Verify required fields exist
+	assert.NotEmpty(t, trace.RunID, "trace should have run_id")
+	assert.Equal(t, "automation", trace.Domain, "trace domain should be automation")
+	assert.NotEmpty(t, trace.ItemID, "trace should have item_id")
+	assert.NotNil(t, trace.Trace, "trace should have trace data")
+
+	t.Logf("Trace run_id=%s, domain=%s, item_id=%s, steps=%d",
+		trace.RunID, trace.Domain, trace.ItemID, len(trace.Trace))
+}
+
+func TestIntegration_HandleTraceLatest(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	// Ensure we have a trace
+	_ = getTestTraceRunID(t, c)
+
+	// Call trace-latest command
+	ctx := testContext(t, c, "trace-latest", testAutomationID)
+	err := handlers.HandleTraceLatest(ctx)
+	assert.NoError(t, err)
+
+	// Verify by getting the latest trace directly
+	traces, err := client.SendMessageTyped[[]types.TraceInfo](c, "trace/list", map[string]any{
+		"domain":  "automation",
+		"item_id": testAutomationID,
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, traces, "should have at least one trace")
+
+	t.Logf("Latest trace run_id=%s, state=%s", traces[0].RunID, traces[0].ScriptExecution)
+}
+
+func TestIntegration_HandleTraceSummary(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	// Ensure we have a trace
+	_ = getTestTraceRunID(t, c)
+
+	// Call trace-summary command
+	ctx := testContext(t, c, "trace-summary", testAutomationID)
+	err := handlers.HandleTraceSummary(ctx)
+	assert.NoError(t, err)
+
+	// Verify by getting traces directly to check summary data
+	traces, err := client.SendMessageTyped[[]types.TraceInfo](c, "trace/list", map[string]any{
+		"domain":  "automation",
+		"item_id": testAutomationID,
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, traces, "should have at least one trace for summary")
+
+	// Count by state
+	var finished, errors int
+	for _, tr := range traces {
+		state := tr.ScriptExecution
+		if state == "" {
+			state = tr.State
+		}
+		switch state {
+		case "finished":
+			finished++
+		case "error":
+			errors++
+		}
+	}
+	t.Logf("Summary: %d total traces, %d finished, %d errors", len(traces), finished, errors)
+}
+
+func TestIntegration_HandleTraceVars(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	runID := getTestTraceRunID(t, c)
+
+	// Call trace-vars command
+	ctx := testContext(t, c, "trace-vars", testAutomationID, runID)
+	err := handlers.HandleTraceVars(ctx)
+	assert.NoError(t, err)
+
+	// Verify trace has variables
+	trace, err := client.SendMessageTyped[types.TraceDetail](c, "trace/get", map[string]any{
+		"domain":  "automation",
+		"item_id": testAutomationID,
+		"run_id":  runID,
+	})
+	require.NoError(t, err)
+
+	// Count variables in trace steps
+	varCount := 0
+	if trace.Trace != nil {
+		for _, steps := range trace.Trace {
+			for _, step := range steps {
+				if step.Variables != nil {
+					varCount++
+				}
+			}
+		}
+	}
+	t.Logf("Found %d trace steps with variables", varCount)
+}
+
+func TestIntegration_HandleTraceTimeline(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	runID := getTestTraceRunID(t, c)
+
+	// Call trace-timeline command
+	ctx := testContext(t, c, "trace-timeline", testAutomationID, runID)
+	err := handlers.HandleTraceTimeline(ctx)
+	assert.NoError(t, err)
+
+	// Verify trace has steps for timeline
+	trace, err := client.SendMessageTyped[types.TraceDetail](c, "trace/get", map[string]any{
+		"domain":  "automation",
+		"item_id": testAutomationID,
+		"run_id":  runID,
+	})
+	require.NoError(t, err)
+
+	// Count timeline steps
+	stepCount := 0
+	if trace.Trace != nil {
+		for path, steps := range trace.Trace {
+			stepCount += len(steps)
+			if len(steps) > 0 {
+				t.Logf("Timeline step: %s (timestamp=%s)", path, steps[0].Timestamp)
+			}
+		}
+	}
+	assert.Greater(t, stepCount, 0, "trace should have at least one timeline step")
+	t.Logf("Total timeline steps: %d", stepCount)
+}
+
+func TestIntegration_HandleTraceTrigger(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	runID := getTestTraceRunID(t, c)
+
+	// Call trace-trigger command
+	ctx := testContext(t, c, "trace-trigger", testAutomationID, runID)
+	err := handlers.HandleTraceTrigger(ctx)
+	assert.NoError(t, err)
+
+	// Verify trace has trigger info
+	trace, err := client.SendMessageTyped[types.TraceDetail](c, "trace/get", map[string]any{
+		"domain":  "automation",
+		"item_id": testAutomationID,
+		"run_id":  runID,
+	})
+	require.NoError(t, err)
+
+	// Trigger should be present (test automation is triggered by state change)
+	assert.NotNil(t, trace.Trigger, "trace should have trigger information")
+	t.Logf("Trigger info present: %v", trace.Trigger != nil)
+}
+
+func TestIntegration_HandleTraceActions(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	runID := getTestTraceRunID(t, c)
+
+	// Call trace-actions command
+	ctx := testContext(t, c, "trace-actions", testAutomationID, runID)
+	err := handlers.HandleTraceActions(ctx)
+	assert.NoError(t, err)
+
+	// Verify trace has action steps
+	trace, err := client.SendMessageTyped[types.TraceDetail](c, "trace/get", map[string]any{
+		"domain":  "automation",
+		"item_id": testAutomationID,
+		"run_id":  runID,
+	})
+	require.NoError(t, err)
+
+	// Count action steps (paths starting with "action/")
+	actionCount := 0
+	if trace.Trace != nil {
+		for path := range trace.Trace {
+			if strings.HasPrefix(path, "action/") {
+				actionCount++
+				t.Logf("Action path: %s", path)
+			}
+		}
+	}
+	t.Logf("Total action steps: %d", actionCount)
+}
+
+func TestIntegration_HandleTraceDebug(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	runID := getTestTraceRunID(t, c)
+
+	// Call trace-debug command
+	ctx := testContext(t, c, "trace-debug", testAutomationID, runID)
+	err := handlers.HandleTraceDebug(ctx)
+	assert.NoError(t, err)
+
+	// Verify the full trace structure
+	trace, err := client.SendMessageTyped[types.TraceDetail](c, "trace/get", map[string]any{
+		"domain":  "automation",
+		"item_id": testAutomationID,
+		"run_id":  runID,
+	})
+	require.NoError(t, err)
+
+	// Debug should show all trace details
+	assert.NotEmpty(t, trace.RunID, "debug trace should have run_id")
+	assert.NotNil(t, trace.Trace, "debug trace should have trace steps")
+
+	// Log comprehensive debug info
+	t.Logf("Debug trace: run_id=%s, domain=%s, item_id=%s", trace.RunID, trace.Domain, trace.ItemID)
+	t.Logf("  script_execution=%s, error=%s", trace.ScriptExecution, trace.Error)
+	t.Logf("  trace_paths=%d, has_trigger=%v, has_context=%v, has_config=%v",
+		len(trace.Trace), trace.Trigger != nil, trace.Context != nil, trace.Config != nil)
+}
+
+// =============================================================================
 // Automation Config Handler Tests
 // =============================================================================
 
@@ -1368,6 +1671,76 @@ func TestIntegration_CompareEntities(t *testing.T) {
 	assert.NotEmpty(t, entity2.State)
 }
 
+func TestIntegration_HandleCompare(t *testing.T) {
+	c := testClient(t)
+
+	// Test with sun.sun comparing to itself (always exists)
+	// This verifies the handler works with a guaranteed entity
+	ctx := testContext(t, c, "compare", "sun.sun", "sun.sun")
+	err := handlers.HandleCompare(ctx)
+	assert.NoError(t, err)
+}
+
+func TestIntegration_HandleCompare_TwoEntitiesSameDomain(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	// Compare two input_boolean entities from the same domain
+	// This tests the side-by-side comparison with different entities
+	// Using test_switch and away_mode from testdata/ha-config/configuration.yaml
+	ctx := testContext(t, c, "compare", testInputBoolean, "input_boolean.away_mode")
+	err := handlers.HandleCompare(ctx)
+	assert.NoError(t, err)
+}
+
+func TestIntegration_HandleCompare_VerifiesOutput(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	// Verify the comparison data structure by making the API calls directly
+	// This ensures the compare command would show both entities properly
+	states, err := client.SendMessageTyped[[]types.HAState](c, "get_states", nil)
+	require.NoError(t, err)
+
+	var state1, state2 *types.HAState
+	for i := range states {
+		if states[i].EntityID == testInputBoolean {
+			state1 = &states[i]
+		}
+		if states[i].EntityID == testInputNumber {
+			state2 = &states[i]
+		}
+	}
+
+	require.NotNil(t, state1, "%s should exist", testInputBoolean)
+	require.NotNil(t, state2, "%s should exist", testInputNumber)
+
+	// Verify both entities appear in comparison data
+	assert.NotEmpty(t, state1.EntityID)
+	assert.NotEmpty(t, state2.EntityID)
+	assert.NotEmpty(t, state1.State)
+	assert.NotEmpty(t, state2.State)
+
+	// The compare handler builds a structure with entity1, entity2, and differences
+	// Verify attributes exist (which the comparison uses)
+	assert.NotNil(t, state1.Attributes)
+	assert.NotNil(t, state2.Attributes)
+
+	t.Logf("Compare: %s (%s) vs %s (%s)",
+		state1.EntityID, state1.State, state2.EntityID, state2.State)
+
+	// Now call the actual handler
+	ctx := testContext(t, c, "compare", testInputBoolean, testInputNumber)
+	err = handlers.HandleCompare(ctx)
+	assert.NoError(t, err)
+}
+
 func TestIntegration_DeviceHealth(t *testing.T) {
 	c := testClient(t)
 
@@ -1424,4 +1797,609 @@ func TestIntegration_DeviceHealthWithFixtures(t *testing.T) {
 
 	// Recently triggered entity should be fresh
 	assert.Less(t, age, 24*time.Hour, "test entity should have been updated in last 24 hours")
+}
+
+// =============================================================================
+// History Full and Attrs Handler Tests
+// =============================================================================
+
+func TestIntegration_HandleHistoryFull(t *testing.T) {
+	c := testClient(t)
+
+	// Test with sun.sun which always has history and attributes
+	ctx := testContext(t, c, "history-full", "sun.sun")
+	err := handlers.HandleHistoryFull(ctx)
+	assert.NoError(t, err)
+}
+
+func TestIntegration_HandleHistoryFull_IncludesAttributes(t *testing.T) {
+	c := testClient(t)
+
+	// Verify the API returns attributes in the response
+	endTime := time.Now()
+	startTime := endTime.Add(-1 * time.Hour)
+
+	result, err := client.SendMessageTyped[map[string][]types.HistoryState](c,
+		"history/history_during_period",
+		map[string]any{
+			"start_time":       startTime.Format(time.RFC3339),
+			"end_time":         endTime.Format(time.RFC3339),
+			"entity_ids":       []string{"sun.sun"},
+			"minimal_response": false,
+			"no_attributes":    false,
+		})
+	require.NoError(t, err)
+
+	history, ok := result["sun.sun"]
+	require.True(t, ok, "should have history for sun.sun")
+
+	if len(history) > 0 {
+		// Verify at least one entry has attributes
+		hasAttrs := false
+		for _, entry := range history {
+			// Check both possible attribute fields (A for compact, Attributes for full)
+			if entry.A != nil || entry.Attributes != nil {
+				hasAttrs = true
+				attrs := entry.A
+				if attrs == nil {
+					attrs = entry.Attributes
+				}
+				t.Logf("Found history entry with %d attributes", len(attrs))
+				break
+			}
+		}
+		assert.True(t, hasAttrs, "history-full should include attributes in response")
+	}
+}
+
+func TestIntegration_HandleHistoryFull_WithFixtures(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	// First trigger a state change to ensure fresh history
+	_, err := c.SendMessage("call_service", map[string]any{
+		"domain":  "input_number",
+		"service": "set_value",
+		"target": map[string]any{
+			"entity_id": testInputNumber,
+		},
+		"service_data": map[string]any{
+			"value": 21.0 + float64(time.Now().Unix()%10),
+		},
+	})
+	require.NoError(t, err)
+
+	time.Sleep(500 * time.Millisecond)
+
+	// Test history-full with the test entity
+	ctx := testContext(t, c, "history-full", testInputNumber)
+	err = handlers.HandleHistoryFull(ctx)
+	assert.NoError(t, err)
+
+	// Also verify the structure directly
+	endTime := time.Now()
+	startTime := endTime.Add(-1 * time.Hour)
+
+	result, err := client.SendMessageTyped[map[string][]types.HistoryState](c,
+		"history/history_during_period",
+		map[string]any{
+			"start_time":       startTime.Format(time.RFC3339),
+			"end_time":         endTime.Format(time.RFC3339),
+			"entity_ids":       []string{testInputNumber},
+			"minimal_response": false,
+			"no_attributes":    false,
+		})
+	require.NoError(t, err)
+
+	history, ok := result[testInputNumber]
+	require.True(t, ok, "should have history for %s", testInputNumber)
+	require.Greater(t, len(history), 0, "should have at least one history entry")
+
+	// Verify attributes are present
+	entry := history[len(history)-1] // Most recent entry
+	attrs := entry.A
+	if attrs == nil {
+		attrs = entry.Attributes
+	}
+	assert.NotNil(t, attrs, "history-full entry should include attributes")
+
+	// input_number should have specific attributes like unit_of_measurement
+	if attrs != nil {
+		t.Logf("Attributes: %v", attrs)
+		// input_number entities typically have min, max, step, mode, etc.
+		_, hasMin := attrs["min"]
+		_, hasMax := attrs["max"]
+		assert.True(t, hasMin || hasMax, "input_number should have min or max attribute")
+	}
+}
+
+func TestIntegration_HandleAttrs(t *testing.T) {
+	c := testClient(t)
+
+	// Test with sun.sun which always has history and changing attributes
+	ctx := testContext(t, c, "attrs", "sun.sun")
+	err := handlers.HandleAttrs(ctx)
+	assert.NoError(t, err)
+}
+
+func TestIntegration_HandleAttrs_ShowsAttributeHistory(t *testing.T) {
+	c := testClient(t)
+
+	// Verify the API returns attribute change history
+	endTime := time.Now()
+	startTime := endTime.Add(-1 * time.Hour)
+
+	result, err := client.SendMessageTyped[map[string][]types.HistoryState](c,
+		"history/history_during_period",
+		map[string]any{
+			"start_time":       startTime.Format(time.RFC3339),
+			"end_time":         endTime.Format(time.RFC3339),
+			"entity_ids":       []string{"sun.sun"},
+			"minimal_response": false,
+			"no_attributes":    false,
+		})
+	require.NoError(t, err)
+
+	history, ok := result["sun.sun"]
+	require.True(t, ok, "should have history for sun.sun")
+
+	if len(history) > 0 {
+		// Verify at least one entry has attributes (attrs command relies on this)
+		hasAttrs := false
+		for _, entry := range history {
+			attrs := entry.A
+			if attrs == nil {
+				attrs = entry.Attributes
+			}
+			if attrs != nil {
+				hasAttrs = true
+				// sun.sun should have elevation and azimuth attributes
+				_, hasElevation := attrs["elevation"]
+				_, hasAzimuth := attrs["azimuth"]
+				if hasElevation || hasAzimuth {
+					t.Logf("Found sun.sun history with elevation/azimuth attributes")
+					break
+				}
+			}
+		}
+		assert.True(t, hasAttrs, "attrs command requires history entries with attributes")
+	}
+}
+
+func TestIntegration_HandleAttrs_WithFixtures(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	// First trigger multiple state changes to create attribute history
+	for i := 0; i < 3; i++ {
+		_, err := c.SendMessage("call_service", map[string]any{
+			"domain":  "input_number",
+			"service": "set_value",
+			"target": map[string]any{
+				"entity_id": testInputNumber,
+			},
+			"service_data": map[string]any{
+				"value": 20.0 + float64(i*2),
+			},
+		})
+		require.NoError(t, err)
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	time.Sleep(300 * time.Millisecond)
+
+	// Test attrs command with the test entity
+	ctx := testContext(t, c, "attrs", testInputNumber)
+	err := handlers.HandleAttrs(ctx)
+	assert.NoError(t, err)
+}
+
+func TestIntegration_HandleAttrs_FormatsCorrectly(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	// Verify the attribute history data structure
+	endTime := time.Now()
+	startTime := endTime.Add(-1 * time.Hour)
+
+	result, err := client.SendMessageTyped[map[string][]types.HistoryState](c,
+		"history/history_during_period",
+		map[string]any{
+			"start_time":       startTime.Format(time.RFC3339),
+			"end_time":         endTime.Format(time.RFC3339),
+			"entity_ids":       []string{testInputNumber},
+			"minimal_response": false,
+			"no_attributes":    false,
+		})
+	require.NoError(t, err)
+
+	history, ok := result[testInputNumber]
+	require.True(t, ok, "should have history for %s", testInputNumber)
+
+	// Count entries with attributes (what attrs command displays)
+	attrsCount := 0
+	for _, entry := range history {
+		attrs := entry.A
+		if attrs == nil {
+			attrs = entry.Attributes
+		}
+		if attrs != nil {
+			attrsCount++
+		}
+	}
+
+	t.Logf("Found %d history entries with attributes for attrs display", attrsCount)
+
+	// Verify at least one entry has attributes for meaningful attrs output
+	if len(history) > 0 {
+		entry := history[len(history)-1]
+		attrs := entry.A
+		if attrs == nil {
+			attrs = entry.Attributes
+		}
+		if attrs != nil {
+			// Verify the entry contains expected state and timestamp fields
+			assert.NotEmpty(t, entry.GetState(), "attrs entry should have state")
+			assert.False(t, entry.GetLastUpdated().IsZero(), "attrs entry should have timestamp")
+		}
+	}
+}
+
+// =============================================================================
+// Statistics Command Tests
+// =============================================================================
+
+func TestIntegration_HandleStats(t *testing.T) {
+	c := testClient(t)
+
+	// Test with sun.sun which is a built-in entity with guaranteed statistics
+	// The sun sensor tracks elevation which generates statistics data
+	ctx := testContext(t, c, "stats", "sun.sun")
+	err := handlers.HandleStats(ctx)
+	// Stats may return empty result if no statistics exist, but should not error
+	assert.NoError(t, err)
+}
+
+func TestIntegration_HandleStats_VerifiesOutputStructure(t *testing.T) {
+	c := testClient(t)
+
+	// Verify the statistics API returns the expected data structure
+	endTime := time.Now()
+	startTime := endTime.Add(-24 * time.Hour)
+
+	// Try sun.sun first (always exists)
+	result, err := client.SendMessageTyped[map[string][]types.StatEntry](c,
+		"recorder/statistics_during_period",
+		map[string]any{
+			"start_time":    startTime.Format(time.RFC3339),
+			"end_time":      endTime.Format(time.RFC3339),
+			"statistic_ids": []string{"sun.sun"},
+			"period":        "hour",
+		})
+	require.NoError(t, err)
+
+	// sun.sun may not have statistics (it depends on the recorder configuration)
+	// If it doesn't, that's okay - the command should still work
+	stats, ok := result["sun.sun"]
+	if ok && len(stats) > 0 {
+		// Verify structure contains expected fields
+		entry := stats[0]
+		t.Logf("Stats entry: start=%v, min=%.2f, max=%.2f, mean=%.2f",
+			entry.Start, entry.Min, entry.Max, entry.Mean)
+
+		// At least one of min, max, mean should be populated for valid stats
+		hasValues := entry.Min != 0 || entry.Max != 0 || entry.Mean != 0 || entry.State != 0
+		if hasValues {
+			t.Logf("Statistics data found with values")
+		} else {
+			t.Log("Statistics entry found but all values are zero")
+		}
+	} else {
+		t.Log("No statistics data found for sun.sun (this is acceptable)")
+	}
+}
+
+func TestIntegration_HandleStats_WithFixtures(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	// First trigger a state change to ensure fresh statistics data
+	_, err := c.SendMessage("call_service", map[string]any{
+		"domain":  "input_number",
+		"service": "set_value",
+		"target": map[string]any{
+			"entity_id": testInputNumber,
+		},
+		"service_data": map[string]any{
+			"value": 23.0 + float64(time.Now().Unix()%10),
+		},
+	})
+	require.NoError(t, err)
+
+	time.Sleep(500 * time.Millisecond)
+
+	// Test stats command with the test entity
+	// Note: input_number may not have statistics immediately - the recorder
+	// needs time to aggregate. The command should still work without error.
+	ctx := testContext(t, c, "stats", testInputNumber)
+	err = handlers.HandleStats(ctx)
+	assert.NoError(t, err)
+
+	// Also verify the API structure directly
+	endTime := time.Now()
+	startTime := endTime.Add(-24 * time.Hour)
+
+	result, err := client.SendMessageTyped[map[string][]types.StatEntry](c,
+		"recorder/statistics_during_period",
+		map[string]any{
+			"start_time":    startTime.Format(time.RFC3339),
+			"end_time":      endTime.Format(time.RFC3339),
+			"statistic_ids": []string{testInputNumber},
+			"period":        "hour",
+		})
+	require.NoError(t, err)
+
+	stats, ok := result[testInputNumber]
+	if ok && len(stats) > 0 {
+		// Verify statistics contain the expected fields
+		entry := stats[len(stats)-1] // Most recent entry
+		t.Logf("Found %d stats entries for %s", len(stats), testInputNumber)
+		t.Logf("Latest stats: start=%v, min=%.2f, max=%.2f, mean=%.2f, state=%.2f",
+			entry.Start, entry.Min, entry.Max, entry.Mean, entry.State)
+	} else {
+		t.Logf("No statistics data for %s (recorder may need time to aggregate)", testInputNumber)
+	}
+}
+
+// =============================================================================
+// Error Handling Edge Case Tests
+// =============================================================================
+
+func TestIntegration_HandleTrace_InvalidAutomation(t *testing.T) {
+	c := testClient(t)
+
+	// Test with a nonexistent automation ID
+	// The trace command should handle this gracefully without crashing
+	ctx := testContext(t, c, "trace", "nonexistent_automation_xyz123", "some_run_id")
+	err := handlers.HandleTrace(ctx)
+
+	// The command may return an error or handle it gracefully
+	// Either way, it should not panic
+	if err != nil {
+		t.Logf("HandleTrace with invalid automation returned error (expected): %v", err)
+		// Verify the error message is meaningful
+		assert.Contains(t, err.Error(), "nonexistent_automation_xyz123",
+			"error should reference the invalid automation ID")
+	} else {
+		t.Log("HandleTrace with invalid automation returned no error (graceful handling)")
+	}
+}
+
+func TestIntegration_HandleTrace_InvalidRunID(t *testing.T) {
+	c := testClient(t)
+
+	if !hasTestFixtures(t, c) {
+		t.Skip("Test fixtures not available - skipping fixture tests")
+	}
+
+	// Test with a valid automation but invalid run_id
+	// The trace command should handle this gracefully
+	invalidRunID := "invalid_run_id_xyz_" + time.Now().Format("20060102150405")
+	ctx := testContext(t, c, "trace", testAutomationID, invalidRunID)
+	err := handlers.HandleTrace(ctx)
+
+	// The command may return an error or handle it gracefully
+	if err != nil {
+		t.Logf("HandleTrace with invalid run_id returned error (expected): %v", err)
+		// Error message should be meaningful
+		errStr := err.Error()
+		// It might say "trace not found" or "no trace" or similar
+		t.Logf("Error details: %s", errStr)
+	} else {
+		t.Log("HandleTrace with invalid run_id returned no error (graceful handling)")
+	}
+
+	// Verify we can still use the client after the error
+	// (i.e., the connection wasn't corrupted)
+	_, pingErr := c.SendMessage("ping", nil)
+	assert.NoError(t, pingErr, "client should still be usable after error")
+}
+
+func TestIntegration_HandleStats_NoStatistics(t *testing.T) {
+	c := testClient(t)
+
+	// Test with an entity that is unlikely to have statistics
+	// Binary sensors and input_booleans typically don't generate statistics
+	// Use a nonexistent but well-formed entity ID to ensure no statistics exist
+	noStatsEntity := "input_boolean.no_stats_test_entity_xyz"
+
+	ctx := testContext(t, c, "stats", noStatsEntity)
+	err := handlers.HandleStats(ctx)
+
+	// The command should handle the case gracefully (empty result, not error)
+	assert.NoError(t, err, "stats command should not error for entity without statistics")
+
+	// Also verify the API behavior directly
+	endTime := time.Now()
+	startTime := endTime.Add(-24 * time.Hour)
+
+	result, err := client.SendMessageTyped[map[string][]types.StatEntry](c,
+		"recorder/statistics_during_period",
+		map[string]any{
+			"start_time":    startTime.Format(time.RFC3339),
+			"end_time":      endTime.Format(time.RFC3339),
+			"statistic_ids": []string{noStatsEntity},
+			"period":        "hour",
+		})
+	require.NoError(t, err, "API should not error for entity without statistics")
+
+	// Result should be empty (no statistics for this entity)
+	stats, ok := result[noStatsEntity]
+	if ok {
+		t.Logf("Found %d stats entries (unexpected, but acceptable)", len(stats))
+	} else {
+		t.Log("No statistics found for entity without stats (expected)")
+	}
+}
+
+func TestIntegration_HandleCompare_InvalidEntity(t *testing.T) {
+	c := testClient(t)
+
+	// Test compare with one nonexistent entity
+	ctx := testContext(t, c, "compare", "sun.sun", "nonexistent.entity_xyz123")
+	err := handlers.HandleCompare(ctx)
+
+	// The command should handle this gracefully
+	if err != nil {
+		t.Logf("HandleCompare with invalid entity returned error (expected): %v", err)
+		// Error message should mention the invalid entity
+		assert.Contains(t, err.Error(), "nonexistent",
+			"error should reference the invalid entity")
+	} else {
+		t.Log("HandleCompare with invalid entity returned no error (shows partial result)")
+	}
+
+	// Verify client is still usable
+	_, pingErr := c.SendMessage("ping", nil)
+	assert.NoError(t, pingErr, "client should still be usable after compare error")
+}
+
+func TestIntegration_HandleCompare_BothEntitiesInvalid(t *testing.T) {
+	c := testClient(t)
+
+	// Test compare with both entities nonexistent
+	ctx := testContext(t, c, "compare", "nonexistent.entity_a", "nonexistent.entity_b")
+	err := handlers.HandleCompare(ctx)
+
+	// The command should return an error or handle gracefully
+	if err != nil {
+		t.Logf("HandleCompare with both invalid entities returned error (expected): %v", err)
+	} else {
+		t.Log("HandleCompare with both invalid entities returned no error (shows empty result)")
+	}
+}
+
+func TestIntegration_HandleHistoryFull_EmptyTimeRange(t *testing.T) {
+	c := testClient(t)
+
+	// Test history with a time range in the past where no data exists
+	// Use a date range from 10 years ago when no data would exist
+	pastTime := time.Date(2015, 1, 1, 0, 0, 0, 0, time.UTC)
+	endTime := pastTime.Add(1 * time.Hour)
+
+	result, err := client.SendMessageTyped[map[string][]types.HistoryState](c,
+		"history/history_during_period",
+		map[string]any{
+			"start_time":       pastTime.Format(time.RFC3339),
+			"end_time":         endTime.Format(time.RFC3339),
+			"entity_ids":       []string{"sun.sun"},
+			"minimal_response": false,
+			"no_attributes":    false,
+		})
+	require.NoError(t, err, "history query should not error for empty time range")
+
+	// Result should be empty (no data from 2015)
+	history, ok := result["sun.sun"]
+	if ok && len(history) > 0 {
+		t.Logf("Unexpectedly found %d history entries from 2015", len(history))
+	} else {
+		t.Log("No history found for past time range (expected empty result)")
+	}
+}
+
+func TestIntegration_HandleHistoryFull_FutureTimeRange(t *testing.T) {
+	c := testClient(t)
+
+	// Test history with a time range in the future where no data can exist
+	futureTime := time.Now().Add(365 * 24 * time.Hour) // 1 year in future
+	endTime := futureTime.Add(1 * time.Hour)
+
+	result, err := client.SendMessageTyped[map[string][]types.HistoryState](c,
+		"history/history_during_period",
+		map[string]any{
+			"start_time":       futureTime.Format(time.RFC3339),
+			"end_time":         endTime.Format(time.RFC3339),
+			"entity_ids":       []string{"sun.sun"},
+			"minimal_response": false,
+			"no_attributes":    false,
+		})
+	require.NoError(t, err, "history query should not error for future time range")
+
+	// Result should be empty (no data from the future)
+	history, ok := result["sun.sun"]
+	if ok && len(history) > 0 {
+		t.Fatalf("Unexpectedly found %d history entries from the future", len(history))
+	} else {
+		t.Log("No history found for future time range (expected empty result)")
+	}
+}
+
+func TestIntegration_HandleAttrs_NoAttributeChanges(t *testing.T) {
+	c := testClient(t)
+
+	// Test attrs with an entity that exists but has minimal attribute changes
+	// Binary sensors with static configuration typically don't change attributes
+	// Use sun.sun but with a very short time range to minimize attribute changes
+
+	// Get attributes for a 1-second window in the past (unlikely to have changes)
+	shortRangeEnd := time.Now().Add(-1 * time.Hour)
+	shortRangeStart := shortRangeEnd.Add(-1 * time.Second)
+
+	result, err := client.SendMessageTyped[map[string][]types.HistoryState](c,
+		"history/history_during_period",
+		map[string]any{
+			"start_time":       shortRangeStart.Format(time.RFC3339),
+			"end_time":         shortRangeEnd.Format(time.RFC3339),
+			"entity_ids":       []string{"sun.sun"},
+			"minimal_response": false,
+			"no_attributes":    false,
+		})
+	require.NoError(t, err, "attrs query should not error for short time range")
+
+	// Result may be empty or have minimal data
+	history, ok := result["sun.sun"]
+	if ok {
+		t.Logf("Found %d history entries in 1-second window", len(history))
+	} else {
+		t.Log("No history found in 1-second window (expected for short range)")
+	}
+}
+
+func TestIntegration_HandleAttrs_NonexistentEntity(t *testing.T) {
+	c := testClient(t)
+
+	// Test attrs with a nonexistent entity
+	endTime := time.Now()
+	startTime := endTime.Add(-1 * time.Hour)
+
+	result, err := client.SendMessageTyped[map[string][]types.HistoryState](c,
+		"history/history_during_period",
+		map[string]any{
+			"start_time":       startTime.Format(time.RFC3339),
+			"end_time":         endTime.Format(time.RFC3339),
+			"entity_ids":       []string{"nonexistent.entity_xyz123"},
+			"minimal_response": false,
+			"no_attributes":    false,
+		})
+	require.NoError(t, err, "attrs query should not error for nonexistent entity")
+
+	// Result should be empty (entity doesn't exist)
+	history, ok := result["nonexistent.entity_xyz123"]
+	if ok && len(history) > 0 {
+		t.Fatalf("Unexpectedly found history for nonexistent entity")
+	} else {
+		t.Log("No history found for nonexistent entity (expected)")
+	}
 }

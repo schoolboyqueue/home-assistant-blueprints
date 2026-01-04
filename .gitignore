@@ -38,3 +38,10 @@ package-lock.json
 
 # Automaker Configuration
 .automaker/
+.autospec/
+
+# Claude Code
+.claude/
+
+# Spec Files
+specs/
