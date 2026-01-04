@@ -166,7 +166,7 @@ func TestClient_SendMessage_Success(t *testing.T) {
 
 		// Send success response
 		success := true
-		reqID, _ := req["id"].(float64) //nolint:errcheck // test knows the format
+		reqID, _ := req["id"].(float64)
 		resp := types.HAMessage{
 			ID:      int(reqID),
 			Type:    "result",
@@ -204,7 +204,7 @@ func TestClient_SendMessage_WithData(t *testing.T) {
 		assert.Equal(t, "turn_on", req["service"])
 
 		success := true
-		reqID, _ := req["id"].(float64) //nolint:errcheck // test knows the format
+		reqID, _ := req["id"].(float64)
 		resp := types.HAMessage{
 			ID:      int(reqID),
 			Type:    "result",
@@ -239,7 +239,7 @@ func TestClient_SendMessage_Error(t *testing.T) {
 
 		// Send error response
 		success := false
-		reqID, _ := req["id"].(float64) //nolint:errcheck // test knows the format
+		reqID, _ := req["id"].(float64)
 		resp := types.HAMessage{
 			ID:      int(reqID),
 			Type:    "result",
@@ -280,7 +280,7 @@ func TestClient_SendMessage_ErrorWithoutDetails(t *testing.T) {
 
 		// Send error response without Error field
 		success := false
-		reqID, _ := req["id"].(float64) //nolint:errcheck // test knows the format
+		reqID, _ := req["id"].(float64)
 		resp := types.HAMessage{
 			ID:      int(reqID),
 			Type:    "result",
@@ -308,7 +308,7 @@ func TestClient_SendMessage_ErrorWithoutDetails(t *testing.T) {
 func TestClient_SendMessage_ConnectionClosed(t *testing.T) {
 	server := testServer(t, func(conn *websocket.Conn) {
 		// Read the request then close
-		_, _, _ = conn.ReadMessage() //nolint:errcheck // intentionally ignoring error
+		_, _, _ = conn.ReadMessage()
 		conn.Close()
 	})
 	defer server.Close()
@@ -339,7 +339,7 @@ func TestSendMessageTyped(t *testing.T) {
 			{EntityID: "light.kitchen", State: "on"},
 			{EntityID: "light.bedroom", State: "off"},
 		}
-		reqID, _ := req["id"].(float64) //nolint:errcheck // test knows the format
+		reqID, _ := req["id"].(float64)
 		resp := types.HAMessage{
 			ID:      int(reqID),
 			Type:    "result",
@@ -373,7 +373,7 @@ func TestSendMessageTyped_Error(t *testing.T) {
 		require.NoError(t, err)
 
 		success := false
-		reqID, _ := req["id"].(float64) //nolint:errcheck // test knows the format
+		reqID, _ := req["id"].(float64)
 		resp := types.HAMessage{
 			ID:      int(reqID),
 			Type:    "result",
@@ -437,7 +437,7 @@ func TestClient_HandleMessage_Event(t *testing.T) {
 		err = json.Unmarshal(data, &req)
 		require.NoError(t, err)
 
-		reqID, _ := req["id"].(float64) //nolint:errcheck // test knows the format
+		reqID, _ := req["id"].(float64)
 		id := int(reqID)
 
 		// Send subscription confirmation
@@ -506,7 +506,7 @@ func TestClient_SubscribeToTemplate(t *testing.T) {
 		err = json.Unmarshal(data, &req)
 		require.NoError(t, err)
 
-		reqID, _ := req["id"].(float64) //nolint:errcheck // test knows the format
+		reqID, _ := req["id"].(float64)
 		id := int(reqID)
 		assert.Equal(t, "render_template", req["type"])
 		assert.Equal(t, "{{ states('sensor.temp') }}", req["template"])
@@ -557,7 +557,7 @@ func TestClient_SubscribeToTemplate(t *testing.T) {
 func TestClient_SubscribeToTrigger_Timeout(t *testing.T) {
 	server := testServer(t, func(conn *websocket.Conn) {
 		// Read but don't respond
-		_, _, _ = conn.ReadMessage() //nolint:errcheck // intentionally ignoring error
+		_, _, _ = conn.ReadMessage()
 		time.Sleep(10 * time.Second)
 	})
 	defer server.Close()
@@ -581,7 +581,7 @@ func TestClient_SubscribeToTrigger_Error(t *testing.T) {
 
 		// Send error response
 		success := false
-		reqID, _ := req["id"].(float64) //nolint:errcheck // test knows the format
+		reqID, _ := req["id"].(float64)
 		resp := types.HAMessage{
 			ID:      int(reqID),
 			Type:    "result",
@@ -613,7 +613,7 @@ func TestClient_SubscribeToTemplate_Error(t *testing.T) {
 		require.NoError(t, err)
 
 		success := false
-		reqID, _ := req["id"].(float64) //nolint:errcheck // test knows the format
+		reqID, _ := req["id"].(float64)
 		resp := types.HAMessage{
 			ID:      int(reqID),
 			Type:    "result",
@@ -720,7 +720,7 @@ func TestClient_ReadLoop_InvalidJSON(t *testing.T) {
 func TestClient_Cleanup_OnError(t *testing.T) {
 	server := testServer(t, func(conn *websocket.Conn) {
 		// Read request
-		_, _, _ = conn.ReadMessage() //nolint:errcheck // intentionally ignoring error
+		_, _, _ = conn.ReadMessage()
 		// Close abruptly
 		conn.Close()
 	})
@@ -754,7 +754,7 @@ func BenchmarkSendMessage(b *testing.B) {
 			}
 
 			success := true
-			reqID, _ := req["id"].(float64) //nolint:errcheck // benchmark knows the format
+			reqID, _ := req["id"].(float64)
 			resp := types.HAMessage{
 				ID:      int(reqID),
 				Type:    "result",
@@ -856,7 +856,7 @@ func TestClient_ContextCancellation(t *testing.T) {
 func TestClient_SendMessageWithContext_Cancellation(t *testing.T) {
 	server := testServer(t, func(conn *websocket.Conn) {
 		// Read request but don't respond, simulating a slow server
-		_, _, _ = conn.ReadMessage() //nolint:errcheck // intentionally ignoring error
+		_, _, _ = conn.ReadMessage()
 		time.Sleep(5 * time.Second)
 	})
 	defer server.Close()
@@ -882,7 +882,7 @@ func TestClient_SendMessageWithContext_Cancellation(t *testing.T) {
 func TestClient_SendMessageWithContext_Timeout(t *testing.T) {
 	server := testServer(t, func(conn *websocket.Conn) {
 		// Read request but don't respond, simulating a slow server
-		_, _, _ = conn.ReadMessage() //nolint:errcheck // intentionally ignoring error
+		_, _, _ = conn.ReadMessage()
 		time.Sleep(5 * time.Second)
 	})
 	defer server.Close()
@@ -903,7 +903,7 @@ func TestClient_SendMessageWithContext_Timeout(t *testing.T) {
 func TestClient_SubscribeToTriggerWithContext_Cancellation(t *testing.T) {
 	server := testServer(t, func(conn *websocket.Conn) {
 		// Read request but don't respond, simulating a slow server
-		_, _, _ = conn.ReadMessage() //nolint:errcheck // intentionally ignoring error
+		_, _, _ = conn.ReadMessage()
 		time.Sleep(5 * time.Second)
 	})
 	defer server.Close()
@@ -932,7 +932,7 @@ func TestClient_SubscribeToTriggerWithContext_Cancellation(t *testing.T) {
 func TestClient_SubscribeToTemplateWithContext_Cancellation(t *testing.T) {
 	server := testServer(t, func(conn *websocket.Conn) {
 		// Read request but don't respond, simulating a slow server
-		_, _, _ = conn.ReadMessage() //nolint:errcheck // intentionally ignoring error
+		_, _, _ = conn.ReadMessage()
 		time.Sleep(5 * time.Second)
 	})
 	defer server.Close()
@@ -967,7 +967,7 @@ func TestClient_ClearSubscriptions(t *testing.T) {
 		err = json.Unmarshal(data, &req)
 		require.NoError(t, err)
 
-		reqID, _ := req["id"].(float64) //nolint:errcheck // test knows the format
+		reqID, _ := req["id"].(float64)
 		id := int(reqID)
 
 		// Send subscription confirmation
@@ -1044,7 +1044,7 @@ func TestClient_SubscriptionCount(t *testing.T) {
 				return
 			}
 
-			reqID, _ := req["id"].(float64) //nolint:errcheck // test knows the format
+			reqID, _ := req["id"].(float64)
 
 			// Send subscription confirmation
 			success := true
@@ -1129,7 +1129,7 @@ func TestClient_SubscriptionAutoCleanupOnContextCancel(t *testing.T) {
 		err = json.Unmarshal(data, &req)
 		require.NoError(t, err)
 
-		reqID, _ := req["id"].(float64) //nolint:errcheck // test knows the format
+		reqID, _ := req["id"].(float64)
 
 		// Send subscription confirmation
 		success := true

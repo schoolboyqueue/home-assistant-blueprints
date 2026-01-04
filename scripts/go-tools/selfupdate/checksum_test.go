@@ -31,7 +31,7 @@ a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2  ha-ws-client-d
 			wantErr: false,
 		},
 		{
-			name: "single space format",
+			name:  "single space format",
 			input: `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ha-ws-client-linux-amd64`,
 			want: Checksums{
 				"ha-ws-client-linux-amd64": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -50,7 +50,7 @@ a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2  file2`,
 			wantErr: false,
 		},
 		{
-			name: "uppercase hash",
+			name:  "uppercase hash",
 			input: `E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855  file1`,
 			want: Checksums{
 				"file1": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -133,7 +133,7 @@ func TestVerifyChecksum(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "testfile")
 	content := []byte("hello world")
-	if err := os.WriteFile(testFile, content, 0644); err != nil {
+	if err := os.WriteFile(testFile, content, 0o644); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -191,7 +191,7 @@ func TestComputeChecksum(t *testing.T) {
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "testfile")
 	content := []byte("test content")
-	if err := os.WriteFile(testFile, content, 0644); err != nil {
+	if err := os.WriteFile(testFile, content, 0o644); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -252,8 +252,8 @@ func TestDownloadChecksums(t *testing.T) {
 a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2  ha-ws-client-darwin-arm64`
 
 	t.Run("successful download", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte(checksumContent))
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(checksumContent))
 		}))
 		defer server.Close()
 
@@ -272,7 +272,7 @@ a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2  ha-ws-client-d
 	})
 
 	t.Run("404 error", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}))
 		defer server.Close()
@@ -289,8 +289,8 @@ a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2  ha-ws-client-d
 	})
 
 	t.Run("invalid checksum content", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Write([]byte("invalid content"))
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte("invalid content"))
 		}))
 		defer server.Close()
 

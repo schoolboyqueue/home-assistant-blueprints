@@ -868,7 +868,7 @@ func BenchmarkChain(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = handler(ctx) //nolint:errcheck // benchmark intentionally ignores error
+		_ = handler(ctx)
 	}
 }
 
@@ -883,6 +883,6 @@ func BenchmarkWithPattern(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = handler(ctx) //nolint:errcheck // benchmark intentionally ignores error
+		_ = handler(ctx)
 	}
 }

@@ -111,14 +111,14 @@ func NewUpdater(toolName, toolTag, currentVersion string, opts ...UpdaterOption)
 
 // Check checks for available updates without downloading.
 func (u *Updater) Check() (*UpdateResult, error) {
-	release, err := u.github.GetLatestReleaseForTool(u.ToolTag)
+	release, err := u.github.GetLatestReleaseForToolWithName(u.ToolTag, u.ToolName)
 	if err != nil {
 		return nil, NewUpdateError("check", u.ToolName, "", err)
 	}
 
-	latestVersion := ExtractVersion(release.TagName, u.ToolTag)
-	if latestVersion == "" {
-		return nil, NewUpdateError("check", u.ToolName, "", fmt.Errorf("could not parse version from tag %q", release.TagName))
+	latestVersion, err := u.extractVersionForRelease(release)
+	if err != nil {
+		return nil, NewUpdateError("check", u.ToolName, "", err)
 	}
 
 	result := &UpdateResult{
@@ -155,17 +155,17 @@ func (u *Updater) UpdateToVersion(version string) error {
 	var err error
 
 	if version == "" {
-		release, err = u.github.GetLatestReleaseForTool(u.ToolTag)
+		release, err = u.github.GetLatestReleaseForToolWithName(u.ToolTag, u.ToolName)
 	} else {
-		release, err = u.github.GetReleaseForToolVersion(u.ToolTag, version)
+		release, err = u.github.GetReleaseForToolVersionWithName(u.ToolTag, u.ToolName, version)
 	}
 	if err != nil {
 		return NewUpdateError("check", u.ToolName, version, err)
 	}
 
-	targetVersion := ExtractVersion(release.TagName, u.ToolTag)
-	if targetVersion == "" {
-		return NewUpdateError("check", u.ToolName, version, fmt.Errorf("could not parse version from tag %q", release.TagName))
+	targetVersion, err := u.extractVersionForRelease(release)
+	if err != nil {
+		return NewUpdateError("check", u.ToolName, version, err)
 	}
 
 	// Check if we're already at this version
@@ -275,7 +275,7 @@ func (u *Updater) checkWritable(dir string) error {
 func (u *Updater) download(url string, size int64, targetDir string) (string, error) {
 	client := &http.Client{Timeout: u.downloadTimeout}
 
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return "", fmt.Errorf("creating request: %w", err)
 	}
@@ -359,7 +359,7 @@ func (u *Updater) replaceBinary(tempPath, binaryPath string) error {
 	if err := os.Rename(tempPath, binaryPath); err != nil {
 		// Try to restore the old binary
 		if restoreErr := os.Rename(oldPath, binaryPath); restoreErr != nil {
-			return fmt.Errorf("replacing binary failed and could not restore: %w (restore error: %v)", err, restoreErr)
+			return fmt.Errorf("replacing binary failed and could not restore: %w (restore error: %w)", err, restoreErr)
 		}
 		return fmt.Errorf("replacing binary: %w", err)
 	}
@@ -371,19 +371,51 @@ func (u *Updater) replaceBinary(tempPath, binaryPath string) error {
 }
 
 // ListAvailableVersions returns a list of available versions for the tool.
+// Each release must have a versions.json asset with the tool's version.
 func (u *Updater) ListAvailableVersions() ([]string, error) {
-	releases, err := u.github.ListReleasesForTool(u.ToolTag)
+	releases, err := u.github.ListReleasesForToolWithName(u.ToolTag, u.ToolName)
 	if err != nil {
 		return nil, NewUpdateError("list", u.ToolName, "", err)
 	}
 
 	versions := make([]string, 0, len(releases))
-	for _, r := range releases {
-		version := ExtractVersion(r.TagName, u.ToolTag)
-		if version != "" {
-			versions = append(versions, version)
+	for i := range releases {
+		version, err := u.extractVersionForRelease(&releases[i])
+		if err != nil {
+			// Skip releases without valid versions.json
+			continue
 		}
+		versions = append(versions, version)
+	}
+
+	if len(versions) == 0 {
+		return nil, NewUpdateError("list", u.ToolName, "", fmt.Errorf("no releases with versions.json found"))
 	}
 
 	return versions, nil
+}
+
+// extractVersionForRelease extracts the version for this tool from a release.
+// Requires versions.json asset in the release.
+func (u *Updater) extractVersionForRelease(release *Release) (string, error) {
+	versionsAsset := release.FindVersionsAsset()
+	if versionsAsset == nil {
+		return "", fmt.Errorf("versions.json not found in release %s", release.TagName)
+	}
+
+	versions, err := DownloadVersions(versionsAsset.BrowserDownloadURL, DefaultCheckTimeout)
+	if err != nil {
+		return "", fmt.Errorf("downloading versions.json: %w", err)
+	}
+
+	if versions == nil {
+		return "", fmt.Errorf("versions.json is empty in release %s", release.TagName)
+	}
+
+	version := versions.GetVersion(u.ToolTag)
+	if version == "" {
+		return "", fmt.Errorf("tool %s not found in versions.json for release %s", u.ToolTag, release.TagName)
+	}
+
+	return version, nil
 }

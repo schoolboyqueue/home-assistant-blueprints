@@ -98,7 +98,12 @@ jobs:
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             # For manual dispatch, construct tag from version
             if [ "$BUILD_CLIENT" == "true" ] && [ "$BUILD_VALIDATOR" == "true" ]; then
-              RELEASE_TAG="v$CLIENT_VERSION"
+              # Use higher version for combined release tag
+              if [ "$(printf '%s\n' "$VALIDATE_VERSION" "$CLIENT_VERSION" | sort -V | tail -1)" = "$VALIDATE_VERSION" ]; then
+                RELEASE_TAG="v$VALIDATE_VERSION"
+              else
+                RELEASE_TAG="v$CLIENT_VERSION"
+              fi
             elif [ "$BUILD_CLIENT" == "true" ]; then
               RELEASE_TAG="ha-ws-client-go/v$CLIENT_VERSION"
             else
@@ -261,6 +266,30 @@ jobs:
           cd artifacts
           sha256sum * > checksums.txt
           cat checksums.txt
+
+      - name: Create versions.json
+        env:
+          BUILD_CLIENT: ${{ needs.determine-builds.outputs.build_client }}
+          BUILD_VALIDATOR: ${{ needs.determine-builds.outputs.build_validator }}
+          CLIENT_VERSION: ${{ needs.determine-builds.outputs.client_version }}
+          VALIDATOR_VERSION: ${{ needs.determine-builds.outputs.validator_version }}
+        run: |
+          cd artifacts
+          echo "{" > versions.json
+          FIRST=true
+          if [ "$BUILD_CLIENT" == "true" ]; then
+            echo "  \"ha-ws-client-go\": \"$CLIENT_VERSION\"" >> versions.json
+            FIRST=false
+          fi
+          if [ "$BUILD_VALIDATOR" == "true" ]; then
+            if [ "$FIRST" == "false" ]; then
+              # Add comma to previous line
+              sed -i '$ s/$/,/' versions.json
+            fi
+            echo "  \"validate-blueprint-go\": \"$VALIDATOR_VERSION\"" >> versions.json
+          fi
+          echo "}" >> versions.json
+          cat versions.json
 
       - name: Generate release body
         id: body

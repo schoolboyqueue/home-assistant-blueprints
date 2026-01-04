@@ -59,20 +59,31 @@ func TestNewUpdater_WithOptions(t *testing.T) {
 }
 
 func TestUpdater_Check(t *testing.T) {
-	releases := []Release{
-		{
-			TagName: "ha-ws-client-go/v1.6.0",
-			Assets: []Asset{
-				{Name: "ha-ws-client-linux-amd64", BrowserDownloadURL: "https://example.com/ha-ws-client-linux-amd64", Size: 1024},
-				{Name: "ha-ws-client-darwin-arm64", BrowserDownloadURL: "https://example.com/ha-ws-client-darwin-arm64", Size: 1024},
-				{Name: "checksums.txt", BrowserDownloadURL: "https://example.com/checksums.txt", Size: 256},
-			},
-		},
-	}
+	versionsJSON := `{"ha-ws-client-go": "1.6.0"}`
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(releases)
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/test/test/releases":
+			releases := []Release{
+				{
+					TagName: "v1.6.0",
+					Assets: []Asset{
+						{Name: "ha-ws-client-linux-amd64", BrowserDownloadURL: "https://example.com/ha-ws-client-linux-amd64", Size: 1024},
+						{Name: "ha-ws-client-darwin-arm64", BrowserDownloadURL: "https://example.com/ha-ws-client-darwin-arm64", Size: 1024},
+						{Name: "checksums.txt", BrowserDownloadURL: "https://example.com/checksums.txt", Size: 256},
+						{Name: "versions.json", BrowserDownloadURL: server.URL + "/versions.json", Size: int64(len(versionsJSON))},
+					},
+				},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(releases)
+		case "/versions.json":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(versionsJSON))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
 	}))
 	defer server.Close()
 
@@ -106,18 +117,29 @@ func TestUpdater_Check(t *testing.T) {
 }
 
 func TestUpdater_Check_AlreadyLatest(t *testing.T) {
-	releases := []Release{
-		{
-			TagName: "ha-ws-client-go/v1.5.4",
-			Assets: []Asset{
-				{Name: "ha-ws-client-linux-amd64", BrowserDownloadURL: "https://example.com/binary"},
-			},
-		},
-	}
+	versionsJSON := `{"ha-ws-client-go": "1.5.4"}`
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(releases)
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/test/test/releases":
+			releases := []Release{
+				{
+					TagName: "v1.5.4",
+					Assets: []Asset{
+						{Name: "ha-ws-client-linux-amd64", BrowserDownloadURL: "https://example.com/binary"},
+						{Name: "versions.json", BrowserDownloadURL: server.URL + "/versions.json"},
+					},
+				},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(releases)
+		case "/versions.json":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(versionsJSON))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
 	}))
 	defer server.Close()
 
@@ -142,19 +164,30 @@ func TestUpdater_Check_AlreadyLatest(t *testing.T) {
 }
 
 func TestUpdater_Check_DevVersion(t *testing.T) {
-	releases := []Release{
-		{
-			TagName: "ha-ws-client-go/v1.5.4",
-			Assets: []Asset{
-				{Name: "ha-ws-client-darwin-arm64", BrowserDownloadURL: "https://example.com/binary"},
-				{Name: "checksums.txt", BrowserDownloadURL: "https://example.com/checksums.txt"},
-			},
-		},
-	}
+	versionsJSON := `{"ha-ws-client-go": "1.5.4"}`
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(releases)
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/test/test/releases":
+			releases := []Release{
+				{
+					TagName: "v1.5.4",
+					Assets: []Asset{
+						{Name: "ha-ws-client-darwin-arm64", BrowserDownloadURL: "https://example.com/binary"},
+						{Name: "checksums.txt", BrowserDownloadURL: "https://example.com/checksums.txt"},
+						{Name: "versions.json", BrowserDownloadURL: server.URL + "/versions.json"},
+					},
+				},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(releases)
+		case "/versions.json":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(versionsJSON))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
 	}))
 	defer server.Close()
 
@@ -205,16 +238,51 @@ func TestUpdater_needsUpdate(t *testing.T) {
 }
 
 func TestUpdater_ListAvailableVersions(t *testing.T) {
-	releases := []Release{
-		{TagName: "ha-ws-client-go/v1.6.0"},
-		{TagName: "ha-ws-client-go/v1.5.4"},
-		{TagName: "ha-ws-client-go/v1.5.3"},
-		{TagName: "validate-blueprint-go/v1.0.0"}, // Different tool
-	}
+	versionsJSON160 := `{"ha-ws-client-go": "1.6.0", "validate-blueprint-go": "2.0.0"}`
+	versionsJSON154 := `{"ha-ws-client-go": "1.5.4"}`
+	versionsJSON153 := `{"ha-ws-client-go": "1.5.3"}`
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(releases)
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/test/test/releases":
+			releases := []Release{
+				{
+					TagName: "v1.6.0",
+					Assets: []Asset{
+						{Name: "ha-ws-client-linux-amd64", BrowserDownloadURL: "https://example.com/binary"},
+						{Name: "versions.json", BrowserDownloadURL: server.URL + "/versions-1.6.0.json"},
+					},
+				},
+				{
+					TagName: "v1.5.4",
+					Assets: []Asset{
+						{Name: "ha-ws-client-linux-amd64", BrowserDownloadURL: "https://example.com/binary"},
+						{Name: "versions.json", BrowserDownloadURL: server.URL + "/versions-1.5.4.json"},
+					},
+				},
+				{
+					TagName: "v1.5.3",
+					Assets: []Asset{
+						{Name: "ha-ws-client-linux-amd64", BrowserDownloadURL: "https://example.com/binary"},
+						{Name: "versions.json", BrowserDownloadURL: server.URL + "/versions-1.5.3.json"},
+					},
+				},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(releases)
+		case "/versions-1.6.0.json":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(versionsJSON160))
+		case "/versions-1.5.4.json":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(versionsJSON154))
+		case "/versions-1.5.3.json":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(versionsJSON153))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
 	}))
 	defer server.Close()
 
@@ -246,19 +314,30 @@ func TestUpdater_ListAvailableVersions(t *testing.T) {
 }
 
 func TestUpdater_Update_AlreadyLatest(t *testing.T) {
-	releases := []Release{
-		{
-			TagName: "ha-ws-client-go/v1.5.4",
-			Assets: []Asset{
-				{Name: "ha-ws-client-darwin-arm64", BrowserDownloadURL: "https://example.com/binary"},
-				{Name: "checksums.txt", BrowserDownloadURL: "https://example.com/checksums.txt"},
-			},
-		},
-	}
+	versionsJSON := `{"ha-ws-client-go": "1.5.4"}`
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(releases)
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/test/test/releases":
+			releases := []Release{
+				{
+					TagName: "v1.5.4",
+					Assets: []Asset{
+						{Name: "ha-ws-client-darwin-arm64", BrowserDownloadURL: "https://example.com/binary"},
+						{Name: "checksums.txt", BrowserDownloadURL: "https://example.com/checksums.txt"},
+						{Name: "versions.json", BrowserDownloadURL: server.URL + "/versions.json"},
+					},
+				},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(releases)
+		case "/versions.json":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(versionsJSON))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
 	}))
 	defer server.Close()
 
@@ -279,19 +358,37 @@ func TestUpdater_Update_AlreadyLatest(t *testing.T) {
 }
 
 func TestUpdater_Update_MissingChecksum(t *testing.T) {
-	releases := []Release{
-		{
-			TagName: "ha-ws-client-go/v1.6.0",
-			Assets: []Asset{
-				{Name: "ha-ws-client-darwin-arm64", BrowserDownloadURL: "https://example.com/binary"},
-				// No checksums.txt
-			},
-		},
-	}
+	versionsJSON := `{"ha-ws-client-go": "1.6.0"}`
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(releases)
+	// Get the current platform's asset name
+	platform, err := DetectPlatform()
+	if err != nil {
+		t.Fatalf("DetectPlatform() error = %v", err)
+	}
+	assetName := platform.AssetName("ha-ws-client")
+
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/test/test/releases":
+			releases := []Release{
+				{
+					TagName: "v1.6.0",
+					Assets: []Asset{
+						{Name: assetName, BrowserDownloadURL: "https://example.com/binary"},
+						// No checksums.txt
+						{Name: "versions.json", BrowserDownloadURL: server.URL + "/versions.json"},
+					},
+				},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(releases)
+		case "/versions.json":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(versionsJSON))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
 	}))
 	defer server.Close()
 
@@ -320,41 +417,42 @@ func TestUpdater_UpdateWithVerification(t *testing.T) {
 	// Create temp directory for test binary
 	tmpDir := t.TempDir()
 	testBinaryPath := filepath.Join(tmpDir, "test-binary")
-	if err := os.WriteFile(testBinaryPath, []byte("old binary"), 0755); err != nil {
+	if err := os.WriteFile(testBinaryPath, []byte("old binary"), 0o755); err != nil {
 		t.Fatalf("Failed to create test binary: %v", err)
 	}
 
 	assetName := "ha-ws-client-darwin-arm64"
 	checksumContent := binaryChecksum + "  " + assetName
+	versionsJSON := `{"ha-ws-client-go": "1.6.0"}`
 
-	releases := []Release{
-		{
-			TagName: "ha-ws-client-go/v1.6.0",
-			Assets: []Asset{
-				{Name: assetName, BrowserDownloadURL: "/binary", Size: int64(len(binaryContent))},
-				{Name: "checksums.txt", BrowserDownloadURL: "/checksums.txt", Size: int64(len(checksumContent))},
-			},
-		},
-	}
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/repos/test/test/releases":
+			releases := []Release{
+				{
+					TagName: "v1.6.0",
+					Assets: []Asset{
+						{Name: assetName, BrowserDownloadURL: server.URL + "/binary", Size: int64(len(binaryContent))},
+						{Name: "checksums.txt", BrowserDownloadURL: server.URL + "/checksums.txt", Size: int64(len(checksumContent))},
+						{Name: "versions.json", BrowserDownloadURL: server.URL + "/versions.json", Size: int64(len(versionsJSON))},
+					},
+				},
+			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(releases)
+			_ = json.NewEncoder(w).Encode(releases)
 		case "/binary":
-			w.Write(binaryContent)
+			_, _ = w.Write(binaryContent)
 		case "/checksums.txt":
-			w.Write([]byte(checksumContent))
+			_, _ = w.Write([]byte(checksumContent))
+		case "/versions.json":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(versionsJSON))
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
 	defer server.Close()
-
-	// Update the release URLs to use the test server
-	releases[0].Assets[0].BrowserDownloadURL = server.URL + "/binary"
-	releases[0].Assets[1].BrowserDownloadURL = server.URL + "/checksums.txt"
 
 	client := NewGitHubClient(
 		WithBaseURL(server.URL),
@@ -384,7 +482,7 @@ func TestUpdater_UpdateWithVerification(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading downloaded file: %v", err)
 	}
-	if string(downloadedContent) != string(binaryContent) {
+	if !bytes.Equal(downloadedContent, binaryContent) {
 		t.Error("downloaded content doesn't match expected")
 	}
 
@@ -425,13 +523,13 @@ func TestUpdater_replaceBinary(t *testing.T) {
 
 	// Create original binary
 	originalPath := filepath.Join(tmpDir, "original")
-	if err := os.WriteFile(originalPath, []byte("original"), 0755); err != nil {
+	if err := os.WriteFile(originalPath, []byte("original"), 0o755); err != nil {
 		t.Fatalf("Failed to create original: %v", err)
 	}
 
 	// Create new binary
 	newPath := filepath.Join(tmpDir, "new")
-	if err := os.WriteFile(newPath, []byte("new content"), 0644); err != nil {
+	if err := os.WriteFile(newPath, []byte("new content"), 0o644); err != nil {
 		t.Fatalf("Failed to create new: %v", err)
 	}
 
@@ -455,7 +553,7 @@ func TestUpdater_replaceBinary(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat replaced binary: %v", err)
 	}
-	if info.Mode() != 0755 {
+	if info.Mode() != 0o755 {
 		t.Errorf("mode = %o, want 0755", info.Mode())
 	}
 }

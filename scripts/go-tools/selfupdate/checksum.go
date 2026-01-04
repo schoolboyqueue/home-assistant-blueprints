@@ -19,7 +19,7 @@ type Checksums map[string]string
 func DownloadChecksums(url string, timeout time.Duration) (Checksums, error) {
 	client := &http.Client{Timeout: timeout}
 
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}

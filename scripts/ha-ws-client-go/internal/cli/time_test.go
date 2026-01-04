@@ -109,6 +109,6 @@ func BenchmarkParseFlexibleDate(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		input := inputs[i%len(inputs)]
-		_, _ = ParseFlexibleDate(input) //nolint:errcheck // benchmark intentionally ignores error
+		_, _ = ParseFlexibleDate(input)
 	}
 }

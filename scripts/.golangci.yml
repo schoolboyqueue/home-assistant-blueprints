@@ -159,6 +159,7 @@ issues:
         - dupl
         - gosec
         - goconst
+        - errcheck  # Test mock servers don't need error checking
 
     # Exclude some staticcheck messages
     - linters:

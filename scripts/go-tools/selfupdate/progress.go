@@ -152,6 +152,7 @@ func NewProgressReader(reader io.Reader, progress *ProgressWriter) *ProgressRead
 func (r *ProgressReader) Read(p []byte) (int, error) {
 	n, err := r.reader.Read(p)
 	if n > 0 {
+		//nolint:errcheck // Progress tracking is non-critical
 		r.progress.Write(p[:n])
 	}
 	return n, err

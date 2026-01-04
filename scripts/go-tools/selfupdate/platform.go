@@ -7,6 +7,12 @@ import (
 	"slices"
 )
 
+// Platform OS and architecture constants.
+const (
+	osWindows = "windows"
+	archARM   = "arm"
+)
+
 // ArmVersion is set at build time via ldflags for ARM builds.
 // For armv6: -ldflags "-X github.com/home-assistant-blueprints/selfupdate.ArmVersion=6"
 // For armv7: -ldflags "-X github.com/home-assistant-blueprints/selfupdate.ArmVersion=7"
@@ -40,12 +46,12 @@ func DetectPlatform() (Platform, error) {
 	}
 
 	// Set file extension for Windows
-	if p.OS == "windows" {
+	if p.OS == osWindows {
 		p.FileExtension = ".exe"
 	}
 
 	// Handle ARM version detection
-	if p.Arch == "arm" {
+	if p.Arch == archARM {
 		if ArmVersion == "" {
 			// No ARM version set at build time - this is a problem for ARM builds
 			return Platform{}, &ArchitectureError{
@@ -75,7 +81,7 @@ func DetectPlatform() (Platform, error) {
 // ArchString returns the architecture as a string, including ARM version if applicable.
 // Examples: "amd64", "arm64", "armv6", "armv7"
 func (p Platform) ArchString() string {
-	if p.Arch == "arm" && p.ARMVersion != "" {
+	if p.Arch == archARM && p.ARMVersion != "" {
 		return fmt.Sprintf("armv%s", p.ARMVersion)
 	}
 	return p.Arch

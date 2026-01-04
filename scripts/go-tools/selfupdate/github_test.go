@@ -75,7 +75,7 @@ func TestGitHubClient_ListReleases(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(releases)
+		_ = json.NewEncoder(w).Encode(releases)
 	}))
 	defer server.Close()
 
@@ -117,7 +117,7 @@ func TestGitHubClient_GetReleaseByTag(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(release)
+		_ = json.NewEncoder(w).Encode(release)
 	}))
 	defer server.Close()
 
@@ -144,9 +144,9 @@ func TestGitHubClient_ListReleasesForTool(t *testing.T) {
 		{TagName: "ha-ws-client-go/v1.5.3"},
 	}
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(releases)
+		_ = json.NewEncoder(w).Encode(releases)
 	}))
 	defer server.Close()
 
@@ -189,9 +189,9 @@ func TestGitHubClient_ListReleasesForTool_NoReleases(t *testing.T) {
 		{TagName: "ha-ws-client-go/v1.6.0"},
 	}
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(releases)
+		_ = json.NewEncoder(w).Encode(releases)
 	}))
 	defer server.Close()
 
@@ -214,9 +214,9 @@ func TestGitHubClient_GetLatestReleaseForTool(t *testing.T) {
 		{TagName: "ha-ws-client-go/v1.5.3"},
 	}
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(releases)
+		_ = json.NewEncoder(w).Encode(releases)
 	}))
 	defer server.Close()
 
@@ -236,7 +236,7 @@ func TestGitHubClient_GetLatestReleaseForTool(t *testing.T) {
 }
 
 func TestGitHubClient_RateLimitError(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("X-RateLimit-Remaining", "0")
 		w.Header().Set("X-RateLimit-Reset", "1704412800") // Fixed timestamp for testing
 		w.WriteHeader(http.StatusForbidden)
@@ -268,7 +268,7 @@ func TestGitHubClient_RateLimitError(t *testing.T) {
 }
 
 func TestGitHubClient_NotFoundError(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer server.Close()
@@ -289,29 +289,6 @@ func TestGitHubClient_NotFoundError(t *testing.T) {
 	}
 	if downloadErr != nil && downloadErr.StatusCode != 404 {
 		t.Errorf("StatusCode = %d, want 404", downloadErr.StatusCode)
-	}
-}
-
-func TestExtractVersion(t *testing.T) {
-	tests := []struct {
-		tagName string
-		toolTag string
-		want    string
-	}{
-		{"ha-ws-client-go/v1.5.4", "ha-ws-client-go", "1.5.4"},
-		{"validate-blueprint-go/v1.6.0", "validate-blueprint-go", "1.6.0"},
-		{"ha-ws-client-go/v2.0.0-beta.1", "ha-ws-client-go", "2.0.0-beta.1"},
-		{"other-tool/v1.0.0", "ha-ws-client-go", ""},
-		{"invalid", "ha-ws-client-go", ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.tagName, func(t *testing.T) {
-			got := ExtractVersion(tt.tagName, tt.toolTag)
-			if got != tt.want {
-				t.Errorf("ExtractVersion(%q, %q) = %q, want %q", tt.tagName, tt.toolTag, got, tt.want)
-			}
-		})
 	}
 }
 
@@ -389,6 +366,61 @@ func TestGitHubClient_GetReleaseForToolVersion(t *testing.T) {
 			t.Fatal("GetReleaseForToolVersion() should return error for nonexistent version")
 		}
 		// The error should be ErrVersionNotFound (which wraps the 404)
+		if !errors.Is(err, ErrVersionNotFound) {
+			t.Errorf("error should be ErrVersionNotFound, got %T: %v", err, err)
+		}
+	})
+}
+
+func TestGitHubClient_GetReleaseForToolVersionWithName_CombinedRelease(t *testing.T) {
+	versionsJSON := `{"ha-ws-client-go": "1.6.0", "validate-blueprint-go": "1.7.0"}`
+
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/test-owner/test-repo/releases/tags/ha-ws-client-go/v1.6.0":
+			// Tool-specific tag doesn't exist
+			w.WriteHeader(http.StatusNotFound)
+		case "/repos/test-owner/test-repo/releases":
+			// Return combined release
+			releases := []Release{
+				{
+					TagName: "v1.7.0",
+					Name:    "ha-ws-client-go v1.6.0, validate-blueprint-go v1.7.0",
+					Assets: []Asset{
+						{Name: "ha-ws-client-linux-amd64", BrowserDownloadURL: "https://example.com/binary"},
+						{Name: "versions.json", BrowserDownloadURL: server.URL + "/versions.json"},
+					},
+				},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(releases)
+		case "/versions.json":
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(versionsJSON))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client := NewGitHubClient(
+		WithBaseURL(server.URL),
+		WithRepository("test-owner", "test-repo"),
+	)
+
+	t.Run("find version in combined release", func(t *testing.T) {
+		result, err := client.GetReleaseForToolVersionWithName("ha-ws-client-go", "ha-ws-client", "1.6.0")
+		if err != nil {
+			t.Fatalf("GetReleaseForToolVersionWithName() error = %v", err)
+		}
+		if result.TagName != "v1.7.0" {
+			t.Errorf("TagName = %q, want %q", result.TagName, "v1.7.0")
+		}
+	})
+
+	t.Run("version not in any release", func(t *testing.T) {
+		_, err := client.GetReleaseForToolVersionWithName("ha-ws-client-go", "ha-ws-client", "9.9.9")
 		if !errors.Is(err, ErrVersionNotFound) {
 			t.Errorf("error should be ErrVersionNotFound, got %T: %v", err, err)
 		}

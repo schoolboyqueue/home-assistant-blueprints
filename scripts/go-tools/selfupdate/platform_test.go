@@ -144,7 +144,6 @@ func TestDetectPlatform(t *testing.T) {
 		}
 
 		p, err := DetectPlatform()
-
 		// Check if we're on a supported platform
 		if err != nil {
 			var archErr *ArchitectureError

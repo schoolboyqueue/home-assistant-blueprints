@@ -2,6 +2,7 @@ package selfupdate
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -46,7 +47,7 @@ func TestProgressWriter_Quiet(t *testing.T) {
 	var buf bytes.Buffer
 	p := NewProgressWriter(&buf, 100, WithQuiet())
 
-	p.Write(make([]byte, 50))
+	_, _ = p.Write(make([]byte, 50))
 	p.Finish()
 
 	if buf.Len() != 0 {
@@ -58,7 +59,7 @@ func TestProgressWriter_UnknownTotal(t *testing.T) {
 	var buf bytes.Buffer
 	p := NewProgressWriter(&buf, 0) // Unknown total
 
-	p.Write(make([]byte, 50))
+	_, _ = p.Write(make([]byte, 50))
 	p.Finish()
 
 	// With unknown total, no percentage is shown
@@ -71,7 +72,7 @@ func TestProgressWriter_Finish(t *testing.T) {
 	var buf bytes.Buffer
 	p := NewProgressWriter(&buf, 100)
 
-	p.Write(make([]byte, 100))
+	_, _ = p.Write(make([]byte, 100))
 	p.Finish()
 
 	output := buf.String()
@@ -88,7 +89,7 @@ func TestProgressWriter_ProgressBar(t *testing.T) {
 	p := NewProgressWriter(&buf, 100)
 
 	// Write 50 bytes
-	p.Write(make([]byte, 50))
+	_, _ = p.Write(make([]byte, 50))
 
 	output := buf.String()
 
@@ -160,7 +161,7 @@ func TestProgressReader_PartialReads(t *testing.T) {
 	buffer := make([]byte, 25)
 	for i := 0; i < 4; i++ {
 		n, err := progressReader.Read(buffer)
-		if err != nil && err != io.EOF {
+		if err != nil && !errors.Is(err, io.EOF) {
 			t.Fatalf("Read() error = %v", err)
 		}
 		if n != 25 {
