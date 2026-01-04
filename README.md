@@ -192,6 +192,15 @@ HVAC-aware ceiling fan automation with EN 16798 adaptive comfort model, heat ind
 │   │   │   └── common/           # Shared utilities
 │   │   ├── Makefile
 │   │   └── README.md
+│   ├── go-tools/                 # Shared Go packages for CLI tools
+│   │   └── selfupdate/           # Self-update functionality
+│   │       ├── checksum.go       # Checksum verification
+│   │       ├── errors.go         # Error types
+│   │       ├── github.go         # GitHub API client
+│   │       ├── platform.go       # Platform detection
+│   │       ├── progress.go       # Download progress display
+│   │       ├── selfupdate.go     # Core update logic
+│   │       └── version.go        # Version parsing
 │   ├── testfixtures/             # Shared test fixtures for Go tools
 │   │   ├── blueprint_fixtures.go # Blueprint test data
 │   │   ├── ha_fixtures.go        # Home Assistant test data
