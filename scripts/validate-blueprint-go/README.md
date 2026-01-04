@@ -68,6 +68,15 @@ make build-all
 
 # Validate all blueprints in the repository
 ./build/validate-blueprint --all
+
+# Check for updates
+./build/validate-blueprint update --check
+
+# Update to the latest version
+./build/validate-blueprint update
+
+# Update to a specific version
+./build/validate-blueprint update --version 1.7.0
 ```
 
 This finds all blueprint files matching patterns like `*_pro.yaml`, `*_pro_blueprint.yaml`, or `blueprint.yaml` in the repository.

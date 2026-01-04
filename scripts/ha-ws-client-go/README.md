@@ -161,6 +161,13 @@ ha-ws-client stats-multi sensor.temp_kitchen sensor.temp_bedroom sensor.temp_liv
 | `monitor-multi <entity>... [seconds]` | Monitor multiple entities concurrently (default 60s) |
 | `analyze <entity_id>` | Analyze entity state patterns |
 
+### Utility Commands
+| Command | Description |
+|---------|-------------|
+| `update` | Check for and install the latest version |
+| `update --check` | Check for updates without installing |
+| `update --version <version>` | Install a specific version (e.g., `1.6.0`) |
+
 ## Output Formats
 
 The client supports three output formats optimized for different use cases:
