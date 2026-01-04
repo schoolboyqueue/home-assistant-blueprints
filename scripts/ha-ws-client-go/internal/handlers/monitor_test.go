@@ -369,7 +369,7 @@ func TestMonitorMultiEntityList(t *testing.T) {
 
 // splitEntityID splits an entity_id into domain and name
 func splitEntityID(entityID string) []string {
-	for i := 0; i < len(entityID); i++ {
+	for i := range len(entityID) {
 		if entityID[i] == '.' {
 			return []string{entityID[:i], entityID[i+1:]}
 		}

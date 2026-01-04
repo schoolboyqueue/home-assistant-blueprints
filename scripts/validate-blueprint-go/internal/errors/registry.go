@@ -1,108 +1,6 @@
 // Package errors provides a centralized error handling system.
-// This file contains the error registry and factory functions for blueprint validation.
+// This file contains the validate-blueprint-go specific error codes and factory functions.
 package errors
-
-import (
-	"sync"
-)
-
-// ErrorDefinition holds the definition of a registered error.
-type ErrorDefinition struct {
-	// Code is the unique identifier for this error.
-	Code string
-	// Type is the category of the error.
-	Type ErrorType
-	// Message is the default message template for this error.
-	Message string
-}
-
-// Registry holds registered error definitions for consistent error creation.
-type Registry struct {
-	mu          sync.RWMutex
-	definitions map[string]ErrorDefinition
-}
-
-// NewRegistry creates a new error registry.
-func NewRegistry() *Registry {
-	return &Registry{
-		definitions: make(map[string]ErrorDefinition),
-	}
-}
-
-// Register adds an error definition to the registry.
-func (r *Registry) Register(def ErrorDefinition) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.definitions[def.Code] = def
-}
-
-// Get retrieves an error definition by code.
-func (r *Registry) Get(code string) *ErrorDefinition {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	if def, ok := r.definitions[code]; ok {
-		return &def
-	}
-	return nil
-}
-
-// Create creates a new Error from a registered definition.
-func (r *Registry) Create(code string) *Error {
-	def := r.Get(code)
-	if def == nil {
-		return nil
-	}
-	return &Error{
-		Type:    def.Type,
-		Code:    def.Code,
-		Message: def.Message,
-		Details: make(map[string]any),
-	}
-}
-
-// CreateWithPath creates a new Error from a registered definition with a path.
-func (r *Registry) CreateWithPath(code, path string) *Error {
-	def := r.Get(code)
-	if def == nil {
-		return nil
-	}
-	return &Error{
-		Type:    def.Type,
-		Code:    def.Code,
-		Path:    path,
-		Message: def.Message,
-		Details: make(map[string]any),
-	}
-}
-
-// List returns all registered error definitions.
-func (r *Registry) List() []ErrorDefinition {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	defs := make([]ErrorDefinition, 0, len(r.definitions))
-	for _, def := range r.definitions {
-		defs = append(defs, def)
-	}
-	return defs
-}
-
-// DefaultRegistry is the global error registry.
-var DefaultRegistry = NewRegistry()
-
-// Register adds an error definition to the default registry.
-func Register(def ErrorDefinition) {
-	DefaultRegistry.Register(def)
-}
-
-// Create creates a new Error from the default registry.
-func Create(code string) *Error {
-	return DefaultRegistry.Create(code)
-}
-
-// CreateWithPath creates a new Error from the default registry with a path.
-func CreateWithPath(code, path string) *Error {
-	return DefaultRegistry.CreateWithPath(code, path)
-}
 
 // Common error codes for blueprint validation.
 const (
@@ -181,7 +79,7 @@ const (
 	CodeMissingDocumentation = "missing_documentation"
 )
 
-// init registers the default error definitions.
+// init registers the validate-blueprint-go specific error definitions.
 func init() {
 	// Syntax errors
 	Register(ErrorDefinition{Code: CodeYAMLSyntax, Type: ErrorTypeSyntax, Message: "YAML syntax error"})

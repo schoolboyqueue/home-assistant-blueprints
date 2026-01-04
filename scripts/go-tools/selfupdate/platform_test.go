@@ -3,6 +3,7 @@ package selfupdate
 import (
 	"errors"
 	"runtime"
+	"slices"
 	"testing"
 )
 
@@ -207,13 +208,7 @@ func TestSupportedArchitectures(t *testing.T) {
 	}
 
 	for _, arch := range expected {
-		found := false
-		for _, supported := range SupportedArchitectures {
-			if supported == arch {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(SupportedArchitectures, arch)
 		if !found {
 			t.Errorf("Expected architecture %q not found in SupportedArchitectures", arch)
 		}

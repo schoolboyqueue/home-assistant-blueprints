@@ -53,6 +53,13 @@ linters:
     - unconvert     # Remove unnecessary type conversions
     - whitespace    # Check for unnecessary whitespace
 
+    # Modernization linters
+    - intrange      # Use range over integers (Go 1.22+)
+    - perfsprint    # Modern string formatting (fmt.Sprintf -> strconv)
+    - tenv          # Use t.Setenv in tests (Go 1.17+)
+    - tparallel     # Correct t.Parallel() usage
+    - usestdlibvars # Use stdlib constants (http.MethodGet vs "GET")
+
 linters-settings:
   errcheck:
     # Report about not checking of errors in type assertions
@@ -165,12 +172,6 @@ issues:
     - linters:
         - staticcheck
       text: "SA9003:"  # Empty branch
-
-    # Allow unused parameters in interface implementations
-    - linters:
-        - revive
-      text: "unused-parameter"
-      source: "func \\(.*\\) .*\\(.*\\) error"
 
     # Allow os.Exit calls in main package (expected for CLI tools)
     - path: main\.go

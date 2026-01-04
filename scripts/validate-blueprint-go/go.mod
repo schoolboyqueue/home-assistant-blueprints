@@ -5,6 +5,7 @@ go 1.22
 require (
 	github.com/fatih/color v1.18.0
 	github.com/home-assistant-blueprints/selfupdate v0.0.0
+	github.com/home-assistant-blueprints/shared v0.0.0
 	github.com/home-assistant-blueprints/testfixtures v0.0.0
 	github.com/stretchr/testify v1.11.1
 	github.com/urfave/cli/v3 v3.3.3
@@ -23,3 +24,5 @@ require (
 replace github.com/home-assistant-blueprints/testfixtures => ../testfixtures
 
 replace github.com/home-assistant-blueprints/selfupdate => ../go-tools/selfupdate
+
+replace github.com/home-assistant-blueprints/shared => ../internal/shared

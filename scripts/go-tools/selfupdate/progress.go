@@ -73,10 +73,7 @@ func (p *ProgressWriter) Write(data []byte) (int, error) {
 // render displays the progress bar using ANSI escape sequences.
 func (p *ProgressWriter) render(current int64, percent int) {
 	// Calculate filled/empty portions
-	filled := (percent * progressBarWidth) / 100
-	if filled > progressBarWidth {
-		filled = progressBarWidth
-	}
+	filled := min((percent * progressBarWidth) / 100, progressBarWidth)
 	empty := progressBarWidth - filled
 
 	// Build progress bar

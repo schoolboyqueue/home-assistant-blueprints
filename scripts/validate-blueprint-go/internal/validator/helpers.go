@@ -1,7 +1,7 @@
 package validator
 
 import (
-	"fmt"
+	"errors"
 	"strconv"
 
 	"github.com/home-assistant-blueprints/validate-blueprint-go/internal/common"
@@ -21,7 +21,7 @@ func ToFloat(val interface{}) (float64, error) {
 	case string:
 		return strconv.ParseFloat(v, 64)
 	default:
-		return 0, fmt.Errorf("cannot convert to float")
+		return 0, errors.New("cannot convert to float")
 	}
 }
 

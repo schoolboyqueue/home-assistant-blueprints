@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -789,10 +790,10 @@ func TestOutputFormat_EmptyTimeline(t *testing.T) {
 
 func TestOutputFormat_MaxItems(t *testing.T) {
 	states := make([]types.HAState, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		states[i] = types.HAState{
 			EntityID: fmt.Sprintf("sensor.test_%d", i),
-			State:    fmt.Sprintf("%d", i),
+			State:    strconv.Itoa(i),
 		}
 	}
 

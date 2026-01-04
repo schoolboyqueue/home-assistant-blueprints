@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -402,7 +403,7 @@ func TestErrorMessages_AreHelpful(t *testing.T) {
 		},
 		{
 			name:        "missing required argument",
-			err:         fmt.Errorf("Usage: state <entity_id>"),
+			err:         errors.New("Usage: state <entity_id>"),
 			wantMessage: "Usage: state <entity_id>",
 		},
 	}
@@ -626,7 +627,7 @@ func TestEdgeCases_LargeDatasets(t *testing.T) {
 
 	// Create a large dataset (1000 entities)
 	states := make([]types.HAState, 1000)
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		states[i] = types.HAState{
 			EntityID: fmt.Sprintf("sensor.test_%d", i),
 			State:    fmt.Sprintf("value_%d", i),

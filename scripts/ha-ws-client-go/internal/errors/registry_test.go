@@ -339,7 +339,7 @@ func TestRegistry_ConcurrentAccess(_ *testing.T) {
 
 	// Register errors concurrently
 	done := make(chan bool)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		go func(n int) {
 			r.Register(ErrorDefinition{
 				Code:    string(rune('a' + n)),
@@ -351,12 +351,12 @@ func TestRegistry_ConcurrentAccess(_ *testing.T) {
 	}
 
 	// Wait for all goroutines
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		<-done
 	}
 
 	// Read concurrently
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		go func(n int) {
 			_ = r.Get(string(rune('a' + n)))
 			_ = r.List()
@@ -364,7 +364,7 @@ func TestRegistry_ConcurrentAccess(_ *testing.T) {
 		}(i)
 	}
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		<-done
 	}
 }

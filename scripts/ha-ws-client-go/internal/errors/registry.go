@@ -1,132 +1,6 @@
 // Package errors provides a centralized error handling system.
-// This file contains the error registry and factory functions for consistent error creation.
+// This file contains the ha-ws-client-go specific error codes and factory functions.
 package errors
-
-import (
-	"sync"
-)
-
-// ErrorDefinition holds the definition of a registered error.
-type ErrorDefinition struct {
-	// Code is the unique identifier for this error.
-	Code string
-	// Type is the category of the error.
-	Type ErrorType
-	// Message is the default message template for this error.
-	Message string
-}
-
-// Registry holds registered error definitions for consistent error creation.
-type Registry struct {
-	mu          sync.RWMutex
-	definitions map[string]ErrorDefinition
-}
-
-// NewRegistry creates a new error registry.
-func NewRegistry() *Registry {
-	return &Registry{
-		definitions: make(map[string]ErrorDefinition),
-	}
-}
-
-// Register adds an error definition to the registry.
-// If an error with the same code already exists, it will be overwritten.
-func (r *Registry) Register(def ErrorDefinition) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.definitions[def.Code] = def
-}
-
-// Get retrieves an error definition by code.
-// Returns nil if not found.
-func (r *Registry) Get(code string) *ErrorDefinition {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	if def, ok := r.definitions[code]; ok {
-		return &def
-	}
-	return nil
-}
-
-// Create creates a new Error from a registered definition.
-// Returns nil if the code is not registered.
-func (r *Registry) Create(code string) *Error {
-	def := r.Get(code)
-	if def == nil {
-		return nil
-	}
-	return &Error{
-		Type:    def.Type,
-		Code:    def.Code,
-		Message: def.Message,
-		Details: make(map[string]any),
-	}
-}
-
-// CreateWithMessage creates a new Error from a registered definition with a custom message.
-// Returns nil if the code is not registered.
-func (r *Registry) CreateWithMessage(code, message string) *Error {
-	def := r.Get(code)
-	if def == nil {
-		return nil
-	}
-	return &Error{
-		Type:    def.Type,
-		Code:    def.Code,
-		Message: message,
-		Details: make(map[string]any),
-	}
-}
-
-// CreateWithCause creates a new Error from a registered definition wrapping a cause.
-// Returns nil if the code is not registered.
-func (r *Registry) CreateWithCause(code string, cause error) *Error {
-	def := r.Get(code)
-	if def == nil {
-		return nil
-	}
-	return &Error{
-		Type:    def.Type,
-		Code:    def.Code,
-		Message: def.Message,
-		Cause:   cause,
-		Details: make(map[string]any),
-	}
-}
-
-// List returns all registered error definitions.
-func (r *Registry) List() []ErrorDefinition {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	defs := make([]ErrorDefinition, 0, len(r.definitions))
-	for _, def := range r.definitions {
-		defs = append(defs, def)
-	}
-	return defs
-}
-
-// DefaultRegistry is the global error registry.
-var DefaultRegistry = NewRegistry()
-
-// Register adds an error definition to the default registry.
-func Register(def ErrorDefinition) {
-	DefaultRegistry.Register(def)
-}
-
-// Create creates a new Error from the default registry.
-func Create(code string) *Error {
-	return DefaultRegistry.Create(code)
-}
-
-// CreateWithMessage creates a new Error from the default registry with a custom message.
-func CreateWithMessage(code, message string) *Error {
-	return DefaultRegistry.CreateWithMessage(code, message)
-}
-
-// CreateWithCause creates a new Error from the default registry wrapping a cause.
-func CreateWithCause(code string, cause error) *Error {
-	return DefaultRegistry.CreateWithCause(code, cause)
-}
 
 // Common error codes for the ha-ws-client-go package.
 const (
@@ -172,7 +46,7 @@ const (
 	CodeTemplateError    = "template_error"
 )
 
-// init registers the default error definitions.
+// init registers the ha-ws-client-go specific error definitions.
 func init() {
 	// Connection errors
 	Register(ErrorDefinition{

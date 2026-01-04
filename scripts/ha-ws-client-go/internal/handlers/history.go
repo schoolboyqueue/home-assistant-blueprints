@@ -56,7 +56,7 @@ func handleLogbook(ctx *Context) error {
 	}
 
 	output.Timeline(entries,
-		output.TimelineTitle[types.LogbookEntry](fmt.Sprintf("Logbook for %s", entityID)),
+		output.TimelineTitle[types.LogbookEntry]("Logbook for "+entityID),
 		output.TimelineCommand[types.LogbookEntry]("logbook"),
 		output.TimelineFormatter(func(e types.LogbookEntry) string {
 			t := time.Unix(int64(e.When), 0)
@@ -100,7 +100,7 @@ func handleHistory(ctx *Context) error {
 	states := result[entityID]
 
 	output.Timeline(states,
-		output.TimelineTitle[types.HistoryState](fmt.Sprintf("History for %s", entityID)),
+		output.TimelineTitle[types.HistoryState]("History for "+entityID),
 		output.TimelineCommand[types.HistoryState]("history"),
 		output.TimelineFormatter(func(s types.HistoryState) string {
 			t := s.GetLastUpdated()
@@ -143,7 +143,7 @@ func handleHistoryFull(ctx *Context) error {
 	states := result[entityID]
 
 	output.Timeline(states,
-		output.TimelineTitle[types.HistoryState](fmt.Sprintf("Full history for %s", entityID)),
+		output.TimelineTitle[types.HistoryState]("Full history for "+entityID),
 		output.TimelineCommand[types.HistoryState]("history-full"),
 		output.TimelineFormatter(func(s types.HistoryState) string {
 			t := s.GetLastUpdated()
@@ -231,7 +231,7 @@ func handleAttrs(ctx *Context) error {
 	}
 
 	output.Timeline(changes,
-		output.TimelineTitle[AttrChange](fmt.Sprintf("Attribute history for %s", entityID)),
+		output.TimelineTitle[AttrChange]("Attribute history for "+entityID),
 		output.TimelineCommand[AttrChange]("attrs"),
 		output.TimelineFormatter(func(c AttrChange) string {
 			if output.IsCompact() {
@@ -350,12 +350,12 @@ func handleStats(ctx *Context) error {
 
 	stats, ok := result[entityID]
 	if !ok || len(stats) == 0 {
-		output.Message(fmt.Sprintf("No statistics found for %s", entityID))
+		output.Message("No statistics found for " + entityID)
 		return nil
 	}
 
 	output.Timeline(stats,
-		output.TimelineTitle[types.StatEntry](fmt.Sprintf("Statistics for %s", entityID)),
+		output.TimelineTitle[types.StatEntry]("Statistics for "+entityID),
 		output.TimelineCommand[types.StatEntry]("stats"),
 		output.TimelineFormatter(func(s types.StatEntry) string {
 			startTime := s.GetStartTime()
@@ -596,9 +596,9 @@ func handleContext(ctx *Context) error {
 		return outputNoContextMatches(arg, contextID, targetEntity)
 	}
 
-	title := fmt.Sprintf("States with context %s", contextID)
+	title := "States with context " + contextID
 	if targetEntity != nil {
-		title = fmt.Sprintf("Related state changes for %s", arg)
+		title = "Related state changes for " + arg
 	}
 
 	output.List(matches,
@@ -618,16 +618,16 @@ func handleContext(ctx *Context) error {
 // outputNoContextMatches outputs appropriate message when no matches found.
 func outputNoContextMatches(arg, contextID string, targetEntity *types.HAState) error {
 	if targetEntity != nil {
-		output.Message(fmt.Sprintf("No related state changes found for %s", arg))
-		output.Message(fmt.Sprintf("Context ID: %s", contextID))
+		output.Message("No related state changes found for " + arg)
+		output.Message("Context ID: " + contextID)
 		if targetEntity.Context != nil && targetEntity.Context.ParentID != "" {
-			output.Message(fmt.Sprintf("Parent context: %s", targetEntity.Context.ParentID))
+			output.Message("Parent context: " + targetEntity.Context.ParentID)
 		}
 		output.Message("")
 		output.Message("The triggering event may have occurred before the current state snapshot.")
 		output.Message("Try 'logbook <entity_id>' to see recent history with context.")
 	} else {
-		output.Message(fmt.Sprintf("No states found with context ID: %s", contextID))
+		output.Message("No states found with context ID: " + contextID)
 	}
 	return nil
 }

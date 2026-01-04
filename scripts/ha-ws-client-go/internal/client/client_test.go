@@ -134,7 +134,7 @@ func TestClient_NextID_Concurrent(t *testing.T) {
 	var wg sync.WaitGroup
 	ids := make(chan int, 100)
 
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -1032,7 +1032,7 @@ func TestClient_ClearSubscriptions(t *testing.T) {
 
 func TestClient_SubscriptionCount(t *testing.T) {
 	server := testServer(t, func(conn *websocket.Conn) {
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			// Read subscription request
 			_, data, err := conn.ReadMessage()
 			if err != nil {

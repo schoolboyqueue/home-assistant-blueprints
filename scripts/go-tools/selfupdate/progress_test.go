@@ -159,7 +159,7 @@ func TestProgressReader_PartialReads(t *testing.T) {
 
 	// Read in chunks
 	buffer := make([]byte, 25)
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		n, err := progressReader.Read(buffer)
 		if err != nil && !errors.Is(err, io.EOF) {
 			t.Fatalf("Read() error = %v", err)

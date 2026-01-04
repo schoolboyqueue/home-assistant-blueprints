@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -866,8 +867,8 @@ func TestHandleStates(t *testing.T) {
 			name: "many states (tests limit)",
 			states: func() []testfixtures.HAState {
 				states := make([]testfixtures.HAState, 50)
-				for i := 0; i < 50; i++ {
-					states[i] = testfixtures.NewHAState(fmt.Sprintf("sensor.test_%d", i), fmt.Sprintf("%d", i))
+				for i := range 50 {
+					states[i] = testfixtures.NewHAState(fmt.Sprintf("sensor.test_%d", i), strconv.Itoa(i))
 				}
 				return states
 			}(),

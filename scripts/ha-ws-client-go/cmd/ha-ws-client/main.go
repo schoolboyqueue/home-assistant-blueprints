@@ -38,7 +38,7 @@ func main() {
 	coord, ctx := shutdown.New(
 		shutdown.WithGracePeriod(5*time.Second),
 		shutdown.WithOnShutdown(func(reason string) {
-			output.Message(fmt.Sprintf("\nShutting down: %s", reason))
+			output.Message("\nShutting down: " + reason)
 		}),
 		shutdown.WithOnCleanupTimeout(func() {
 			output.Message("Warning: cleanup timed out, some operations may not have completed")

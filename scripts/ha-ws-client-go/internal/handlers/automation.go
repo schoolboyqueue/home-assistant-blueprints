@@ -121,8 +121,8 @@ func handleTraces(ctx *Context) error {
 								"message":        "No stored traces. Traces may be disabled or cleared.",
 							}, output.WithCommand("traces"), output.WithCount(0))
 						} else {
-							output.Message(fmt.Sprintf("No stored traces for %s", entityID))
-							output.Message(fmt.Sprintf("However, last_triggered: %s", lastTriggered))
+							output.Message("No stored traces for " + entityID)
+							output.Message("However, last_triggered: " + lastTriggered)
 							output.Message("")
 							output.Message("Traces may be disabled or cleared. Check:")
 							output.Message("  - Settings > Automations > (automation) > Stored Traces")
@@ -241,7 +241,7 @@ func handleTraceSummary(ctx *Context) error {
 	}
 
 	if len(traces) == 0 {
-		output.Message(fmt.Sprintf("No traces found for automation.%s", id))
+		output.Message("No traces found for automation." + id)
 		return nil
 	}
 
@@ -334,7 +334,7 @@ func handleTraceVars(ctx *Context) error {
 	}
 
 	output.List(allVars,
-		output.ListTitle[map[string]any](fmt.Sprintf("Variables for trace %s", runID)),
+		output.ListTitle[map[string]any]("Variables for trace "+runID),
 		output.ListCommand[map[string]any]("trace-vars"),
 	)
 	return nil
@@ -379,7 +379,7 @@ func handleTraceTimeline(ctx *Context) error {
 	}
 
 	output.Timeline(steps,
-		output.TimelineTitle[TimelineStep](fmt.Sprintf("Execution timeline for %s", runID)),
+		output.TimelineTitle[TimelineStep]("Execution timeline for "+runID),
 		output.TimelineCommand[TimelineStep]("trace-timeline"),
 		output.TimelineFormatter(func(s TimelineStep) string {
 			errStr := ""
@@ -459,7 +459,7 @@ func handleTraceActions(ctx *Context) error {
 	}
 
 	output.List(actions,
-		output.ListTitle[ActionResult](fmt.Sprintf("Actions for trace %s", runID)),
+		output.ListTitle[ActionResult]("Actions for trace "+runID),
 		output.ListCommand[ActionResult]("trace-actions"),
 		output.ListFormatter(func(a ActionResult, _ int) string {
 			if output.IsCompact() {

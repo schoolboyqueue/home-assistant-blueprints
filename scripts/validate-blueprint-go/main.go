@@ -218,7 +218,7 @@ func runValidateAllWithContext(ctx context.Context) bool {
 		select {
 		case <-ctx.Done():
 			interrupted = true
-			completed, total, _, _, _ := partialResult.Summary()
+			completed, total, _, _, _ := partialResult.SummaryWithCounts()
 			fmt.Printf("\nValidation interrupted after %d/%d blueprints\n", completed, total)
 			goto summary
 		default:
