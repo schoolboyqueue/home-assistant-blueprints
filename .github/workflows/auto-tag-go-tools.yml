@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: write
-  actions: write
 
 jobs:
   check-and-tag:
@@ -103,18 +102,4 @@ jobs:
             git push origin "v$VERSION"
           fi
 
-      - name: Trigger release workflow
-        if: steps.changed-files.outputs.changed == 'true' && (steps.validate-version.outputs.exists == 'false' || steps.client-version.outputs.exists == 'false')
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # Determine which tool(s) to build
-          BUILD_TARGET="both"
-          if [ "${{ steps.validate-version.outputs.exists }}" == "true" ]; then
-            BUILD_TARGET="ha-ws-client-go"
-          elif [ "${{ steps.client-version.outputs.exists }}" == "true" ]; then
-            BUILD_TARGET="validate-blueprint-go"
-          fi
-
-          echo "Triggering release workflow for: $BUILD_TARGET"
-          gh workflow run "Build and Release Go Tools" --field build_target="$BUILD_TARGET"
+      # Note: Release workflow is triggered automatically via workflow_run when this workflow completes

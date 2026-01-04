@@ -1,11 +1,10 @@
 name: Build and Release Go Tools
 
 on:
-  push:
-    tags:
-      - 'v*'
-      - 'ha-ws-client-go/v*'
-      - 'validate-blueprint-go/v*'
+  workflow_run:
+    workflows: ["Auto-tag Go Tools on Version Bump"]
+    types:
+      - completed
   workflow_dispatch:
     inputs:
       build_target:
@@ -24,6 +23,8 @@ permissions:
 jobs:
   determine-builds:
     name: Determine what to build
+    # Only run if auto-tag workflow succeeded, or if manually triggered
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     outputs:
       build_client: ${{ steps.check.outputs.build_client }}
@@ -41,6 +42,7 @@ jobs:
         id: check
         env:
           INPUT_TARGET: ${{ github.event.inputs.build_target }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           # Get versions from Makefiles
           VALIDATE_VERSION=$(grep -E '^VERSION\s*(\?=|:=|=)' scripts/validate-blueprint-go/Makefile | head -1 | sed 's/.*[?:]\?=\s*//' | tr -d ' ')
@@ -49,8 +51,6 @@ jobs:
           echo "validator_version=$VALIDATE_VERSION" >> $GITHUB_OUTPUT
           echo "client_version=$CLIENT_VERSION" >> $GITHUB_OUTPUT
 
-          # Determine what to build based on trigger
-          TAG_NAME="${GITHUB_REF_NAME}"
           BUILD_CLIENT="false"
           BUILD_VALIDATOR="false"
 
@@ -68,14 +68,27 @@ jobs:
                 BUILD_VALIDATOR="true"
                 ;;
             esac
-          elif [[ "$TAG_NAME" == ha-ws-client-go/* ]]; then
-            BUILD_CLIENT="true"
-          elif [[ "$TAG_NAME" == validate-blueprint-go/* ]]; then
-            BUILD_VALIDATOR="true"
-          elif [[ "$TAG_NAME" == v* ]]; then
-            # Combined v* tag - build both
-            BUILD_CLIENT="true"
-            BUILD_VALIDATOR="true"
+          elif [ "${{ github.event_name }}" == "workflow_run" ]; then
+            # Triggered by auto-tag workflow - check which tags exist without releases
+            # Fetch tags to ensure we have latest
+            git fetch --tags
+
+            # Check if tag exists and doesn't have a release yet
+            if git tag -l "validate-blueprint-go/v$VALIDATE_VERSION" | grep -q .; then
+              # Check if release exists for this tag
+              if ! gh release view "validate-blueprint-go/v$VALIDATE_VERSION" > /dev/null 2>&1; then
+                BUILD_VALIDATOR="true"
+                echo "Found unreleased tag: validate-blueprint-go/v$VALIDATE_VERSION"
+              fi
+            fi
+
+            if git tag -l "ha-ws-client-go/v$CLIENT_VERSION" | grep -q .; then
+              # Check if release exists for this tag
+              if ! gh release view "ha-ws-client-go/v$CLIENT_VERSION" > /dev/null 2>&1; then
+                BUILD_CLIENT="true"
+                echo "Found unreleased tag: ha-ws-client-go/v$CLIENT_VERSION"
+              fi
+            fi
           fi
 
           echo "build_client=$BUILD_CLIENT" >> $GITHUB_OUTPUT
@@ -94,24 +107,21 @@ jobs:
             echo "release_version=$VALIDATE_VERSION" >> $GITHUB_OUTPUT
           fi
 
-          # Determine tag for release
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            # For manual dispatch, construct tag from version
-            if [ "$BUILD_CLIENT" == "true" ] && [ "$BUILD_VALIDATOR" == "true" ]; then
-              # Use higher version for combined release tag
-              if [ "$(printf '%s\n' "$VALIDATE_VERSION" "$CLIENT_VERSION" | sort -V | tail -1)" = "$VALIDATE_VERSION" ]; then
-                RELEASE_TAG="v$VALIDATE_VERSION"
-              else
-                RELEASE_TAG="v$CLIENT_VERSION"
-              fi
-            elif [ "$BUILD_CLIENT" == "true" ]; then
-              RELEASE_TAG="ha-ws-client-go/v$CLIENT_VERSION"
+          # Determine tag for release (construct from versions for both workflow_dispatch and workflow_run)
+          if [ "$BUILD_CLIENT" == "true" ] && [ "$BUILD_VALIDATOR" == "true" ]; then
+            # Use higher version for combined release tag
+            if [ "$(printf '%s\n' "$VALIDATE_VERSION" "$CLIENT_VERSION" | sort -V | tail -1)" = "$VALIDATE_VERSION" ]; then
+              RELEASE_TAG="v$VALIDATE_VERSION"
             else
-              RELEASE_TAG="validate-blueprint-go/v$VALIDATE_VERSION"
+              RELEASE_TAG="v$CLIENT_VERSION"
             fi
+          elif [ "$BUILD_CLIENT" == "true" ]; then
+            RELEASE_TAG="ha-ws-client-go/v$CLIENT_VERSION"
+          elif [ "$BUILD_VALIDATOR" == "true" ]; then
+            RELEASE_TAG="validate-blueprint-go/v$VALIDATE_VERSION"
           else
-            # For tag push, use the actual tag
-            RELEASE_TAG="$TAG_NAME"
+            # Nothing to build - this will be handled by job condition
+            RELEASE_TAG=""
           fi
           echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
 
@@ -120,12 +130,14 @@ jobs:
             RELEASE_TITLE="ha-ws-client-go v$CLIENT_VERSION, validate-blueprint-go v$VALIDATE_VERSION"
           elif [ "$BUILD_CLIENT" == "true" ]; then
             RELEASE_TITLE="ha-ws-client-go v$CLIENT_VERSION"
-          else
+          elif [ "$BUILD_VALIDATOR" == "true" ]; then
             RELEASE_TITLE="validate-blueprint-go v$VALIDATE_VERSION"
+          else
+            RELEASE_TITLE=""
           fi
           echo "release_title=$RELEASE_TITLE" >> $GITHUB_OUTPUT
 
-          echo "Tag: $TAG_NAME"
+          echo "Event: ${{ github.event_name }}"
           echo "Release tag: $RELEASE_TAG"
           echo "Release title: $RELEASE_TITLE"
           echo "Build ha-ws-client-go: $BUILD_CLIENT (v$CLIENT_VERSION)"
@@ -134,6 +146,8 @@ jobs:
   test:
     name: Run Tests
     needs: determine-builds
+    # Only run if at least one tool needs to be built
+    if: needs.determine-builds.outputs.build_client == 'true' || needs.determine-builds.outputs.build_validator == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -165,6 +179,8 @@ jobs:
   build:
     name: Build Go Binaries
     needs: [determine-builds, test]
+    # Only run if at least one tool needs to be built
+    if: needs.determine-builds.outputs.build_client == 'true' || needs.determine-builds.outputs.build_validator == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -249,7 +265,10 @@ jobs:
     name: Create Release
     needs: [determine-builds, build]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    # Run if at least one tool needs to be built and this is workflow_run or workflow_dispatch
+    if: |
+      (needs.determine-builds.outputs.build_client == 'true' || needs.determine-builds.outputs.build_validator == 'true') &&
+      (github.event_name == 'workflow_run' || github.event_name == 'workflow_dispatch')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
