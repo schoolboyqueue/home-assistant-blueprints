@@ -382,3 +382,87 @@ func NewHAConfig() HAConfig {
 		Components: []string{"homeassistant", "automation", "script"},
 	}
 }
+
+// =====================================
+// TraceDetail Fixtures
+// =====================================
+
+// NewTraceDetail creates a TraceDetail fixture.
+func NewTraceDetail(itemID, runID string) TraceDetail {
+	now := time.Now().UTC().Format(time.RFC3339)
+	return TraceDetail{
+		ItemID:          itemID,
+		RunID:           runID,
+		Domain:          "automation",
+		ScriptExecution: "finished",
+		Timestamp: &Timestamp{
+			Start:  now,
+			Finish: now,
+		},
+		Context: &HAContext{
+			ID: "test-context-id",
+		},
+		Trace: map[string][]TraceStep{
+			"action/0": {
+				{
+					Path:      "action/0",
+					Timestamp: now,
+					Result: &TraceResult{
+						Enabled: true,
+					},
+				},
+			},
+		},
+	}
+}
+
+// NewTraceDetailWithTrigger creates a TraceDetail with trigger information.
+func NewTraceDetailWithTrigger(itemID, runID string, trigger map[string]any) TraceDetail {
+	detail := NewTraceDetail(itemID, runID)
+	detail.Trigger = trigger
+	return detail
+}
+
+// NewTraceDetailWithConfig creates a TraceDetail with automation config.
+func NewTraceDetailWithConfig(itemID, runID string, config *AutomationConfig) TraceDetail {
+	detail := NewTraceDetail(itemID, runID)
+	detail.Config = config
+	return detail
+}
+
+// =====================================
+// HistoryState Fixtures
+// =====================================
+
+// NewHistoryState creates a HistoryState fixture (compact format).
+func NewHistoryState(state string, timestamp time.Time) HistoryState {
+	return HistoryState{
+		S:  state,
+		LU: float64(timestamp.Unix()),
+		LC: float64(timestamp.Unix()),
+	}
+}
+
+// NewHistoryStateWithAttrs creates a HistoryState with attributes (compact format).
+func NewHistoryStateWithAttrs(state string, timestamp time.Time, attrs map[string]any) HistoryState {
+	return HistoryState{
+		S:  state,
+		LU: float64(timestamp.Unix()),
+		LC: float64(timestamp.Unix()),
+		A:  attrs,
+	}
+}
+
+// =====================================
+// LogbookEntry Fixtures
+// =====================================
+
+// NewLogbookEntry creates a LogbookEntry fixture.
+func NewLogbookEntry(entityID, state, message string, when time.Time) LogbookEntry {
+	return LogbookEntry{
+		EntityID: entityID,
+		State:    state,
+		Message:  message,
+		When:     float64(when.Unix()),
+	}
+}

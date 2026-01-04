@@ -3,13 +3,10 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/stretchr/testify/require"
 
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/client"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/output"
@@ -190,8 +187,8 @@ func NewTestContext(t *testing.T, router *MessageRouter, opts ...TestContextOpti
 	// Create test server with the router's handler
 	server := testfixtures.TestServer(t, router.Handler())
 
-	// Dial the server
-	conn := dialServer(t, server)
+	// Dial the server using testfixtures helper
+	conn := testfixtures.DialServer(t, server)
 
 	// Create client
 	var c *client.Client
@@ -216,18 +213,6 @@ func NewTestContext(t *testing.T, router *MessageRouter, opts ...TestContextOpti
 	}
 
 	return ctx, cleanup
-}
-
-// dialServer connects to a test server and returns the WebSocket connection.
-func dialServer(t *testing.T, server *httptest.Server) *websocket.Conn {
-	t.Helper()
-	url := "ws" + strings.TrimPrefix(server.URL, "http")
-	conn, resp, err := websocket.DefaultDialer.Dial(url, nil)
-	require.NoError(t, err)
-	if resp != nil && resp.Body != nil {
-		resp.Body.Close()
-	}
-	return conn
 }
 
 // =====================================

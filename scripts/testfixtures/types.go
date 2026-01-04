@@ -106,3 +106,76 @@ type AreaEntry struct {
 	Name    string   `json:"name"`
 	Aliases []string `json:"aliases,omitempty"`
 }
+
+// =====================================
+// Trace Detail Types
+// =====================================
+
+// TraceDetail represents detailed information about an automation trace.
+type TraceDetail struct {
+	ScriptExecution string                 `json:"script_execution,omitempty"`
+	Error           string                 `json:"error,omitempty"`
+	Trace           map[string][]TraceStep `json:"trace,omitempty"`
+	Config          *AutomationConfig      `json:"config,omitempty"`
+	Context         *HAContext             `json:"context,omitempty"`
+	Trigger         any                    `json:"trigger,omitempty"`
+	RunID           string                 `json:"run_id,omitempty"`
+	Domain          string                 `json:"domain,omitempty"`
+	ItemID          string                 `json:"item_id,omitempty"`
+	Timestamp       *Timestamp             `json:"timestamp,omitempty"`
+}
+
+// TraceStep represents a step in an automation trace.
+type TraceStep struct {
+	Path             string         `json:"path"`
+	Timestamp        string         `json:"timestamp,omitempty"`
+	Error            string         `json:"error,omitempty"`
+	Result           *TraceResult   `json:"result,omitempty"`
+	Variables        map[string]any `json:"variables,omitempty"`
+	ChangedVariables map[string]any `json:"changed_variables,omitempty"`
+}
+
+// TraceResult represents the result of a trace step.
+type TraceResult struct {
+	Enabled  bool           `json:"enabled,omitempty"`
+	Response map[string]any `json:"response,omitempty"`
+}
+
+// AutomationConfig represents an automation configuration.
+type AutomationConfig struct {
+	ID          string `json:"id,omitempty"`
+	Alias       string `json:"alias,omitempty"`
+	Description string `json:"description,omitempty"`
+	Trigger     []any  `json:"trigger,omitempty"`
+	Condition   []any  `json:"condition,omitempty"`
+	Action      []any  `json:"action,omitempty"`
+	Mode        string `json:"mode,omitempty"`
+}
+
+// =====================================
+// History Types
+// =====================================
+
+// HistoryState represents a historical state entry.
+type HistoryState struct {
+	// Compact format fields
+	LU float64        `json:"lu,omitempty"` // Last updated (Unix timestamp)
+	LC float64        `json:"lc,omitempty"` // Last changed (Unix timestamp)
+	S  string         `json:"s,omitempty"`  // State
+	A  map[string]any `json:"a,omitempty"`  // Attributes
+
+	// Full format fields
+	LastUpdated string         `json:"last_updated,omitempty"`
+	LastChanged string         `json:"last_changed,omitempty"`
+	State       string         `json:"state,omitempty"`
+	Attributes  map[string]any `json:"attributes,omitempty"`
+}
+
+// LogbookEntry represents a logbook entry.
+type LogbookEntry struct {
+	When      float64 `json:"when"`
+	EntityID  string  `json:"entity_id,omitempty"`
+	State     string  `json:"state,omitempty"`
+	Message   string  `json:"message,omitempty"`
+	ContextID string  `json:"context_id,omitempty"`
+}
