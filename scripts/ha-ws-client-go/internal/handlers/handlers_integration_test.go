@@ -1906,13 +1906,14 @@ func TestIntegration_HandleHistoryFull_WithFixtures(t *testing.T) {
 	}
 	assert.NotNil(t, attrs, "history-full entry should include attributes")
 
-	// input_number should have specific attributes like unit_of_measurement
+	// Verify the history entry has some attributes
+	// Note: The history API returns a subset of attributes (friendly_name, icon, unit_of_measurement, etc.)
+	// but NOT all state attributes like min/max/step which are only in the current state
 	if attrs != nil {
 		t.Logf("Attributes: %v", attrs)
-		// input_number entities typically have min, max, step, mode, etc.
-		_, hasMin := attrs["min"]
-		_, hasMax := attrs["max"]
-		assert.True(t, hasMin || hasMax, "input_number should have min or max attribute")
+		// History should at least have friendly_name
+		_, hasFriendlyName := attrs["friendly_name"]
+		assert.True(t, hasFriendlyName, "history entry should have friendly_name attribute")
 	}
 }
 
@@ -2175,13 +2176,15 @@ func TestIntegration_HandleTrace_InvalidAutomation(t *testing.T) {
 	ctx := testContext(t, c, "trace", "nonexistent_automation_xyz123", "some_run_id")
 	err := handlers.HandleTrace(ctx)
 
-	// The command may return an error or handle it gracefully
-	// Either way, it should not panic
+	// The command should return an error for a nonexistent automation
+	// Home Assistant returns a generic "trace could not be found" message
+	// that doesn't include the automation ID
 	if err != nil {
 		t.Logf("HandleTrace with invalid automation returned error (expected): %v", err)
-		// Verify the error message is meaningful
-		assert.Contains(t, err.Error(), "nonexistent_automation_xyz123",
-			"error should reference the invalid automation ID")
+		// Verify the error message indicates the trace wasn't found
+		errStr := err.Error()
+		assert.True(t, strings.Contains(errStr, "not_found") || strings.Contains(errStr, "not found"),
+			"error should indicate trace was not found, got: %s", errStr)
 	} else {
 		t.Log("HandleTrace with invalid automation returned no error (graceful handling)")
 	}
