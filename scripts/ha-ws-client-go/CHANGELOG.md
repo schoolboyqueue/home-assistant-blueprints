@@ -5,6 +5,14 @@ All notable changes to ha-ws-client-go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2026-01-04
+
+### Changed
+
+- Extract shared packages (errors, shutdown, validators) to `scripts/internal/shared`
+- Add modernization linters (intrange, perfsprint, tenv, tparallel, usestdlibvars)
+- Use Go 1.22+ integer range syntax and string concatenation for performance
+
 ## [1.7.0] - 2026-01-04
 
 ### Added

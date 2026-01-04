@@ -11,7 +11,7 @@ PROJECT_NAME := validate-blueprint-go
 GO_LOCAL_PATH := github.com/home-assistant-blueprints/validate-blueprint-go
 
 # Optional overrides
-VERSION ?= 1.8.0
+VERSION ?= 1.8.1
 BUILD_DIR := build
 BUILD_PATH := .
 
