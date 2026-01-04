@@ -1,15 +1,16 @@
 blueprint:
-  name: "Bathroom Light Fan Control Pro v1.10.12"
-  description: >-
-    Smart bathroom controller for lights and exhaust fan.
-    Lights: Turns on from motion or door activity (Wasp-in-a-Box), respects presence and optional lux threshold, supports Night Mode (dim and color temperature), and shuts off after vacancy with a grace period. Includes a manual-off override window to prevent auto-on.
-    Fan: Controls by humidity delta (bathroom minus home) with hysteresis to avoid chatter. Supports minimum/maximum runtime, optional early rate-of-rise boost, rate-of-fall hold, and a post-shower purge latch.
-    Compatible with a single light entity or an Area, and with either fan.* or switch.* for the fan device.
-  # NOTE: Manual-off override arms only when the configured `light_target` turns off. If you use `light_area`, ensure `light_target` reflects wall switch/UI state changes.
+  name: Bathroom Light Fan Control Pro v1.10.13
+  description: 'Smart bathroom controller for lights and exhaust fan. Lights: Turns
+    on from motion or door activity (Wasp-in-a-Box), respects presence and optional
+    lux threshold, supports Night Mode (dim and color temperature), and shuts off
+    after vacancy with a grace period. Includes a manual-off override window to prevent
+    auto-on. Fan: Controls by humidity delta (bathroom minus home) with hysteresis
+    to avoid chatter. Supports minimum/maximum runtime, optional early rate-of-rise
+    boost, rate-of-fall hold, and a post-shower purge latch. Compatible with a single
+    light entity or an Area, and with either fan.* or switch.* for the fan device.'
   domain: automation
   author: Jeremy Carter
-  source_url: https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/bathroom-light-fan-control/bathroom_light_fan_control_pro.yaml
-
+  source_url: https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/bathroom-light-fan-control/bathroom_light_fan_control_pro.yaml
   input:
     presence_and_lighting:
       name: Presence & Lighting
@@ -18,81 +19,111 @@ blueprint:
       input:
         presence_entities:
           name: Presence Entities (any = home)
-          description: Optional. One or more entities that indicate someone is home. Lights turn on only when at least one shows 'on'/'home'. Leave empty to disable presence requirement.
+          description: Optional. One or more entities that indicate someone is home.
+            Lights turn on only when at least one shows 'on'/'home'. Leave empty to
+            disable presence requirement.
           default: []
           selector:
             entity:
               multiple: true
               filter:
-                - domain: person
-                - domain: device_tracker
-                - domain: binary_sensor
-                - domain: input_boolean
-                - domain: zone
+              - domain:
+                - person
+              - domain:
+                - device_tracker
+              - domain:
+                - binary_sensor
+              - domain:
+                - input_boolean
+              - domain:
+                - zone
+              reorder: false
         light_target:
           name: Bathroom Light(s)
           description: The light or light group to control.
           selector:
             entity:
-              domain: light
+              domain:
+              - light
+              multiple: false
+              reorder: false
         light_area:
           name: (Optional) Light Area
-          description: If set, services will target this area for light control instead of a single entity.
-          default: ""
+          description: If set, services will target this area for light control instead
+            of a single entity.
+          default: ''
           selector:
-            area: {}
+            area:
+              multiple: false
         lights_off_delay_min:
           name: Lights off delay after vacancy (minutes)
           description: Extra grace period before turning lights off after vacancy.
           default: 2
           selector:
             number:
-              min: 0
-              max: 120
-              step: 1
+              min: 0.0
+              max: 120.0
+              step: 1.0
               unit_of_measurement: min
               mode: slider
         illuminance_sensor:
           name: (Optional) Illuminance Sensor
-          description: Optional. Lights will turn on only when measured illuminance is below the threshold. If the sensor is unavailable, the check is skipped.
-          default: ""
+          description: Optional. Lights will turn on only when measured illuminance
+            is below the threshold. If the sensor is unavailable, the check is skipped.
+          default: ''
           selector:
             entity:
-              domain: sensor
+              domain:
+              - sensor
+              multiple: false
+              reorder: false
         illuminance_threshold:
           name: Illuminance Threshold (lux)
           default: 50
           selector:
             number:
-              min: 1
-              max: 2000
-              step: 1
+              min: 1.0
+              max: 2000.0
+              step: 1.0
+              mode: slider
         manual_override_duration_min:
           name: Manual Override Duration (minutes)
-          description: "Duration to suspend auto-on after manual light off. Set to 0 to disable manual override entirely. Without automation_control helper, may trigger when automation turns off lights."
+          description: Duration to suspend auto-on after manual light off. Set to
+            0 to disable manual override entirely. Without automation_control helper,
+            may trigger when automation turns off lights.
           default: 30
           selector:
             number:
-              min: 0
-              max: 120
-              step: 1
+              min: 0.0
+              max: 120.0
+              step: 1.0
               unit_of_measurement: min
               mode: slider
         manual_override_until:
           name: Manual Override Until (input_datetime)
-          description: Input_datetime helper (date and time) used to store when auto-on is allowed again.
-          default: ""
+          description: Input_datetime helper (date and time) used to store when auto-on
+            is allowed again.
+          default: ''
           selector:
             entity:
-              domain: input_datetime
+              domain:
+              - input_datetime
+              multiple: false
+              reorder: false
         automation_control:
           name: Automation Control Helper (input_boolean)
-          description: "Optional: Prevents manual override from triggering when automation turns off lights. If using manual override, create an input_boolean helper and select it here. Without this helper, manual override may activate when automation turns off lights (not just user manual control). To disable manual override entirely, set duration to 0 instead."
-          default: ""
+          description: 'Optional: Prevents manual override from triggering when automation
+            turns off lights. If using manual override, create an input_boolean helper
+            and select it here. Without this helper, manual override may activate
+            when automation turns off lights (not just user manual control). To disable
+            manual override entirely, set duration to 0 instead.'
+          default: ''
           selector:
             entity:
-              domain: input_boolean
-
+              domain:
+              - input_boolean
+              multiple: false
+              reorder: false
     fan_and_humidity:
       name: Fan & Humidity (Core)
       icon: mdi:fan
@@ -103,97 +134,114 @@ blueprint:
           description: Sensor reporting the bathroom relative humidity (%).
           selector:
             entity:
-              domain: sensor
+              domain:
+              - sensor
+              multiple: false
+              reorder: false
         home_humidity_sensor:
           name: Baseline/Home Humidity Sensor
           description: Sensor reporting the home/baseline relative humidity (%).
           selector:
             entity:
-              domain: sensor
+              domain:
+              - sensor
+              multiple: false
+              reorder: false
         fan_target:
           name: Exhaust Fan (switch or fan)
           description: Entity that controls the exhaust fan. Supports fan.* or switch.*.
           selector:
             entity:
               filter:
-                - domain: fan
-                - domain: switch
+              - domain:
+                - fan
+              - domain:
+                - switch
+              multiple: false
+              reorder: false
         humidity_delta_on:
           name: Fan ON threshold (Δ% RH)
-          description: Turn fan on when bathroom humidity minus home humidity rises above this value. Use together with the OFF threshold for hysteresis.
+          description: Turn fan on when bathroom humidity minus home humidity rises
+            above this value. Use together with the OFF threshold for hysteresis.
           default: 15
           selector:
             number:
-              min: 0
-              max: 50
+              min: 0.0
+              max: 50.0
               step: 0.5
               unit_of_measurement: Δ%RH
               mode: slider
         humidity_delta_off:
           name: Fan OFF threshold (Δ% RH)
-          description: Turn fan off when bathroom humidity minus home humidity falls below this value. Should be lower than the ON threshold to avoid chatter.
+          description: Turn fan off when bathroom humidity minus home humidity falls
+            below this value. Should be lower than the ON threshold to avoid chatter.
           default: 10
           selector:
             number:
-              min: 0
-              max: 50
+              min: 0.0
+              max: 50.0
               step: 0.5
               unit_of_measurement: Δ%RH
               mode: slider
         fan_min_runtime_min:
           name: Minimum fan runtime before auto-off (minutes)
-          description: Minimum time the fan must remain on before it can turn off automatically. Set to 0 to disable.
+          description: Minimum time the fan must remain on before it can turn off
+            automatically. Set to 0 to disable.
           default: 5
           selector:
             number:
-              min: 0
-              max: 120
-              step: 1
+              min: 0.0
+              max: 120.0
+              step: 1.0
               unit_of_measurement: min
               mode: slider
         fan_max_runtime_min:
           name: Maximum Fan Runtime (minutes)
-          description: Maximum allowed fan runtime before a forced turn off. Use a large value (e.g., 240) to effectively disable.
+          description: Maximum allowed fan runtime before a forced turn off. Use a
+            large value (e.g., 240) to effectively disable.
           default: 60
           selector:
             number:
-              min: 1
-              max: 240
-              step: 1
+              min: 1.0
+              max: 240.0
+              step: 1.0
               unit_of_measurement: min
               mode: slider
         auto_fan_off_after_lights_off_min:
           name: Auto Fan Off Delay After Lights Off (minutes)
-          description: Delay after lights turn off before automatically turning the fan off, if humidity delta is below the OFF threshold.
+          description: Delay after lights turn off before automatically turning the
+            fan off, if humidity delta is below the OFF threshold.
           default: 5
           selector:
             number:
-              min: 0
-              max: 120
-              step: 1
+              min: 0.0
+              max: 120.0
+              step: 1.0
               unit_of_measurement: min
               mode: slider
-
     humidity_advanced:
       name: Humidity Advanced
       icon: mdi:chart-line
       collapsed: true
-      description: Rate-of-rise boost, rate-of-fall hold, and post-shower purge latch. Collapse if you don’t need advanced features.
+      description: Rate-of-rise boost, rate-of-fall hold, and post-shower purge latch.
+        Collapse if you don’t need advanced features.
       input:
         rate_of_rise_enabled:
           name: Enable Humidity Rate-of-Rise Boost
-          description: If enabled, turn the fan on early when bathroom humidity rises quickly within a short window.
+          description: If enabled, turn the fan on early when bathroom humidity rises
+            quickly within a short window.
           default: false
           selector:
             boolean: {}
         rate_of_rise_threshold:
           name: Rate-of-Rise Threshold (Δ% RH)
-          description: Minimum increase in bathroom humidity within the window required to trigger early fan on.
+          description: Minimum increase in bathroom humidity within the window required
+            to trigger early fan on.
           default: 7
           selector:
             number:
-              min: 1
-              max: 30
+              min: 1.0
+              max: 30.0
               step: 0.5
               unit_of_measurement: Δ%RH
               mode: slider
@@ -203,42 +251,50 @@ blueprint:
           default: 3
           selector:
             number:
-              min: 1
-              max: 30
-              step: 1
+              min: 1.0
+              max: 30.0
+              step: 1.0
               unit_of_measurement: min
               mode: slider
         ror_min_on_time_min:
           name: Minimum Fan ON Time After ROR Boost (minutes)
-          description: Minimum time to keep the fan on after a rate-of-rise trigger. Set to 0 to disable.
+          description: Minimum time to keep the fan on after a rate-of-rise trigger.
+            Set to 0 to disable.
           default: 8
           selector:
             number:
-              min: 0
-              max: 60
-              step: 1
+              min: 0.0
+              max: 60.0
+              step: 1.0
               unit_of_measurement: min
+              mode: slider
         ror_latch_until:
           name: ROR Latch Until (input_datetime)
-          description: Input_datetime helper used to store the minimum on latch expiry time after a rate-of-rise trigger.
-          default: ""
+          description: Input_datetime helper used to store the minimum on latch expiry
+            time after a rate-of-rise trigger.
+          default: ''
           selector:
             entity:
-              domain: input_datetime
+              domain:
+              - input_datetime
+              multiple: false
+              reorder: false
         rate_of_fall_enabled:
           name: Enable Humidity Rate-of-Fall Hold
-          description: If enabled, delay turning the fan off while humidity is dropping quickly to avoid rapid cycling.
+          description: If enabled, delay turning the fan off while humidity is dropping
+            quickly to avoid rapid cycling.
           default: false
           selector:
             boolean: {}
         rate_of_fall_threshold:
           name: Rate-of-Fall Threshold (Δ% RH)
-          description: Minimum decrease in bathroom humidity within the window that will prevent fan off.
+          description: Minimum decrease in bathroom humidity within the window that
+            will prevent fan off.
           default: 5
           selector:
             number:
-              min: 1
-              max: 30
+              min: 1.0
+              max: 30.0
               step: 0.5
               unit_of_measurement: Δ%RH
               mode: slider
@@ -248,37 +304,39 @@ blueprint:
           default: 3
           selector:
             number:
-              min: 1
-              max: 30
-              step: 1
+              min: 1.0
+              max: 30.0
+              step: 1.0
               unit_of_measurement: min
               mode: slider
-
     night_schedule:
       name: Night Schedule
       icon: mdi:weather-night
       collapsed: true
-      description: Quiet hours for lights (dim/warm) and fan threshold bias. Night mode activates during schedule OR when explicitly enabled.
+      description: Quiet hours for lights (dim/warm) and fan threshold bias. Night
+        mode activates during schedule OR when explicitly enabled.
       input:
         night_enabled:
           name: Enable Night Schedule
-          description: When enabled, night mode automatically activates during the schedule below.
+          description: When enabled, night mode automatically activates during the
+            schedule below.
           default: true
           selector:
             boolean: {}
         night_start:
           name: Night Start
-          default: "22:00:00"
+          default: '22:00:00'
           selector:
             time: {}
         night_end:
           name: Night End
-          default: "06:00:00"
+          default: 06:00:00
           selector:
             time: {}
         night_mode_enabled:
           name: Force Night Mode Always On
-          description: When enabled, night mode (dim/warm lights) is ALWAYS active, ignoring the schedule. Use for permanent dim lighting.
+          description: When enabled, night mode (dim/warm lights) is ALWAYS active,
+            ignoring the schedule. Use for permanent dim lighting.
           default: false
           selector:
             boolean: {}
@@ -288,83 +346,101 @@ blueprint:
           default: 50
           selector:
             number:
-              min: 1
-              max: 255
-              step: 1
+              min: 1.0
+              max: 255.0
+              step: 1.0
+              mode: slider
         night_mode_color_temp_kelvin:
           name: Night Mode Color Temperature (Kelvin)
-          description: Color temperature in Kelvin when night mode is active (2500 = warm white, 6500 = cool daylight).
+          description: Color temperature in Kelvin when night mode is active (2500
+            = warm white, 6500 = cool daylight).
           default: 2500
           selector:
             color_temp:
               min_mireds: 153
               max_mireds: 500
+              unit: mired
         night_fan_delta_on_bias:
           name: Night Fan ON Bias (Δ% RH)
-          description: Value added to the ON threshold during the night schedule. Negative values make the fan more aggressive at night.
+          description: Value added to the ON threshold during the night schedule.
+            Negative values make the fan more aggressive at night.
           default: 0
           selector:
             number:
-              min: -10
-              max: 10
+              min: -10.0
+              max: 10.0
               step: 0.5
               unit_of_measurement: Δ%RH
-
+              mode: slider
     occupancy_sensors:
       name: Occupancy Sensors (Wasp-in-a-Box)
       icon: mdi:motion-sensor
-      description: Motion and door sensors used to determine occupancy and drive the lights directly.
+      description: Motion and door sensors used to determine occupancy and drive the
+        lights directly.
       input:
         door_sensor:
           name: Door Sensor or Group
-          description: Binary sensor or helper representing door open state. For groups, provide an input_boolean or group that turns on when any member is open.
+          description: Binary sensor or helper representing door open state. For groups,
+            provide an input_boolean or group that turns on when any member is open.
           selector:
             entity:
               filter:
-                - domain: binary_sensor
-                - domain: input_boolean
+              - domain:
+                - binary_sensor
+              - domain:
+                - input_boolean
+              multiple: false
+              reorder: false
         motion_sensor:
           name: Motion Sensor or Group
-          description: Binary sensor or helper representing motion detected. For groups, provide an input_boolean or group that turns on when any member senses motion.
+          description: Binary sensor or helper representing motion detected. For groups,
+            provide an input_boolean or group that turns on when any member senses
+            motion.
           selector:
             entity:
               filter:
-                - domain: binary_sensor
-                - domain: input_boolean
+              - domain:
+                - binary_sensor
+              - domain:
+                - input_boolean
+              multiple: false
+              reorder: false
         motion_sensor_turn_off_delay:
           name: Motion sensor clear delay (seconds)
-          description: Time to wait after motion reports off before considering the room vacant.
+          description: Time to wait after motion reports off before considering the
+            room vacant.
           default: 5
           selector:
             number:
               mode: box
-              min: 0
-              max: 3600
-              step: 1
+              min: 0.0
+              max: 3600.0
+              step: 1.0
               unit_of_measurement: seconds
         door_sensor_turn_off_delay:
           name: Door left open delay (seconds)
-          description: Consider the room vacant if the door stays open for this long with no motion.
+          description: Consider the room vacant if the door stays open for this long
+            with no motion.
           default: 15
           selector:
             number:
               mode: box
-              min: 0
-              max: 3600
-              step: 1
+              min: 0.0
+              max: 3600.0
+              step: 1.0
               unit_of_measurement: seconds
         motion_sensor_delay:
           name: Motion Sensor Delay (sec)
-          description: Motion sensor’s own clear delay. Add buffer to prevent false positives. Set to -1 to disable.
+          description: Motion sensor’s own clear delay. Add buffer to prevent false
+            positives. Set to -1 to disable.
           default: -1
           selector:
             number:
               mode: box
-              min: -1
-              max: 3600
-              step: 1
+              min: -1.0
+              max: 3600.0
+              step: 1.0
               unit_of_measurement: seconds
-
     diagnostics:
       name: Diagnostics & Logging
       icon: mdi:bug-outline
@@ -372,18 +448,20 @@ blueprint:
       input:
         debug_level:
           name: Level
-          description: "Select 'basic' for helpful trace logs; 'verbose' adds detailed sensor states and calculations."
+          description: Select 'basic' for helpful trace logs; 'verbose' adds detailed
+            sensor states and calculations.
           default: basic
           selector:
             select:
               options:
-                - "off"
-                - "basic"
-                - "verbose"
-
+              - 'off'
+              - basic
+              - verbose
+              custom_value: false
+              multiple: false
+              sort: false
 mode: restart
 max_exceeded: silent
-
 variables:
   presence_entities: !input presence_entities
   light_target: !input light_target
@@ -423,810 +501,748 @@ variables:
   ror_min_on_time_min: !input ror_min_on_time_min
   ror_latch_until: !input ror_latch_until
   light_area: !input light_area
-  blueprint_version: "1.10.12"
-  area_set: >-
-    {{ light_area is not none and (light_area|string) != '' }}
+  blueprint_version: 1.10.13
+  area_set: '{{ light_area is not none and (light_area|string) != '''' }}'
+  fan_domain: '{{ fan_target.split(''.'')[0] }}'
+  fan_is_fan: '{{ fan_domain == ''fan'' }}'
+  turn_fan_on: '{{ ''fan.turn_on'' if fan_is_fan else ''switch.turn_on'' }}'
+  turn_fan_off: '{{ ''fan.turn_off'' if fan_is_fan else ''switch.turn_off'' }}'
+  bath_humidity_valid: '{{ states(bathroom_humidity_sensor) not in [''unknown'',''unavailable'','''',
+    None] }}'
+  home_humidity_valid: '{{ states(home_humidity_sensor) not in [''unknown'',''unavailable'','''',
+    None] }}'
+  humidity_sensors_ok: '{{ bath_humidity_valid and home_humidity_valid }}'
+  humidity_delta: '{{ (states(bathroom_humidity_sensor)|float(0) - states(home_humidity_sensor)|float(0))
+    if humidity_sensors_ok else -999 }}
 
-  # Fan domain helpers
-  fan_domain: "{{ fan_target.split('.')[0] }}"
-  fan_is_fan: "{{ fan_domain == 'fan' }}"
-  turn_fan_on: "{{ 'fan.turn_on' if fan_is_fan else 'switch.turn_on' }}"
-  turn_fan_off: "{{ 'fan.turn_off' if fan_is_fan else 'switch.turn_off' }}"
+    '
+  in_night_schedule: "{% if not night_enabled %}\n  {{ false }}\n{% else %}\n  {%
+    set fmt = '%H:%M:%S' %}\n  {% set start_dt = strptime(night_start, fmt) %}\n  {%
+    set end_dt = strptime(night_end, fmt) %}\n  {% set now_dt = now() %}\n  {% if
+    start_dt is none or end_dt is none or now_dt is none %}\n    {{ false }}\n  {%
+    else %}\n    {% set start_mins = start_dt.hour * 60 + start_dt.minute %}\n    {%
+    set end_mins = end_dt.hour * 60 + end_dt.minute %}\n    {% set now_mins = now_dt.hour
+    * 60 + now_dt.minute %}\n    {% if start_mins <= end_mins %}\n      {{ now_mins
+    >= start_mins and now_mins < end_mins }}\n    {% else %}\n      {{ now_mins >=
+    start_mins or now_mins < end_mins }}\n    {% endif %}\n  {% endif %}\n{% endif
+    %}"
+  night_mode_active: '{{ night_mode_enabled or in_night_schedule }}'
+  fan_delta_on_effective: '{{ (humidity_delta_on + (night_fan_delta_on_bias|float(0)))
+    if in_night_schedule else humidity_delta_on }}
 
-  # Humidity sensor validity and delta
-  bath_humidity_valid: "{{ states(bathroom_humidity_sensor) not in ['unknown','unavailable','', None] }}"
-  home_humidity_valid: "{{ states(home_humidity_sensor) not in ['unknown','unavailable','', None] }}"
-  humidity_sensors_ok: "{{ bath_humidity_valid and home_humidity_valid }}"
-  humidity_delta: >
-    {{ (states(bathroom_humidity_sensor)|float(0) - states(home_humidity_sensor)|float(0)) if humidity_sensors_ok else -999 }}
-
-  # Night schedule computation
-  in_night_schedule: >-
-    {% if not night_enabled %}
-      {{ false }}
-    {% else %}
-      {% set fmt = '%H:%M:%S' %}
-      {% set start_dt = strptime(night_start, fmt) %}
-      {% set end_dt = strptime(night_end, fmt) %}
-      {% set now_dt = now() %}
-      {% if start_dt is none or end_dt is none or now_dt is none %}
-        {{ false }}
-      {% else %}
-        {% set start_mins = start_dt.hour * 60 + start_dt.minute %}
-        {% set end_mins = end_dt.hour * 60 + end_dt.minute %}
-        {% set now_mins = now_dt.hour * 60 + now_dt.minute %}
-        {% if start_mins <= end_mins %}
-          {{ now_mins >= start_mins and now_mins < end_mins }}
-        {% else %}
-          {{ now_mins >= start_mins or now_mins < end_mins }}
-        {% endif %}
-      {% endif %}
-    {% endif %}
-
-  # Night mode should activate during night schedule OR when explicitly enabled
-  night_mode_active: "{{ night_mode_enabled or in_night_schedule }}"
-
-  # Effective fan ON threshold with night bias
-  fan_delta_on_effective: >
-    {{ (humidity_delta_on + (night_fan_delta_on_bias|float(0))) if in_night_schedule else humidity_delta_on }}
-
-  presence_ok: >-
-    {% set ents = presence_entities if presence_entities is defined and presence_entities is not none else [] %}
-    {% if ents | length == 0 %}
-      {{ true }}
-    {% else %}
-      {% set ns = namespace(found=false) %}
-      {% for e in ents %}
-        {% if e not in ['', 'unknown', 'unavailable', None] and states(e) in ['on','home'] %}
-          {% set ns.found = true %}
-        {% endif %}
-      {% endfor %}
-      {{ ns.found }}
-    {% endif %}
-
-  override_ok: >-
-    {% set disabled = manual_override_duration_min | int(0) == 0 %}
-    {% if disabled or manual_override_until in ['', None] %}
-      {{ true }}
-    {% else %}
-      {% set until_state = states(manual_override_until) %}
-      {% if until_state in ['unknown','unavailable','', None] %}
-        {{ true }}
-      {% else %}
-        {# Use timestamp attribute directly to avoid timezone conversion issues #}
-        {% set until_ts = state_attr(manual_override_until, 'timestamp') %}
-        {% set now_ts = as_timestamp(now()) %}
-        {{ (now_ts is not none and until_ts is not none and now_ts > until_ts) }}
-      {% endif %}
-    {% endif %}
-
-  lux_ok: >-
-    {% if illuminance_sensor %}
-      {% set lux_state = states(illuminance_sensor) %}
-      {% if lux_state in ['unknown','unavailable','', None] %}
-        {{ true }}
-      {% else %}
-        {{ (lux_state | float(0)) < (illuminance_threshold | float(0)) }}
-      {% endif %}
-    {% else %}
-      {{ true }}
-    {% endif %}
-
-  should_turn_on_light: >-
-    {{ trigger is defined and (trigger.id in ['wasp_motion','wasp_door_opened']) and is_state(light_target,'off') and presence_ok and override_ok and lux_ok }}
-
+    '
+  presence_ok: "{% set ents = presence_entities if presence_entities is defined and
+    presence_entities is not none else [] %} {% if ents | length == 0 %}\n  {{ true
+    }}\n{% else %}\n  {% set ns = namespace(found=false) %}\n  {% for e in ents %}\n
+    \   {% if e not in ['', 'unknown', 'unavailable', None] and states(e) in ['on','home']
+    %}\n      {% set ns.found = true %}\n    {% endif %}\n  {% endfor %}\n  {{ ns.found
+    }}\n{% endif %}"
+  override_ok: "{% set disabled = manual_override_duration_min | int(0) == 0 %} {%
+    if disabled or manual_override_until in ['', None] %}\n  {{ true }}\n{% else %}\n
+    \ {% set until_state = states(manual_override_until) %}\n  {% if until_state in
+    ['unknown','unavailable','', None] %}\n    {{ true }}\n  {% else %}\n    {# Use
+    timestamp attribute directly to avoid timezone conversion issues #}\n    {% set
+    until_ts = state_attr(manual_override_until, 'timestamp') %}\n    {% set now_ts
+    = as_timestamp(now()) %}\n    {{ (now_ts is not none and until_ts is not none
+    and now_ts > until_ts) }}\n  {% endif %}\n{% endif %}"
+  lux_ok: "{% if illuminance_sensor %}\n  {% set lux_state = states(illuminance_sensor)
+    %}\n  {% if lux_state in ['unknown','unavailable','', None] %}\n    {{ true }}\n
+    \ {% else %}\n    {{ (lux_state | float(0)) < (illuminance_threshold | float(0))
+    }}\n  {% endif %}\n{% else %}\n  {{ true }}\n{% endif %}"
+  should_turn_on_light: '{{ trigger is defined and (trigger.id in [''wasp_motion'',''wasp_door_opened''])
+    and is_state(light_target,''off'') and presence_ok and override_ok and lux_ok
+    }}'
 trigger:
-  - id: ha_start
-    platform: homeassistant
-    event: start
-
-  - id: humidity_bath_change
-    platform: state
-    entity_id: !input bathroom_humidity_sensor
-
-  - id: humidity_home_change
-    platform: state
-    entity_id: !input home_humidity_sensor
-
-  - id: light_manual_off
-    platform: state
-    entity_id: !input light_target
-    from: "on"
-    to: "off"
-
-  - id: fan_max_runtime_expired
-    platform: state
-    entity_id: !input fan_target
-    to: "on"
-    for:
-      minutes: !input fan_max_runtime_min
-
-  - id: lights_off_for_fan_auto_off
-    platform: state
-    entity_id: !input light_target
-    to: "off"
-    for:
-      minutes: !input auto_fan_off_after_lights_off_min
-
-  - id: wasp_motion
-    platform: state
-    entity_id: !input motion_sensor
-    from: "off"
-    to: "on"
-
-  - id: wasp_door_opened
-    platform: state
-    entity_id: !input door_sensor
-    from: "off"
-    to: "on"
-
-  - id: wasp_motion_clear
-    platform: state
-    entity_id: !input motion_sensor
-    from: "on"
-    to: "off"
-    for:
-      minutes: !input lights_off_delay_min
-
-  - id: wasp_door_left_open
-    platform: state
-    entity_id: !input door_sensor
-    to: "on"
-    for: { seconds: !input door_sensor_turn_off_delay }
-
+- id: ha_start
+  platform: homeassistant
+  event: start
+- id: humidity_bath_change
+  platform: state
+  entity_id: !input bathroom_humidity_sensor
+- id: humidity_home_change
+  platform: state
+  entity_id: !input home_humidity_sensor
+- id: light_manual_off
+  platform: state
+  entity_id: !input light_target
+  from: 'on'
+  to: 'off'
+- id: fan_max_runtime_expired
+  platform: state
+  entity_id: !input fan_target
+  to: 'on'
+  for:
+    minutes: !input fan_max_runtime_min
+- id: lights_off_for_fan_auto_off
+  platform: state
+  entity_id: !input light_target
+  to: 'off'
+  for:
+    minutes: !input auto_fan_off_after_lights_off_min
+- id: wasp_motion
+  platform: state
+  entity_id: !input motion_sensor
+  from: 'off'
+  to: 'on'
+- id: wasp_door_opened
+  platform: state
+  entity_id: !input door_sensor
+  from: 'off'
+  to: 'on'
+- id: wasp_motion_clear
+  platform: state
+  entity_id: !input motion_sensor
+  from: 'on'
+  to: 'off'
+  for:
+    minutes: !input lights_off_delay_min
+- id: wasp_door_left_open
+  platform: state
+  entity_id: !input door_sensor
+  to: 'on'
+  for:
+    seconds: !input door_sensor_turn_off_delay
 condition: []
-
 action:
-  # Universal debug: log every trigger (helps diagnose why automation fires but doesn't execute expected path)
-  - choose:
-      - conditions: "{{ debug_level == 'verbose' }}"
+- choose:
+  - conditions: '{{ debug_level == ''verbose'' }}'
+    sequence:
+    - service: logbook.log
+      data:
+        name: Bathroom Light Fan
+        message: 'Trigger fired: id={{ trigger.id if trigger is defined else ''undefined''
+          }} | entity={{ trigger.entity_id if (trigger is defined and trigger.entity_id
+          is defined) else ''n/a'' }} | from={{ trigger.from_state.state if (trigger
+          is defined and trigger.from_state is defined) else ''n/a'' }} | to={{ trigger.to_state.state
+          if (trigger is defined and trigger.to_state is defined) else ''n/a'' }}
+          (v{{ blueprint_version }})'
+- choose:
+  - conditions:
+    - condition: template
+      value_template: '{{ trigger.id == ''ha_start'' }}'
+    sequence:
+    - choose:
+      - conditions:
+        - condition: state
+          entity_id: !input fan_target
+          state: 'on'
+        - condition: template
+          value_template: '{{ humidity_sensors_ok and humidity_delta < humidity_delta_off
+            }}'
         sequence:
+        - service: '{{ turn_fan_off }}'
+          target:
+            entity_id: !input fan_target
+        - choose:
+          - conditions: '{{ debug_level in [''basic'',''verbose''] }}'
+            sequence:
+            - service: logbook.log
+              data:
+                name: Bathroom Light Fan
+                message: 'Fan OFF: startup check | delta={{ humidity_delta | round(1)
+                  }}% below threshold (v{{ blueprint_version }})'
+    - delay:
+        seconds: 30
+    - choose:
+      - conditions:
+        - condition: state
+          entity_id: !input light_target
+          state: 'on'
+        - condition: state
+          entity_id: !input motion_sensor
+          state: 'off'
+        - condition: or
+          conditions:
+          - condition: state
+            entity_id: !input door_sensor
+            state: 'on'
+          - condition: state
+            entity_id: !input door_sensor
+            state: unavailable
+          - condition: state
+            entity_id: !input door_sensor
+            state: unknown
+        sequence:
+        - choose:
+          - conditions: '{{ automation_control not in ['''', None] }}'
+            sequence:
+            - service: input_boolean.turn_on
+              target:
+                entity_id: '{{ automation_control }}'
+        - choose:
+          - conditions:
+            - condition: template
+              value_template: '{{ area_set }}'
+            sequence:
+            - delay:
+                minutes: '{{ lights_off_delay_min }}'
+            - service: light.turn_off
+              target:
+                area_id: !input light_area
+          default:
+          - delay:
+              minutes: '{{ lights_off_delay_min }}'
+          - service: light.turn_off
+            target:
+              entity_id: !input light_target
+        - delay:
+            milliseconds: 100
+        - choose:
+          - conditions: '{{ automation_control not in ['''', None] }}'
+            sequence:
+            - service: input_boolean.turn_off
+              target:
+                entity_id: '{{ automation_control }}'
+        - choose:
+          - conditions: '{{ debug_level == ''basic'' }}'
+            sequence:
+            - service: logbook.log
+              data:
+                name: Bathroom Light Fan
+                message: 'Light OFF: startup check | grace={{ lights_off_delay_min
+                  }}min | motion=off, door=open (v{{ blueprint_version }})'
+          - conditions: '{{ debug_level == ''verbose'' }}'
+            sequence:
+            - service: logbook.log
+              data:
+                name: Bathroom Light Fan
+                message: 'Light OFF: startup check | grace={{ lights_off_delay_min
+                  }}min | motion={{ is_state(motion_sensor, ''off'') }} | door={{
+                  states(door_sensor) }} | light={{ states(light_target) }} (v{{ blueprint_version
+                  }})'
+  - conditions:
+    - condition: template
+      value_template: '{{ trigger.id in [''wasp_motion'',''wasp_door_opened'',''wasp_door_closed'',''wasp_motion_clear'',''wasp_door_left_open'']
+        }}'
+    sequence:
+    - choose:
+      - conditions:
+        - condition: template
+          value_template: '{{ debug_level == ''verbose'' and trigger.id in [''wasp_motion'',''wasp_door_opened'']
+            }}'
+        sequence:
+        - service: logbook.log
+          data:
+            name: Bathroom Light Fan
+            message: 'Conditions: should_turn_on={{ should_turn_on_light }} | light_off={{
+              is_state(light_target,''off'') }} | presence_ok={{ presence_ok }} (count={{
+              presence_entities | length }}) | override_ok={{ override_ok }} | lux_ok={{
+              lux_ok }} (v{{ blueprint_version }})'
+    - choose:
+      - conditions:
+        - condition: template
+          value_template: '{{ trigger.id in [''wasp_motion'',''wasp_door_opened'']
+            }}'
+        sequence:
+        - if:
+          - condition: template
+            value_template: '{{ should_turn_on_light }}'
+          then:
+          - choose:
+            - conditions:
+              - condition: template
+                value_template: '{{ night_mode_active }}'
+              sequence:
+              - choose:
+                - conditions:
+                  - condition: template
+                    value_template: '{{ area_set }}'
+                  sequence:
+                  - service: light.turn_on
+                    target:
+                      area_id: !input light_area
+                    data:
+                      brightness: '{{ night_mode_brightness }}'
+                      color_temp_kelvin: '{{ night_mode_color_temp_kelvin }}'
+                default:
+                - variables:
+                    _modes: '{{ state_attr(light_target, ''supported_color_modes'')|default([],
+                      true) }}'
+                    _has_bri: '{{ ''brightness'' in _modes }}'
+                    _has_ct: '{{ ''color_temp'' in _modes }}'
+                - choose:
+                  - conditions: '{{ _has_bri and _has_ct }}'
+                    sequence:
+                    - service: light.turn_on
+                      target:
+                        entity_id: !input light_target
+                      data:
+                        brightness: '{{ night_mode_brightness }}'
+                        color_temp_kelvin: '{{ night_mode_color_temp_kelvin }}'
+                  - conditions: '{{ _has_bri and not _has_ct }}'
+                    sequence:
+                    - service: light.turn_on
+                      target:
+                        entity_id: !input light_target
+                      data:
+                        brightness: '{{ night_mode_brightness }}'
+                  - conditions: '{{ (not _has_bri) and _has_ct }}'
+                    sequence:
+                    - service: light.turn_on
+                      target:
+                        entity_id: !input light_target
+                      data:
+                        color_temp_kelvin: '{{ night_mode_color_temp_kelvin }}'
+                  default:
+                  - service: light.turn_on
+                    target:
+                      entity_id: !input light_target
+            default:
+            - choose:
+              - conditions:
+                - condition: template
+                  value_template: '{{ area_set }}'
+                sequence:
+                - service: light.turn_on
+                  target:
+                    area_id: !input light_area
+                  data:
+                    brightness_pct: 100
+              default:
+              - variables:
+                  _modes: '{{ state_attr(light_target, ''supported_color_modes'')|default([],
+                    true) }}'
+                  _has_bri: '{{ ''brightness'' in _modes }}'
+              - choose:
+                - conditions: '{{ _has_bri }}'
+                  sequence:
+                  - service: light.turn_on
+                    target:
+                      entity_id: !input light_target
+                    data:
+                      brightness_pct: 100
+                default:
+                - service: light.turn_on
+                  target:
+                    entity_id: !input light_target
+          - choose:
+            - conditions: '{{ debug_level == ''basic'' }}'
+              sequence:
+              - service: logbook.log
+                data:
+                  name: Bathroom Light Fan
+                  message: 'Light ON: trigger={{ trigger.id }} | night_mode={{ night_mode_active
+                    }} | presence={{ presence_ok }} | lux_ok={{ lux_ok }} (v{{ blueprint_version
+                    }})'
+            - conditions: '{{ debug_level == ''verbose'' }}'
+              sequence:
+              - service: logbook.log
+                data:
+                  name: Bathroom Light Fan
+                  message: 'Light ON: trigger={{ trigger.id }} | night_mode={{ night_mode_active
+                    }} (enabled={{ night_mode_enabled }}, schedule={{ in_night_schedule
+                    }}) | presence={{ presence_ok }} | lux={{ states(illuminance_sensor)
+                    if illuminance_sensor else ''n/a'' }} (ok={{ lux_ok }}) | area={{
+                    area_set }} (v{{ blueprint_version }})'
+          else:
+          - choose:
+            - conditions: '{{ debug_level in [''basic'',''verbose''] }}'
+              sequence:
+              - service: logbook.log
+                data:
+                  name: Bathroom Light Fan
+                  message: 'Light skipped: trigger={{ trigger.id }} | light_already_on={{
+                    is_state(light_target, ''on'') }} | presence_ok={{ presence_ok
+                    }} | override_ok={{ override_ok }} | lux_ok={{ lux_ok }} (v{{
+                    blueprint_version }})'
+      - conditions:
+        - condition: template
+          value_template: '{{ trigger.id in [''wasp_motion_clear'',''wasp_door_left_open'']
+            }}'
+        sequence:
+        - choose:
+          - conditions: '{{ debug_level == ''verbose'' }}'
+            sequence:
+            - service: logbook.log
+              data:
+                name: Bathroom Light Fan
+                message: 'Clear trigger: id={{ trigger.id }} | motion={{ is_state(motion_sensor,
+                  ''off'') }} | door={{ is_state(door_sensor, ''on'') }} (v{{ blueprint_version
+                  }})'
+        - choose:
+          - conditions:
+            - condition: and
+              conditions:
+              - condition: template
+                value_template: '{{ trigger.id == ''wasp_motion_clear'' }}'
+              - condition: or
+                conditions:
+                - condition: state
+                  entity_id: !input door_sensor
+                  state: 'on'
+                - condition: state
+                  entity_id: !input door_sensor
+                  state: unavailable
+                - condition: state
+                  entity_id: !input door_sensor
+                  state: unknown
+            sequence:
+            - choose:
+              - conditions: '{{ automation_control not in ['''', None] }}'
+                sequence:
+                - service: input_boolean.turn_on
+                  target:
+                    entity_id: '{{ automation_control }}'
+            - choose:
+              - conditions:
+                - condition: template
+                  value_template: '{{ area_set }}'
+                sequence:
+                - service: light.turn_off
+                  target:
+                    area_id: !input light_area
+              default:
+              - service: light.turn_off
+                target:
+                  entity_id: !input light_target
+            - delay:
+                milliseconds: 100
+            - choose:
+              - conditions: '{{ automation_control not in ['''', None] }}'
+                sequence:
+                - service: input_boolean.turn_off
+                  target:
+                    entity_id: '{{ automation_control }}'
+            - choose:
+              - conditions: '{{ debug_level == ''basic'' }}'
+                sequence:
+                - service: logbook.log
+                  data:
+                    name: Bathroom Light Fan
+                    message: 'Light OFF: vacancy | trigger={{ trigger.id }} | grace={{
+                      lights_off_delay_min }}min (v{{ blueprint_version }})'
+              - conditions: '{{ debug_level == ''verbose'' }}'
+                sequence:
+                - service: logbook.log
+                  data:
+                    name: Bathroom Light Fan
+                    message: 'Light OFF: vacancy | trigger={{ trigger.id }} | grace={{
+                      lights_off_delay_min }}min | motion={{ is_state(motion_sensor,
+                      ''off'') }} | door={{ is_state(door_sensor, ''off'') }} (v{{
+                      blueprint_version }})'
+          - conditions:
+            - condition: and
+              conditions:
+              - condition: template
+                value_template: '{{ trigger.id == ''wasp_motion_clear'' }}'
+              - condition: template
+                value_template: "{% if door_sensor in states and motion_sensor in
+                  states %}\n  {{ is_state(door_sensor, 'off') and (\n      states[door_sensor].last_changed
+                  > states[motion_sensor].last_changed and (\n        motion_sensor_delay
+                  == -1 or (\n          motion_sensor_delay > -1 and states[door_sensor].last_changed
+                  >= states[motion_sensor].last_changed - timedelta(seconds=motion_sensor_delay)\n
+                  \       )\n      )\n    ) }}\n{% else %}\n  false\n{% endif %}"
+            sequence:
+            - choose:
+              - conditions: '{{ automation_control not in ['''', None] }}'
+                sequence:
+                - service: input_boolean.turn_on
+                  target:
+                    entity_id: '{{ automation_control }}'
+            - choose:
+              - conditions:
+                - condition: template
+                  value_template: '{{ area_set }}'
+                sequence:
+                - service: light.turn_off
+                  target:
+                    area_id: !input light_area
+              default:
+              - service: light.turn_off
+                target:
+                  entity_id: !input light_target
+            - delay:
+                milliseconds: 100
+            - choose:
+              - conditions: '{{ automation_control not in ['''', None] }}'
+                sequence:
+                - service: input_boolean.turn_off
+                  target:
+                    entity_id: '{{ automation_control }}'
+            - choose:
+              - conditions: '{{ debug_level == ''basic'' }}'
+                sequence:
+                - service: logbook.log
+                  data:
+                    name: Bathroom Light Fan
+                    message: 'Light OFF: vacancy | trigger={{ trigger.id }} | grace={{
+                      lights_off_delay_min }}min (v{{ blueprint_version }})'
+              - conditions: '{{ debug_level == ''verbose'' }}'
+                sequence:
+                - service: logbook.log
+                  data:
+                    name: Bathroom Light Fan
+                    message: 'Light OFF: vacancy | trigger={{ trigger.id }} | grace={{
+                      lights_off_delay_min }}min | motion={{ is_state(motion_sensor,
+                      ''off'') }} | door={{ is_state(door_sensor, ''off'') }} (v{{
+                      blueprint_version }})'
+          - conditions:
+            - condition: and
+              conditions:
+              - condition: template
+                value_template: '{{ trigger.id == ''wasp_door_left_open'' }}'
+              - condition: state
+                entity_id: !input motion_sensor
+                state: 'off'
+            sequence:
+            - choose:
+              - conditions: '{{ automation_control not in ['''', None] }}'
+                sequence:
+                - service: input_boolean.turn_on
+                  target:
+                    entity_id: '{{ automation_control }}'
+            - choose:
+              - conditions:
+                - condition: template
+                  value_template: '{{ area_set }}'
+                sequence:
+                - service: light.turn_off
+                  target:
+                    area_id: !input light_area
+              default:
+              - service: light.turn_off
+                target:
+                  entity_id: !input light_target
+            - delay:
+                milliseconds: 100
+            - choose:
+              - conditions: '{{ automation_control not in ['''', None] }}'
+                sequence:
+                - service: input_boolean.turn_off
+                  target:
+                    entity_id: '{{ automation_control }}'
+            - choose:
+              - conditions: '{{ debug_level == ''basic'' }}'
+                sequence:
+                - service: logbook.log
+                  data:
+                    name: Bathroom Light Fan
+                    message: 'Light OFF: vacancy | trigger={{ trigger.id }} | grace={{
+                      lights_off_delay_min }}min (v{{ blueprint_version }})'
+              - conditions: '{{ debug_level == ''verbose'' }}'
+                sequence:
+                - service: logbook.log
+                  data:
+                    name: Bathroom Light Fan
+                    message: 'Light OFF: vacancy | trigger={{ trigger.id }} | grace={{
+                      lights_off_delay_min }}min | motion={{ is_state(motion_sensor,
+                      ''off'') }} | door={{ is_state(door_sensor, ''off'') }} (v{{
+                      blueprint_version }})'
+    - stop: WITB branch completed
+  - conditions:
+    - condition: template
+      value_template: '{{ trigger.id == ''light_manual_off'' }}'
+    - condition: template
+      value_template: '{{ manual_override_duration_min | int(0) > 0 }}'
+    - condition: template
+      value_template: '{{ automation_control in ['''', None] or is_state(automation_control,
+        ''off'') }}'
+    sequence:
+    - if:
+      - condition: template
+        value_template: '{{ manual_override_until not in ['''', None] }}'
+      then:
+      - variables:
+          _until_ts: '{% set now_ts = as_timestamp(now()) %} {% set duration_sec =
+            (manual_override_duration_min | int(0)) * 60 %} {{ (now_ts + duration_sec)
+            | int }}
+
+            '
+      - service: input_datetime.set_datetime
+        data:
+          entity_id: '{{ manual_override_until }}'
+          timestamp: '{{ _until_ts | int }}'
+      - choose:
+        - conditions: '{{ debug_level in [''basic'',''verbose''] }}'
+          sequence:
           - service: logbook.log
             data:
               name: Bathroom Light Fan
-              message: >-
-                Trigger fired: id={{ trigger.id if trigger is defined else 'undefined' }} | entity={{ trigger.entity_id if (trigger is defined and trigger.entity_id is defined) else 'n/a' }} | from={{ trigger.from_state.state if (trigger is defined and trigger.from_state is defined) else 'n/a' }} | to={{ trigger.to_state.state if (trigger is defined and trigger.to_state is defined) else 'n/a' }} (v{{ blueprint_version }})
+              message: 'Manual override: activated | suspend={{ manual_override_duration_min
+                }}min (v{{ blueprint_version }})'
+      else:
+      - choose:
+        - conditions: '{{ debug_level in [''basic'',''verbose''] }}'
+          sequence:
+          - service: logbook.log
+            data:
+              name: Bathroom Light Fan
+              message: 'Manual override: detected but no helper | auto-on will resume
+                (v{{ blueprint_version }})'
+  - conditions:
+    - condition: template
+      value_template: '{% set base_ok = (trigger.id in [''humidity_bath_change'',''humidity_home_change''])
+        and humidity_sensors_ok and (humidity_delta > fan_delta_on_effective) %}
 
-  - choose:
-      # --- Home Assistant start: check if fan should be off at startup ---
-      - conditions:
-          - condition: template
-            value_template: "{{ trigger.id == 'ha_start' }}"
+        {# Rate-of-rise path only considers bathroom sensor changes #} {% set ror_enabled
+        = rate_of_rise_enabled %} {% set is_bath = (trigger.id == ''humidity_bath_change'')
+        %} {% set from_v = trigger.from_state.state|float(0) if is_bath and trigger.from_state
+        is not none and trigger.from_state.state not in [''unknown'',''unavailable'','''']
+        else None %} {% set to_v = trigger.to_state.state|float(0) if is_bath and
+        trigger.to_state is not none and trigger.to_state.state not in [''unknown'',''unavailable'','''']
+        else None %} {% set from_ts = as_timestamp(trigger.from_state.last_changed)
+        if is_bath and trigger.from_state is not none else None %} {% set to_ts =
+        as_timestamp(trigger.to_state.last_changed) if is_bath and trigger.to_state
+        is not none else None %} {% set dt = (to_ts - from_ts) if (from_ts is not
+        none and to_ts is not none) else 999999 %} {% set rise = (to_v - from_v) if
+        (from_v is not none and to_v is not none) else -999 %} {% set ror_ok = ror_enabled
+        and is_bath and (dt <= (rate_of_rise_window_min|int(0) * 60)) and (rise >=
+        (rate_of_rise_threshold|float(0))) %}
+
+        {{ base_ok or ror_ok }}'
+    sequence:
+    - variables:
+        _ror_triggered: '{% set ror_enabled = rate_of_rise_enabled %} {% set is_bath
+          = (trigger.id == ''humidity_bath_change'') %} {% set from_v = trigger.from_state.state|float(0)
+          if is_bath and trigger.from_state is not none and trigger.from_state.state
+          not in [''unknown'',''unavailable'',''''] else None %} {% set to_v = trigger.to_state.state|float(0)
+          if is_bath and trigger.to_state is not none and trigger.to_state.state not
+          in [''unknown'',''unavailable'',''''] else None %} {% set from_ts = as_timestamp(trigger.from_state.last_changed)
+          if is_bath and trigger.from_state is not none else None %} {% set to_ts
+          = as_timestamp(trigger.to_state.last_changed) if is_bath and trigger.to_state
+          is not none else None %} {% set dt = (to_ts - from_ts) if (from_ts is not
+          none and to_ts is not none) else 999999 %} {% set rise = (to_v - from_v)
+          if (from_v is not none and to_v is not none) else -999 %} {{ ror_enabled
+          and is_bath and (dt <= (rate_of_rise_window_min|int(0) * 60)) and (rise
+          >= (rate_of_rise_threshold|float(0))) }}'
+    - choose:
+      - conditions: '{{ _ror_triggered and (ror_min_on_time_min|int(0) > 0) and (ror_latch_until
+          not in ['''', None]) }}'
         sequence:
-          # Fan startup sanity check
-          - choose:
-              - conditions:
-                  - condition: state
-                    entity_id: !input fan_target
-                    state: "on"
-                  - condition: template
-                    value_template: "{{ humidity_sensors_ok and humidity_delta < humidity_delta_off }}"
-                sequence:
-                  - service: "{{ turn_fan_off }}"
-                    target:
-                      entity_id: !input fan_target
-                  - choose:
-                      - conditions: "{{ debug_level in ['basic','verbose'] }}"
-                        sequence:
-                          - service: logbook.log
-                            data:
-                              name: Bathroom Light Fan
-                              message: "Fan OFF: startup check | delta={{ humidity_delta | round(1) }}% below threshold (v{{ blueprint_version }})"
-          # Light startup sanity check: allow sensors to settle, then if lights are on with motion off and door open/unknown, treat as vacancy
-          - delay:
-              seconds: 30
-          - choose:
-              - conditions:
-                  - condition: state
-                    entity_id: !input light_target
-                    state: "on"
-                  - condition: state
-                    entity_id: !input motion_sensor
-                    state: "off"
-                  - condition: or
-                    conditions:
-                      - condition: state
-                        entity_id: !input door_sensor
-                        state: "on"
-                      - condition: state
-                        entity_id: !input door_sensor
-                        state: "unavailable"
-                      - condition: state
-                        entity_id: !input door_sensor
-                        state: "unknown"
-                sequence:
-                  # Signal that automation is turning off lights (not user manual control)
-                  - choose:
-                      - conditions: "{{ automation_control not in ['', None] }}"
-                        sequence:
-                          - service: input_boolean.turn_on
-                            target:
-                              entity_id: "{{ automation_control }}"
-                  # Wait startup grace period, then turn off lights
-                  - choose:
-                      - conditions:
-                          - condition: template
-                            value_template: "{{ area_set }}"
-                        sequence:
-                          - delay:
-                              minutes: "{{ lights_off_delay_min }}"
-                          - service: light.turn_off
-                            target:
-                              area_id: !input light_area
-                    default:
-                      - delay:
-                          minutes: "{{ lights_off_delay_min }}"
-                      - service: light.turn_off
-                        target:
-                          entity_id: !input light_target
-                  # Wait a moment for light state to settle
-                  - delay:
-                      milliseconds: 100
-                  # Reset the control helper AFTER lights are off and settled
-                  - choose:
-                      - conditions: "{{ automation_control not in ['', None] }}"
-                        sequence:
-                          - service: input_boolean.turn_off
-                            target:
-                              entity_id: "{{ automation_control }}"
-                  # Debug logging for startup light OFF events
-                  - choose:
-                      - conditions: "{{ debug_level == 'basic' }}"
-                        sequence:
-                          - service: logbook.log
-                            data:
-                              name: Bathroom Light Fan
-                              message: "Light OFF: startup check | grace={{ lights_off_delay_min }}min | motion=off, door=open (v{{ blueprint_version }})"
-                      - conditions: "{{ debug_level == 'verbose' }}"
-                        sequence:
-                          - service: logbook.log
-                            data:
-                              name: Bathroom Light Fan
-                              message: "Light OFF: startup check | grace={{ lights_off_delay_min }}min | motion={{ is_state(motion_sensor, 'off') }} | door={{ states(door_sensor) }} | light={{ states(light_target) }} (v{{ blueprint_version }})"
+        - variables:
+            _latch_until_ts: '{% set now_ts = as_timestamp(now()) %} {% set latch_duration_sec
+              = (ror_min_on_time_min | int(0)) * 60 %} {{ (now_ts + latch_duration_sec)
+              | int }}
 
-      # --- Wasp-in-a-Box: manage light directly based on motion/door ---
-      - conditions:
-          - condition: template
-            value_template: >-
-              {{ trigger.id in ['wasp_motion','wasp_door_opened','wasp_door_closed','wasp_motion_clear','wasp_door_left_open'] }}
+              '
+        - service: input_datetime.set_datetime
+          data:
+            entity_id: '{{ ror_latch_until }}'
+            timestamp: '{{ _latch_until_ts | int }}'
+        - choose:
+          - conditions: '{{ debug_level in [''basic'',''verbose''] }}'
+            sequence:
+            - service: logbook.log
+              data:
+                name: Bathroom Light Fan
+                message: 'ROR latch: set | min_on={{ ror_min_on_time_min }}min (v{{
+                  blueprint_version }})'
+    - choose:
+      - conditions: '{{ debug_level == ''basic'' }}'
         sequence:
-          # Debug: Show all condition states for motion/door open triggers
-          - choose:
-              - conditions:
-                  - condition: template
-                    value_template: "{{ debug_level == 'verbose' and trigger.id in ['wasp_motion','wasp_door_opened'] }}"
-                sequence:
-                  - service: logbook.log
-                    data:
-                      name: Bathroom Light Fan
-                      message: >-
-                        Conditions: should_turn_on={{ should_turn_on_light }} | light_off={{ is_state(light_target,'off') }} | presence_ok={{ presence_ok }} (count={{ presence_entities | length }}) | override_ok={{ override_ok }} | lux_ok={{ lux_ok }} (v{{ blueprint_version }})
-
-          - choose:
-              # Motion or Door opened: unified light ON logic
-              - conditions:
-                  - condition: template
-                    value_template: "{{ trigger.id in ['wasp_motion','wasp_door_opened'] }}"
-                sequence:
-                  - if:
-                      - condition: template
-                        value_template: "{{ should_turn_on_light }}"
-                    then:
-                      - choose:
-                          # Night mode active: turn on with dimming and/or warm color temp
-                          - conditions:
-                              - condition: template
-                                value_template: "{{ night_mode_active }}"
-                            sequence:
-                              - choose:
-                                  # Area-based control: use basic service call (areas don't support brightness/color_temp params)
-                                  - conditions:
-                                      - condition: template
-                                        value_template: "{{ area_set }}"
-                                    sequence:
-                                      - service: light.turn_on
-                                        target:
-                                          area_id: !input light_area
-                                        data:
-                                          brightness: "{{ night_mode_brightness }}"
-                                          color_temp_kelvin: "{{ night_mode_color_temp_kelvin }}"
-                                # Entity-based control: check capabilities and apply appropriate params
-                                default:
-                                  - variables:
-                                      _modes: "{{ state_attr(light_target, 'supported_color_modes')|default([], true) }}"
-                                      _has_bri: "{{ 'brightness' in _modes }}"
-                                      _has_ct: "{{ 'color_temp' in _modes }}"
-                                  - choose:
-                                      - conditions: "{{ _has_bri and _has_ct }}"
-                                        sequence:
-                                          - service: light.turn_on
-                                            target:
-                                              entity_id: !input light_target
-                                            data:
-                                              brightness: "{{ night_mode_brightness }}"
-                                              color_temp_kelvin: "{{ night_mode_color_temp_kelvin }}"
-                                      - conditions: "{{ _has_bri and not _has_ct }}"
-                                        sequence:
-                                          - service: light.turn_on
-                                            target:
-                                              entity_id: !input light_target
-                                            data:
-                                              brightness: "{{ night_mode_brightness }}"
-                                      - conditions: "{{ (not _has_bri) and _has_ct }}"
-                                        sequence:
-                                          - service: light.turn_on
-                                            target:
-                                              entity_id: !input light_target
-                                            data:
-                                              color_temp_kelvin: "{{ night_mode_color_temp_kelvin }}"
-                                    default:
-                                      - service: light.turn_on
-                                        target:
-                                          entity_id: !input light_target
-                        # Normal mode: turn on without special params
-                        default:
-                          - choose:
-                              - conditions:
-                                  - condition: template
-                                    value_template: "{{ area_set }}"
-                                sequence:
-                                  - service: light.turn_on
-                                    target:
-                                      area_id: !input light_area
-                            default:
-                              - service: light.turn_on
-                                target:
-                                  entity_id: !input light_target
-                      # Debug logging for light ON events
-                      - choose:
-                          - conditions: "{{ debug_level == 'basic' }}"
-                            sequence:
-                              - service: logbook.log
-                                data:
-                                  name: Bathroom Light Fan
-                                  message: >-
-                                    Light ON: trigger={{ trigger.id }} | night_mode={{ night_mode_active }} | presence={{ presence_ok }} | lux_ok={{ lux_ok }} (v{{ blueprint_version }})
-                          - conditions: "{{ debug_level == 'verbose' }}"
-                            sequence:
-                              - service: logbook.log
-                                data:
-                                  name: Bathroom Light Fan
-                                  message: >-
-                                    Light ON: trigger={{ trigger.id }} | night_mode={{ night_mode_active }} (enabled={{ night_mode_enabled }}, schedule={{ in_night_schedule }}) | presence={{ presence_ok }} | lux={{ states(illuminance_sensor) if illuminance_sensor else 'n/a' }} (ok={{ lux_ok }}) | area={{ area_set }} (v{{ blueprint_version }})
-                    else:
-                      # Debug: log why light didn't turn on
-                      - choose:
-                          - conditions: "{{ debug_level in ['basic','verbose'] }}"
-                            sequence:
-                              - service: logbook.log
-                                data:
-                                  name: Bathroom Light Fan
-                                  message: >-
-                                    Light skipped: trigger={{ trigger.id }} | light_already_on={{ is_state(light_target, 'on') }} | presence_ok={{ presence_ok }} | override_ok={{ override_ok }} | lux_ok={{ lux_ok }} (v{{ blueprint_version }})
-
-              # Wasp-in-a-Box: Compute vacancy conditions to turn off light
-              # Vacancy requires motion clear AND (door open OR door left open too long)
-              # Door closed = occupancy (even without motion)
-              - conditions:
-                  - condition: template
-                    value_template: >-
-                      {{ trigger.id in ['wasp_motion_clear','wasp_door_left_open'] }}
-                sequence:
-                  # Debug: Show clear trigger received
-                  - choose:
-                      - conditions: "{{ debug_level == 'verbose' }}"
-                        sequence:
-                          - service: logbook.log
-                            data:
-                              name: Bathroom Light Fan
-                              message: >-
-                                Clear trigger: id={{ trigger.id }} | motion={{ is_state(motion_sensor, 'off') }} | door={{ is_state(door_sensor, 'on') }} (v{{ blueprint_version }})
-
-                  - choose:
-                      - conditions:
-                          # Case A: motion cleared AND door is already open/unknown (vacancy)
-                          - condition: and
-                            conditions:
-                              - condition: template
-                                value_template: "{{ trigger.id == 'wasp_motion_clear' }}"
-                              - condition: or
-                                conditions:
-                                  - condition: state
-                                    entity_id: !input door_sensor
-                                    state: "on"
-                                  - condition: state
-                                    entity_id: !input door_sensor
-                                    state: "unavailable"
-                                  - condition: state
-                                    entity_id: !input door_sensor
-                                    state: "unknown"
-                        sequence:
-                          # Signal that automation is turning off lights (not user manual control)
-                          - choose:
-                              - conditions: "{{ automation_control not in ['', None] }}"
-                                sequence:
-                                  - service: input_boolean.turn_on
-                                    target:
-                                      entity_id: "{{ automation_control }}"
-                          # Turn off lights immediately (grace handled at trigger level)
-                          - choose:
-                              - conditions:
-                                  - condition: template
-                                    value_template: "{{ area_set }}"
-                                sequence:
-                                  - service: light.turn_off
-                                    target:
-                                      area_id: !input light_area
-                            default:
-                              - service: light.turn_off
-                                target:
-                                  entity_id: !input light_target
-                          # Wait a moment for light state to settle
-                          - delay:
-                              milliseconds: 100
-                          # Reset the control helper AFTER lights are off and settled
-                          - choose:
-                              - conditions: "{{ automation_control not in ['', None] }}"
-                                sequence:
-                                  - service: input_boolean.turn_off
-                                    target:
-                                      entity_id: "{{ automation_control }}"
-                          # Debug logging for light OFF events
-                          - choose:
-                              - conditions: "{{ debug_level == 'basic' }}"
-                                sequence:
-                                  - service: logbook.log
-                                    data:
-                                      name: Bathroom Light Fan
-                                      message: "Light OFF: vacancy | trigger={{ trigger.id }} | grace={{ lights_off_delay_min }}min (v{{ blueprint_version }})"
-                              - conditions: "{{ debug_level == 'verbose' }}"
-                                sequence:
-                                  - service: logbook.log
-                                    data:
-                                      name: Bathroom Light Fan
-                                      message: "Light OFF: vacancy | trigger={{ trigger.id }} | grace={{ lights_off_delay_min }}min | motion={{ is_state(motion_sensor, 'off') }} | door={{ is_state(door_sensor, 'off') }} (v{{ blueprint_version }})"
-                      # Case B: motion cleared AND door closed but closed after motion cleared (edge case)
-                      - conditions:
-                          - condition: and
-                            conditions:
-                              - condition: template
-                                value_template: "{{ trigger.id == 'wasp_motion_clear' }}"
-                              - condition: template
-                                value_template: >-
-                                  {% if door_sensor in states and motion_sensor in states %}
-                                    {{ is_state(door_sensor, 'off') and (
-                                        states[door_sensor].last_changed > states[motion_sensor].last_changed and (
-                                          motion_sensor_delay == -1 or (
-                                            motion_sensor_delay > -1 and states[door_sensor].last_changed >= states[motion_sensor].last_changed - timedelta(seconds=motion_sensor_delay)
-                                          )
-                                        )
-                                      ) }}
-                                  {% else %}
-                                    false
-                                  {% endif %}
-                        sequence:
-                          # Signal that automation is turning off lights (not user manual control)
-                          - choose:
-                              - conditions: "{{ automation_control not in ['', None] }}"
-                                sequence:
-                                  - service: input_boolean.turn_on
-                                    target:
-                                      entity_id: "{{ automation_control }}"
-                          # Turn off lights immediately (grace handled at trigger level)
-                          - choose:
-                              - conditions:
-                                  - condition: template
-                                    value_template: "{{ area_set }}"
-                                sequence:
-                                  - service: light.turn_off
-                                    target:
-                                      area_id: !input light_area
-                            default:
-                              - service: light.turn_off
-                                target:
-                                  entity_id: !input light_target
-                          # Wait a moment for light state to settle
-                          - delay:
-                              milliseconds: 100
-                          # Reset the control helper AFTER lights are off and settled
-                          - choose:
-                              - conditions: "{{ automation_control not in ['', None] }}"
-                                sequence:
-                                  - service: input_boolean.turn_off
-                                    target:
-                                      entity_id: "{{ automation_control }}"
-                          # Debug logging for light OFF events
-                          - choose:
-                              - conditions: "{{ debug_level == 'basic' }}"
-                                sequence:
-                                  - service: logbook.log
-                                    data:
-                                      name: Bathroom Light Fan
-                                      message: "Light OFF: vacancy | trigger={{ trigger.id }} | grace={{ lights_off_delay_min }}min (v{{ blueprint_version }})"
-                              - conditions: "{{ debug_level == 'verbose' }}"
-                                sequence:
-                                  - service: logbook.log
-                                    data:
-                                      name: Bathroom Light Fan
-                                      message: "Light OFF: vacancy | trigger={{ trigger.id }} | grace={{ lights_off_delay_min }}min | motion={{ is_state(motion_sensor, 'off') }} | door={{ is_state(door_sensor, 'off') }} (v{{ blueprint_version }})"
-                      # Case C: door left open for too long AND motion is off
-                      - conditions:
-                          - condition: and
-                            conditions:
-                              - condition: template
-                                value_template: "{{ trigger.id == 'wasp_door_left_open' }}"
-                              - condition: state
-                                entity_id: !input motion_sensor
-                                state: "off"
-                        sequence:
-                          # Signal that automation is turning off lights (not user manual control)
-                          - choose:
-                              - conditions: "{{ automation_control not in ['', None] }}"
-                                sequence:
-                                  - service: input_boolean.turn_on
-                                    target:
-                                      entity_id: "{{ automation_control }}"
-                          # Turn off lights immediately (grace handled at trigger level)
-                          - choose:
-                              - conditions:
-                                  - condition: template
-                                    value_template: "{{ area_set }}"
-                                sequence:
-                                  - service: light.turn_off
-                                    target:
-                                      area_id: !input light_area
-                            default:
-                              - service: light.turn_off
-                                target:
-                                  entity_id: !input light_target
-                          # Wait a moment for light state to settle
-                          - delay:
-                              milliseconds: 100
-                          # Reset the control helper AFTER lights are off and settled
-                          - choose:
-                              - conditions: "{{ automation_control not in ['', None] }}"
-                                sequence:
-                                  - service: input_boolean.turn_off
-                                    target:
-                                      entity_id: "{{ automation_control }}"
-                          # Debug logging for light OFF events
-                          - choose:
-                              - conditions: "{{ debug_level == 'basic' }}"
-                                sequence:
-                                  - service: logbook.log
-                                    data:
-                                      name: Bathroom Light Fan
-                                      message: "Light OFF: vacancy | trigger={{ trigger.id }} | grace={{ lights_off_delay_min }}min (v{{ blueprint_version }})"
-                              - conditions: "{{ debug_level == 'verbose' }}"
-                                sequence:
-                                  - service: logbook.log
-                                    data:
-                                      name: Bathroom Light Fan
-                                      message: "Light OFF: vacancy | trigger={{ trigger.id }} | grace={{ lights_off_delay_min }}min | motion={{ is_state(motion_sensor, 'off') }} | door={{ is_state(door_sensor, 'off') }} (v{{ blueprint_version }})"
-          - stop: "WITB branch completed"
-
-      # Manual override: user turned off lights, suspend auto-on
-      - conditions:
-          - condition: template
-            value_template: "{{ trigger.id == 'light_manual_off' }}"
-          # Only trigger override if manual_override_duration > 0
-          - condition: template
-            value_template: "{{ manual_override_duration_min | int(0) > 0 }}"
-          # Only trigger if automation_control helper is OFF (means user turned off, not automation)
-          # If helper not configured, allow override (user chose not to use the helper)
-          - condition: template
-            value_template: "{{ automation_control in ['', None] or is_state(automation_control, 'off') }}"
+        - service: logbook.log
+          data:
+            name: Bathroom Light Fan
+            message: 'Fan ON: {{ ''ROR boost'' if _ror_triggered else ''delta'' }}
+              | delta={{ humidity_delta | round(1) }}% | threshold={{ fan_delta_on_effective
+              | round(1) }}% (v{{ blueprint_version }})'
+      - conditions: '{{ debug_level == ''verbose'' }}'
         sequence:
-          - if:
-              - condition: template
-                value_template: "{{ manual_override_until not in ['', None] }}"
-            then:
-              - variables:
-                  _until_ts: >
-                    {% set now_ts = as_timestamp(now()) %}
-                    {% set duration_sec = (manual_override_duration_min | int(0)) * 60 %}
-                    {{ (now_ts + duration_sec) | int }}
-              - service: input_datetime.set_datetime
-                data:
-                  entity_id: "{{ manual_override_until }}"
-                  timestamp: "{{ _until_ts | int }}"
-              - choose:
-                  - conditions: "{{ debug_level in ['basic','verbose'] }}"
-                    sequence:
-                      - service: logbook.log
-                        data:
-                          name: Bathroom Light Fan
-                          message: "Manual override: activated | suspend={{ manual_override_duration_min }}min (v{{ blueprint_version }})"
-            else:
-              - choose:
-                  - conditions: "{{ debug_level in ['basic','verbose'] }}"
-                    sequence:
-                      - service: logbook.log
-                        data:
-                          name: Bathroom Light Fan
-                          message: "Manual override: detected but no helper | auto-on will resume (v{{ blueprint_version }})"
-
-      # Fan: Humidity delta crossed above ON threshold
-      - conditions:
-          - condition: template
-            value_template: >-
-              {% set base_ok = (trigger.id in ['humidity_bath_change','humidity_home_change']) and humidity_sensors_ok and (humidity_delta > fan_delta_on_effective) %}
-
-              {# Rate-of-rise path only considers bathroom sensor changes #}
-              {% set ror_enabled = rate_of_rise_enabled %}
-              {% set is_bath = (trigger.id == 'humidity_bath_change') %}
-              {% set from_v = trigger.from_state.state|float(0) if is_bath and trigger.from_state is not none and trigger.from_state.state not in ['unknown','unavailable',''] else None %}
-              {% set to_v = trigger.to_state.state|float(0) if is_bath and trigger.to_state is not none and trigger.to_state.state not in ['unknown','unavailable',''] else None %}
-              {% set from_ts = as_timestamp(trigger.from_state.last_changed) if is_bath and trigger.from_state is not none else None %}
-              {% set to_ts = as_timestamp(trigger.to_state.last_changed) if is_bath and trigger.to_state is not none else None %}
-              {% set dt = (to_ts - from_ts) if (from_ts is not none and to_ts is not none) else 999999 %}
-              {% set rise = (to_v - from_v) if (from_v is not none and to_v is not none) else -999 %}
-              {% set ror_ok = ror_enabled and is_bath and (dt <= (rate_of_rise_window_min|int(0) * 60)) and (rise >= (rate_of_rise_threshold|float(0))) %}
-
-              {{ base_ok or ror_ok }}
+        - service: logbook.log
+          data:
+            name: Bathroom Light Fan
+            message: 'Fan ON: {{ ''ROR boost'' if _ror_triggered else ''delta'' }}
+              | bath={{ states(bathroom_humidity_sensor) }}% | home={{ states(home_humidity_sensor)
+              }}% | delta={{ humidity_delta | round(1) }}% | threshold={{ fan_delta_on_effective
+              | round(1) }}% | night_bias={{ night_fan_delta_on_bias }} | in_night={{
+              in_night_schedule }} (v{{ blueprint_version }})'
+    - service: '{{ turn_fan_on }}'
+      target:
+        entity_id: !input fan_target
+  - conditions:
+    - condition: template
+      value_template: '{{ trigger.id in [''humidity_bath_change'',''humidity_home_change'']
+        and humidity_sensors_ok and humidity_delta < humidity_delta_off }}'
+    - condition: or
+      conditions:
+      - condition: template
+        value_template: '{{ fan_min_runtime_min | int(0) == 0 }}'
+      - condition: state
+        entity_id: !input fan_target
+        state: 'on'
+        for:
+          minutes: !input fan_min_runtime_min
+    - condition: template
+      value_template: "{# Block OFF if fast fall is happening (bathroom sensor only)
+        #} {% set enabled = rate_of_fall_enabled %} {% set is_bath = (trigger.id ==
+        'humidity_bath_change') %} {% if not enabled or not is_bath or trigger.from_state
+        is none or trigger.to_state is none %}\n  true\n{% else %}\n  {% set from_ok
+        = trigger.from_state.state not in ['unknown','unavailable',''] %}\n  {% set
+        to_ok = trigger.to_state.state not in ['unknown','unavailable',''] %}\n  {%
+        if not from_ok or not to_ok %}\n    true\n  {% else %}\n    {% set from_ts
+        = as_timestamp(trigger.from_state.last_changed) %}\n    {% set to_ts = as_timestamp(trigger.to_state.last_changed)
+        %}\n    {% if from_ts is none or to_ts is none %}\n      true\n    {% else
+        %}\n      {% set dt = to_ts - from_ts %}\n      {% set drop = (trigger.from_state.state|float(0)
+        - trigger.to_state.state|float(0)) %}\n      {% set fast_fall = (dt <= (rate_of_fall_window_min|int(0)
+        * 60)) and (drop >= (rate_of_fall_threshold|float(0))) %}\n      {{ not fast_fall
+        }}\n    {% endif %}\n  {% endif %}\n{% endif %}"
+    - condition: template
+      value_template: "{% set has_latch = (ror_latch_until not in ['', None]) %} {%
+        set disabled = ror_min_on_time_min|int(0) == 0 %} {% if not has_latch or disabled
+        %}\n  true\n{% else %}\n  {% set until = states(ror_latch_until) %}\n  {%
+        if until in ['unknown','', None] %}\n    true\n  {% else %}\n    {% set until_ts
+        = as_timestamp(until) %}\n    {% set now_ts = as_timestamp(now()) %}\n    {{
+        (until_ts is not none and now_ts is not none and now_ts > until_ts) }}\n  {%
+        endif %}\n{% endif %}"
+    sequence:
+    - service: '{{ turn_fan_off }}'
+      target:
+        entity_id: !input fan_target
+    - choose:
+      - conditions: '{{ debug_level == ''basic'' }}'
         sequence:
-          # Recompute ror_ok for use in sequence (condition template variables don't persist)
-          - variables:
-              _ror_triggered: >-
-                {% set ror_enabled = rate_of_rise_enabled %}
-                {% set is_bath = (trigger.id == 'humidity_bath_change') %}
-                {% set from_v = trigger.from_state.state|float(0) if is_bath and trigger.from_state is not none and trigger.from_state.state not in ['unknown','unavailable',''] else None %}
-                {% set to_v = trigger.to_state.state|float(0) if is_bath and trigger.to_state is not none and trigger.to_state.state not in ['unknown','unavailable',''] else None %}
-                {% set from_ts = as_timestamp(trigger.from_state.last_changed) if is_bath and trigger.from_state is not none else None %}
-                {% set to_ts = as_timestamp(trigger.to_state.last_changed) if is_bath and trigger.to_state is not none else None %}
-                {% set dt = (to_ts - from_ts) if (from_ts is not none and to_ts is not none) else 999999 %}
-                {% set rise = (to_v - from_v) if (from_v is not none and to_v is not none) else -999 %}
-                {{ ror_enabled and is_bath and (dt <= (rate_of_rise_window_min|int(0) * 60)) and (rise >= (rate_of_rise_threshold|float(0))) }}
-          - choose:
-              - conditions: "{{ _ror_triggered and (ror_min_on_time_min|int(0) > 0) and (ror_latch_until not in ['', None]) }}"
-                sequence:
-                  - variables:
-                      _latch_until_ts: >
-                        {% set now_ts = as_timestamp(now()) %}
-                        {% set latch_duration_sec = (ror_min_on_time_min | int(0)) * 60 %}
-                        {{ (now_ts + latch_duration_sec) | int }}
-                  - service: input_datetime.set_datetime
-                    data:
-                      entity_id: "{{ ror_latch_until }}"
-                      timestamp: "{{ _latch_until_ts | int }}"
-                  - choose:
-                      - conditions: "{{ debug_level in ['basic','verbose'] }}"
-                        sequence:
-                          - service: logbook.log
-                            data:
-                              name: Bathroom Light Fan
-                              message: "ROR latch: set | min_on={{ ror_min_on_time_min }}min (v{{ blueprint_version }})"
-          - choose:
-              - conditions: "{{ debug_level == 'basic' }}"
-                sequence:
-                  - service: logbook.log
-                    data:
-                      name: Bathroom Light Fan
-                      message: >-
-                        Fan ON: {{ 'ROR boost' if _ror_triggered else 'delta' }} | delta={{ humidity_delta | round(1) }}% | threshold={{ fan_delta_on_effective | round(1) }}% (v{{ blueprint_version }})
-              - conditions: "{{ debug_level == 'verbose' }}"
-                sequence:
-                  - service: logbook.log
-                    data:
-                      name: Bathroom Light Fan
-                      message: >-
-                        Fan ON: {{ 'ROR boost' if _ror_triggered else 'delta' }} | bath={{ states(bathroom_humidity_sensor) }}% | home={{ states(home_humidity_sensor) }}% | delta={{ humidity_delta | round(1) }}% | threshold={{ fan_delta_on_effective | round(1) }}% | night_bias={{ night_fan_delta_on_bias }} | in_night={{ in_night_schedule }} (v{{ blueprint_version }})
-          - service: "{{ turn_fan_on }}"
-            target:
-              entity_id: !input fan_target
-
-      # Fan: Humidity delta fell below OFF threshold and (optionally) min runtime elapsed
-      - conditions:
-          - condition: template
-            value_template: >-
-              {{ trigger.id in ['humidity_bath_change','humidity_home_change'] and humidity_sensors_ok and humidity_delta < humidity_delta_off }}
-          - condition: or
-            conditions:
-              # Disable min runtime if set to 0
-              - condition: template
-                value_template: >-
-                  {{ fan_min_runtime_min | int(0) == 0 }}
-              # Otherwise require the fan to have been ON for the specified duration
-              - condition: state
-                entity_id: !input fan_target
-                state: "on"
-                for:
-                  minutes: !input fan_min_runtime_min
-          - condition: template
-            value_template: >-
-              {# Block OFF if fast fall is happening (bathroom sensor only) #}
-              {% set enabled = rate_of_fall_enabled %}
-              {% set is_bath = (trigger.id == 'humidity_bath_change') %}
-              {% if not enabled or not is_bath or trigger.from_state is none or trigger.to_state is none %}
-                true
-              {% else %}
-                {% set from_ok = trigger.from_state.state not in ['unknown','unavailable',''] %}
-                {% set to_ok = trigger.to_state.state not in ['unknown','unavailable',''] %}
-                {% if not from_ok or not to_ok %}
-                  true
-                {% else %}
-                  {% set from_ts = as_timestamp(trigger.from_state.last_changed) %}
-                  {% set to_ts = as_timestamp(trigger.to_state.last_changed) %}
-                  {% if from_ts is none or to_ts is none %}
-                    true
-                  {% else %}
-                    {% set dt = to_ts - from_ts %}
-                    {% set drop = (trigger.from_state.state|float(0) - trigger.to_state.state|float(0)) %}
-                    {% set fast_fall = (dt <= (rate_of_fall_window_min|int(0) * 60)) and (drop >= (rate_of_fall_threshold|float(0))) %}
-                    {{ not fast_fall }}
-                  {% endif %}
-                {% endif %}
-              {% endif %}
-          - condition: template
-            value_template: >-
-              {% set has_latch = (ror_latch_until not in ['', None]) %}
-              {% set disabled = ror_min_on_time_min|int(0) == 0 %}
-              {% if not has_latch or disabled %}
-                true
-              {% else %}
-                {% set until = states(ror_latch_until) %}
-                {% if until in ['unknown','', None] %}
-                  true
-                {% else %}
-                  {% set until_ts = as_timestamp(until) %}
-                  {% set now_ts = as_timestamp(now()) %}
-                  {{ (until_ts is not none and now_ts is not none and now_ts > until_ts) }}
-                {% endif %}
-              {% endif %}
+        - service: logbook.log
+          data:
+            name: Bathroom Light Fan
+            message: 'Fan OFF: delta below threshold | delta={{ humidity_delta | round(1)
+              }}% | threshold={{ humidity_delta_off }}% | min_runtime=ok | ror_latch=cleared
+              (v{{ blueprint_version }})'
+      - conditions: '{{ debug_level == ''verbose'' }}'
         sequence:
-          - service: "{{ turn_fan_off }}"
-            target:
-              entity_id: !input fan_target
-          - choose:
-              - conditions: "{{ debug_level == 'basic' }}"
-                sequence:
-                  - service: logbook.log
-                    data:
-                      name: Bathroom Light Fan
-                      message: "Fan OFF: delta below threshold | delta={{ humidity_delta | round(1) }}% | threshold={{ humidity_delta_off }}% | min_runtime=ok | ror_latch=cleared (v{{ blueprint_version }})"
-              - conditions: "{{ debug_level == 'verbose' }}"
-                sequence:
-                  - service: logbook.log
-                    data:
-                      name: Bathroom Light Fan
-                      message: "Fan OFF: delta below threshold | bath={{ states(bathroom_humidity_sensor) }}% | home={{ states(home_humidity_sensor) }}% | delta={{ humidity_delta | round(1) }}% | threshold={{ humidity_delta_off }}% | min_runtime={{ fan_min_runtime_min }}min | ror_latch=cleared (v{{ blueprint_version }})"
-
-      # Auto fan off when lights have been off for specified duration and humidity is below off threshold
-      - conditions:
-          - condition: template
-            value_template: "{{ trigger.id == 'lights_off_for_fan_auto_off' }}"
-          - condition: template
-            value_template: "{{ humidity_sensors_ok and humidity_delta < humidity_delta_off }}"
-          - condition: state
-            entity_id: !input fan_target
-            state: "on"
+        - service: logbook.log
+          data:
+            name: Bathroom Light Fan
+            message: 'Fan OFF: delta below threshold | bath={{ states(bathroom_humidity_sensor)
+              }}% | home={{ states(home_humidity_sensor) }}% | delta={{ humidity_delta
+              | round(1) }}% | threshold={{ humidity_delta_off }}% | min_runtime={{
+              fan_min_runtime_min }}min | ror_latch=cleared (v{{ blueprint_version
+              }})'
+  - conditions:
+    - condition: template
+      value_template: '{{ trigger.id == ''lights_off_for_fan_auto_off'' }}'
+    - condition: template
+      value_template: '{{ humidity_sensors_ok and humidity_delta < humidity_delta_off
+        }}'
+    - condition: state
+      entity_id: !input fan_target
+      state: 'on'
+    sequence:
+    - service: '{{ turn_fan_off }}'
+      target:
+        entity_id: !input fan_target
+    - choose:
+      - conditions: '{{ debug_level in [''basic'',''verbose''] }}'
         sequence:
-          - service: "{{ turn_fan_off }}"
-            target:
-              entity_id: !input fan_target
-          - choose:
-              - conditions: "{{ debug_level in ['basic','verbose'] }}"
-                sequence:
-                  - service: logbook.log
-                    data:
-                      name: Bathroom Light Fan
-                      message: "Fan OFF: lights off timeout | lights_off={{ auto_fan_off_after_lights_off_min }}min | delta below threshold (v{{ blueprint_version }})"
-
-      # Fan max runtime expired - force fan off
-      - conditions:
-          - condition: template
-            value_template: "{{ trigger.id == 'fan_max_runtime_expired' }}"
-          - condition: state
-            entity_id: !input fan_target
-            state: "on"
+        - service: logbook.log
+          data:
+            name: Bathroom Light Fan
+            message: 'Fan OFF: lights off timeout | lights_off={{ auto_fan_off_after_lights_off_min
+              }}min | delta below threshold (v{{ blueprint_version }})'
+  - conditions:
+    - condition: template
+      value_template: '{{ trigger.id == ''fan_max_runtime_expired'' }}'
+    - condition: state
+      entity_id: !input fan_target
+      state: 'on'
+    sequence:
+    - service: '{{ turn_fan_off }}'
+      target:
+        entity_id: !input fan_target
+    - choose:
+      - conditions: '{{ debug_level in [''basic'',''verbose''] }}'
         sequence:
-          - service: "{{ turn_fan_off }}"
-            target:
-              entity_id: !input fan_target
-          - choose:
-              - conditions: "{{ debug_level in ['basic','verbose'] }}"
-                sequence:
-                  - service: logbook.log
-                    data:
-                      name: Bathroom Light Fan
-                      message: "Fan OFF: max runtime expired | max={{ fan_max_runtime_min }}min (v{{ blueprint_version }})"
+        - service: logbook.log
+          data:
+            name: Bathroom Light Fan
+            message: 'Fan OFF: max runtime expired | max={{ fan_max_runtime_min }}min
+              (v{{ blueprint_version }})'
