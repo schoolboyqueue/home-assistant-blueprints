@@ -1,14 +1,12 @@
 name: Auto-tag Go Tools on Version Bump
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI Go Tools"]
+    types:
+      - completed
     branches:
       - main
-    paths:
-      - 'scripts/validate-blueprint-go/Makefile'
-      - 'scripts/validate-blueprint-go/CHANGELOG.md'
-      - 'scripts/ha-ws-client-go/Makefile'
-      - 'scripts/ha-ws-client-go/CHANGELOG.md'
 
 permissions:
   contents: write
@@ -16,6 +14,8 @@ permissions:
 
 jobs:
   check-and-tag:
+    # Only run if CI workflow succeeded
+    if: github.event.workflow_run.conclusion == 'success'
     name: Check versions and create tags
     runs-on: ubuntu-latest
     steps:
@@ -24,7 +24,29 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check if version files changed
+        id: changed-files
+        run: |
+          # Get the commit SHA from the triggering workflow run
+          COMMIT_SHA="${{ github.event.workflow_run.head_sha }}"
+
+          # Check if any version-related files changed in this commit
+          CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r "$COMMIT_SHA" 2>/dev/null || echo "")
+
+          VERSION_FILES_CHANGED=false
+          if echo "$CHANGED_FILES" | grep -qE '^scripts/(validate-blueprint-go|ha-ws-client-go)/(Makefile|CHANGELOG\.md)$'; then
+            VERSION_FILES_CHANGED=true
+          fi
+
+          echo "changed=$VERSION_FILES_CHANGED" >> $GITHUB_OUTPUT
+          echo "Version files changed: $VERSION_FILES_CHANGED"
+          if [ "$VERSION_FILES_CHANGED" = "true" ]; then
+            echo "Changed version files:"
+            echo "$CHANGED_FILES" | grep -E '^scripts/(validate-blueprint-go|ha-ws-client-go)/(Makefile|CHANGELOG\.md)$' || true
+          fi
+
       - name: Check validate-blueprint-go version
+        if: steps.changed-files.outputs.changed == 'true'
         id: validate-version
         run: |
           VERSION=$(grep -E '^VERSION\s*(\?=|:=|=)' scripts/validate-blueprint-go/Makefile | head -1 | sed 's/.*[?:]\?=\s*//' | tr -d ' ')
@@ -36,6 +58,7 @@ jobs:
           fi
 
       - name: Check ha-ws-client-go version
+        if: steps.changed-files.outputs.changed == 'true'
         id: client-version
         run: |
           VERSION=$(grep -E '^VERSION\s*(\?=|:=|=)' scripts/ha-ws-client-go/Makefile | head -1 | sed 's/.*[?:]\?=\s*//' | tr -d ' ')
@@ -47,7 +70,7 @@ jobs:
           fi
 
       - name: Create validate-blueprint-go tag
-        if: steps.validate-version.outputs.exists == 'false'
+        if: steps.changed-files.outputs.changed == 'true' && steps.validate-version.outputs.exists == 'false'
         env:
           VERSION: ${{ steps.validate-version.outputs.version }}
         run: |
@@ -57,7 +80,7 @@ jobs:
           git push origin "validate-blueprint-go/v$VERSION"
 
       - name: Create ha-ws-client-go tag
-        if: steps.client-version.outputs.exists == 'false'
+        if: steps.changed-files.outputs.changed == 'true' && steps.client-version.outputs.exists == 'false'
         env:
           VERSION: ${{ steps.client-version.outputs.version }}
         run: |
@@ -67,7 +90,7 @@ jobs:
           git push origin "ha-ws-client-go/v$VERSION"
 
       - name: Create combined release tag
-        if: steps.validate-version.outputs.exists == 'false' || steps.client-version.outputs.exists == 'false'
+        if: steps.changed-files.outputs.changed == 'true' && (steps.validate-version.outputs.exists == 'false' || steps.client-version.outputs.exists == 'false')
         env:
           VERSION: ${{ steps.validate-version.outputs.version }}
         run: |
@@ -81,7 +104,7 @@ jobs:
           fi
 
       - name: Trigger release workflow
-        if: steps.validate-version.outputs.exists == 'false' || steps.client-version.outputs.exists == 'false'
+        if: steps.changed-files.outputs.changed == 'true' && (steps.validate-version.outputs.exists == 'false' || steps.client-version.outputs.exists == 'false')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
