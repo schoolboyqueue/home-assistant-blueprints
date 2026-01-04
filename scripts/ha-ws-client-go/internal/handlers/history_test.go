@@ -7,6 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/home-assistant-blueprints/testfixtures"
+
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
 
@@ -704,9 +706,9 @@ func TestHandleLogbook(t *testing.T) {
 		t.Parallel()
 
 		now := time.Now()
-		entries := []types.LogbookEntry{
-			MockLogbookEntry("light.kitchen", "on", "turned on", now.Add(-1*time.Hour)),
-			MockLogbookEntry("light.kitchen", "off", "turned off", now.Add(-30*time.Minute)),
+		entries := []testfixtures.LogbookEntry{
+			testfixtures.NewLogbookEntry("light.kitchen", "on", "turned on", now.Add(-1*time.Hour)),
+			testfixtures.NewLogbookEntry("light.kitchen", "off", "turned off", now.Add(-30*time.Minute)),
 		}
 
 		router := NewMessageRouter(t).OnSuccess("logbook/get_events", entries)
@@ -737,7 +739,7 @@ func TestHandleLogbook(t *testing.T) {
 	t.Run("handles empty results", func(t *testing.T) {
 		t.Parallel()
 
-		router := NewMessageRouter(t).OnSuccess("logbook/get_events", []types.LogbookEntry{})
+		router := NewMessageRouter(t).OnSuccess("logbook/get_events", []testfixtures.LogbookEntry{})
 
 		now := time.Now()
 		timeRange := &types.TimeRange{
@@ -795,10 +797,10 @@ func TestHandleHistory(t *testing.T) {
 		t.Parallel()
 
 		now := time.Now()
-		historyStates := []types.HistoryState{
-			MockHistoryState("72.5", now.Add(-2*time.Hour)),
-			MockHistoryState("73.0", now.Add(-1*time.Hour)),
-			MockHistoryState("72.8", now),
+		historyStates := []testfixtures.HistoryState{
+			testfixtures.NewHistoryState("72.5", now.Add(-2*time.Hour)),
+			testfixtures.NewHistoryState("73.0", now.Add(-1*time.Hour)),
+			testfixtures.NewHistoryState("72.8", now),
 		}
 
 		result := HistoryResult("sensor.temperature", historyStates...)
@@ -859,7 +861,7 @@ func TestHandleHistory(t *testing.T) {
 		t.Parallel()
 
 		// Response contains different entity than requested
-		result := map[string][]types.HistoryState{
+		result := map[string][]testfixtures.HistoryState{
 			"sensor.other": {},
 		}
 		router := NewMessageRouter(t).OnSuccess("history/history_during_period", result)
@@ -920,12 +922,12 @@ func TestHandleHistoryFull(t *testing.T) {
 		t.Parallel()
 
 		now := time.Now()
-		historyStates := []types.HistoryState{
-			MockHistoryStateWithAttrs("on", now.Add(-2*time.Hour), map[string]any{
+		historyStates := []testfixtures.HistoryState{
+			testfixtures.NewHistoryStateWithAttrs("on", now.Add(-2*time.Hour), map[string]any{
 				"brightness": 255,
 				"color_temp": 4000,
 			}),
-			MockHistoryStateWithAttrs("off", now.Add(-1*time.Hour), map[string]any{
+			testfixtures.NewHistoryStateWithAttrs("off", now.Add(-1*time.Hour), map[string]any{
 				"brightness": 0,
 			}),
 		}
@@ -959,9 +961,9 @@ func TestHandleHistoryFull(t *testing.T) {
 		t.Parallel()
 
 		now := time.Now()
-		historyStates := []types.HistoryState{
-			MockHistoryState("on", now.Add(-1*time.Hour)),
-			MockHistoryState("off", now),
+		historyStates := []testfixtures.HistoryState{
+			testfixtures.NewHistoryState("on", now.Add(-1*time.Hour)),
+			testfixtures.NewHistoryState("off", now),
 		}
 
 		result := HistoryResult("light.kitchen", historyStates...)
@@ -994,7 +996,7 @@ func TestHandleHistoryFull(t *testing.T) {
 
 		now := time.Now()
 		// Simulate full format response (Attributes field instead of A)
-		historyStates := []types.HistoryState{
+		historyStates := []testfixtures.HistoryState{
 			{
 				State:       "on",
 				LastUpdated: now.Format(time.RFC3339),
@@ -1063,16 +1065,16 @@ func TestHandleAttrs(t *testing.T) {
 		t.Parallel()
 
 		now := time.Now()
-		historyStates := []types.HistoryState{
-			MockHistoryStateWithAttrs("72.5", now.Add(-2*time.Hour), map[string]any{
+		historyStates := []testfixtures.HistoryState{
+			testfixtures.NewHistoryStateWithAttrs("72.5", now.Add(-2*time.Hour), map[string]any{
 				"unit_of_measurement": "°F",
 				"device_class":        "temperature",
 			}),
-			MockHistoryStateWithAttrs("73.0", now.Add(-1*time.Hour), map[string]any{
+			testfixtures.NewHistoryStateWithAttrs("73.0", now.Add(-1*time.Hour), map[string]any{
 				"unit_of_measurement": "°F",
 				"device_class":        "temperature",
 			}),
-			MockHistoryStateWithAttrs("72.8", now, map[string]any{
+			testfixtures.NewHistoryStateWithAttrs("72.8", now, map[string]any{
 				"unit_of_measurement": "°F",
 				"device_class":        "temperature",
 			}),
@@ -1107,9 +1109,9 @@ func TestHandleAttrs(t *testing.T) {
 		t.Parallel()
 
 		now := time.Now()
-		historyStates := []types.HistoryState{
-			MockHistoryState("on", now.Add(-1*time.Hour)),
-			MockHistoryState("off", now),
+		historyStates := []testfixtures.HistoryState{
+			testfixtures.NewHistoryState("on", now.Add(-1*time.Hour)),
+			testfixtures.NewHistoryState("off", now),
 		}
 
 		result := HistoryResult("switch.light", historyStates...)
@@ -1201,14 +1203,14 @@ func TestHandleTimeline(t *testing.T) {
 		now := time.Now()
 
 		// Create history states for multiple entities
-		result := map[string][]types.HistoryState{
+		result := map[string][]testfixtures.HistoryState{
 			"light.kitchen": {
-				MockHistoryState("on", now.Add(-2*time.Hour)),
-				MockHistoryState("off", now.Add(-30*time.Minute)),
+				testfixtures.NewHistoryState("on", now.Add(-2*time.Hour)),
+				testfixtures.NewHistoryState("off", now.Add(-30*time.Minute)),
 			},
 			"light.bedroom": {
-				MockHistoryState("off", now.Add(-3*time.Hour)),
-				MockHistoryState("on", now.Add(-1*time.Hour)),
+				testfixtures.NewHistoryState("off", now.Add(-3*time.Hour)),
+				testfixtures.NewHistoryState("on", now.Add(-1*time.Hour)),
 			},
 		}
 
@@ -1408,11 +1410,11 @@ func TestHandleSyslog(t *testing.T) {
 }
 
 // MockStatEntry creates a StatEntry for testing.
-func MockStatEntry(start float64, min, max, mean, sum float64) types.StatEntry {
+func MockStatEntry(start, minVal, maxVal, mean, sum float64) types.StatEntry {
 	return types.StatEntry{
 		Start: start,
-		Min:   min,
-		Max:   max,
+		Min:   minVal,
+		Max:   maxVal,
 		Mean:  mean,
 		Sum:   sum,
 	}
@@ -1562,11 +1564,14 @@ func TestHandleStatsMulti(t *testing.T) {
 
 		// Mock handler that returns stats for the requested entity
 		router := NewMessageRouter(t).On("recorder/statistics_during_period", func(_ string, data map[string]any) any {
-			statIDs, _ := data["statistic_ids"].([]any)
-			if len(statIDs) == 0 {
+			statIDs, ok := data["statistic_ids"].([]any)
+			if !ok || len(statIDs) == 0 {
 				return map[string][]types.StatEntry{}
 			}
-			entityID := statIDs[0].(string)
+			entityID, ok := statIDs[0].(string)
+			if !ok {
+				return map[string][]types.StatEntry{}
+			}
 			return map[string][]types.StatEntry{
 				entityID: {
 					MockStatEntry(baseTime, 70.0, 75.0, 72.5, 290.0),
@@ -1594,11 +1599,14 @@ func TestHandleStatsMulti(t *testing.T) {
 		baseTime := float64(now.Add(-2 * time.Hour).Unix())
 
 		router := NewMessageRouter(t).On("recorder/statistics_during_period", func(_ string, data map[string]any) any {
-			statIDs, _ := data["statistic_ids"].([]any)
-			if len(statIDs) == 0 {
+			statIDs, ok := data["statistic_ids"].([]any)
+			if !ok || len(statIDs) == 0 {
 				return map[string][]types.StatEntry{}
 			}
-			entityID := statIDs[0].(string)
+			entityID, ok := statIDs[0].(string)
+			if !ok {
+				return map[string][]types.StatEntry{}
+			}
 			return map[string][]types.StatEntry{
 				entityID: {MockStatEntry(baseTime, 70.0, 75.0, 72.5, 290.0)},
 			}

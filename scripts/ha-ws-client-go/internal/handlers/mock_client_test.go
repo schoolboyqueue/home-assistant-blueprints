@@ -8,10 +8,10 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"github.com/home-assistant-blueprints/testfixtures"
+
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/client"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/output"
-	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
-	"github.com/home-assistant-blueprints/testfixtures"
 )
 
 // =====================================
@@ -52,9 +52,9 @@ func (r *MessageRouter) OnSuccess(msgType string, result any) *MessageRouter {
 }
 
 // OnError registers a handler that returns an error result.
-func (r *MessageRouter) OnError(msgType string, code, message string) *MessageRouter {
+func (r *MessageRouter) OnError(msgType, code, message string) *MessageRouter {
 	r.handlers[msgType] = func(_ string, _ map[string]any) any {
-		return &types.HAError{Code: code, Message: message}
+		return &testfixtures.HAError{Code: code, Message: message}
 	}
 	return r
 }
@@ -73,13 +73,19 @@ func (r *MessageRouter) Handler() testfixtures.WSHandler {
 				return
 			}
 
-			msgType, _ := req["type"].(string)
-			reqID, _ := req["id"].(float64)
+			msgType, ok := req["type"].(string)
+			if !ok {
+				return
+			}
+			reqID, ok := req["id"].(float64)
+			if !ok {
+				return
+			}
 			id := int(reqID)
 
 			// Get data from request if present
-			msgData, _ := req["data"].(map[string]any)
-			if msgData == nil {
+			msgData, ok := req["data"].(map[string]any)
+			if !ok {
 				// Some messages put data at the top level (not nested under "data")
 				msgData = req
 			}
@@ -98,7 +104,7 @@ func (r *MessageRouter) Handler() testfixtures.WSHandler {
 			result := handler(msgType, msgData)
 
 			// Check if handler returned an error
-			if haErr, ok := result.(*types.HAError); ok {
+			if haErr, ok := result.(*testfixtures.HAError); ok {
 				resp := testfixtures.NewErrorMessage(id, haErr.Code, haErr.Message)
 				if err := conn.WriteJSON(resp); err != nil {
 					return
@@ -232,59 +238,36 @@ func QuickTestContext(t *testing.T, msgType string, result any, args ...string) 
 // =====================================
 
 // StateListResult creates a result containing a list of entity states.
-func StateListResult(states ...types.HAState) []types.HAState {
+func StateListResult(states ...testfixtures.HAState) []testfixtures.HAState {
 	return states
 }
 
-// TraceListResult creates a result containing a list of trace info entries.
-func TraceListResult(traces ...types.TraceInfo) map[string][]types.TraceInfo {
-	if len(traces) == 0 {
-		return map[string][]types.TraceInfo{}
-	}
-	// Group by item_id
-	result := make(map[string][]types.TraceInfo)
-	for _, trace := range traces {
-		result[trace.ItemID] = append(result[trace.ItemID], trace)
-	}
-	return result
-}
-
-// TraceDetailResult creates a trace detail response.
-func TraceDetailResult(detail types.TraceDetail) types.TraceDetail {
-	return detail
-}
-
 // EntityRegistryResult creates an entity registry result.
-func EntityRegistryResult(entries ...types.EntityEntry) []types.EntityEntry {
+func EntityRegistryResult(entries ...testfixtures.EntityEntry) []testfixtures.EntityEntry {
 	return entries
 }
 
 // DeviceRegistryResult creates a device registry result.
-func DeviceRegistryResult(entries ...types.DeviceEntry) []types.DeviceEntry {
+func DeviceRegistryResult(entries ...testfixtures.DeviceEntry) []testfixtures.DeviceEntry {
 	return entries
 }
 
 // AreaRegistryResult creates an area registry result.
-func AreaRegistryResult(entries ...types.AreaEntry) []types.AreaEntry {
+func AreaRegistryResult(entries ...testfixtures.AreaEntry) []testfixtures.AreaEntry {
 	return entries
 }
 
 // HistoryResult creates a history query result.
 // The result is a map from entity_id to list of history states.
-func HistoryResult(entityID string, states ...types.HistoryState) map[string][]types.HistoryState {
-	return map[string][]types.HistoryState{
+func HistoryResult(entityID string, states ...testfixtures.HistoryState) map[string][]testfixtures.HistoryState {
+	return map[string][]testfixtures.HistoryState{
 		entityID: states,
 	}
 }
 
 // LogbookResult creates a logbook query result.
-func LogbookResult(entries ...types.LogbookEntry) []types.LogbookEntry {
+func LogbookResult(entries ...testfixtures.LogbookEntry) []testfixtures.LogbookEntry {
 	return entries
-}
-
-// ConfigResult creates a config result.
-func ConfigResult(cfg types.HAConfig) types.HAConfig {
-	return cfg
 }
 
 // =====================================
@@ -303,199 +286,5 @@ func CaptureOutput() (*output.Config, func()) {
 	output.SetConfig(testConfig)
 	return original, func() {
 		output.SetConfig(original)
-	}
-}
-
-// =====================================
-// Mock State Builders
-// =====================================
-
-// MockState creates a HAState for testing.
-func MockState(entityID, state string) types.HAState {
-	return types.HAState{
-		EntityID: entityID,
-		State:    state,
-	}
-}
-
-// MockStateWithAttrs creates a HAState with attributes.
-func MockStateWithAttrs(entityID, state string, attrs map[string]any) types.HAState {
-	return types.HAState{
-		EntityID:   entityID,
-		State:      state,
-		Attributes: attrs,
-	}
-}
-
-// MockStateWithTimestamps creates a HAState with timestamps.
-func MockStateWithTimestamps(entityID, state string) types.HAState {
-	now := time.Now().UTC().Format(time.RFC3339)
-	return types.HAState{
-		EntityID:    entityID,
-		State:       state,
-		LastChanged: now,
-		LastUpdated: now,
-	}
-}
-
-// =====================================
-// Mock Trace Builders
-// =====================================
-
-// MockTraceInfo creates a TraceInfo for testing.
-func MockTraceInfo(itemID, runID, state string) types.TraceInfo {
-	return types.TraceInfo{
-		ItemID: itemID,
-		RunID:  runID,
-		State:  state,
-	}
-}
-
-// MockTraceInfoFull creates a fully populated TraceInfo.
-func MockTraceInfoFull(itemID, runID, state, scriptExecution string) types.TraceInfo {
-	now := time.Now().UTC().Format(time.RFC3339)
-	return types.TraceInfo{
-		ItemID:          itemID,
-		RunID:           runID,
-		State:           state,
-		ScriptExecution: scriptExecution,
-		Timestamp: &types.Timestamp{
-			Start:  now,
-			Finish: now,
-		},
-		Context: &types.HAContext{
-			ID: "test-context-id",
-		},
-	}
-}
-
-// MockTraceDetail creates a TraceDetail for testing.
-func MockTraceDetail(itemID, runID string) types.TraceDetail {
-	now := time.Now().UTC().Format(time.RFC3339)
-	return types.TraceDetail{
-		ItemID:          itemID,
-		RunID:           runID,
-		Domain:          "automation",
-		ScriptExecution: "finished",
-		Timestamp: &types.Timestamp{
-			Start:  now,
-			Finish: now,
-		},
-		Context: &types.HAContext{
-			ID: "test-context-id",
-		},
-		Trace: map[string][]types.TraceStep{
-			"action/0": {
-				{
-					Path:      "action/0",
-					Timestamp: now,
-					Result: &types.TraceResult{
-						Enabled: true,
-					},
-				},
-			},
-		},
-	}
-}
-
-// MockTraceDetailWithTrigger creates a TraceDetail with trigger information.
-func MockTraceDetailWithTrigger(itemID, runID string, trigger map[string]any) types.TraceDetail {
-	detail := MockTraceDetail(itemID, runID)
-	detail.Trigger = trigger
-	return detail
-}
-
-// MockTraceDetailWithConfig creates a TraceDetail with automation config.
-func MockTraceDetailWithConfig(itemID, runID string, config *types.AutomationConfig) types.TraceDetail {
-	detail := MockTraceDetail(itemID, runID)
-	detail.Config = config
-	return detail
-}
-
-// =====================================
-// Mock History Builders
-// =====================================
-
-// MockHistoryState creates a HistoryState for testing.
-func MockHistoryState(state string, timestamp time.Time) types.HistoryState {
-	return types.HistoryState{
-		S:  state,
-		LU: float64(timestamp.Unix()),
-		LC: float64(timestamp.Unix()),
-	}
-}
-
-// MockHistoryStateWithAttrs creates a HistoryState with attributes.
-func MockHistoryStateWithAttrs(state string, timestamp time.Time, attrs map[string]any) types.HistoryState {
-	return types.HistoryState{
-		S:  state,
-		LU: float64(timestamp.Unix()),
-		LC: float64(timestamp.Unix()),
-		A:  attrs,
-	}
-}
-
-// =====================================
-// Mock Logbook Builders
-// =====================================
-
-// MockLogbookEntry creates a LogbookEntry for testing.
-func MockLogbookEntry(entityID, state, message string, when time.Time) types.LogbookEntry {
-	return types.LogbookEntry{
-		EntityID: entityID,
-		State:    state,
-		Message:  message,
-		When:     float64(when.Unix()),
-	}
-}
-
-// =====================================
-// Mock Registry Builders
-// =====================================
-
-// MockEntityEntry creates an EntityEntry for testing.
-func MockEntityEntry(entityID, name, platform string) types.EntityEntry {
-	return types.EntityEntry{
-		EntityID:     entityID,
-		Name:         name,
-		OriginalName: name,
-		Platform:     platform,
-	}
-}
-
-// MockDeviceEntry creates a DeviceEntry for testing.
-func MockDeviceEntry(id, name, manufacturer, model string) types.DeviceEntry {
-	return types.DeviceEntry{
-		ID:           id,
-		Name:         name,
-		Manufacturer: manufacturer,
-		Model:        model,
-	}
-}
-
-// MockAreaEntry creates an AreaEntry for testing.
-func MockAreaEntry(areaID, name string) types.AreaEntry {
-	return types.AreaEntry{
-		AreaID: areaID,
-		Name:   name,
-	}
-}
-
-// =====================================
-// Mock Config Builders
-// =====================================
-
-// MockHAConfig creates an HAConfig for testing.
-func MockHAConfig() types.HAConfig {
-	return types.HAConfig{
-		Version:      "2024.1.0",
-		LocationName: "Test Home",
-		TimeZone:     "America/New_York",
-		UnitSystem: map[string]string{
-			"length":      "mi",
-			"temperature": "°F",
-		},
-		State:      "RUNNING",
-		Components: []string{"homeassistant", "automation", "script"},
 	}
 }

@@ -12,6 +12,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/home-assistant-blueprints/testfixtures"
+
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
 
@@ -743,16 +745,16 @@ func TestHandleState(t *testing.T) {
 	tests := []struct {
 		name        string
 		entityID    string
-		states      []types.HAState
+		states      any
 		expectError bool
 		description string
 	}{
 		{
 			name:     "entity found",
 			entityID: "light.kitchen",
-			states: []types.HAState{
-				MockState("light.kitchen", "on"),
-				MockState("light.bedroom", "off"),
+			states: []testfixtures.HAState{
+				testfixtures.NewHAState("light.kitchen", "on"),
+				testfixtures.NewHAState("light.bedroom", "off"),
 			},
 			expectError: false,
 			description: "Returns state when entity is found",
@@ -760,8 +762,8 @@ func TestHandleState(t *testing.T) {
 		{
 			name:     "entity not found",
 			entityID: "light.nonexistent",
-			states: []types.HAState{
-				MockState("light.kitchen", "on"),
+			states: []testfixtures.HAState{
+				testfixtures.NewHAState("light.kitchen", "on"),
 			},
 			expectError: true,
 			description: "Returns error when entity is not found",
@@ -769,8 +771,8 @@ func TestHandleState(t *testing.T) {
 		{
 			name:     "with attributes",
 			entityID: "light.kitchen",
-			states: []types.HAState{
-				MockStateWithAttrs("light.kitchen", "on", map[string]any{
+			states: []testfixtures.HAState{
+				testfixtures.NewHAStateWithAttrs("light.kitchen", "on", map[string]any{
 					"brightness":    255,
 					"color_mode":    "rgb",
 					"friendly_name": "Kitchen Light",
@@ -782,7 +784,7 @@ func TestHandleState(t *testing.T) {
 		{
 			name:        "empty states list",
 			entityID:    "light.any",
-			states:      []types.HAState{},
+			states:      []testfixtures.HAState{},
 			expectError: true,
 			description: "Returns error when no states exist",
 		},
@@ -840,32 +842,32 @@ func TestHandleStates(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		states      []types.HAState
+		states      any
 		expectError bool
 		description string
 	}{
 		{
 			name: "with multiple states",
-			states: []types.HAState{
-				MockState("light.kitchen", "on"),
-				MockState("light.bedroom", "off"),
-				MockState("sensor.temperature", "23.5"),
+			states: []testfixtures.HAState{
+				testfixtures.NewHAState("light.kitchen", "on"),
+				testfixtures.NewHAState("light.bedroom", "off"),
+				testfixtures.NewHAState("sensor.temperature", "23.5"),
 			},
 			expectError: false,
 			description: "Returns sample of states",
 		},
 		{
 			name:        "empty states",
-			states:      []types.HAState{},
+			states:      []testfixtures.HAState{},
 			expectError: false,
 			description: "Handles empty state list",
 		},
 		{
 			name: "many states (tests limit)",
-			states: func() []types.HAState {
-				states := make([]types.HAState, 50)
+			states: func() []testfixtures.HAState {
+				states := make([]testfixtures.HAState, 50)
 				for i := 0; i < 50; i++ {
-					states[i] = MockState(fmt.Sprintf("sensor.test_%d", i), fmt.Sprintf("%d", i))
+					states[i] = testfixtures.NewHAState(fmt.Sprintf("sensor.test_%d", i), fmt.Sprintf("%d", i))
 				}
 				return states
 			}(),
@@ -912,31 +914,31 @@ func TestHandleStatesJSON(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		states      []types.HAState
+		states      any
 		expectError bool
 		description string
 	}{
 		{
 			name: "returns all states as JSON",
-			states: []types.HAState{
-				MockState("light.kitchen", "on"),
-				MockState("light.bedroom", "off"),
-				MockState("sensor.temperature", "23.5"),
+			states: []testfixtures.HAState{
+				testfixtures.NewHAState("light.kitchen", "on"),
+				testfixtures.NewHAState("light.bedroom", "off"),
+				testfixtures.NewHAState("sensor.temperature", "23.5"),
 			},
 			expectError: false,
 			description: "Returns all states in JSON format",
 		},
 		{
 			name:        "empty states",
-			states:      []types.HAState{},
+			states:      []testfixtures.HAState{},
 			expectError: false,
 			description: "Handles empty state list",
 		},
 		{
 			name: "states with timestamps",
-			states: []types.HAState{
-				MockStateWithTimestamps("light.kitchen", "on"),
-				MockStateWithTimestamps("sensor.temperature", "23.5"),
+			states: []testfixtures.HAState{
+				testfixtures.NewHAStateWithTimestamps("light.kitchen", "on"),
+				testfixtures.NewHAStateWithTimestamps("sensor.temperature", "23.5"),
 			},
 			expectError: false,
 			description: "Includes timestamp information",
@@ -982,17 +984,17 @@ func TestHandleStatesFilter(t *testing.T) {
 	tests := []struct {
 		name        string
 		pattern     string
-		states      []types.HAState
+		states      any
 		expectError bool
 		description string
 	}{
 		{
 			name:    "pattern matches entities",
 			pattern: "light.*",
-			states: []types.HAState{
-				MockState("light.kitchen", "on"),
-				MockState("light.bedroom", "off"),
-				MockState("sensor.temperature", "23.5"),
+			states: []testfixtures.HAState{
+				testfixtures.NewHAState("light.kitchen", "on"),
+				testfixtures.NewHAState("light.bedroom", "off"),
+				testfixtures.NewHAState("sensor.temperature", "23.5"),
 			},
 			expectError: false,
 			description: "Filters states matching pattern",
@@ -1000,9 +1002,9 @@ func TestHandleStatesFilter(t *testing.T) {
 		{
 			name:    "no matches",
 			pattern: "switch.*",
-			states: []types.HAState{
-				MockState("light.kitchen", "on"),
-				MockState("sensor.temperature", "23.5"),
+			states: []testfixtures.HAState{
+				testfixtures.NewHAState("light.kitchen", "on"),
+				testfixtures.NewHAState("sensor.temperature", "23.5"),
 			},
 			expectError: false,
 			description: "Handles no matches gracefully",
@@ -1010,9 +1012,9 @@ func TestHandleStatesFilter(t *testing.T) {
 		{
 			name:    "exact match pattern",
 			pattern: "sensor.temperature",
-			states: []types.HAState{
-				MockState("light.kitchen", "on"),
-				MockState("sensor.temperature", "23.5"),
+			states: []testfixtures.HAState{
+				testfixtures.NewHAState("light.kitchen", "on"),
+				testfixtures.NewHAState("sensor.temperature", "23.5"),
 			},
 			expectError: false,
 			description: "Matches exact entity ID",
@@ -1020,9 +1022,9 @@ func TestHandleStatesFilter(t *testing.T) {
 		{
 			name:    "with timestamps for age display",
 			pattern: "light.*",
-			states: []types.HAState{
-				MockStateWithTimestamps("light.kitchen", "on"),
-				MockStateWithTimestamps("light.bedroom", "off"),
+			states: []testfixtures.HAState{
+				testfixtures.NewHAStateWithTimestamps("light.kitchen", "on"),
+				testfixtures.NewHAStateWithTimestamps("light.bedroom", "off"),
 			},
 			expectError: false,
 			description: "Includes age information",
@@ -1092,19 +1094,19 @@ func TestHandleConfig(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		config      types.HAConfig
+		config      any
 		expectError bool
 		description string
 	}{
 		{
 			name:        "full config",
-			config:      MockHAConfig(),
+			config:      testfixtures.NewHAConfig(),
 			expectError: false,
 			description: "Returns HA configuration",
 		},
 		{
 			name: "minimal config",
-			config: types.HAConfig{
+			config: testfixtures.HAConfig{
 				Version:      "2024.1.0",
 				LocationName: "Home",
 				State:        "RUNNING",
@@ -1114,7 +1116,7 @@ func TestHandleConfig(t *testing.T) {
 		},
 		{
 			name: "config with many components",
-			config: types.HAConfig{
+			config: testfixtures.HAConfig{
 				Version:      "2024.6.0",
 				LocationName: "Smart Home",
 				TimeZone:     "Europe/London",

@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/home-assistant-blueprints/testfixtures"
+
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
 
@@ -546,10 +548,10 @@ func TestFilteredRegistryHandler_WithPattern(t *testing.T) {
 
 	// Create entity registry entries
 	entities := EntityRegistryResult(
-		MockEntityEntry("light.kitchen", "Kitchen Light", "hue"),
-		MockEntityEntry("light.bedroom", "Bedroom Light", "hue"),
-		MockEntityEntry("sensor.temperature", "Temperature", "esphome"),
-		MockEntityEntry("sensor.humidity", "Humidity", "esphome"),
+		testfixtures.NewEntityEntry("light.kitchen", "Kitchen Light", "hue"),
+		testfixtures.NewEntityEntry("light.bedroom", "Bedroom Light", "hue"),
+		testfixtures.NewEntityEntry("sensor.temperature", "Temperature", "esphome"),
+		testfixtures.NewEntityEntry("sensor.humidity", "Humidity", "esphome"),
 	)
 
 	router := NewMessageRouter(t).
@@ -587,8 +589,8 @@ func TestFilteredRegistryHandler_WithoutPattern(t *testing.T) {
 
 	// Create entity registry entries
 	entities := EntityRegistryResult(
-		MockEntityEntry("light.kitchen", "Kitchen Light", "hue"),
-		MockEntityEntry("sensor.temperature", "Temperature", "esphome"),
+		testfixtures.NewEntityEntry("light.kitchen", "Kitchen Light", "hue"),
+		testfixtures.NewEntityEntry("sensor.temperature", "Temperature", "esphome"),
 	)
 
 	router := NewMessageRouter(t).
@@ -685,8 +687,8 @@ func TestFilteredRegistryHandler_PatternNoMatch(t *testing.T) {
 
 	// Create entities that won't match the pattern
 	entities := EntityRegistryResult(
-		MockEntityEntry("sensor.temperature", "Temperature", "esphome"),
-		MockEntityEntry("sensor.humidity", "Humidity", "esphome"),
+		testfixtures.NewEntityEntry("sensor.temperature", "Temperature", "esphome"),
+		testfixtures.NewEntityEntry("sensor.humidity", "Humidity", "esphome"),
 	)
 
 	router := NewMessageRouter(t).
@@ -722,9 +724,9 @@ func TestHandleAreas_Success(t *testing.T) {
 	t.Parallel()
 
 	areas := AreaRegistryResult(
-		MockAreaEntry("living_room", "Living Room"),
-		MockAreaEntry("bedroom", "Master Bedroom"),
-		types.AreaEntry{
+		testfixtures.NewAreaEntry("living_room", "Living Room"),
+		testfixtures.NewAreaEntry("bedroom", "Master Bedroom"),
+		testfixtures.AreaEntry{
 			AreaID:  "kitchen",
 			Name:    "Kitchen",
 			Aliases: []string{"Cooking Area", "Food Prep"},
@@ -782,8 +784,8 @@ func TestHandleEntities_Success(t *testing.T) {
 	t.Parallel()
 
 	entities := EntityRegistryResult(
-		MockEntityEntry("light.kitchen", "Kitchen Light", "hue"),
-		types.EntityEntry{
+		testfixtures.NewEntityEntry("light.kitchen", "Kitchen Light", "hue"),
+		testfixtures.EntityEntry{
 			EntityID:     "switch.disabled",
 			Name:         "Disabled Switch",
 			OriginalName: "Old Switch",
@@ -810,8 +812,8 @@ func TestHandleDevices_Success(t *testing.T) {
 	t.Parallel()
 
 	devices := DeviceRegistryResult(
-		MockDeviceEntry("abc123def456", "Hue Bridge", "Philips", "BSB002"),
-		types.DeviceEntry{
+		testfixtures.NewDeviceEntry("abc123def456", "Hue Bridge", "Philips", "BSB002"),
+		testfixtures.DeviceEntry{
 			ID:           "xyz789abc012ghi345",
 			Name:         "Motion Sensor",
 			NameByUser:   "Front Door Motion",

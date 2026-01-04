@@ -3,9 +3,10 @@ package validator
 import (
 	"testing"
 
-	"github.com/home-assistant-blueprints/testfixtures"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/home-assistant-blueprints/testfixtures"
 )
 
 func TestNewValidationContext(t *testing.T) {

@@ -7,6 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/home-assistant-blueprints/testfixtures"
+
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/types"
 )
 
@@ -250,8 +252,8 @@ func TestMessageRequest_Execute_Success(t *testing.T) {
 	t.Parallel()
 
 	states := StateListResult(
-		MockState("light.kitchen", "on"),
-		MockState("sensor.temperature", "22.5"),
+		testfixtures.NewHAState("light.kitchen", "on"),
+		testfixtures.NewHAState("sensor.temperature", "22.5"),
 	)
 
 	router := NewMessageRouter(t).
@@ -290,10 +292,10 @@ func TestMessageRequest_Execute_Error(t *testing.T) {
 func TestMessageRequest_Execute_WithData(t *testing.T) {
 	t.Parallel()
 
-	traceDetail := MockTraceDetail("automation.test", "1234567890")
+	traceDetail := testfixtures.NewTraceDetail("automation.test", "1234567890")
 
 	router := NewMessageRouter(t).
-		On("trace/get", func(msgType string, data map[string]any) any {
+		On("trace/get", func(_ string, data map[string]any) any {
 			// Verify the data was passed correctly
 			assert.Equal(t, "automation", data["domain"])
 			assert.Equal(t, "test", data["item_id"])
@@ -319,7 +321,7 @@ func TestMessageRequest_Execute_WithData(t *testing.T) {
 func TestMessageRequest_ExecuteRaw_Success(t *testing.T) {
 	t.Parallel()
 
-	config := MockHAConfig()
+	config := testfixtures.NewHAConfig()
 	router := NewMessageRouter(t).
 		OnSuccess("get_config", config)
 
@@ -355,7 +357,7 @@ func TestMessageRequest_ExecuteRaw_Error(t *testing.T) {
 func TestMessageRequest_ExecuteAndOutput_Success(t *testing.T) {
 	t.Parallel()
 
-	config := MockHAConfig()
+	config := testfixtures.NewHAConfig()
 	router := NewMessageRouter(t).
 		OnSuccess("get_config", config)
 
@@ -396,7 +398,7 @@ func TestMessageRequest_ExecuteAndOutput_NoOptions(t *testing.T) {
 	t.Parallel()
 
 	states := StateListResult(
-		MockState("light.kitchen", "on"),
+		testfixtures.NewHAState("light.kitchen", "on"),
 	)
 	router := NewMessageRouter(t).
 		OnSuccess("get_states", states)
@@ -418,9 +420,9 @@ func TestMessageDispatcher_Execute_FullPipeline(t *testing.T) {
 	t.Parallel()
 
 	states := StateListResult(
-		MockState("light.kitchen", "on"),
-		MockState("light.bedroom", "off"),
-		MockState("sensor.temperature", "22.5"),
+		testfixtures.NewHAState("light.kitchen", "on"),
+		testfixtures.NewHAState("light.bedroom", "off"),
+		testfixtures.NewHAState("sensor.temperature", "22.5"),
 	)
 
 	router := NewMessageRouter(t).
@@ -459,7 +461,7 @@ func TestMessageDispatcher_Execute_FullPipeline(t *testing.T) {
 func TestMessageDispatcher_Execute_TransformError(t *testing.T) {
 	t.Parallel()
 
-	states := StateListResult(MockState("light.kitchen", "on"))
+	states := StateListResult(testfixtures.NewHAState("light.kitchen", "on"))
 
 	router := NewMessageRouter(t).
 		OnSuccess("get_states", states)
@@ -480,7 +482,7 @@ func TestMessageDispatcher_Execute_TransformError(t *testing.T) {
 func TestMessageDispatcher_Execute_DefaultOutput(t *testing.T) {
 	t.Parallel()
 
-	states := StateListResult(MockState("light.kitchen", "on"))
+	states := StateListResult(testfixtures.NewHAState("light.kitchen", "on"))
 
 	router := NewMessageRouter(t).
 		OnSuccess("get_states", states)
@@ -517,8 +519,8 @@ func TestMessageDispatcher_Result_Success(t *testing.T) {
 	t.Parallel()
 
 	states := StateListResult(
-		MockState("light.kitchen", "on"),
-		MockState("light.bedroom", "off"),
+		testfixtures.NewHAState("light.kitchen", "on"),
+		testfixtures.NewHAState("light.bedroom", "off"),
 	)
 
 	router := NewMessageRouter(t).
@@ -564,7 +566,7 @@ func TestMessageDispatcher_Result_Error(t *testing.T) {
 func TestMessageDispatcher_Result_TransformError(t *testing.T) {
 	t.Parallel()
 
-	states := StateListResult(MockState("light.kitchen", "on"))
+	states := StateListResult(testfixtures.NewHAState("light.kitchen", "on"))
 
 	router := NewMessageRouter(t).
 		OnSuccess("get_states", states)
@@ -586,9 +588,9 @@ func TestFetchStates_Success(t *testing.T) {
 	t.Parallel()
 
 	states := StateListResult(
-		MockState("light.kitchen", "on"),
-		MockState("sensor.temperature", "22.5"),
-		MockState("binary_sensor.motion", "on"),
+		testfixtures.NewHAState("light.kitchen", "on"),
+		testfixtures.NewHAState("sensor.temperature", "22.5"),
+		testfixtures.NewHAState("binary_sensor.motion", "on"),
 	)
 
 	router := NewMessageRouter(t).
@@ -637,7 +639,7 @@ func TestFetchStates_Error(t *testing.T) {
 
 // testStateWithGetter wraps HAState and implements GetEntityID interface for testing.
 type testStateWithGetter struct {
-	types.HAState
+	testfixtures.HAState
 }
 
 func (s testStateWithGetter) GetEntityID() string {
@@ -649,9 +651,9 @@ func TestFetchAndFindEntity_Found(t *testing.T) {
 
 	// Create test states that will be serialized/deserialized correctly
 	states := []testStateWithGetter{
-		{MockState("light.kitchen", "on")},
-		{MockState("light.bedroom", "off")},
-		{MockState("sensor.temperature", "22.5")},
+		{testfixtures.NewHAState("light.kitchen", "on")},
+		{testfixtures.NewHAState("light.bedroom", "off")},
+		{testfixtures.NewHAState("sensor.temperature", "22.5")},
 	}
 
 	router := NewMessageRouter(t).
@@ -672,8 +674,8 @@ func TestFetchAndFindEntity_NotFound(t *testing.T) {
 	t.Parallel()
 
 	states := []testStateWithGetter{
-		{MockState("light.kitchen", "on")},
-		{MockState("sensor.temperature", "22.5")},
+		{testfixtures.NewHAState("light.kitchen", "on")},
+		{testfixtures.NewHAState("sensor.temperature", "22.5")},
 	}
 
 	router := NewMessageRouter(t).
@@ -709,8 +711,8 @@ func TestListRequest_Execute_Success(t *testing.T) {
 	t.Parallel()
 
 	areas := AreaRegistryResult(
-		MockAreaEntry("living_room", "Living Room"),
-		MockAreaEntry("bedroom", "Master Bedroom"),
+		testfixtures.NewAreaEntry("living_room", "Living Room"),
+		testfixtures.NewAreaEntry("bedroom", "Master Bedroom"),
 	)
 
 	router := NewMessageRouter(t).
@@ -740,15 +742,15 @@ func TestListRequest_Execute_WithFilter(t *testing.T) {
 	t.Parallel()
 
 	entities := EntityRegistryResult(
-		MockEntityEntry("light.kitchen", "Kitchen Light", "hue"),
-		types.EntityEntry{
+		testfixtures.NewEntityEntry("light.kitchen", "Kitchen Light", "hue"),
+		testfixtures.EntityEntry{
 			EntityID:     "switch.disabled",
 			Name:         "Disabled Switch",
 			OriginalName: "Old Switch",
 			Platform:     "zwave",
 			DisabledBy:   "user",
 		},
-		MockEntityEntry("light.bedroom", "Bedroom Light", "hue"),
+		testfixtures.NewEntityEntry("light.bedroom", "Bedroom Light", "hue"),
 	)
 
 	router := NewMessageRouter(t).
@@ -824,8 +826,8 @@ func TestTimelineRequest_Execute_Success(t *testing.T) {
 	t.Parallel()
 
 	logbook := LogbookResult(
-		MockLogbookEntry("light.kitchen", "on", "Light turned on", time.Now().Add(-10*time.Minute)),
-		MockLogbookEntry("light.kitchen", "off", "Light turned off", time.Now().Add(-5*time.Minute)),
+		testfixtures.NewLogbookEntry("light.kitchen", "on", "Light turned on", time.Now().Add(-10*time.Minute)),
+		testfixtures.NewLogbookEntry("light.kitchen", "off", "Light turned off", time.Now().Add(-5*time.Minute)),
 	)
 
 	router := NewMessageRouter(t).
@@ -1002,7 +1004,7 @@ func TestMapRequest_Execute_Error(t *testing.T) {
 func TestSimpleHandler_Success(t *testing.T) {
 	t.Parallel()
 
-	config := MockHAConfig()
+	config := testfixtures.NewHAConfig()
 	router := NewMessageRouter(t).
 		OnSuccess("get_config", config)
 
@@ -1023,14 +1025,14 @@ func TestSimpleHandler_WithData(t *testing.T) {
 	t.Parallel()
 
 	states := StateListResult(
-		MockState("light.kitchen", "on"),
+		testfixtures.NewHAState("light.kitchen", "on"),
 	)
 
 	router := NewMessageRouter(t).
 		On("get_states", func(_ string, data map[string]any) any {
 			// Verify data is passed
-			if limit, ok := data["limit"]; ok {
-				assert.Equal(t, 10, int(limit.(float64)))
+			if limit, ok := data["limit"].(float64); ok {
+				assert.Equal(t, 10, int(limit))
 			}
 			return states
 		})
@@ -1073,9 +1075,9 @@ func TestTransformHandler_Success(t *testing.T) {
 	t.Parallel()
 
 	states := StateListResult(
-		MockState("light.kitchen", "on"),
-		MockState("light.bedroom", "off"),
-		MockState("sensor.temperature", "22.5"),
+		testfixtures.NewHAState("light.kitchen", "on"),
+		testfixtures.NewHAState("light.bedroom", "off"),
+		testfixtures.NewHAState("sensor.temperature", "22.5"),
 	)
 
 	router := NewMessageRouter(t).
@@ -1125,7 +1127,7 @@ func TestTransformHandler_Success(t *testing.T) {
 func TestTransformHandler_TransformError(t *testing.T) {
 	t.Parallel()
 
-	states := StateListResult(MockState("light.kitchen", "on"))
+	states := StateListResult(testfixtures.NewHAState("light.kitchen", "on"))
 
 	router := NewMessageRouter(t).
 		OnSuccess("get_states", states)
@@ -1174,8 +1176,8 @@ func TestTransformHandler_WithData(t *testing.T) {
 	t.Parallel()
 
 	areas := AreaRegistryResult(
-		MockAreaEntry("living_room", "Living Room"),
-		MockAreaEntry("bedroom", "Master Bedroom"),
+		testfixtures.NewAreaEntry("living_room", "Living Room"),
+		testfixtures.NewAreaEntry("bedroom", "Master Bedroom"),
 	)
 
 	router := NewMessageRouter(t).

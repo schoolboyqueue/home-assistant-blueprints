@@ -529,8 +529,10 @@ func TestHandleMonitor_Success(t *testing.T) {
 		if !ok {
 			return nil
 		}
-		platform, _ := trigger["platform"].(string)
-		assert.Equal(t, "state", platform)
+		platform, ok := trigger["platform"].(string)
+		if ok {
+			assert.Equal(t, "state", platform)
+		}
 		return nil // Success response
 	})
 
