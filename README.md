@@ -225,7 +225,9 @@ Contributions are welcome!
 **Development setup:**
 
 ```bash
-npm install  # Installs git hooks via Husky
+pip install pre-commit  # Install pre-commit
+pre-commit install      # Set up git hooks
+npm run go:build        # Build Go validation tools
 ```
 
 This sets up pre-commit hooks that validate blueprints and enforce conventional commits.

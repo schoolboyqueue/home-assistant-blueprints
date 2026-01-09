@@ -147,7 +147,14 @@ When updating Go tools:
 3. Keep both tools' versions synchronized when making coordinated changes
 4. GitHub Actions will automatically build and release binaries on version tags
 
-**Pre-commit hook checks for Go tools:**
+**Pre-commit hooks:**
+- The project uses [pre-commit](https://pre-commit.com) instead of Husky
+- Hooks validate blueprints, Go code, commit messages, and more
+- Configuration: `.pre-commit-config.yaml`
+- Hook scripts: `.pre-commit/hooks/`
+- Setup: `pip install pre-commit && pre-commit install`
+
+**Pre-commit checks for Go tools:**
 - CHANGELOG.md must exist for both tools
 - Makefile VERSION must match latest CHANGELOG.md version entry
 - Warning if tool versions are not synchronized (not blocking)

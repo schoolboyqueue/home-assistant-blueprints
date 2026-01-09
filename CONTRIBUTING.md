@@ -22,7 +22,8 @@ Thank you for your interest in contributing! This guide covers contributions to 
    ```
 3. Set up the development environment:
    ```bash
-   npm install                    # Install husky for pre-commit hooks
+   pip install pre-commit         # Install pre-commit
+   pre-commit install             # Set up git hooks
    npm run go:tools               # Install Go development tools
    npm run go:build               # Build Go tools
    ```
@@ -190,15 +191,16 @@ When making functional code changes (not docs/tests only):
 
 ### Prerequisites
 
-- **Node.js** (for Husky pre-commit hooks)
+- **Python 3** (for pre-commit hooks)
 - **Go 1.21+** (for Go tools)
 - **npm** (for package management)
 
 ### Initial Setup
 
 ```bash
-# Install npm dependencies (sets up Husky)
-npm install
+# Install pre-commit hooks
+pip install pre-commit
+pre-commit install
 
 # Install Go development tools
 npm run go:tools
@@ -307,14 +309,22 @@ docs(readme): update installation instructions
 
 1. **Run pre-commit checks locally**:
    ```bash
-   # For blueprints - validator runs automatically via Husky
+   # Pre-commit hooks will run automatically on commit
    git add .
-   git commit -m "..."   # Pre-commit hook will validate
+   git commit -m "..."   # Hooks validate blueprints, Go code, etc.
+
+   # Or run manually on all files
+   pre-commit run --all-files
+
+   # Skip hooks if needed (use sparingly)
+   git commit --no-verify
 
    # For Go code
    cd scripts/<tool>
    make pre-commit
    ```
+
+   See [`.pre-commit/README.md`](.pre-commit/README.md) for detailed hook documentation, troubleshooting, and advanced usage.
 
 2. **Ensure all checks pass**:
    - Blueprint validation

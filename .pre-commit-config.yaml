@@ -1,0 +1,117 @@
+# Pre-commit hooks configuration for Home Assistant Blueprints
+# Install: pip install pre-commit
+# Setup: pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # Standard pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+        exclude: '\.md$'
+      - id: end-of-file-fixer
+        name: Fix end of files
+      - id: check-yaml
+        name: Check YAML syntax
+        args: [--allow-multiple-documents]
+        exclude: '^blueprints/.*\.yaml$' # Blueprints use custom !input tag, validated separately
+      - id: check-json
+        name: Check JSON syntax
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+      - id: check-case-conflict
+        name: Check for case conflicts
+      - id: mixed-line-ending
+        name: Check line endings
+        args: [--fix=lf]
+
+  # Markdown linting
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.15.0
+    hooks:
+      - id: markdownlint-cli2
+        name: Lint Markdown files
+
+  # Go formatting and linting
+  - repo: https://github.com/dnephin/pre-commit-golang
+    rev: v0.5.1
+    hooks:
+      - id: go-fmt
+        name: Format Go code
+        files: '^scripts/(ha-ws-client-go|validate-blueprint-go)/.*\.go$'
+      - id: go-vet
+        name: Run go vet
+        files: '^scripts/(ha-ws-client-go|validate-blueprint-go)/.*\.go$'
+      - id: go-mod-tidy
+        name: Tidy go.mod
+        files: '^scripts/(ha-ws-client-go|validate-blueprint-go)/(go\.mod|go\.sum|.*\.go)$'
+
+  # golangci-lint for Go tools
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v1.62.2
+    hooks:
+      - id: golangci-lint
+        name: Lint Go tools with golangci-lint
+        entry: bash -c 'cd scripts/validate-blueprint-go && golangci-lint run && cd ../ha-ws-client-go && golangci-lint run'
+        pass_filenames: false
+        files: '^scripts/(ha-ws-client-go|validate-blueprint-go)/.*\.go$'
+
+  # Conventional Commits validation
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.6.0
+    hooks:
+      - id: conventional-pre-commit
+        name: Validate commit message format
+        stages: [commit-msg]
+        args:
+          [
+            feat,
+            fix,
+            docs,
+            style,
+            refactor,
+            perf,
+            test,
+            build,
+            ci,
+            chore,
+            revert,
+            security,
+          ]
+
+  # Local hooks for custom validation
+  - repo: local
+    hooks:
+      - id: blueprint-validation
+        name: Validate Home Assistant Blueprints
+        entry: .pre-commit/hooks/validate-blueprints.sh
+        language: script
+        files: '^blueprints/[^/]+/.*\.yaml$'
+        exclude: "^blueprints/shared/"
+        pass_filenames: true
+        require_serial: true
+
+      - id: blueprint-version-check
+        name: Check blueprint version consistency
+        entry: .pre-commit/hooks/check-blueprint-versions.sh
+        language: script
+        files: '^blueprints/[^/]+/.*\.(yaml|md)$'
+        exclude: "^blueprints/shared/"
+        pass_filenames: true
+
+      - id: blueprint-documentation
+        name: Check blueprint documentation
+        entry: .pre-commit/hooks/check-documentation.sh
+        language: script
+        files: '^blueprints/[^/]+/.*\.yaml$'
+        exclude: "^blueprints/shared/"
+        pass_filenames: true
+
+      - id: go-tools-version-check
+        name: Check Go tool versions and changelogs
+        entry: .pre-commit/hooks/check-go-versions.sh
+        language: script
+        files: '^scripts/(ha-ws-client-go|validate-blueprint-go)/.*\.(go|mod|sum)$'
+        pass_filenames: true

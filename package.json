@@ -20,7 +20,6 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "prepare": "husky",
     "validate": "./scripts/validate-blueprint-go/build/validate-blueprint --all",
     "validate:single": "./scripts/validate-blueprint-go/build/validate-blueprint",
     "docs:check": "npm run check --prefix docs",
@@ -37,7 +36,5 @@
     "go:check": "export PATH=\"$HOME/go/bin:$PATH\" && cd scripts/validate-blueprint-go && make check && cd ../ha-ws-client-go && make check",
     "go:clean": "cd scripts/validate-blueprint-go && make clean && cd ../ha-ws-client-go && make clean"
   },
-  "devDependencies": {
-    "husky": "^9.1.7"
-  }
+  "devDependencies": {}
 }
