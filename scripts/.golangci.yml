@@ -8,7 +8,7 @@ run:
   # Include test files
   tests: true
   # Go version to use for analysis
-  go: "1.22"
+  go: "1.25"
 
 output:
   # Format: colored-line-number, line-number, json, tab, checkstyle, code-climate
@@ -26,38 +26,38 @@ linters:
   disable-all: true
   enable:
     # Default linters
-    - errcheck      # Check for unchecked errors
-    - gosimple      # Simplify code
-    - govet         # Go vet checks
-    - ineffassign   # Detect ineffective assignments
-    - staticcheck   # Static analysis checks
-    - unused        # Check for unused code
+    - errcheck # Check for unchecked errors
+    - gosimple # Simplify code
+    - govet # Go vet checks
+    - ineffassign # Detect ineffective assignments
+    - staticcheck # Static analysis checks
+    - unused # Check for unused code
 
     # Additional recommended linters
-    - bodyclose     # Check HTTP response body is closed
-    - dogsled       # Check for too many blank identifiers
-    - dupl          # Code duplication detection
-    - errorlint     # Find issues with error wrapping
-    - copyloopvar   # Check for loop variable capture issues
-    - goconst       # Find repeated strings that could be constants
-    - gocritic      # Opinionated Go linter
-    - gocyclo       # Check cyclomatic complexity
-    - gofmt         # Check code is formatted
-    - goimports     # Check imports are organized
-    - gosec         # Security checks
-    - misspell      # Find commonly misspelled English words
-    - nakedret      # Check for naked returns in long functions
-    - nilerr        # Check for returning nil after checking err
-    - nolintlint    # Check nolint directives
-    - revive        # Fast, configurable linter (replaces golint)
-    - unconvert     # Remove unnecessary type conversions
-    - whitespace    # Check for unnecessary whitespace
+    - bodyclose # Check HTTP response body is closed
+    - dogsled # Check for too many blank identifiers
+    - dupl # Code duplication detection
+    - errorlint # Find issues with error wrapping
+    - copyloopvar # Check for loop variable capture issues
+    - goconst # Find repeated strings that could be constants
+    - gocritic # Opinionated Go linter
+    - gocyclo # Check cyclomatic complexity
+    - gofmt # Check code is formatted
+    - goimports # Check imports are organized
+    - gosec # Security checks
+    - misspell # Find commonly misspelled English words
+    - nakedret # Check for naked returns in long functions
+    - nilerr # Check for returning nil after checking err
+    - nolintlint # Check nolint directives
+    - revive # Fast, configurable linter (replaces golint)
+    - unconvert # Remove unnecessary type conversions
+    - whitespace # Check for unnecessary whitespace
 
     # Modernization linters
-    - intrange      # Use range over integers (Go 1.22+)
-    - perfsprint    # Modern string formatting (fmt.Sprintf -> strconv)
-    - tenv          # Use t.Setenv in tests (Go 1.17+)
-    - tparallel     # Correct t.Parallel() usage
+    - intrange # Use range over integers (Go 1.22+)
+    - perfsprint # Modern string formatting (fmt.Sprintf -> strconv)
+    - tenv # Use t.Setenv in tests (Go 1.17+)
+    - tparallel # Correct t.Parallel() usage
     - usestdlibvars # Use stdlib constants (http.MethodGet vs "GET")
 
 linters-settings:
@@ -72,6 +72,7 @@ linters-settings:
     enable-all: true
     disable:
       - fieldalignment # Too noisy for these projects
+      - shadow # Handled separately by other tools
 
   gocyclo:
     # Minimal code complexity to report
@@ -96,9 +97,9 @@ linters-settings:
       - style
       - performance
     disabled-checks:
-      - hugeParam      # Too noisy
-      - rangeValCopy   # Too noisy for these projects
-      - unnamedResult  # Style preference, not enforced
+      - hugeParam # Too noisy
+      - rangeValCopy # Too noisy for these projects
+      - unnamedResult # Style preference, not enforced
 
   revive:
     # Enable all available rules
@@ -151,7 +152,7 @@ linters-settings:
 
   whitespace:
     multi-if: true
-    multi-func: false  # Disabled as it conflicts with gofumpt formatting
+    multi-func: false # Disabled as it conflicts with gofumpt formatting
 
 issues:
   # Maximum issues count per one linter
@@ -166,12 +167,12 @@ issues:
         - dupl
         - gosec
         - goconst
-        - errcheck  # Test mock servers don't need error checking
+        - errcheck # Test mock servers don't need error checking
 
     # Exclude some staticcheck messages
     - linters:
         - staticcheck
-      text: "SA9003:"  # Empty branch
+      text: "SA9003:" # Empty branch
 
     # Allow os.Exit calls in main package (expected for CLI tools)
     - path: main\.go
