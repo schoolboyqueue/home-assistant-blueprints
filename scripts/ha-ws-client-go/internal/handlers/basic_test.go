@@ -638,7 +638,7 @@ func BenchmarkFormatDuration(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := range b.N {
 		d := durations[i%len(durations)]
 		_ = formatDuration(d)
 	}
@@ -654,7 +654,7 @@ func BenchmarkEntityIDParsing(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := range b.N {
 		id := entityIDs[i%len(entityIDs)]
 		_ = strings.SplitN(id, ".", 2)
 	}
@@ -676,7 +676,7 @@ func BenchmarkAttributeComparison(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		diffs := make(map[string]any)
 		for k, v1 := range attrs1 {
 			if v2, ok := attrs2[k]; ok {

@@ -428,7 +428,7 @@ func BenchmarkBatchExecutor_Sequential(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		BatchExecutor(
 			context.Background(),
 			items,
@@ -451,7 +451,7 @@ func BenchmarkBatchExecutor_Concurrent(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		BatchExecutor(
 			context.Background(),
 			items,
@@ -471,7 +471,7 @@ func BenchmarkBatchExecutor_LimitedConcurrency(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		BatchExecutor(
 			context.Background(),
 			items,

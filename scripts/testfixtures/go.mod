@@ -1,6 +1,6 @@
 module github.com/home-assistant-blueprints/testfixtures
 
-go 1.23
+go 1.25
 
 require (
 	github.com/gorilla/websocket v1.5.3

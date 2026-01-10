@@ -235,7 +235,7 @@ func BenchmarkFindEntityByID(b *testing.B) {
 	states = append(states, types.HAState{EntityID: "target.entity", State: "found"})
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = findEntityByID(states, "target.entity")
 	}
 }
@@ -256,7 +256,7 @@ func BenchmarkFindStatesByContext(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = findStatesByContext(states, "target-ctx")
 	}
 }
@@ -660,7 +660,7 @@ func BenchmarkHistoryStateGetState(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := range b.N {
 		s := states[i%len(states)]
 		_ = s.GetState()
 	}
@@ -675,7 +675,7 @@ func BenchmarkHistoryStateGetLastUpdated(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := range b.N {
 		s := states[i%len(states)]
 		_ = s.GetLastUpdated()
 	}
@@ -689,7 +689,7 @@ func BenchmarkSysLogEntryGetMessage(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := range b.N {
 		e := entries[i%len(entries)]
 		_ = e.GetMessage()
 	}

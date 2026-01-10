@@ -780,7 +780,7 @@ func BenchmarkSendMessage(b *testing.B) {
 	defer client.Close()
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		if _, err := client.SendMessage("ping", nil); err != nil {
 			b.Fatal(err)
 		}

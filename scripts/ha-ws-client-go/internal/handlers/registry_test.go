@@ -497,7 +497,7 @@ func BenchmarkFilterByPattern(b *testing.B) {
 	re := regexp.MustCompile("(?i)light.*")
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = filterByPattern(items, re, matchFields)
 	}
 }
@@ -512,7 +512,7 @@ func BenchmarkPatternToRegex(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := range b.N {
 		pattern := patterns[i%len(patterns)]
 		regexPattern := regexp.QuoteMeta(pattern)
 		regexPattern = regexp.MustCompile(`\\\*`).ReplaceAllString(regexPattern, ".*")
@@ -533,7 +533,7 @@ func BenchmarkMatchFields(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := range b.N {
 		e := entries[i%len(entries)]
 		_ = matchFields(e)
 	}

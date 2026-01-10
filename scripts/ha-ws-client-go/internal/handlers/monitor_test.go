@@ -479,7 +479,7 @@ func BenchmarkSplitEntityID(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := range b.N {
 		e := entities[i%len(entities)]
 		_ = splitEntityID(e)
 	}
@@ -495,7 +495,7 @@ func BenchmarkMatchEntityPattern(b *testing.B) {
 	pattern := "sensor.*"
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := range b.N {
 		e := entities[i%len(entities)]
 		_ = matchEntityPattern(e, pattern)
 	}
@@ -509,7 +509,7 @@ func BenchmarkStateFormatting(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := range b.N {
 		s := states[i%len(states)]
 		_ = fmt.Sprintf("%s: %s", s.EntityID, s.State)
 	}

@@ -867,7 +867,7 @@ func BenchmarkChain(b *testing.B) {
 	ctx := &Context{Args: []string{"cmd", "arg1", "24", "120"}}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = handler(ctx)
 	}
 }
@@ -882,7 +882,7 @@ func BenchmarkWithPattern(b *testing.B) {
 	ctx := &Context{Args: []string{"filter", "light.*"}}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_ = handler(ctx)
 	}
 }

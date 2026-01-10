@@ -487,7 +487,7 @@ func BenchmarkEnsureAutomationPrefix(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := range b.N {
 		input := inputs[i%len(inputs)]
 		_ = EnsureAutomationPrefix(input)
 	}
@@ -503,7 +503,7 @@ func BenchmarkStripAutomationPrefix(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for i := range b.N {
 		input := inputs[i%len(inputs)]
 		_ = stripAutomationPrefix(input)
 	}
