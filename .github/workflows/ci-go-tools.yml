@@ -39,12 +39,12 @@ jobs:
           cache-dependency-path: scripts/${{ matrix.tool }}/go.sum
 
       - name: Install golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: v1.62.2
-          working-directory: scripts/${{ matrix.tool }}
-          args: --timeout=5m
-          skip-cache: true
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.62.2
+
+      - name: Run golangci-lint
+        working-directory: scripts/${{ matrix.tool }}
+        run: golangci-lint run --timeout=5m
 
       - name: Run unit tests with coverage
         working-directory: scripts/${{ matrix.tool }}
