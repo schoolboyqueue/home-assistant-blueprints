@@ -71,11 +71,9 @@ linters-settings:
     check-blank: true
 
   govet:
-    # Enable all analyzers
-    enable-all: true
-    disable:
-      - fieldalignment # Too noisy for these projects
-      - shadow # Handled separately by other tools
+    # Disable govet entirely - golangci-lint's typecheck conflicts with Go 1.25
+    # Real go vet is run separately in CI with correct Go version
+    enable: []
 
   gocyclo:
     # Minimal code complexity to report
