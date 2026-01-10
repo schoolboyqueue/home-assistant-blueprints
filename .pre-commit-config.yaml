@@ -42,12 +42,19 @@ repos:
       - id: go-fmt
         name: Format Go code
         files: '^scripts/(ha-ws-client-go|validate-blueprint-go)/.*\.go$'
-      - id: go-vet
-        name: Run go vet
-        files: '^scripts/(ha-ws-client-go|validate-blueprint-go)/.*\.go$'
       - id: go-mod-tidy
         name: Tidy go.mod
         files: '^scripts/(ha-ws-client-go|validate-blueprint-go)/(go\.mod|go\.sum|.*\.go)$'
+
+  # go-vet for Go tools
+  - repo: local
+    hooks:
+      - id: go-vet
+        name: Run go vet
+        entry: bash -c 'cd scripts/validate-blueprint-go && go vet ./... && cd ../ha-ws-client-go && go vet ./...'
+        language: system
+        pass_filenames: false
+        files: '^scripts/(ha-ws-client-go|validate-blueprint-go)/.*\.go$'
 
   # golangci-lint for Go tools
   - repo: https://github.com/golangci/golangci-lint
