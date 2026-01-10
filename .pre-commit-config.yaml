@@ -64,7 +64,7 @@ repos:
     hooks:
       - id: govulncheck
         name: Security audit with govulncheck
-        entry: bash -c 'cd scripts/validate-blueprint-go && go install golang.org/x/vuln/cmd/govulncheck@latest && govulncheck ./... && cd ../ha-ws-client-go && govulncheck ./...'
+        entry: bash -c 'export PATH="$HOME/go/bin:$PATH" && cd scripts/validate-blueprint-go && go install golang.org/x/vuln/cmd/govulncheck@latest && govulncheck ./... && cd ../ha-ws-client-go && govulncheck ./...'
         language: system
         pass_filenames: false
         files: '^scripts/(ha-ws-client-go|validate-blueprint-go)/(go\.mod|go\.sum|.*\.go)$'

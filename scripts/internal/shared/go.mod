@@ -1,3 +1,3 @@
 module github.com/home-assistant-blueprints/shared
 
-go 1.22
+go 1.23

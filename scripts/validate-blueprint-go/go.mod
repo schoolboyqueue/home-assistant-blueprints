@@ -1,6 +1,6 @@
 module github.com/home-assistant-blueprints/validate-blueprint-go
 
-go 1.22
+go 1.23
 
 require (
 	github.com/fatih/color v1.18.0

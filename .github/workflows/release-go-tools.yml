@@ -162,7 +162,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.23'
           cache-dependency-path: scripts/${{ matrix.tool }}/go.sum
 
       - name: Run linter
@@ -217,7 +217,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.23'
 
       - name: Build validate-blueprint
         if: needs.determine-builds.outputs.build_validator == 'true'
