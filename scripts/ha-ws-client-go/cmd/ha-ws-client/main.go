@@ -12,13 +12,14 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/urfave/cli/v3"
 
+	"github.com/home-assistant-blueprints/selfupdate"
+
 	hacli "github.com/home-assistant-blueprints/ha-ws-client-go/internal/cli"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/client"
 	errs "github.com/home-assistant-blueprints/ha-ws-client-go/internal/errors"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/handlers"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/output"
 	"github.com/home-assistant-blueprints/ha-ws-client-go/internal/shutdown"
-	"github.com/home-assistant-blueprints/selfupdate"
 )
 
 // Version information - set by ldflags during build

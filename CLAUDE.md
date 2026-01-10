@@ -29,7 +29,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 | `make go-clean`                    | Clean Go build artifacts                                   |
 | `make docs-check`                  | Check docs with Biome                                      |
 | `make docs-fix`                    | Fix docs issues with Biome                                 |
-| `make check`                       | Run all checks (Go + blueprints + docs)                    |
+| `make markdown-check`              | Check markdown files with markdownlint                     |
+| `make markdown-lint`               | Lint and fix markdown files with markdownlint              |
+| `make markdown-format`             | Format markdown tables with prettier                       |
+| `make markdown-fix`                | Lint and format all markdown files                         |
+| `make check`                       | Run all checks (Go + blueprints + docs + markdown)         |
 | `make check-all`                   | Run all checks including security audit                    |
 | `make clean`                       | Clean build artifacts                                      |
 | `make help`                        | Show all available targets                                 |

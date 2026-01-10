@@ -181,6 +181,33 @@ docs-fix:
 	cd docs && npm run fix
 
 #------------------------------------------------------------------------------
+# Markdown Formatting
+#------------------------------------------------------------------------------
+
+# Check markdown files with markdownlint
+.PHONY: markdown-check
+markdown-check:
+	@echo "$(GREEN)Checking markdown files...$(NC)"
+	npx markdownlint-cli2 "**/*.md" "!.automaker/**" "!**/node_modules/**"
+
+# Lint and fix markdown files with markdownlint
+.PHONY: markdown-lint
+markdown-lint:
+	@echo "$(GREEN)Linting markdown files...$(NC)"
+	npx markdownlint-cli2 --fix "**/*.md" "!.automaker/**" "!**/node_modules/**"
+
+# Format markdown tables with prettier
+.PHONY: markdown-format
+markdown-format:
+	@echo "$(GREEN)Formatting markdown tables...$(NC)"
+	npx prettier --write "**/*.md" "!.automaker/**" "!**/node_modules/**"
+
+# Lint and format all markdown files
+.PHONY: markdown-fix
+markdown-fix: markdown-lint markdown-format
+	@echo "$(GREEN)All markdown files fixed$(NC)"
+
+#------------------------------------------------------------------------------
 # Cleanup
 #------------------------------------------------------------------------------
 
@@ -202,14 +229,14 @@ clean-all:
 # Quality Checks
 #------------------------------------------------------------------------------
 
-# Run all checks (Go + blueprints + docs)
+# Run all checks (Go + blueprints + docs + markdown)
 .PHONY: check
-check: go-check validate docs-check
+check: go-check validate docs-check markdown-check
 	@echo "$(GREEN)All checks passed!$(NC)"
 
 # Run all checks including security audit
 .PHONY: check-all
-check-all: go-check go-audit validate docs-check
+check-all: go-check go-audit validate docs-check markdown-check
 	@echo "$(GREEN)All checks including security audit passed!$(NC)"
 
 # Quick check (no tests)

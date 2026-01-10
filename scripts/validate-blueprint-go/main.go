@@ -21,6 +21,7 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/home-assistant-blueprints/selfupdate"
+
 	"github.com/home-assistant-blueprints/validate-blueprint-go/internal/shutdown"
 	"github.com/home-assistant-blueprints/validate-blueprint-go/internal/validator"
 )
