@@ -59,8 +59,9 @@ linters:
     - tenv # Use t.Setenv in tests (Go 1.17+)
     - tparallel # Correct t.Parallel() usage
     - usestdlibvars # Use stdlib constants (http.MethodGet vs "GET")
-  disable:
-    - typecheck # Disabled: golangci-lint v1.62.2 built with Go 1.23 cannot check Go 1.25 modules
+  # Note: typecheck is implicitly disabled (not in enable list)
+  # golangci-lint v1.62.2 was built with Go 1.23 and cannot check Go 1.25 modules
+  # Type checking is still performed by go vet and go test with Go 1.25
 
 linters-settings:
   errcheck:
