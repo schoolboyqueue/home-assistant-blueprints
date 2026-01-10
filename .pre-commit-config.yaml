@@ -33,6 +33,7 @@ repos:
     hooks:
       - id: markdownlint-cli2
         name: Lint Markdown files
+        args: [--fix]
 
   # Go formatting and linting
   - repo: https://github.com/dnephin/pre-commit-golang
@@ -54,7 +55,7 @@ repos:
     hooks:
       - id: golangci-lint
         name: Lint Go tools with golangci-lint
-        entry: bash -c 'cd scripts/validate-blueprint-go && golangci-lint run && cd ../ha-ws-client-go && golangci-lint run'
+        entry: bash -c 'cd scripts/validate-blueprint-go && golangci-lint run --fix && cd ../ha-ws-client-go && golangci-lint run --fix'
         pass_filenames: false
         files: '^scripts/(ha-ws-client-go|validate-blueprint-go)/.*\.go$'
 

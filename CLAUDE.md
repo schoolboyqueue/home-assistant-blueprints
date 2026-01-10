@@ -10,23 +10,27 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
 ## Commands
 
-### npm Scripts
+### Make Targets
 
-| Script | Description |
+| Target | Description |
 |--------|-------------|
-| `npm run validate` | Validate all blueprints |
-| `npm run validate:single <path>` | Validate a single blueprint |
-| `npm run go:init` | Download Go dependencies |
-| `npm run go:tools` | Install Go dev tools (golangci-lint, gofumpt, goimports) |
-| `npm run go:build` | Build Go tools |
-| `npm run go:test` | Run Go tests |
-| `npm run go:lint` | Run Go linters |
-| `npm run go:format` | Format Go code |
-| `npm run go:vet` | Run go vet |
-| `npm run go:check` | Run all Go checks (format, lint, vet, test) |
-| `npm run go:clean` | Clean Go build artifacts |
-| `npm run docs:check` | Check docs with Biome |
-| `npm run docs:fix` | Fix docs issues with Biome |
+| `make setup` | Setup development environment (pre-commit, Go tools, docs) |
+| `make validate` | Validate all blueprints |
+| `make validate-single FILE=<path>` | Validate a single blueprint |
+| `make build` | Build all Go tools |
+| `make go-init` | Download Go dependencies |
+| `make go-tools` | Install Go dev tools (golangci-lint, gofumpt, goimports) |
+| `make go-test` | Run Go tests |
+| `make go-lint` | Run Go linters (with auto-fix) |
+| `make go-format` | Format Go code |
+| `make go-vet` | Run go vet |
+| `make go-check` | Run all Go checks (format, lint, vet, test) |
+| `make go-clean` | Clean Go build artifacts |
+| `make docs-check` | Check docs with Biome |
+| `make docs-fix` | Fix docs issues with Biome |
+| `make check` | Run all checks (Go + blueprints + docs) |
+| `make clean` | Clean build artifacts |
+| `make help` | Show all available targets |
 
 ### Validate Blueprints
 
@@ -37,12 +41,13 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 # Validate all blueprints in the repository
 ./scripts/validate-blueprint-go/build/validate-blueprint --all
 
-# Or use npm scripts
-npm run validate          # Validate all blueprints
-npm run validate:single <path>  # Validate a single file
+# Or use make targets
+make validate                           # Validate all blueprints
+make validate-single FILE=<path>        # Validate a single file
 ```
 
 The validator checks:
+
 - YAML syntax and blueprint schema
 - Input/selector definitions and !input reference validation
 - Template syntax (balanced delimiters, no !input inside {{ }})
@@ -60,6 +65,7 @@ The validator checks:
 ### Blueprint Structure
 
 Each blueprint lives in `blueprints/<blueprint-name>/` and contains:
+
 - `*.yaml` - The blueprint file (named `*_pro.yaml` or `*_pro_blueprint.yaml`)
 - `README.md` - Documentation
 - `CHANGELOG.md` - Version history
@@ -119,6 +125,7 @@ action:
 ### Commits
 
 Uses Conventional Commits:
+
 - `feat(blueprint-name): description` - New features
 - `fix(blueprint-name): description` - Bug fixes
 - `docs(readme): description` - Documentation changes
@@ -127,6 +134,7 @@ Uses Conventional Commits:
 ### Versioning
 
 Each blueprint has its own semantic version in:
+
 1. Blueprint `name` field: `"Blueprint Name vX.Y.Z"`
 2. `blueprint_version` variable
 3. `CHANGELOG.md` - Add entry for new version
@@ -142,12 +150,14 @@ The Go tools (ha-ws-client-go and validate-blueprint-go) each have their own sem
 3. **Version flag**: Run `--version` to check current version
 
 When updating Go tools:
+
 1. Update the VERSION in Makefile (or rely on git tag for releases)
 2. Add entry to CHANGELOG.md with date and changes
 3. Keep both tools' versions synchronized when making coordinated changes
 4. GitHub Actions will automatically build and release binaries on version tags
 
 **Pre-commit hooks:**
+
 - The project uses [pre-commit](https://pre-commit.com) instead of Husky
 - Hooks validate blueprints, Go code, commit messages, and more
 - Configuration: `.pre-commit-config.yaml`
@@ -155,6 +165,7 @@ When updating Go tools:
 - Setup: `pip install pre-commit && pre-commit install`
 
 **Pre-commit checks for Go tools:**
+
 - CHANGELOG.md must exist for both tools
 - Makefile VERSION must match latest CHANGELOG.md version entry
 - Warning if tool versions are not synchronized (not blocking)
@@ -162,6 +173,7 @@ When updating Go tools:
 ### Markdown
 
 Uses markdownlint with:
+
 - Line length limit disabled (MD013: false)
 - HTML elements allowed: div, h1, p, em, b, a, img, br, details, summary, kbd
 
@@ -175,22 +187,26 @@ Uses markdownlint with:
 The project website is served from `docs/` and must be kept in sync with blueprints:
 
 **Files:**
+
 - `docs/index.html` - Main website with blueprint gallery
 - `docs/styles.css` - Styling
 - `docs/script.js` - Interactive functionality
 - `_config.yml` - Jekyll configuration
 
 **When adding a new blueprint:**
+
 1. Update the blueprint count in the hero stats section (`<span class="stat-value">`)
 2. Add a new `<article class="blueprint-card">` in the blueprints gallery section
 3. Include: icon SVG, title, description, tags, import URL, and docs link
 4. Import URL format: `https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://raw.githubusercontent.com/schoolboyqueue/home-assistant-blueprints/main/blueprints/<name>/<file>.yaml`
 
 **When updating a blueprint:**
+
 - Update the description if features changed significantly
 - Update tags if new capabilities were added
 
 **When removing a blueprint:**
+
 1. Remove the blueprint card from the gallery
 2. Update the blueprint count in the hero stats
 

@@ -16,16 +16,21 @@ Thank you for your interest in contributing! This guide covers contributions to 
 
 1. Fork the repository
 2. Clone your fork:
+
    ```bash
    git clone https://github.com/YOUR_USERNAME/home-assistant-blueprints.git
    cd home-assistant-blueprints
    ```
+
 3. Set up the development environment:
+
    ```bash
+   make setup                     # Setup everything (pre-commit, Go tools, docs)
+   # Or manually:
    pip install pre-commit         # Install pre-commit
    pre-commit install             # Set up git hooks
-   npm run go:tools               # Install Go development tools
-   npm run go:build               # Build Go tools
+   make go-tools                  # Install Go development tools
+   make build                     # Build Go tools
    ```
 
 ## Contributing Blueprints
@@ -34,7 +39,7 @@ Thank you for your interest in contributing! This guide covers contributions to 
 
 Each blueprint lives in its own directory under `blueprints/`:
 
-```
+```text
 blueprints/
 └── my-blueprint/
     ├── my_blueprint_pro.yaml    # The blueprint file
@@ -45,6 +50,7 @@ blueprints/
 ### Blueprint Requirements
 
 1. **YAML Structure**: Follow the Home Assistant blueprint schema:
+
    ```yaml
    blueprint:
      name: "My Blueprint vX.Y.Z"
@@ -72,8 +78,9 @@ blueprints/
 3. **Documentation**: Include README.md and CHANGELOG.md
 
 4. **Validation**: Must pass the blueprint validator:
+
    ```bash
-   npm run validate:single blueprints/my-blueprint/my_blueprint_pro.yaml
+   make validate-single FILE=blueprints/my-blueprint/my_blueprint_pro.yaml
    ```
 
 ### Blueprint Best Practices
@@ -143,6 +150,7 @@ make pre-commit
    - `templates.go` - Jinja2 template validation
 
 2. Add validation method to `BlueprintValidator`:
+
    ```go
    func (v *BlueprintValidator) ValidateSomething() {
        if invalid {
@@ -158,6 +166,7 @@ make pre-commit
 #### ha-ws-client-go
 
 1. Add handler function in `internal/handlers/`:
+
    ```go
    func HandleMyCommand(ctx *Context) error {
        // Implementation
@@ -193,42 +202,46 @@ When making functional code changes (not docs/tests only):
 
 - **Python 3** (for pre-commit hooks)
 - **Go 1.21+** (for Go tools)
-- **npm** (for package management)
+- **Make** (standard on Unix systems)
+- **npm** (for docs tooling only)
 
 ### Initial Setup
 
 ```bash
-# Install pre-commit hooks
+# One-command setup (installs everything)
+make setup
+
+# Or manually:
 pip install pre-commit
 pre-commit install
-
-# Install Go development tools
-npm run go:tools
-
-# Build Go tools
-npm run go:build
+make go-tools
+make build
+cd docs && npm install
 
 # Verify setup
-npm run validate   # Should validate all blueprints
+make validate   # Should validate all blueprints
 ```
 
-### Available npm Scripts
+### Available Make Targets
 
-| Script | Description |
+| Target | Description |
 |--------|-------------|
-| `npm run validate` | Validate all blueprints |
-| `npm run validate:single <path>` | Validate a single blueprint |
-| `npm run go:init` | Download Go dependencies |
-| `npm run go:tools` | Install Go development tools |
-| `npm run go:build` | Build Go tools |
-| `npm run go:test` | Run Go tests |
-| `npm run go:lint` | Run Go linters |
-| `npm run go:format` | Format Go code |
-| `npm run go:vet` | Run go vet |
-| `npm run go:check` | Run all Go checks (format, lint, vet, test) |
-| `npm run go:clean` | Clean Go build artifacts |
-| `npm run docs:check` | Check docs with Biome |
-| `npm run docs:fix` | Fix docs issues with Biome |
+| `make setup` | Setup development environment (pre-commit, Go tools, docs) |
+| `make validate` | Validate all blueprints |
+| `make validate-single FILE=<path>` | Validate a single blueprint |
+| `make build` | Build all Go tools |
+| `make go-init` | Download Go dependencies |
+| `make go-tools` | Install Go dev tools (golangci-lint, gofumpt, goimports) |
+| `make go-test` | Run Go tests |
+| `make go-lint` | Run Go linters (with auto-fix) |
+| `make go-format` | Format Go code |
+| `make go-vet` | Run go vet |
+| `make go-check` | Run all Go checks (format, lint, vet, test) |
+| `make clean` | Clean Go build artifacts |
+| `make docs-check` | Check docs with Biome |
+| `make docs-fix` | Fix docs issues with Biome |
+| `make check` | Run all checks (Go + blueprints + docs) |
+| `make help` | Show all available targets |
 
 ## Coding Standards
 
@@ -258,7 +271,7 @@ npm run validate   # Should validate all blueprints
 
 This project uses [Conventional Commits](https://www.conventionalcommits.org/):
 
-```
+```text
 <type>[scope]: <description>
 
 [optional body]
@@ -308,6 +321,7 @@ docs(readme): update installation instructions
 ### Before Submitting
 
 1. **Run pre-commit checks locally**:
+
    ```bash
    # Pre-commit hooks will run automatically on commit
    git add .
@@ -339,6 +353,7 @@ docs(readme): update installation instructions
 ### PR Description
 
 Include:
+
 - Summary of changes
 - Related issue (if applicable)
 - Testing performed
@@ -349,6 +364,7 @@ Include:
 The repository includes a comprehensive pre-commit hook that validates:
 
 **For Blueprints:**
+
 - YAML syntax and schema
 - Version consistency between `name:` and `blueprint_version`
 - No `!input` inside `{{ }}` templates
@@ -357,6 +373,7 @@ The repository includes a comprehensive pre-commit hook that validates:
 - README.md and CHANGELOG.md existence
 
 **For Go Code:**
+
 - golangci-lint passes
 - Makefile VERSION matches CHANGELOG.md version
 - CHANGELOG.md exists

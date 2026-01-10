@@ -7,6 +7,7 @@
   "scripts": {
     "check": "biome check .",
     "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
     "format": "biome format --write .",
     "fix": "biome check --write ."
   },
