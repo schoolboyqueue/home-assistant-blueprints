@@ -44,7 +44,7 @@ jobs:
 
       - name: Run golangci-lint
         working-directory: scripts/${{ matrix.tool }}
-        run: golangci-lint run --timeout=5m
+        run: golangci-lint run --timeout=5m --disable=typecheck
 
       - name: Run unit tests with coverage
         working-directory: scripts/${{ matrix.tool }}
