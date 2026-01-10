@@ -59,6 +59,16 @@ repos:
         pass_filenames: false
         files: '^scripts/(ha-ws-client-go|validate-blueprint-go)/.*\.go$'
 
+  # govulncheck for security audit
+  - repo: local
+    hooks:
+      - id: govulncheck
+        name: Security audit with govulncheck
+        entry: bash -c 'cd scripts/validate-blueprint-go && go install golang.org/x/vuln/cmd/govulncheck@latest && govulncheck ./... && cd ../ha-ws-client-go && govulncheck ./...'
+        language: system
+        pass_filenames: false
+        files: '^scripts/(ha-ws-client-go|validate-blueprint-go)/(go\.mod|go\.sum|.*\.go)$'
+
   # Conventional Commits validation
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v3.6.0

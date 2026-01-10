@@ -138,6 +138,14 @@ go-check:
 	cd scripts/validate-blueprint-go && $(MAKE) check; \
 	cd ../ha-ws-client-go && $(MAKE) check
 
+# Run security audit with govulncheck
+.PHONY: go-audit
+go-audit:
+	@echo "$(GREEN)Running security audit...$(NC)"
+	@export PATH="$$HOME/go/bin:$$PATH"; \
+	cd scripts/validate-blueprint-go && $(MAKE) audit; \
+	cd ../ha-ws-client-go && $(MAKE) audit
+
 #------------------------------------------------------------------------------
 # Documentation
 #------------------------------------------------------------------------------
@@ -198,6 +206,11 @@ clean-all:
 .PHONY: check
 check: go-check validate docs-check
 	@echo "$(GREEN)All checks passed!$(NC)"
+
+# Run all checks including security audit
+.PHONY: check-all
+check-all: go-check go-audit validate docs-check
+	@echo "$(GREEN)All checks including security audit passed!$(NC)"
 
 # Quick check (no tests)
 .PHONY: check-quick
@@ -270,6 +283,7 @@ help:
 	@echo "  make go-lint        Lint all Go code (with auto-fix)"
 	@echo "  make go-vet         Run go vet on all Go code"
 	@echo "  make go-check       Run all Go checks (format, lint, vet, test)"
+	@echo "  make go-audit       Run security audit with govulncheck"
 	@echo ""
 	@echo "$(YELLOW)Documentation:$(NC)"
 	@echo "  make docs-check     Check documentation with Biome"
@@ -280,6 +294,7 @@ help:
 	@echo ""
 	@echo "$(YELLOW)Quality Checks:$(NC)"
 	@echo "  make check          Run all checks (Go + blueprints + docs)"
+	@echo "  make check-all      Run all checks including security audit"
 	@echo "  make check-quick    Quick check (no tests)"
 	@echo "  make pre-commit     Pre-commit check (format + lint + test)"
 	@echo ""

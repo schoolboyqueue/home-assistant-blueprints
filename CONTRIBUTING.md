@@ -237,10 +237,12 @@ make validate   # Should validate all blueprints
 | `make go-format` | Format Go code |
 | `make go-vet` | Run go vet |
 | `make go-check` | Run all Go checks (format, lint, vet, test) |
+| `make go-audit` | Run security audit with govulncheck |
 | `make clean` | Clean Go build artifacts |
 | `make docs-check` | Check docs with Biome |
 | `make docs-fix` | Fix docs issues with Biome |
 | `make check` | Run all checks (Go + blueprints + docs) |
+| `make check-all` | Run all checks including security audit |
 | `make help` | Show all available targets |
 
 ## Coding Standards
