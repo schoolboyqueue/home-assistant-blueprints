@@ -7,8 +7,8 @@ run:
   timeout: 5m
   # Include test files
   tests: true
-  # Go version to use for analysis
-  go: "1.25"
+  # Go version to use for analysis (limited by golangci-lint build version)
+  go: "1.23"
 
 output:
   # Format: colored-line-number, line-number, json, tab, checkstyle, code-climate
