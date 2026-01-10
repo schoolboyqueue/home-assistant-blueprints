@@ -224,26 +224,26 @@ make validate   # Should validate all blueprints
 
 ### Available Make Targets
 
-| Target | Description |
-|--------|-------------|
-| `make setup` | Setup development environment (pre-commit, Go tools, docs) |
-| `make validate` | Validate all blueprints |
-| `make validate-single FILE=<path>` | Validate a single blueprint |
-| `make build` | Build all Go tools |
-| `make go-init` | Download Go dependencies |
-| `make go-tools` | Install Go dev tools (golangci-lint, gofumpt, goimports) |
-| `make go-test` | Run Go tests |
-| `make go-lint` | Run Go linters (with auto-fix) |
-| `make go-format` | Format Go code |
-| `make go-vet` | Run go vet |
-| `make go-check` | Run all Go checks (format, lint, vet, test) |
-| `make go-audit` | Run security audit with govulncheck |
-| `make clean` | Clean Go build artifacts |
-| `make docs-check` | Check docs with Biome |
-| `make docs-fix` | Fix docs issues with Biome |
-| `make check` | Run all checks (Go + blueprints + docs) |
-| `make check-all` | Run all checks including security audit |
-| `make help` | Show all available targets |
+| Target                             | Description                                                |
+| ---------------------------------- | ---------------------------------------------------------- |
+| `make setup`                       | Setup development environment (pre-commit, Go tools, docs) |
+| `make validate`                    | Validate all blueprints                                    |
+| `make validate-single FILE=<path>` | Validate a single blueprint                                |
+| `make build`                       | Build all Go tools                                         |
+| `make go-init`                     | Download Go dependencies                                   |
+| `make go-tools`                    | Install Go dev tools (golangci-lint, gofumpt, goimports)   |
+| `make go-test`                     | Run Go tests                                               |
+| `make go-lint`                     | Run Go linters (with auto-fix)                             |
+| `make go-format`                   | Format Go code                                             |
+| `make go-vet`                      | Run go vet                                                 |
+| `make go-check`                    | Run all Go checks (format, lint, vet, test)                |
+| `make go-audit`                    | Run security audit with govulncheck                        |
+| `make clean`                       | Clean Go build artifacts                                   |
+| `make docs-check`                  | Check docs with Biome                                      |
+| `make docs-fix`                    | Fix docs issues with Biome                                 |
+| `make check`                       | Run all checks (Go + blueprints + docs)                    |
+| `make check-all`                   | Run all checks including security audit                    |
+| `make help`                        | Show all available targets                                 |
 
 ## Coding Standards
 
@@ -283,19 +283,19 @@ This project uses [Conventional Commits](https://www.conventionalcommits.org/):
 
 ### Types
 
-| Type | Description |
-|------|-------------|
-| `feat` | New feature |
-| `fix` | Bug fix |
-| `docs` | Documentation only |
-| `style` | Formatting, no code change |
-| `refactor` | Code restructuring |
-| `perf` | Performance improvement |
-| `test` | Adding/fixing tests |
-| `build` | Build system changes |
-| `ci` | CI configuration |
-| `chore` | Maintenance |
-| `revert` | Revert previous commit |
+| Type       | Description                |
+| ---------- | -------------------------- |
+| `feat`     | New feature                |
+| `fix`      | Bug fix                    |
+| `docs`     | Documentation only         |
+| `style`    | Formatting, no code change |
+| `refactor` | Code restructuring         |
+| `perf`     | Performance improvement    |
+| `test`     | Adding/fixing tests        |
+| `build`    | Build system changes       |
+| `ci`       | CI configuration           |
+| `chore`    | Maintenance                |
+| `revert`   | Revert previous commit     |
 
 ### Examples
 

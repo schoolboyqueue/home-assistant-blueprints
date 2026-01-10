@@ -6,13 +6,13 @@ A high-performance Home Assistant WebSocket API client written in Go, optimized 
 
 Go offers several advantages for embedded devices like Raspberry Pi:
 
-| Aspect | Interpreted (Node.js) | Go |
-|--------|----------------------|-----|
-| Binary Size | ~50MB+ (runtime) | ~5-8MB (single binary) |
-| Memory Usage | ~50MB+ baseline | ~5-10MB |
-| Startup Time | ~500ms+ (JIT) | ~10ms |
-| Dependencies | Runtime + packages | None (static binary) |
-| Cross-compilation | Complex | Built-in support |
+| Aspect            | Interpreted (Node.js) | Go                     |
+| ----------------- | --------------------- | ---------------------- |
+| Binary Size       | ~50MB+ (runtime)      | ~5-8MB (single binary) |
+| Memory Usage      | ~50MB+ baseline       | ~5-10MB                |
+| Startup Time      | ~500ms+ (JIT)         | ~10ms                  |
+| Dependencies      | Runtime + packages    | None (static binary)   |
+| Cross-compilation | Complex               | Built-in support       |
 
 ## Features
 
@@ -98,81 +98,81 @@ ha-ws-client stats-multi sensor.temp_kitchen sensor.temp_bedroom sensor.temp_liv
 
 ### Basic Commands
 
-| Command | Description |
-|---------|-------------|
-| `state <entity_id>` | Get single entity state |
-| `states` | Get all entity states (summary) |
-| `states-json` | Get all states as JSON array |
+| Command                                | Description                                                     |
+| -------------------------------------- | --------------------------------------------------------------- |
+| `state <entity_id>`                    | Get single entity state                                         |
+| `states`                               | Get all entity states (summary)                                 |
+| `states-json`                          | Get all states as JSON array                                    |
 | `states-filter <pattern> [--show-age]` | Filter states by entity_id pattern (--show-age shows staleness) |
-| `config` | Get HA configuration |
-| `services` | List all services |
-| `call <domain> <service> [data]` | Call a service (data as JSON) |
-| `template <template>` | Render a Jinja template |
-| `ping` | Test connection |
+| `config`                               | Get HA configuration                                            |
+| `services`                             | List all services                                               |
+| `call <domain> <service> [data]`       | Call a service (data as JSON)                                   |
+| `template <template>`                  | Render a Jinja template                                         |
+| `ping`                                 | Test connection                                                 |
 
 ### Diagnostic Commands
 
-| Command | Description |
-|---------|-------------|
-| `device-health <entity_id>` | Check device responsiveness and stale detection |
+| Command                       | Description                                         |
+| ----------------------------- | --------------------------------------------------- |
+| `device-health <entity_id>`   | Check device responsiveness and stale detection     |
 | `compare <entity1> <entity2>` | Side-by-side entity comparison with attribute diffs |
 
 ### Log Commands
 
-| Command | Description |
-|---------|-------------|
-| `logbook <entity_id> [hours]` | Get logbook entries (default 24h) |
-| `history <entity_id> [hours]` | Get state history (default 24h) |
-| `history-full <entity_id> [hours]` | Get history with full attributes |
-| `attrs <entity_id> [hours]` | Attribute change history |
-| `timeline <hours> <entity>...` | Multi-entity chronological timeline |
-| `syslog` | Get system log errors/warnings |
-| `stats <entity_id> [hours]` | Get sensor statistics |
-| `stats-multi <entity>... [hours]` | Get statistics for multiple entities concurrently |
-| `context <context_id>` | Look up what triggered a state change |
-| `watch <entity_id> [seconds]` | Live subscribe to state changes |
+| Command                            | Description                                       |
+| ---------------------------------- | ------------------------------------------------- |
+| `logbook <entity_id> [hours]`      | Get logbook entries (default 24h)                 |
+| `history <entity_id> [hours]`      | Get state history (default 24h)                   |
+| `history-full <entity_id> [hours]` | Get history with full attributes                  |
+| `attrs <entity_id> [hours]`        | Attribute change history                          |
+| `timeline <hours> <entity>...`     | Multi-entity chronological timeline               |
+| `syslog`                           | Get system log errors/warnings                    |
+| `stats <entity_id> [hours]`        | Get sensor statistics                             |
+| `stats-multi <entity>... [hours]`  | Get statistics for multiple entities concurrently |
+| `context <context_id>`             | Look up what triggered a state change             |
+| `watch <entity_id> [seconds]`      | Live subscribe to state changes                   |
 
 ### Registry Commands
 
-| Command | Description |
-|---------|-------------|
+| Command              | Description                 |
+| -------------------- | --------------------------- |
 | `entities [pattern]` | List/search entity registry |
-| `devices [pattern]` | List/search device registry |
-| `areas` | List all areas |
+| `devices [pattern]`  | List/search device registry |
+| `areas`              | List all areas              |
 
 ### Automation Debugging
 
 > **Note:** All trace commands accept `automation_id` in either entity_id format (e.g., `automation.morning_routine`) or internal numeric ID format (e.g., `1764091895602`). The entity_id format is automatically resolved to the internal ID.
 
-| Command | Description |
-|---------|-------------|
-| `traces [automation_id] [--from]` | List automation traces (supports time filtering) |
-| `trace <automation_id> <run_id>` | Get detailed trace |
-| `trace-latest <automation_id>` | Get most recent trace without listing first |
-| `trace-summary <automation_id>` | Quick overview of recent automation runs |
-| `trace-vars <automation_id> <run_id>` | Show evaluated variables |
-| `trace-timeline <automation_id> <run_id>` | Step-by-step execution timeline |
-| `trace-trigger <automation_id> <run_id>` | Show trigger context details |
-| `trace-actions <automation_id> <run_id>` | Show action results |
-| `trace-debug <automation_id> <run_id>` | Comprehensive debug view |
-| `automation-config <entity_id>` | Get automation configuration |
-| `blueprint-inputs <entity_id>` | Validate blueprint inputs |
+| Command                                   | Description                                      |
+| ----------------------------------------- | ------------------------------------------------ |
+| `traces [automation_id] [--from]`         | List automation traces (supports time filtering) |
+| `trace <automation_id> <run_id>`          | Get detailed trace                               |
+| `trace-latest <automation_id>`            | Get most recent trace without listing first      |
+| `trace-summary <automation_id>`           | Quick overview of recent automation runs         |
+| `trace-vars <automation_id> <run_id>`     | Show evaluated variables                         |
+| `trace-timeline <automation_id> <run_id>` | Step-by-step execution timeline                  |
+| `trace-trigger <automation_id> <run_id>`  | Show trigger context details                     |
+| `trace-actions <automation_id> <run_id>`  | Show action results                              |
+| `trace-debug <automation_id> <run_id>`    | Comprehensive debug view                         |
+| `automation-config <entity_id>`           | Get automation configuration                     |
+| `blueprint-inputs <entity_id>`            | Validate blueprint inputs                        |
 
 ### Monitoring Commands
 
-| Command | Description |
-|---------|-------------|
-| `monitor <entity_id>` | Monitor entity state changes |
+| Command                               | Description                                          |
+| ------------------------------------- | ---------------------------------------------------- |
+| `monitor <entity_id>`                 | Monitor entity state changes                         |
 | `monitor-multi <entity>... [seconds]` | Monitor multiple entities concurrently (default 60s) |
-| `analyze <entity_id>` | Analyze entity state patterns |
+| `analyze <entity_id>`                 | Analyze entity state patterns                        |
 
 ### Utility Commands
 
-| Command | Description |
-|---------|-------------|
-| `update` | Check for and install the latest version |
-| `update --check` | Check for updates without installing |
-| `update --list` | List all available versions |
+| Command                      | Description                                |
+| ---------------------------- | ------------------------------------------ |
+| `update`                     | Check for and install the latest version   |
+| `update --check`             | Check for updates without installing       |
+| `update --list`              | List all available versions                |
 | `update --version <version>` | Install a specific version (e.g., `1.6.0`) |
 
 ## Output Formats
@@ -192,16 +192,16 @@ ha-ws-client state sun.sun --json
 
 ### Output Options
 
-| Option | Description |
-|--------|-------------|
-| `--output=json` | Machine-readable JSON |
-| `--output=compact` | Reduced verbosity |
-| `--output=default` | Human-readable formatted |
-| `--json` | Shorthand for `--output=json` |
-| `--compact` | Shorthand for `--output=compact` |
-| `--no-headers` | Hide section headers/titles |
-| `--no-timestamps` | Hide timestamps in output |
-| `--max-items=N` | Limit output to N items |
+| Option             | Description                      |
+| ------------------ | -------------------------------- |
+| `--output=json`    | Machine-readable JSON            |
+| `--output=compact` | Reduced verbosity                |
+| `--output=default` | Human-readable formatted         |
+| `--json`           | Shorthand for `--output=json`    |
+| `--compact`        | Shorthand for `--output=compact` |
+| `--no-headers`     | Hide section headers/titles      |
+| `--no-timestamps`  | Hide timestamps in output        |
+| `--max-items=N`    | Limit output to N items          |
 
 ### Time Filtering
 
@@ -281,11 +281,11 @@ scp build/ha-ws-client-linux-armv6 pi@raspberrypi:/usr/local/bin/ha-ws-client
 
 Tested on Raspberry Pi 4:
 
-| Metric | Value |
-|--------|-------|
-| Startup | ~12ms |
-| Memory (idle) | ~6MB |
-| Binary size | ~6MB |
+| Metric           | Value |
+| ---------------- | ----- |
+| Startup          | ~12ms |
+| Memory (idle)    | ~6MB  |
+| Binary size      | ~6MB  |
 | `states` command | ~45ms |
 
 ## Development
@@ -391,12 +391,12 @@ HA_HOST=192.168.1.100:8124 HA_TOKEN=your_token go test -tags=integration -v ./in
 
 #### Environment Variables
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `SUPERVISOR_TOKEN` | Add-on supervisor token (auto-set in add-on) | - |
-| `HA_TOKEN` | Long-lived access token for remote connections | `eyJ0eXAi...` |
-| `HA_HOST` | Home Assistant host (shorthand for HA_WS_URL) | `192.168.1.100` or `192.168.1.100:8124` |
-| `HA_WS_URL` | Full WebSocket URL (overrides HA_HOST) | `ws://192.168.1.100:8123/api/websocket` |
+| Variable           | Description                                    | Example                                 |
+| ------------------ | ---------------------------------------------- | --------------------------------------- |
+| `SUPERVISOR_TOKEN` | Add-on supervisor token (auto-set in add-on)   | -                                       |
+| `HA_TOKEN`         | Long-lived access token for remote connections | `eyJ0eXAi...`                           |
+| `HA_HOST`          | Home Assistant host (shorthand for HA_WS_URL)  | `192.168.1.100` or `192.168.1.100:8124` |
+| `HA_WS_URL`        | Full WebSocket URL (overrides HA_HOST)         | `ws://192.168.1.100:8123/api/websocket` |
 
 **Priority:** `HA_TOKEN` > `SUPERVISOR_TOKEN` for token, `HA_WS_URL` > `HA_HOST` > default for URL.
 
@@ -404,11 +404,11 @@ HA_HOST=192.168.1.100:8124 HA_TOKEN=your_token go test -tags=integration -v ./in
 
 Integration tests are designed to run in three different environments:
 
-| Environment | Token | URL | Fixture Tests |
-|-------------|-------|-----|---------------|
-| **HA Add-on** | `SUPERVISOR_TOKEN` (auto) | `ws://supervisor/core/api/websocket` | Skipped |
-| **Remote** | `HA_TOKEN` | `ws://{HA_HOST}/api/websocket` | Skipped |
-| **CI (GitHub Actions)** | `HA_TOKEN` (from onboarding) | `ws://localhost:8123/api/websocket` | Run |
+| Environment             | Token                        | URL                                  | Fixture Tests |
+| ----------------------- | ---------------------------- | ------------------------------------ | ------------- |
+| **HA Add-on**           | `SUPERVISOR_TOKEN` (auto)    | `ws://supervisor/core/api/websocket` | Skipped       |
+| **Remote**              | `HA_TOKEN`                   | `ws://{HA_HOST}/api/websocket`       | Skipped       |
+| **CI (GitHub Actions)** | `HA_TOKEN` (from onboarding) | `ws://localhost:8123/api/websocket`  | Run           |
 
 **How it works:**
 

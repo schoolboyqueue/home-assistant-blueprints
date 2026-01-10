@@ -68,19 +68,16 @@ Bathroom Light & Fan Control Pro is a comprehensive Home Assistant automation bl
 ### Installation
 
 1. **Import the blueprint:**
-
    - Click the badge above, or
    - Navigate to: Settings → Automations & Scenes → Blueprints → Import Blueprint
    - Paste URL: `https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/bathroom-light-fan-control/bathroom_light_fan_control_pro.yaml`
 
 2. **Create an automation:**
-
    - Go to: Settings → Automations & Scenes
    - Click "+ Create Automation" → "Use Blueprint"
    - Select "Bathroom Light & Fan Control (Pro)"
 
 3. **Minimum required configuration:**
-
    - **Bathroom Light(s):** Your light entity
    - **Door Sensor:** Binary sensor for door
    - **Motion Sensor:** Binary sensor for motion

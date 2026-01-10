@@ -50,41 +50,41 @@ validate-blueprint-go/
 
 The core validation logic is organized into focused files:
 
-| File | Purpose |
-|------|---------|
-| `validator.go` | Main `BlueprintValidator` struct and `Validate()` orchestration |
-| `constants.go` | All configuration constants (ValidModes, ValidConditionTypes, ValidSelectorTypes, HysteresisPatterns, Jinja2Builtins) |
-| `yaml.go` | YAML parsing with custom `!input` tag handling |
-| `schema.go` | Root structure validation, blueprint section, mode, version sync |
-| `inputs.go` | Input definitions and selector validation |
-| `triggers.go` | Trigger validation and entity_id checks |
-| `conditions.go` | Condition validation including nested conditions |
-| `actions.go` | Action/service validation including choose/if/repeat blocks |
-| `templates.go` | Jinja2 template syntax validation |
-| `hysteresis.go` | Variable validation and hysteresis boundary detection |
-| `helpers.go` | Utility functions (ToFloat, Abs, ContainsVariableRef, etc.) |
-| `reporter.go` | Result formatting with colored output |
-| `categories.go` | Category classification for validation messages |
-| `context.go` | Validation context management |
-| `types.go` | Type definitions for validation |
+| File            | Purpose                                                                                                               |
+| --------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `validator.go`  | Main `BlueprintValidator` struct and `Validate()` orchestration                                                       |
+| `constants.go`  | All configuration constants (ValidModes, ValidConditionTypes, ValidSelectorTypes, HysteresisPatterns, Jinja2Builtins) |
+| `yaml.go`       | YAML parsing with custom `!input` tag handling                                                                        |
+| `schema.go`     | Root structure validation, blueprint section, mode, version sync                                                      |
+| `inputs.go`     | Input definitions and selector validation                                                                             |
+| `triggers.go`   | Trigger validation and entity_id checks                                                                               |
+| `conditions.go` | Condition validation including nested conditions                                                                      |
+| `actions.go`    | Action/service validation including choose/if/repeat blocks                                                           |
+| `templates.go`  | Jinja2 template syntax validation                                                                                     |
+| `hysteresis.go` | Variable validation and hysteresis boundary detection                                                                 |
+| `helpers.go`    | Utility functions (ToFloat, Abs, ContainsVariableRef, etc.)                                                           |
+| `reporter.go`   | Result formatting with colored output                                                                                 |
+| `categories.go` | Category classification for validation messages                                                                       |
+| `context.go`    | Validation context management                                                                                         |
+| `types.go`      | Type definitions for validation                                                                                       |
 
 ### `internal/common`
 
-| File | Purpose |
-|------|---------|
+| File            | Purpose                                        |
+| --------------- | ---------------------------------------------- |
 | `validators.go` | Shared validation helpers used across packages |
 
 ### `internal/errors`
 
-| File | Purpose |
-|------|---------|
-| `errors.go` | Typed errors with ErrorType enum (Syntax, Schema, Template, etc.) |
-| `registry.go` | Error registry pattern for consistent error creation |
+| File          | Purpose                                                           |
+| ------------- | ----------------------------------------------------------------- |
+| `errors.go`   | Typed errors with ErrorType enum (Syntax, Schema, Template, etc.) |
+| `registry.go` | Error registry pattern for consistent error creation              |
 
 ### `internal/shutdown`
 
-| File | Purpose |
-|------|---------|
+| File          | Purpose                                                  |
+| ------------- | -------------------------------------------------------- |
 | `shutdown.go` | Graceful shutdown coordination with context cancellation |
 
 ## Development
@@ -211,10 +211,10 @@ v.AddWarningf("Unknown selector type '%s'", selectorType)
 
 ## Exit Codes
 
-| Code | Description |
-|------|-------------|
-| `0` | All validations passed |
-| `1` | Validation failed with errors |
+| Code | Description                   |
+| ---- | ----------------------------- |
+| `0`  | All validations passed        |
+| `1`  | Validation failed with errors |
 
 ## Dependencies
 
@@ -271,12 +271,12 @@ Binary sizes are ~5-8MB (vs ~50MB+ for Node.js equivalent).
 
 **Keep documentation in sync with code changes:**
 
-| Change Type | Files to Update |
-|-------------|-----------------|
-| New validation check | README.md (What It Checks tables), CLAUDE.md (Validation Flow), CHANGELOG.md |
-| New internal package | README.md + CLAUDE.md (Architecture sections), CLAUDE.md (Package Structure), root README.md |
-| New validator file | README.md + CLAUDE.md (Architecture sections), CLAUDE.md (Package Structure table) |
-| Changed validation behavior | README.md (check descriptions), CLAUDE.md (examples), CHANGELOG.md |
-| Version release | Makefile (VERSION), CHANGELOG.md (new entry with date) |
+| Change Type                 | Files to Update                                                                              |
+| --------------------------- | -------------------------------------------------------------------------------------------- |
+| New validation check        | README.md (What It Checks tables), CLAUDE.md (Validation Flow), CHANGELOG.md                 |
+| New internal package        | README.md + CLAUDE.md (Architecture sections), CLAUDE.md (Package Structure), root README.md |
+| New validator file          | README.md + CLAUDE.md (Architecture sections), CLAUDE.md (Package Structure table)           |
+| Changed validation behavior | README.md (check descriptions), CLAUDE.md (examples), CHANGELOG.md                           |
+| Version release             | Makefile (VERSION), CHANGELOG.md (new entry with date)                                       |
 
 Before committing structural changes, verify the Architecture and Package Structure sections in both README.md and CLAUDE.md reflect the current directory structure.

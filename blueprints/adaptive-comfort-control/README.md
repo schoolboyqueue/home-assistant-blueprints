@@ -39,19 +39,16 @@ Adaptive Comfort Control Pro is an advanced Home Assistant automation blueprint 
 ### Installation
 
 1. **Import the blueprint:**
-
    - Click the badge above, or
    - Navigate to: Settings → Automations & Scenes → Blueprints → Import Blueprint
    - Paste URL: `https://github.com/schoolboyqueue/home-assistant-blueprints/blob/main/blueprints/adaptive-comfort-control/adaptive_comfort_control_pro_blueprint.yaml`
 
 2. **Create an automation:**
-
    - Go to: Settings → Automations & Scenes
    - Click "+ Create Automation" → "Use Blueprint"
    - Select "Adaptive Comfort Control Pro"
 
 3. **Minimum required configuration:**
-
    - **Climate Device:** Your thermostat entity
    - **Indoor Temperature:** Indoor temp sensor
    - **Outdoor Temperature:** Outdoor temp sensor

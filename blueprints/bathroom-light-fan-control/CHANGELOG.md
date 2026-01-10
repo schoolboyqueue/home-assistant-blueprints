@@ -315,7 +315,6 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 **BREAKING CHANGE - Requires new helper:**
 
 1. Create an input_boolean helper:
-
    - Settings → Devices & Services → Helpers → Create Helper → Toggle
    - Name: "[Bathroom Name] Automation Control"
    - Icon: `mdi:robot` (optional)
@@ -455,16 +454,13 @@ This is correct Wasp-in-a-Box behavior - door closed indicates occupancy.
 **For existing automations:**
 
 1. **If you had `require_presence: false`:**
-
    - Remove or leave `presence_entities: []` (empty)
    - Behavior: lights work regardless of presence
 
 2. **If you had `presence_boolean: input_boolean.home`:**
-
    - Change to: `presence_entities: [input_boolean.home]`
 
 3. **If you had both `presence_boolean` AND `presence_entities`:**
-
    - Combine into single list: `presence_entities: [input_boolean.home, person.john, person.jane]`
 
 4. **If you had `require_presence: true` with entities:**

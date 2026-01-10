@@ -52,39 +52,39 @@ The adaptive comfort model solves this by calculating a dynamic comfort band bas
 
 ### Fan & Sensors
 
-| Input | Required | Description |
-|-------|----------|-------------|
-| Ceiling fan | Yes | Fan entity to control |
-| Indoor temperature sensor | Yes | Room temperature sensor |
-| Indoor humidity sensor | No | Enables heat index calculation |
-| Outdoor temperature sensor | No | Enables adaptive comfort mode (supports weather entities) |
-| Presence sensor | Yes | Binary sensor for occupancy |
-| Climate entity | Yes | Thermostat for HVAC coordination |
+| Input                      | Required | Description                                               |
+| -------------------------- | -------- | --------------------------------------------------------- |
+| Ceiling fan                | Yes      | Fan entity to control                                     |
+| Indoor temperature sensor  | Yes      | Room temperature sensor                                   |
+| Indoor humidity sensor     | No       | Enables heat index calculation                            |
+| Outdoor temperature sensor | No       | Enables adaptive comfort mode (supports weather entities) |
+| Presence sensor            | Yes      | Binary sensor for occupancy                               |
+| Climate entity             | Yes      | Thermostat for HVAC coordination                          |
 
 ### Comfort Settings
 
-| Input | Default | Description |
-|-------|---------|-------------|
-| Comfort mode | Adaptive | Fixed thresholds or EN 16798 adaptive |
-| Comfort category | II (Normal) | I=±2°C strict, II=±3°C normal, III=±4°C relaxed |
+| Input             | Default     | Description                                     |
+| ----------------- | ----------- | ----------------------------------------------- |
+| Comfort mode      | Adaptive    | Fixed thresholds or EN 16798 adaptive           |
+| Comfort category  | II (Normal) | I=±2°C strict, II=±3°C normal, III=±4°C relaxed |
 | Temperature units | Auto-detect | Fahrenheit, Celsius, or auto-detect from sensor |
 
 ### Fan Capabilities
 
-| Input | Default | Description |
-|-------|---------|-------------|
-| Supports direction | Off | Enable for fans with forward/reverse |
-| Reverse when heating | Off | Run reverse during heating to circulate warm air |
-| Heating speed | 25% | Fan speed during heating (if reverse enabled) |
+| Input                | Default | Description                                      |
+| -------------------- | ------- | ------------------------------------------------ |
+| Supports direction   | Off     | Enable for fans with forward/reverse             |
+| Reverse when heating | Off     | Run reverse during heating to circulate warm air |
+| Heating speed        | 25%     | Fan speed during heating (if reverse enabled)    |
 
 ### Speed Tiers
 
-| Input | Default | Description |
-|-------|---------|-------------|
-| Speed mode | Deviation | Fixed thresholds or comfort deviation |
-| Medium speed threshold | 2° | Degrees above comfort for medium speed |
-| High speed threshold | 4° | Degrees above comfort for high speed |
-| Low/Medium/High speed | 33/66/100% | Speed percentages for each tier |
+| Input                  | Default    | Description                            |
+| ---------------------- | ---------- | -------------------------------------- |
+| Speed mode             | Deviation  | Fixed thresholds or comfort deviation  |
+| Medium speed threshold | 2°         | Degrees above comfort for medium speed |
+| High speed threshold   | 4°         | Degrees above comfort for high speed   |
+| Low/Medium/High speed  | 33/66/100% | Speed percentages for each tier        |
 
 ---
 
@@ -102,11 +102,11 @@ Where `T_outdoor` is clamped to 10-30°C per the standard.
 
 **Example calculations:**
 
-| Outdoor Temp | Comfort Temp | Band (Cat II ±3°C) |
-|--------------|--------------|---------------------|
-| 50°F (10°C) | 72°F (22.1°C) | 66.7°F - 77.5°F |
-| 68°F (20°C) | 78°F (25.4°C) | 72.7°F - 83.9°F |
-| 86°F (30°C) | 84°F (28.7°C) | 78.5°F - 90.1°F |
+| Outdoor Temp | Comfort Temp  | Band (Cat II ±3°C) |
+| ------------ | ------------- | ------------------ |
+| 50°F (10°C)  | 72°F (22.1°C) | 66.7°F - 77.5°F    |
+| 68°F (20°C)  | 78°F (25.4°C) | 72.7°F - 83.9°F    |
+| 86°F (30°C)  | 84°F (28.7°C) | 78.5°F - 90.1°F    |
 
 ### Heat Index Integration
 
@@ -118,19 +118,19 @@ When a humidity sensor is provided, the blueprint calculates heat index (feels-l
 
 In **deviation mode** (default), fan speed is based on how far above the comfort band you are:
 
-| Deviation | Speed |
-|-----------|-------|
-| 0-2° above | Low (33%) |
+| Deviation  | Speed        |
+| ---------- | ------------ |
+| 0-2° above | Low (33%)    |
 | 2-4° above | Medium (66%) |
-| 4°+ above | High (100%) |
+| 4°+ above  | High (100%)  |
 
 ### HVAC Coordination
 
-| HVAC State | Fan Behavior |
-|------------|--------------|
-| Heating | Off (or reverse at low speed if enabled) |
-| Cooling | On at calculated speed (distributes cool air) |
-| Idle | Uses adaptive comfort band |
+| HVAC State | Fan Behavior                                  |
+| ---------- | --------------------------------------------- |
+| Heating    | Off (or reverse at low speed if enabled)      |
+| Cooling    | On at calculated speed (distributes cool air) |
+| Idle       | Uses adaptive comfort band                    |
 
 ---
 

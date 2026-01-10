@@ -42,7 +42,7 @@ Responses:
 Test connection.
 
 ```json
-{"id": 1, "type": "ping"}
+{ "id": 1, "type": "ping" }
 ```
 
 Response: `{"id": 1, "type": "pong"}`
@@ -52,7 +52,7 @@ Response: `{"id": 1, "type": "pong"}`
 Get all entity states.
 
 ```json
-{"id": 1, "type": "get_states"}
+{ "id": 1, "type": "get_states" }
 ```
 
 Response: Array of state objects
@@ -77,7 +77,7 @@ Response: Array of state objects
 Get Home Assistant configuration.
 
 ```json
-{"id": 1, "type": "get_config"}
+{ "id": 1, "type": "get_config" }
 ```
 
 ### get_services
@@ -85,7 +85,7 @@ Get Home Assistant configuration.
 Get all available services.
 
 ```json
-{"id": 1, "type": "get_services"}
+{ "id": 1, "type": "get_services" }
 ```
 
 Response: `{"result": {"domain": {"service_name": {...}}}}`
@@ -100,7 +100,7 @@ Call a service.
   "type": "call_service",
   "domain": "light",
   "service": "turn_on",
-  "service_data": {"entity_id": "light.kitchen", "brightness": 255}
+  "service_data": { "entity_id": "light.kitchen", "brightness": 255 }
 }
 ```
 
@@ -122,7 +122,7 @@ Initial response confirms subscription, then events with:
 {
   "id": 1,
   "type": "event",
-  "event": {"result": "<rendered_template>"}
+  "event": { "result": "<rendered_template>" }
 }
 ```
 
@@ -154,12 +154,10 @@ Get state history for entities. **NOT** `history/period/<timestamp>`.
 {
   "result": {
     "sensor.temperature": [
-      {"s": "72.5", "lu": 1704067200},
-      {"s": "73.0", "lu": 1704070800}
+      { "s": "72.5", "lu": 1704067200 },
+      { "s": "73.0", "lu": 1704070800 }
     ],
-    "light.kitchen": [
-      {"s": "on", "lu": 1704067200}
-    ]
+    "light.kitchen": [{ "s": "on", "lu": 1704067200 }]
   }
 }
 ```
@@ -294,7 +292,7 @@ List available statistic IDs.
 Get system log entries.
 
 ```json
-{"id": 1, "type": "system_log/list"}
+{ "id": 1, "type": "system_log/list" }
 ```
 
 Response:
@@ -308,7 +306,7 @@ Response:
       "message": ["Error message here"],
       "name": "homeassistant.components.sensor",
       "timestamp": 1704067200.123,
-      "first_occurred": 1704067000.000,
+      "first_occurred": 1704067000.0,
       "count": 5
     }
   ]
@@ -326,7 +324,7 @@ Response:
 List all entities in the registry.
 
 ```json
-{"id": 1, "type": "config/entity_registry/list"}
+{ "id": 1, "type": "config/entity_registry/list" }
 ```
 
 ### config/device_registry/list
@@ -334,7 +332,7 @@ List all entities in the registry.
 List all devices.
 
 ```json
-{"id": 1, "type": "config/device_registry/list"}
+{ "id": 1, "type": "config/device_registry/list" }
 ```
 
 ### config/area_registry/list
@@ -342,7 +340,7 @@ List all devices.
 List all areas.
 
 ```json
-{"id": 1, "type": "config/area_registry/list"}
+{ "id": 1, "type": "config/area_registry/list" }
 ```
 
 ---
@@ -408,8 +406,8 @@ Response:
       "run_id": "01ABC123...",
       "state": "stopped",
       "script_execution": "finished",
-      "timestamp": {"start": "2024-01-01T00:00:00+00:00", "finish": "2024-01-01T00:00:01+00:00"},
-      "context": {"id": "..."}
+      "timestamp": { "start": "2024-01-01T00:00:00+00:00", "finish": "2024-01-01T00:00:01+00:00" },
+      "context": { "id": "..." }
     }
   ]
 }
@@ -539,8 +537,8 @@ interface HAState {
   entity_id: string;
   state: string;
   attributes: Record<string, any>;
-  last_changed: string;  // ISO timestamp
-  last_updated: string;  // ISO timestamp
+  last_changed: string; // ISO timestamp
+  last_updated: string; // ISO timestamp
   context: {
     id: string;
     parent_id: string | null;
@@ -553,10 +551,10 @@ interface HAState {
 
 ```typescript
 interface HistoryStateMinimal {
-  s: string;           // state
-  lu: number;          // last_updated (Unix timestamp)
-  lc?: number;         // last_changed (Unix timestamp)
-  a?: Record<string, any>;  // attributes
+  s: string; // state
+  lu: number; // last_updated (Unix timestamp)
+  lc?: number; // last_changed (Unix timestamp)
+  a?: Record<string, any>; // attributes
 }
 ```
 
@@ -565,8 +563,8 @@ interface HistoryStateMinimal {
 ```typescript
 interface HistoryStateFull {
   state: string;
-  last_updated: string;  // ISO timestamp
-  last_changed: string;  // ISO timestamp
+  last_updated: string; // ISO timestamp
+  last_changed: string; // ISO timestamp
   attributes: Record<string, any>;
 }
 ```
@@ -575,7 +573,7 @@ interface HistoryStateFull {
 
 ```typescript
 interface LogbookEntry {
-  when: number;         // Unix timestamp with fractional seconds
+  when: number; // Unix timestamp with fractional seconds
   state?: string;
   entity_id?: string;
   message?: string;
@@ -587,8 +585,8 @@ interface LogbookEntry {
 
 ```typescript
 interface StatEntry {
-  start: number;        // Unix timestamp (NOT string)
-  end?: number;         // Unix timestamp
+  start: number; // Unix timestamp (NOT string)
+  end?: number; // Unix timestamp
   min: number;
   max: number;
   mean?: number;
@@ -602,8 +600,8 @@ interface StatEntry {
 ```typescript
 interface SysLogEntry {
   level: string;
-  source: string[];      // Array of strings
-  message: string | string[];  // Can be string OR array
+  source: string[]; // Array of strings
+  message: string | string[]; // Can be string OR array
   name?: string;
   timestamp?: number;
   first_occurred?: number;

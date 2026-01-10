@@ -12,27 +12,27 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
 ### Make Targets
 
-| Target | Description |
-|--------|-------------|
-| `make setup` | Setup development environment (pre-commit, Go tools, docs) |
-| `make validate` | Validate all blueprints |
-| `make validate-single FILE=<path>` | Validate a single blueprint |
-| `make build` | Build all Go tools |
-| `make go-init` | Download Go dependencies |
-| `make go-tools` | Install Go dev tools (golangci-lint, gofumpt, goimports) |
-| `make go-test` | Run Go tests |
-| `make go-lint` | Run Go linters (with auto-fix) |
-| `make go-format` | Format Go code |
-| `make go-vet` | Run go vet |
-| `make go-check` | Run all Go checks (format, lint, vet, test) |
-| `make go-audit` | Run security audit with govulncheck |
-| `make go-clean` | Clean Go build artifacts |
-| `make docs-check` | Check docs with Biome |
-| `make docs-fix` | Fix docs issues with Biome |
-| `make check` | Run all checks (Go + blueprints + docs) |
-| `make check-all` | Run all checks including security audit |
-| `make clean` | Clean build artifacts |
-| `make help` | Show all available targets |
+| Target                             | Description                                                |
+| ---------------------------------- | ---------------------------------------------------------- |
+| `make setup`                       | Setup development environment (pre-commit, Go tools, docs) |
+| `make validate`                    | Validate all blueprints                                    |
+| `make validate-single FILE=<path>` | Validate a single blueprint                                |
+| `make build`                       | Build all Go tools                                         |
+| `make go-init`                     | Download Go dependencies                                   |
+| `make go-tools`                    | Install Go dev tools (golangci-lint, gofumpt, goimports)   |
+| `make go-test`                     | Run Go tests                                               |
+| `make go-lint`                     | Run Go linters (with auto-fix)                             |
+| `make go-format`                   | Format Go code                                             |
+| `make go-vet`                      | Run go vet                                                 |
+| `make go-check`                    | Run all Go checks (format, lint, vet, test)                |
+| `make go-audit`                    | Run security audit with govulncheck                        |
+| `make go-clean`                    | Clean Go build artifacts                                   |
+| `make docs-check`                  | Check docs with Biome                                      |
+| `make docs-fix`                    | Fix docs issues with Biome                                 |
+| `make check`                       | Run all checks (Go + blueprints + docs)                    |
+| `make check-all`                   | Run all checks including security audit                    |
+| `make clean`                       | Clean build artifacts                                      |
+| `make help`                        | Show all available targets                                 |
 
 ### Validate Blueprints
 
@@ -92,8 +92,7 @@ blueprint:
           description: Description
           default: value
           selector:
-            selector_type:
-              options...
+            selector_type: options...
 
 variables:
   blueprint_version: "X.Y.Z"
@@ -218,15 +217,15 @@ The project website is served from `docs/` and must be kept in sync with bluepri
 
 ### Files to Update
 
-| Change Type | Files to Update |
-|-------------|-----------------|
-| New blueprint | Root README.md (gallery + structure), docs/index.html, CLAUDE.md if patterns change |
-| New Go tool feature | Tool's README.md, CLAUDE.md (architecture if new files), CHANGELOG.md |
-| New Go tool internal package | Tool's README.md + CLAUDE.md (architecture sections), root README.md (structure) |
-| New workflow file | Root README.md (structure section) |
-| Changed directory structure | All README.md and CLAUDE.md files with architecture/structure sections |
-| New npm script | package.json, CLAUDE.md (npm Scripts table), CONTRIBUTING.md (Available npm Scripts) |
-| Contribution process change | CONTRIBUTING.md, CLAUDE.md if it affects documented workflows |
+| Change Type                  | Files to Update                                                                      |
+| ---------------------------- | ------------------------------------------------------------------------------------ |
+| New blueprint                | Root README.md (gallery + structure), docs/index.html, CLAUDE.md if patterns change  |
+| New Go tool feature          | Tool's README.md, CLAUDE.md (architecture if new files), CHANGELOG.md                |
+| New Go tool internal package | Tool's README.md + CLAUDE.md (architecture sections), root README.md (structure)     |
+| New workflow file            | Root README.md (structure section)                                                   |
+| Changed directory structure  | All README.md and CLAUDE.md files with architecture/structure sections               |
+| New npm script               | package.json, CLAUDE.md (npm Scripts table), CONTRIBUTING.md (Available npm Scripts) |
+| Contribution process change  | CONTRIBUTING.md, CLAUDE.md if it affects documented workflows                        |
 
 ### Architecture Sections
 

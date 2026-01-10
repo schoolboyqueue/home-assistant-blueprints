@@ -15,12 +15,12 @@ This blueprint features **intelligent hardware auto-detection** that identifies 
 
 The blueprint recognizes these specific device models:
 
-| Manufacturer | Models | Protocol | Features |
-|-------------|--------|----------|----------|
-| **Zooz** | ZEN71, ZEN72, ZEN73, ZEN74, ZEN76, ZEN77 | Z-Wave | LED, 5x multi-tap, Central Scene |
-| **Inovelli Blue** | VZM31 (2-in-1), VZM35 (Fan) | Zigbee | LED, Config button, 5x multi-tap, Release detection |
-| **Inovelli Red** | LZW30, LZW31, LZW36 | Z-Wave | LED, Config button, 5x multi-tap |
-| **Lutron Pico** | 2-button, 3-button, 4-button, 5-button | Lutron | Release detection, Favorite button |
+| Manufacturer      | Models                                   | Protocol | Features                                            |
+| ----------------- | ---------------------------------------- | -------- | --------------------------------------------------- |
+| **Zooz**          | ZEN71, ZEN72, ZEN73, ZEN74, ZEN76, ZEN77 | Z-Wave   | LED, 5x multi-tap, Central Scene                    |
+| **Inovelli Blue** | VZM31 (2-in-1), VZM35 (Fan)              | Zigbee   | LED, Config button, 5x multi-tap, Release detection |
+| **Inovelli Red**  | LZW30, LZW31, LZW36                      | Z-Wave   | LED, Config button, 5x multi-tap                    |
+| **Lutron Pico**   | 2-button, 3-button, 4-button, 5-button   | Lutron   | Release detection, Favorite button                  |
 
 Supported behaviors:
 

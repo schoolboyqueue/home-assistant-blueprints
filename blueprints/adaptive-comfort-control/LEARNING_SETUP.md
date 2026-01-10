@@ -8,23 +8,23 @@ The learning system tracks your manual temperature adjustments and adapts to you
 - **Time of Day**: Day vs Night (based on sun position)
 - **Season**: Winter, Spring, Summer, or Autumn
 
-| Key | Description |
-|-----|-------------|
-| `heat_day_winter` | Heating preference during winter days |
+| Key                 | Description                             |
+| ------------------- | --------------------------------------- |
+| `heat_day_winter`   | Heating preference during winter days   |
 | `heat_night_winter` | Heating preference during winter nights |
-| `cool_day_winter` | Cooling preference during winter days |
+| `cool_day_winter`   | Cooling preference during winter days   |
 | `cool_night_winter` | Cooling preference during winter nights |
-| `heat_day_spring` | Heating preference during spring days |
+| `heat_day_spring`   | Heating preference during spring days   |
 | `heat_night_spring` | Heating preference during spring nights |
-| `cool_day_spring` | Cooling preference during spring days |
+| `cool_day_spring`   | Cooling preference during spring days   |
 | `cool_night_spring` | Cooling preference during spring nights |
-| `heat_day_summer` | Heating preference during summer days |
+| `heat_day_summer`   | Heating preference during summer days   |
 | `heat_night_summer` | Heating preference during summer nights |
-| `cool_day_summer` | Cooling preference during summer days |
+| `cool_day_summer`   | Cooling preference during summer days   |
 | `cool_night_summer` | Cooling preference during summer nights |
-| `heat_day_autumn` | Heating preference during autumn days |
+| `heat_day_autumn`   | Heating preference during autumn days   |
 | `heat_night_autumn` | Heating preference during autumn nights |
-| `cool_day_autumn` | Cooling preference during autumn days |
+| `cool_day_autumn`   | Cooling preference during autumn days   |
 | `cool_night_autumn` | Cooling preference during autumn nights |
 
 This allows the system to learn complex seasonal patterns. For example, you might prefer it cooler during summer nights but warmer during winter mornings, and these preferences will be applied automatically as conditions change.
@@ -163,12 +163,12 @@ Adjustments you make are stored with the current season, so preferences learned 
 
 ### Heating vs Cooling Detection
 
-| Trigger | Offset Updated |
-|---------|----------------|
-| You adjust `target_temp_low` (heat setpoint) | `heat_{day\|night}_{season}` |
+| Trigger                                       | Offset Updated               |
+| --------------------------------------------- | ---------------------------- |
+| You adjust `target_temp_low` (heat setpoint)  | `heat_{day\|night}_{season}` |
 | You adjust `target_temp_high` (cool setpoint) | `cool_{day\|night}_{season}` |
-| Single setpoint + HVAC mode is "heat" | `heat_{day\|night}_{season}` |
-| Single setpoint + HVAC mode is "cool" | `cool_{day\|night}_{season}` |
+| Single setpoint + HVAC mode is "heat"         | `heat_{day\|night}_{season}` |
+| Single setpoint + HVAC mode is "cool"         | `cool_{day\|night}_{season}` |
 
 The `{day|night}` component is determined by sun position, and `{season}` is one of `summer`, `winter`, or `shoulder`.
 
@@ -251,13 +251,13 @@ event_data:
 
 ### Learning Rate Guide
 
-| Rate | Speed | Stability | Best For |
-|------|-------|-----------|----------|
-| 0.05 | Very Slow | Very Stable | Highly consistent preferences |
-| 0.10 | Slow | Stable | Most users |
-| **0.15** | **Moderate** | **Balanced** | **Recommended default** |
-| 0.20 | Fast | Moderate | Quickly adapting to new patterns |
-| 0.30 | Very Fast | Less Stable | Experimental/testing |
+| Rate     | Speed        | Stability    | Best For                         |
+| -------- | ------------ | ------------ | -------------------------------- |
+| 0.05     | Very Slow    | Very Stable  | Highly consistent preferences    |
+| 0.10     | Slow         | Stable       | Most users                       |
+| **0.15** | **Moderate** | **Balanced** | **Recommended default**          |
+| 0.20     | Fast         | Moderate     | Quickly adapting to new patterns |
+| 0.30     | Very Fast    | Less Stable  | Experimental/testing             |
 
 ### Convergence Timeline
 

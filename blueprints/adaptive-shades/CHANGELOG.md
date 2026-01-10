@@ -89,7 +89,7 @@
   - Changes from Home Assistant UI (detected via `user_id` in context)
   - Changes from other automations (detected via `parent_id` in context)
   - Changes from physical remotes/buttons (detected as manual when helper is configured)
-  
+
   Without the helper, behavior is unchanged from v1.12.4 (only UI changes detected as manual).
 
 ## [1.12.4] - 2025-12-26
@@ -121,7 +121,7 @@
   2. UI interactions (`user_id` present) - always treated as manual
   3. Automation/script changes (`parent_id` present) - never treated as manual
   4. Device state reports (no `user_id` or `parent_id`) - treated as manual only if the final position differs significantly from the automation's target position (beyond the hysteresis threshold)
-  
+
   This correctly detects physical remote control, voice assistant commands, and native app changes without false positives from intermediate position reports during shade movement or final position reports after automation-triggered movements.
 
 ## [1.12.0] - 2025-12-25

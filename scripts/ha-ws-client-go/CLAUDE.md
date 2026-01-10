@@ -142,7 +142,7 @@ func HandleMyCommand(ctx *Context) error {
 - Use semantic versioning: patch for fixes, minor for features, major for breaking changes
 - **Skip version bump for:**
   - Documentation-only changes (README.md, CLAUDE.md, comments)
-  - Test-only changes (*_test.go files, testdata/)
+  - Test-only changes (\*\_test.go files, testdata/)
   - CI/workflow changes (.github/)
 
 **2. Update documentation (for new features/commands):**
@@ -266,11 +266,11 @@ Dev tools (installed via `make tools`):
 
 All commands support output format flags for context-efficient AI consumption:
 
-| Flag | Format | Use Case |
-|------|--------|----------|
-| `--json` | JSON | Machine-readable, most context-efficient |
-| `--compact` | Compact | Reduced verbosity, single-line entries |
-| (default) | Default | Human-readable with formatting |
+| Flag        | Format  | Use Case                                 |
+| ----------- | ------- | ---------------------------------------- |
+| `--json`    | JSON    | Machine-readable, most context-efficient |
+| `--compact` | Compact | Reduced verbosity, single-line entries   |
+| (default)   | Default | Human-readable with formatting           |
 
 **Additional flags:**
 
@@ -338,12 +338,12 @@ Binary sizes are ~5.5-5.8MB (vs ~50MB+ for Node.js equivalent).
 
 **Keep documentation in sync with code changes:**
 
-| Change Type | Files to Update |
-|-------------|-----------------|
-| New command | README.md (command tables), CLAUDE.md (if patterns change), CHANGELOG.md |
-| New internal package | README.md + CLAUDE.md (Architecture sections), root README.md |
-| New handler file | README.md + CLAUDE.md (Architecture sections) |
-| Changed command behavior | README.md (command description), CLAUDE.md (examples), CHANGELOG.md |
-| Version release | Makefile (VERSION), CHANGELOG.md (new entry with date) |
+| Change Type              | Files to Update                                                          |
+| ------------------------ | ------------------------------------------------------------------------ |
+| New command              | README.md (command tables), CLAUDE.md (if patterns change), CHANGELOG.md |
+| New internal package     | README.md + CLAUDE.md (Architecture sections), root README.md            |
+| New handler file         | README.md + CLAUDE.md (Architecture sections)                            |
+| Changed command behavior | README.md (command description), CLAUDE.md (examples), CHANGELOG.md      |
+| Version release          | Makefile (VERSION), CHANGELOG.md (new entry with date)                   |
 
 Before committing structural changes, verify the Architecture section in both README.md and CLAUDE.md reflects the current directory structure.

@@ -175,7 +175,7 @@
 
 ### Changed
 
-- **Safety-first auto-on when guards enabled:** Final `climate.turn_on` is now allowed even from a manual `hvac_mode: off` state *only* when freeze or overheat protection is enabled and currently blocking pause (`pause_blocked_now`), preserving manual off in normal conditions but restoring HVAC when approaching configured safety guards.
+- **Safety-first auto-on when guards enabled:** Final `climate.turn_on` is now allowed even from a manual `hvac_mode: off` state _only_ when freeze or overheat protection is enabled and currently blocking pause (`pause_blocked_now`), preserving manual off in normal conditions but restoring HVAC when approaching configured safety guards.
 
 ## [4.18.3] — 2025-11-15
 

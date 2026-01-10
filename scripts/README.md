@@ -4,10 +4,10 @@ This directory contains tools for developing and debugging Home Assistant bluepr
 
 ## Tools
 
-| Tool | Language | Description |
-|------|----------|-------------|
-| [validate-blueprint-go](./validate-blueprint-go/) | Go | Validate blueprint YAML structure before importing to HA |
-| [ha-ws-client-go](./ha-ws-client-go/) | Go | WebSocket API client for querying HA and debugging automations |
+| Tool                                              | Language | Description                                                    |
+| ------------------------------------------------- | -------- | -------------------------------------------------------------- |
+| [validate-blueprint-go](./validate-blueprint-go/) | Go       | Validate blueprint YAML structure before importing to HA       |
+| [ha-ws-client-go](./ha-ws-client-go/)             | Go       | WebSocket API client for querying HA and debugging automations |
 
 ## Version Information
 

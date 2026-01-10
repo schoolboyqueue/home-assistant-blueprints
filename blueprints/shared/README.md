@@ -17,20 +17,20 @@ Reusable Jinja2 template macros for common calculation patterns. This file serve
 
 **Included Templates:**
 
-| Template | Description | Used By |
-|----------|-------------|---------|
-| Unit Conversion | C/F temperature conversion | All temperature blueprints |
-| Heat Index | Rothfusz regression (feels-like temp) | adaptive-fan-control |
-| Adaptive Comfort | EN 16798 / ASHRAE 55 model | adaptive-fan, adaptive-comfort |
-| Psychrometrics | Dew point, enthalpy, humidity ratio | adaptive-comfort-control |
-| Atmospheric Pressure | Barometric formula from elevation | adaptive-comfort-control |
-| Solar Geometry | Sun position relative to window | adaptive-shades |
-| Clear-Sky Irradiance | ASHRAE clear-sky model | adaptive-shades |
-| Slat Angle | Venetian blind optimal angle | adaptive-shades |
-| Time Schedule | Overnight schedule parsing | bathroom-light-fan, adaptive-shades |
-| Presence Detection | Multi-entity presence check | All occupancy-based blueprints |
-| Sensor Validation | Safe sensor value extraction | All blueprints |
-| Climate Helpers | Thermostat attribute reading | adaptive-comfort, adaptive-shades |
+| Template             | Description                           | Used By                             |
+| -------------------- | ------------------------------------- | ----------------------------------- |
+| Unit Conversion      | C/F temperature conversion            | All temperature blueprints          |
+| Heat Index           | Rothfusz regression (feels-like temp) | adaptive-fan-control                |
+| Adaptive Comfort     | EN 16798 / ASHRAE 55 model            | adaptive-fan, adaptive-comfort      |
+| Psychrometrics       | Dew point, enthalpy, humidity ratio   | adaptive-comfort-control            |
+| Atmospheric Pressure | Barometric formula from elevation     | adaptive-comfort-control            |
+| Solar Geometry       | Sun position relative to window       | adaptive-shades                     |
+| Clear-Sky Irradiance | ASHRAE clear-sky model                | adaptive-shades                     |
+| Slat Angle           | Venetian blind optimal angle          | adaptive-shades                     |
+| Time Schedule        | Overnight schedule parsing            | bathroom-light-fan, adaptive-shades |
+| Presence Detection   | Multi-entity presence check           | All occupancy-based blueprints      |
+| Sensor Validation    | Safe sensor value extraction          | All blueprints                      |
+| Climate Helpers      | Thermostat attribute reading          | adaptive-comfort, adaptive-shades   |
 
 **Why This File Exists:**
 Home Assistant blueprints don't support external imports. This file documents the canonical formulas so:
@@ -75,11 +75,11 @@ Since Home Assistant blueprints don't support external imports, copy the relevan
 variables:
   # Copy from regional_profile_helpers.yaml
   _us_state_to_region: >
-      {{ {
-        'AL': 'Hot-Humid',
-        'AK': 'Very Cold',
-        # ... rest of mapping
-      } }}
+    {{ {
+      'AL': 'Hot-Humid',
+      'AK': 'Very Cold',
+      # ... rest of mapping
+    } }}
 
   # Parse state code from "XX - State Name" format
   _state_code: "{{ (user_state_code.split(' ')[0] if user_state_code else '') }}"
@@ -93,11 +93,11 @@ variables:
 ```yaml
 variables:
   _psychro_dp_max_c: >
-      {{ {
-        'Hot-Humid': 18.0,
-        'Hot-Dry': 19.0,
-        # ... rest of mapping
-      } }}
+    {{ {
+      'Hot-Humid': 18.0,
+      'Hot-Dry': 19.0,
+      # ... rest of mapping
+    } }}
 
   # Get dew point threshold for the region
   max_dew_point_c: "{{ _psychro_dp_max_c.get(climate_region, 17.0) }}"
@@ -111,12 +111,12 @@ variables:
 ```yaml
 variables:
   _seasonal_winter_bias_c: >
-      {{ {
-        'Hot-Humid': 0.1,
-        'Cold': 0.5,
-        'Very Cold': 0.6,
-        # ... rest of mapping
-      } }}
+    {{ {
+      'Hot-Humid': 0.1,
+      'Cold': 0.5,
+      'Very Cold': 0.6,
+      # ... rest of mapping
+    } }}
 
   # Apply intensity factor (1.0 = recommended)
   bias_intensity: !input bias_preset_intensity
@@ -127,16 +127,16 @@ variables:
 
 ## Climate Zones
 
-| Zone | Description | Example Regions |
-|------|-------------|-----------------|
-| Hot-Humid | High temps & humidity year-round | FL, LA, TX, HI, Singapore, Queensland |
-| Hot-Dry | High temps, low humidity | AZ, NV, NM, Dubai, Egypt |
-| Marine | Mild coastal climate | CA, OR, WA, UK, NZ, Portugal |
-| Mixed-Humid | Warm humid summers, mild winters | NC, TN, VA, Japan, Italy |
-| Mixed-Dry | Warm dry summers, cold winters | CO, WY, ID, Spain, Greece |
-| Cold | Warm summers, cold winters | NY, MA, MI, Germany, Ontario |
-| Very Cold | Short cool summers, long cold winters | AK, MN, Finland, Norway |
-| Subarctic | Very short summers, extreme cold | Yukon, NWT, Nunavut |
+| Zone        | Description                           | Example Regions                       |
+| ----------- | ------------------------------------- | ------------------------------------- |
+| Hot-Humid   | High temps & humidity year-round      | FL, LA, TX, HI, Singapore, Queensland |
+| Hot-Dry     | High temps, low humidity              | AZ, NV, NM, Dubai, Egypt              |
+| Marine      | Mild coastal climate                  | CA, OR, WA, UK, NZ, Portugal          |
+| Mixed-Humid | Warm humid summers, mild winters      | NC, TN, VA, Japan, Italy              |
+| Mixed-Dry   | Warm dry summers, cold winters        | CO, WY, ID, Spain, Greece             |
+| Cold        | Warm summers, cold winters            | NY, MA, MI, Germany, Ontario          |
+| Very Cold   | Short cool summers, long cold winters | AK, MN, Finland, Norway               |
+| Subarctic   | Very short summers, extreme cold      | Yukon, NWT, Nunavut                   |
 
 ## Data Sources
 
