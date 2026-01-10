@@ -94,7 +94,7 @@ The adaptive comfort model solves this by calculating a dynamic comfort band bas
 
 The comfort temperature is calculated as:
 
-```
+```text
 T_comfort = 0.33 × T_outdoor + 18.8°C
 ```
 

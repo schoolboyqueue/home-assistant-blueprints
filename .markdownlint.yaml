@@ -1,0 +1,42 @@
+# Markdownlint configuration
+# See: https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+
+default: true
+
+# MD013: Line length - disabled for flexibility
+MD013: false
+
+# MD024: Multiple headings with the same content - allow in different sections
+MD024:
+  siblings_only: true
+
+# MD033: Inline HTML - allow specific elements
+MD033:
+  allowed_elements:
+    - div
+    - h1
+    - p
+    - em
+    - b
+    - a
+    - img
+    - br
+    - details
+    - summary
+    - kbd
+
+# MD036: Emphasis used instead of a heading - disabled
+MD036: false
+
+# MD040: Fenced code blocks should have a language specified
+MD040: true
+
+# MD041: First line in a file should be a top-level heading - disabled
+MD041: false
+
+# MD055: Table pipe style - require pretty/padded tables
+MD055:
+  style: padded
+
+# MD060: Table column style - disabled (not auto-fixable)
+MD060: false

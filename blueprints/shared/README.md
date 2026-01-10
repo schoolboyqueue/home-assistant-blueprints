@@ -34,6 +34,7 @@ Reusable Jinja2 template macros for common calculation patterns. This file serve
 
 **Why This File Exists:**
 Home Assistant blueprints don't support external imports. This file documents the canonical formulas so:
+
 - Developers can copy-paste verified implementations
 - Formulas are documented with mathematical references
 - Changes can be audited in one place before propagating to blueprints

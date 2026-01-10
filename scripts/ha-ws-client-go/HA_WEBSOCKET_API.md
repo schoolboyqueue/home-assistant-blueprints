@@ -13,6 +13,7 @@ This document provides the correct WebSocket message types, parameters, and resp
 ## Message Format
 
 All messages after auth use this format:
+
 ```json
 {
   "id": 1,
@@ -22,6 +23,7 @@ All messages after auth use this format:
 ```
 
 Responses:
+
 ```json
 {
   "id": 1,
@@ -36,18 +38,25 @@ Responses:
 ## Core Commands
 
 ### ping
+
 Test connection.
+
 ```json
 {"id": 1, "type": "ping"}
 ```
+
 Response: `{"id": 1, "type": "pong"}`
 
 ### get_states
+
 Get all entity states.
+
 ```json
 {"id": 1, "type": "get_states"}
 ```
+
 Response: Array of state objects
+
 ```json
 {
   "result": [
@@ -64,20 +73,27 @@ Response: Array of state objects
 ```
 
 ### get_config
+
 Get Home Assistant configuration.
+
 ```json
 {"id": 1, "type": "get_config"}
 ```
 
 ### get_services
+
 Get all available services.
+
 ```json
 {"id": 1, "type": "get_services"}
 ```
+
 Response: `{"result": {"domain": {"service_name": {...}}}}`
 
 ### call_service
+
 Call a service.
+
 ```json
 {
   "id": 1,
@@ -89,7 +105,9 @@ Call a service.
 ```
 
 ### render_template (Subscription-based)
+
 Render a Jinja2 template. **This is subscription-based** - it returns results via events.
+
 ```json
 {
   "id": 1,
@@ -97,7 +115,9 @@ Render a Jinja2 template. **This is subscription-based** - it returns results vi
   "template": "{{ states('sun.sun') }}"
 }
 ```
+
 Initial response confirms subscription, then events with:
+
 ```json
 {
   "id": 1,
@@ -111,7 +131,9 @@ Initial response confirms subscription, then events with:
 ## History Commands
 
 ### history/history_during_period
+
 Get state history for entities. **NOT** `history/period/<timestamp>`.
+
 ```json
 {
   "id": 1,
@@ -125,7 +147,9 @@ Get state history for entities. **NOT** `history/period/<timestamp>`.
   "include_start_time_state": true
 }
 ```
+
 **Response format**: `map[entity_id][]HistoryState`
+
 ```json
 {
   "result": {
@@ -141,19 +165,23 @@ Get state history for entities. **NOT** `history/period/<timestamp>`.
 ```
 
 **HistoryState fields** (minimal_response=true):
+
 - `s` - state value (string)
 - `lu` - last_updated (Unix timestamp, number)
 - `lc` - last_changed (Unix timestamp, number)
 - `a` - attributes (object, if no_attributes=false)
 
 **HistoryState fields** (minimal_response=false):
+
 - `state` - state value
 - `last_updated` - ISO timestamp string
 - `last_changed` - ISO timestamp string
 - `attributes` - full attributes object
 
 ### history/stream (Subscription-based)
+
 Subscribe to live history stream.
+
 ```json
 {
   "id": 1,
@@ -168,7 +196,9 @@ Subscribe to live history stream.
 ## Logbook Commands
 
 ### logbook/get_events
+
 Get logbook entries. **NOT** `logbook/period/<timestamp>`.
+
 ```json
 {
   "id": 1,
@@ -180,7 +210,9 @@ Get logbook entries. **NOT** `logbook/period/<timestamp>`.
   "context_id": null
 }
 ```
+
 Response: Array of logbook entries
+
 ```json
 {
   "result": [
@@ -195,6 +227,7 @@ Response: Array of logbook entries
 ```
 
 ### logbook/event_stream (Subscription-based)
+
 Subscribe to live logbook events.
 
 ---
@@ -202,7 +235,9 @@ Subscribe to live logbook events.
 ## Recorder/Statistics Commands
 
 ### recorder/statistics_during_period
+
 Get sensor statistics.
+
 ```json
 {
   "id": 1,
@@ -213,9 +248,11 @@ Get sensor statistics.
   "period": "hour"
 }
 ```
+
 **period options**: `5minute`, `hour`, `day`, `week`, `month`
 
 Response: `map[statistic_id][]StatEntry`
+
 ```json
 {
   "result": {
@@ -237,7 +274,9 @@ Response: `map[statistic_id][]StatEntry`
 **Note**: `start` and `end` are Unix timestamps (numbers), not ISO strings.
 
 ### recorder/list_statistic_ids
+
 List available statistic IDs.
+
 ```json
 {
   "id": 1,
@@ -251,11 +290,15 @@ List available statistic IDs.
 ## System Log Commands
 
 ### system_log/list
+
 Get system log entries.
+
 ```json
 {"id": 1, "type": "system_log/list"}
 ```
+
 Response:
+
 ```json
 {
   "result": [
@@ -279,19 +322,25 @@ Response:
 ## Registry Commands
 
 ### config/entity_registry/list
+
 List all entities in the registry.
+
 ```json
 {"id": 1, "type": "config/entity_registry/list"}
 ```
 
 ### config/device_registry/list
+
 List all devices.
+
 ```json
 {"id": 1, "type": "config/device_registry/list"}
 ```
 
 ### config/area_registry/list
+
 List all areas.
+
 ```json
 {"id": 1, "type": "config/area_registry/list"}
 ```
@@ -301,7 +350,9 @@ List all areas.
 ## Automation Commands
 
 ### automation/config
+
 Get automation configuration. **NOT** `config/automation/config/<id>`.
+
 ```json
 {
   "id": 1,
@@ -309,7 +360,9 @@ Get automation configuration. **NOT** `config/automation/config/<id>`.
   "entity_id": "automation.my_automation"
 }
 ```
+
 Response:
+
 ```json
 {
   "result": {
@@ -333,7 +386,9 @@ Response:
 ## Trace Commands
 
 ### trace/list
+
 List automation/script traces. Response is an **array**, not a map.
+
 ```json
 {
   "id": 1,
@@ -342,7 +397,9 @@ List automation/script traces. Response is an **array**, not a map.
   "item_id": "my_automation"
 }
 ```
+
 Response:
+
 ```json
 {
   "result": [
@@ -359,7 +416,9 @@ Response:
 ```
 
 ### trace/get
+
 Get detailed trace for a specific run.
+
 ```json
 {
   "id": 1,
@@ -371,7 +430,9 @@ Get detailed trace for a specific run.
 ```
 
 ### trace/contexts
+
 Get trace contexts.
+
 ```json
 {
   "id": 1,
@@ -386,7 +447,9 @@ Get trace contexts.
 ## Subscription Commands
 
 ### subscribe_trigger
+
 Subscribe to a trigger.
+
 ```json
 {
   "id": 1,
@@ -397,7 +460,9 @@ Subscribe to a trigger.
   }
 }
 ```
+
 Events:
+
 ```json
 {
   "id": 1,
@@ -416,7 +481,9 @@ Events:
 ```
 
 ### subscribe_events
+
 Subscribe to events by type.
+
 ```json
 {
   "id": 1,
@@ -426,7 +493,9 @@ Subscribe to events by type.
 ```
 
 ### unsubscribe_events
+
 Unsubscribe from events.
+
 ```json
 {
   "id": 1,
@@ -464,6 +533,7 @@ Unsubscribe from events.
 ## Type Definitions
 
 ### HAState
+
 ```typescript
 interface HAState {
   entity_id: string;
@@ -480,6 +550,7 @@ interface HAState {
 ```
 
 ### HistoryState (minimal_response=true)
+
 ```typescript
 interface HistoryStateMinimal {
   s: string;           // state
@@ -490,6 +561,7 @@ interface HistoryStateMinimal {
 ```
 
 ### HistoryState (minimal_response=false)
+
 ```typescript
 interface HistoryStateFull {
   state: string;
@@ -500,6 +572,7 @@ interface HistoryStateFull {
 ```
 
 ### LogbookEntry
+
 ```typescript
 interface LogbookEntry {
   when: number;         // Unix timestamp with fractional seconds
@@ -511,6 +584,7 @@ interface LogbookEntry {
 ```
 
 ### StatEntry
+
 ```typescript
 interface StatEntry {
   start: number;        // Unix timestamp (NOT string)
@@ -524,6 +598,7 @@ interface StatEntry {
 ```
 
 ### SysLogEntry
+
 ```typescript
 interface SysLogEntry {
   level: string;
@@ -537,6 +612,7 @@ interface SysLogEntry {
 ```
 
 ### TraceInfo
+
 ```typescript
 interface TraceInfo {
   item_id: string;

@@ -6,7 +6,7 @@ Go CLI for Home Assistant WebSocket API. Runs in HA add-on environment or on Ras
 
 ## Architecture
 
-```
+```text
 ha-ws-client-go/
 ├── cmd/ha-ws-client/
 │   └── main.go               # Entry point - CLI parsing, WebSocket, routing
@@ -83,6 +83,7 @@ make help         # Show all available commands
 This project uses **golangci-lint** with 25+ linters and **gofumpt** for stricter formatting.
 
 Key conventions:
+
 - **Tabs** for indentation (Go standard)
 - Error wrapping with `fmt.Errorf("...: %w", err)`
 - Named return values where it improves clarity
@@ -120,6 +121,7 @@ func parseTimeArgs(args []string) (filtered []string, fromTime, toTime *time.Tim
    - Write a concise description
 
 Handler signature:
+
 ```go
 func HandleMyCommand(ctx *Context) error {
     // ctx.Client - WebSocket client
@@ -134,6 +136,7 @@ func HandleMyCommand(ctx *Context) error {
 ### Before Committing
 
 **1. Bump version (for functional code changes only):**
+
 - Update `VERSION` in `Makefile` (e.g., `1.0.4` → `1.0.5`)
 - Add entry to `CHANGELOG.md` with the new version and date
 - Use semantic versioning: patch for fixes, minor for features, major for breaking changes
@@ -143,6 +146,7 @@ func HandleMyCommand(ctx *Context) error {
   - CI/workflow changes (.github/)
 
 **2. Update documentation (for new features/commands):**
+
 - Update `README.md` command tables if adding new commands or flags
 - Ensure command syntax and descriptions are accurate
 
@@ -161,12 +165,14 @@ make pre-commit   # Runs format, lint-fix, and tests
 **4. Build and test** before committing to verify changes work.
 
 **Common linter issues to watch for:**
+
 - Repeated string literals → extract to constants
 - Unchecked type assertions → use `val, ok := x.(Type)` pattern
 - Assignment operators → use `x /= 2` instead of `x = x / 2`
 - Error return values not checked → always check or explicitly ignore with `_ =`
 
 **Install dev tools if not present:**
+
 ```bash
 GOPATH=/config/.gopath go install mvdan.cc/gofumpt@v0.7.0
 GOPATH=/config/.gopath go install golang.org/x/tools/cmd/goimports@latest
@@ -251,6 +257,7 @@ export SUPERVISOR_TOKEN="your-token"
 - `gopkg.in/yaml.v3` - YAML parsing
 
 Dev tools (installed via `make tools`):
+
 - `golangci-lint` - Comprehensive linting
 - `gofumpt` - Stricter code formatting
 - `goimports` - Import organization
@@ -266,11 +273,13 @@ All commands support output format flags for context-efficient AI consumption:
 | (default) | Default | Human-readable with formatting |
 
 **Additional flags:**
+
 - `--no-headers` - Suppress headers/separators
 - `--no-timestamps` - Suppress timestamps
 - `--max-items=N` - Limit output items
 
 **Examples:**
+
 ```bash
 ./ha-ws-client states --json              # JSON array of all states
 ./ha-ws-client history sensor.temp 4 --compact  # One-line-per-entry
@@ -278,6 +287,7 @@ All commands support output format flags for context-efficient AI consumption:
 ```
 
 **JSON output structure:**
+
 ```json
 {"success": true, "data": [...], "count": 42, "command": "states"}
 {"success": true, "message": "pong"}
@@ -297,12 +307,14 @@ make build VERSION=1.2.3
 ```
 
 **Version synchronization requirements:**
+
 1. Update `VERSION` in Makefile before release (or use git tags)
 2. Add entry to `CHANGELOG.md` following Keep a Changelog format
 3. Keep version synchronized with validate-blueprint-go when making coordinated releases
 4. GitHub Actions will automatically build and attach binaries to releases
 
 **Pre-commit hook enforces:**
+
 - CHANGELOG.md must exist
 - Makefile VERSION must match latest CHANGELOG.md version
 - Warning (not blocking) if versions differ between ha-ws-client-go and validate-blueprint-go

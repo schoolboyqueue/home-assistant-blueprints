@@ -97,6 +97,7 @@ ha-ws-client stats-multi sensor.temp_kitchen sensor.temp_bedroom sensor.temp_liv
 ## Commands
 
 ### Basic Commands
+
 | Command | Description |
 |---------|-------------|
 | `state <entity_id>` | Get single entity state |
@@ -110,12 +111,14 @@ ha-ws-client stats-multi sensor.temp_kitchen sensor.temp_bedroom sensor.temp_liv
 | `ping` | Test connection |
 
 ### Diagnostic Commands
+
 | Command | Description |
 |---------|-------------|
 | `device-health <entity_id>` | Check device responsiveness and stale detection |
 | `compare <entity1> <entity2>` | Side-by-side entity comparison with attribute diffs |
 
 ### Log Commands
+
 | Command | Description |
 |---------|-------------|
 | `logbook <entity_id> [hours]` | Get logbook entries (default 24h) |
@@ -130,6 +133,7 @@ ha-ws-client stats-multi sensor.temp_kitchen sensor.temp_bedroom sensor.temp_liv
 | `watch <entity_id> [seconds]` | Live subscribe to state changes |
 
 ### Registry Commands
+
 | Command | Description |
 |---------|-------------|
 | `entities [pattern]` | List/search entity registry |
@@ -155,6 +159,7 @@ ha-ws-client stats-multi sensor.temp_kitchen sensor.temp_bedroom sensor.temp_liv
 | `blueprint-inputs <entity_id>` | Validate blueprint inputs |
 
 ### Monitoring Commands
+
 | Command | Description |
 |---------|-------------|
 | `monitor <entity_id>` | Monitor entity state changes |
@@ -162,6 +167,7 @@ ha-ws-client stats-multi sensor.temp_kitchen sensor.temp_bedroom sensor.temp_liv
 | `analyze <entity_id>` | Analyze entity state patterns |
 
 ### Utility Commands
+
 | Command | Description |
 |---------|-------------|
 | `update` | Check for and install the latest version |
@@ -431,6 +437,7 @@ Integration tests are designed to run in three different environments:
 #### Test Coverage
 
 **Base tests** (run everywhere):
+
 - Basic commands (ping, states, config, services)
 - Entity state queries and filtering (`sun.sun`)
 - Template rendering
@@ -442,6 +449,7 @@ Integration tests are designed to run in three different environments:
 - Middleware behavior with live connections
 
 **Fixture tests** (CI only):
+
 - Input helper entity verification
 - Service calls with state change verification
 - Input number history queries
@@ -452,7 +460,7 @@ Integration tests are designed to run in three different environments:
 
 ## Architecture
 
-```
+```text
 ha-ws-client-go/
 ├── cmd/ha-ws-client/        # Main entry point
 │   └── main.go

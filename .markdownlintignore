@@ -1,0 +1,5 @@
+# Ignore generated files and directories
+.automaker/
+**/node_modules/
+build/
+dist/

@@ -94,6 +94,7 @@ This finds all blueprint files matching patterns like `*_pro.yaml`, `*_pro_bluep
 ## What It Checks
 
 ### YAML & Structure
+
 | Check | Description |
 |-------|-------------|
 | YAML syntax | Valid YAML syntax |
@@ -102,6 +103,7 @@ This finds all blueprint files matching patterns like `*_pro.yaml`, `*_pro_bluep
 | Blueprint metadata | `name`, `description`, `domain`, `input` |
 
 ### Triggers
+
 | Check | Description |
 |-------|-------------|
 | Trigger platform | Presence of trigger platform/type |
@@ -109,6 +111,7 @@ This finds all blueprint files matching patterns like `*_pro.yaml`, `*_pro_bluep
 | Entity ID fields | Must be static strings (no templates allowed) |
 
 ### Inputs & Selectors
+
 | Check | Description |
 |-------|-------------|
 | Input definitions | Valid input definitions and grouping |
@@ -117,6 +120,7 @@ This finds all blueprint files matching patterns like `*_pro.yaml`, `*_pro_bluep
 | Select options | Valid select option values |
 
 ### Actions & Service Calls
+
 | Check | Description |
 |-------|-------------|
 | Service format | Valid service call structure |
@@ -126,18 +130,21 @@ This finds all blueprint files matching patterns like `*_pro.yaml`, `*_pro_bluep
 | Choose blocks | Valid `choose` block structure |
 
 ### Jinja2 Templates
+
 | Check | Description |
 |-------|-------------|
 | Input tags | No `!input` tags inside `{{ }}` blocks |
 | Delimiters | Balanced Jinja2 delimiters |
 
 ### Hysteresis Boundaries
+
 | Check | Description |
 |-------|-------------|
 | Thresholds | ON/OFF threshold relationships |
 | Gaps | Warns about inverted or missing gaps |
 
 ### Math Operations
+
 | Check | Description |
 |-------|-------------|
 | Logarithms | Warns about potential `log()` with non-positive values |
@@ -145,6 +152,7 @@ This finds all blueprint files matching patterns like `*_pro.yaml`, `*_pro_bluep
 | List methods | Detects Python-style methods (should use Jinja2 filters) |
 
 ### Documentation
+
 | Check | Description |
 |-------|-------------|
 | README.md | Exists in blueprint directory |
@@ -242,7 +250,7 @@ Run `make help` to see all available targets organized by category.
 
 ## Architecture
 
-```
+```text
 validate-blueprint-go/
 ├── main.go                  # CLI entry point and orchestration
 ├── internal/

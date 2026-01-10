@@ -6,7 +6,7 @@ Go CLI for validating Home Assistant Blueprint YAML files. Checks YAML syntax, b
 
 ## Architecture
 
-```
+```text
 validate-blueprint-go/
 ├── main.go                      # CLI entry point and orchestration
 ├── internal/
@@ -123,6 +123,7 @@ make help         # Show all available commands
 This project uses **golangci-lint** with 23+ linters and **gofumpt** for stricter formatting.
 
 Key conventions:
+
 - **Tabs** for indentation (Go standard)
 - Error wrapping with `fmt.Errorf("...: %w", err)`
 - Named return values where it improves clarity
@@ -170,6 +171,7 @@ color.Yellow("⚠ Warning: %s", message)
 4. Update `README.md` with new check documentation
 
 Validation method pattern:
+
 ```go
 // In the appropriate file (e.g., schema.go, inputs.go, etc.)
 func (v *BlueprintValidator) ValidateSomething() {
@@ -220,6 +222,7 @@ v.AddWarningf("Unknown selector type '%s'", selectorType)
 - `github.com/fatih/color` - Colored terminal output
 
 Dev tools (installed via `make tools`):
+
 - `golangci-lint` - Comprehensive linting
 - `gofumpt` - Stricter code formatting
 - `goimports` - Import organization
@@ -237,12 +240,14 @@ make build VERSION=1.2.3
 ```
 
 **Version synchronization requirements:**
+
 1. Update `VERSION` in Makefile before release (or use git tags)
 2. Add entry to `CHANGELOG.md` following Keep a Changelog format
 3. Keep version synchronized with ha-ws-client-go when making coordinated releases
 4. GitHub Actions will automatically build and attach binaries to releases
 
 **Pre-commit hook enforces:**
+
 - CHANGELOG.md must exist
 - Makefile VERSION must match latest CHANGELOG.md version
 - Warning (not blocking) if versions differ between validate-blueprint-go and ha-ws-client-go
