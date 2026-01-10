@@ -38,19 +38,16 @@ jobs:
           go-version: "1.25"
           cache-dependency-path: scripts/${{ matrix.tool }}/go.sum
 
-      # golangci-lint v1.62.2 is built with Go 1.23 and cannot analyze Go 1.25 modules
-      # Skipping until a Go 1.25-compatible version is available
-      # - name: Install golangci-lint
-      #   run: |
-      #     curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.62.2
+      - name: Build golangci-lint from source
+        run: |
+          git clone --depth 1 --branch v1.62.2 https://github.com/golangci/golangci-lint.git /tmp/golangci-lint
+          cd /tmp/golangci-lint
+          go build -o $(go env GOPATH)/bin/golangci-lint ./cmd/golangci-lint
+          golangci-lint --version
 
-      # - name: Run golangci-lint
-      #   working-directory: scripts/${{ matrix.tool }}
-      #   run: golangci-lint run --timeout=5m
-
-      - name: Run go vet
+      - name: Run golangci-lint
         working-directory: scripts/${{ matrix.tool }}
-        run: go vet ./...
+        run: golangci-lint run --timeout=5m
 
       - name: Run unit tests with coverage
         working-directory: scripts/${{ matrix.tool }}
