@@ -387,8 +387,68 @@ Your thermostat entity (e.g., `climate.ecobee`, `climate.main_floor_thermostat`)
 **Indoor Temperature** (required)  
 Primary indoor air temperature sensor. Supports `sensor`, `input_number`, or `weather` entity.
 
-**Outdoor Temperature** (required)  
+**Outdoor Temperature** (required)
 Outdoor temperature for adaptive model. Supports `sensor`, `input_number`, or `weather` entity.
+
+---
+
+### Running Mean Outdoor Temperature (RMOT)
+
+The ASHRAE-55 adaptive comfort model works best with a **Running Mean Outdoor Temperature (RMOT)** — a 7-14 day rolling average of outdoor temperatures. This smooths out daily fluctuations and better represents the thermal adaptation of occupants.
+
+**When to use RMOT:**
+- Climates with significant daily temperature swings
+- Seasons with rapid weather changes
+- When you want more stable comfort targets
+
+**Blueprint Settings:**
+1. Enable **"Use Running Mean Outdoor Temperature (RMOT)"** toggle
+2. Set **"RMOT Sensor"** to your statistics sensor
+
+#### Creating an RMOT Sensor
+
+If your outdoor temperature comes from a `weather` entity (like `weather.home`), you'll need two sensors:
+
+**Step 1: Template sensor to extract temperature**
+
+Add to `configuration.yaml`:
+
+```yaml
+template:
+  - sensor:
+      - unique_id: outdoor_temperature_from_weather
+        name: Outdoor Temperature
+        unit_of_measurement: "°F"  # or "°C" for metric
+        device_class: temperature
+        state_class: measurement
+        state: "{{ state_attr('weather.forecast_home', 'temperature') | float(0) }}"
+```
+
+**Step 2: Statistics sensor for 7-day mean**
+
+Add to `configuration.yaml`:
+
+```yaml
+sensor:
+  - platform: statistics
+    unique_id: outdoor_temperature_rmot
+    name: Outdoor Temperature RMOT
+    entity_id: sensor.outdoor_temperature
+    state_characteristic: mean
+    sampling_size: 672  # 7 days × 96 samples/day (15-min intervals)
+    max_age:
+      days: 7
+```
+
+**Step 3: Restart Home Assistant**
+
+After adding the sensors, restart Home Assistant to create the entities.
+
+> **Note:** The RMOT sensor will need several days to accumulate enough data for an accurate 7-day mean. Until then, it will calculate the mean from available samples.
+
+**Alternative: Using an existing outdoor temperature sensor**
+
+If you already have `sensor.outdoor_temperature`, skip Step 1 and just create the statistics sensor pointing to your existing sensor.
 
 ---
 

@@ -1,5 +1,5 @@
 blueprint:
-  name: Adaptive Comfort Control Pro v4.23.3
+  name: Adaptive Comfort Control Pro v4.23.4
   description: 'Adaptive comfort control + HVAC pause with unit awareness (°C/°F),
     seasonal bias, built-in psychrometrics (dew point, absolute humidity, enthalpy),
     optional RMOT, and CO₂-driven ventilation preference. Includes per-field help
@@ -1105,7 +1105,7 @@ blueprint:
               multiple: false
               sort: false
 variables:
-  blueprint_version: 4.23.3
+  blueprint_version: 4.23.4
   climate_entity_id: !input climate_entity
   indoor_sensor_id: !input indoor_temp_sensor
   outdoor_sensor_id: !input outdoor_temp_sensor
@@ -1286,15 +1286,15 @@ variables:
   learned_offset_sys: "{% set season = _learning_season %} {% set time = 'night' if
     _is_night_now else 'day' %} {% if season == 'winter' %}\n  {% set heat_val = learned_heat_day_winter_sys
     if time == 'day' else learned_heat_night_winter_sys %}\n  {% set cool_val = learned_cool_day_winter_sys
-    if time == 'day' else learned_cool_night_winter_sys %}\n{% elif season == 'spring'
+    if time == 'day' else learned_cool_night_winter_sys %}\n  {# Winter: use heating preference (85/15 weight) #}\n  {{ (0.85 * (heat_val | float(0)) + 0.15 * (cool_val | float(0))) | round(2) }}\n{% elif season == 'spring'
     %}\n  {% set heat_val = learned_heat_day_spring_sys if time == 'day' else learned_heat_night_spring_sys
     %}\n  {% set cool_val = learned_cool_day_spring_sys if time == 'day' else learned_cool_night_spring_sys
-    %}\n{% elif season == 'summer' %}\n  {% set heat_val = learned_heat_day_summer_sys
+    %}\n  {# Spring: balanced average #}\n  {{ ((heat_val | float(0)) + (cool_val | float(0))) / 2 }}\n{% elif season == 'summer' %}\n  {% set heat_val = learned_heat_day_summer_sys
     if time == 'day' else learned_heat_night_summer_sys %}\n  {% set cool_val = learned_cool_day_summer_sys
-    if time == 'day' else learned_cool_night_summer_sys %}\n{% else %}\n  {% set heat_val
+    if time == 'day' else learned_cool_night_summer_sys %}\n  {# Summer: use cooling preference (15/85 weight) #}\n  {{ (0.15 * (heat_val | float(0)) + 0.85 * (cool_val | float(0))) | round(2) }}\n{% else %}\n  {% set heat_val
     = learned_heat_day_autumn_sys if time == 'day' else learned_heat_night_autumn_sys
     %}\n  {% set cool_val = learned_cool_day_autumn_sys if time == 'day' else learned_cool_night_autumn_sys
-    %}\n{% endif %} {{ ((heat_val | float(0)) + (cool_val | float(0))) / 2 }}\n"
+    %}\n  {# Autumn: slight heating bias (60/40 weight) #}\n  {{ (0.6 * (heat_val | float(0)) + 0.4 * (cool_val | float(0))) | round(2) }}\n{% endif %}\n"
   learned_offset_c: '{{ (learned_offset_sys * 5/9) if is_imperial else learned_offset_sys
     }}'
   manual_override_until_id: '{% set raw = _raw_manual_override_until %} {% set e =
